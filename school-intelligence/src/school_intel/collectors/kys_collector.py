@@ -247,3 +247,20 @@ class KysCollector:
                 )
             )
         return requests
+
+    def fetch_identity_reference(
+        self, school_id: str
+    ) -> tuple[AcademicYearMapping, list[AcademicYearMapping], SourceFetchResult, SourceFetchResult]:
+        """Fetch authoritative identity payloads from the latest discovered academic year."""
+        years = self.discover_academic_years(school_id)
+        if not years:
+            raise ValueError(f"No academic years discovered for KYS school {school_id}")
+
+        latest = max(years, key=lambda mapping: mapping.year_id)
+        report = self.fetch_report_card(school_id, latest.year_id)
+        profile = self.fetch_profile(school_id, latest.year_id)
+        if not self.is_api_success(report.raw_payload, report.http_status or 0):
+            raise ValueError(f"KYS report-card unavailable for school {school_id} year {latest.academic_year}")
+        if not self.is_api_success(profile.raw_payload, profile.http_status or 0):
+            raise ValueError(f"KYS profile unavailable for school {school_id} year {latest.academic_year}")
+        return latest, years, report, profile

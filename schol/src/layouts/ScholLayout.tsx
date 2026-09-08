@@ -1,6 +1,5 @@
 import { NavLink, Outlet } from 'react-router-dom'
 import {
-  Building2,
   LayoutDashboard,
   Map,
   Search,
@@ -10,10 +9,10 @@ import {
 import clsx from 'clsx'
 
 const nav = [
-  { to: '/', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/schools', label: 'School Directory', icon: School },
-  { to: '/schools', label: 'School Profile', icon: Building2, disabled: true },
-  { to: '/schools', label: 'CRM', icon: Users, disabled: true },
+  { to: '/collection/new', label: 'Collect Schools', icon: Map },
+  { to: '/admin/collection-runs', label: 'Collection Runs', icon: LayoutDashboard },
+  { to: '/admin/identity-review', label: 'Identity Review', icon: Users },
 ]
 
 export function ScholLayout() {
@@ -36,10 +35,7 @@ export function ScholLayout() {
                 className={({ isActive }) =>
                   clsx(
                     'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium',
-                    item.disabled && 'pointer-events-none opacity-40',
-                    isActive && !item.disabled
-                      ? 'bg-primary-50 text-primary-700'
-                      : 'text-slate-600 hover:bg-slate-100',
+                    isActive ? 'bg-primary-50 text-primary-700' : 'text-slate-600 hover:bg-slate-100',
                   )
                 }
               >

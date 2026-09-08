@@ -3,8 +3,8 @@ from __future__ import annotations
 from typing import Any
 
 from school_intel.domain.enums import DataSource, ValidationStatus
-from school_intel.domain.schemas import EnrollmentNormalized, StudentDistributionNormalized
-from school_intel.utils.text import coerce_optional_int, first_present
+from school_intel.domain.schemas import EnrollmentNormalized, KysSchoolIdentity, StudentDistributionNormalized
+from school_intel.utils.text import coerce_optional_int, first_present, normalize_identifier, title_case_location
 
 
 class KysParser:
@@ -179,3 +179,57 @@ class KysParser:
 
     def parse_facilities(self, payload: dict[str, Any]) -> dict[str, Any]:
         return self._api_data(payload)
+
+    def parse_school_identity(
+        self,
+        report_card_payload: dict[str, Any],
+        profile_payload: dict[str, Any] | None = None,
+        *,
+        kys_school_id: str | None = None,
+        state_school_code: str | None = None,
+        academic_year: str | None = None,
+        year_id: int | None = None,
+    ) -> KysSchoolIdentity:
+        report = self._api_data(report_card_payload)
+        profile = self._api_data(profile_payload or {})
+
+        canonical_name = first_present(report, "schoolName", "schName")
+        if canonical_name is not None:
+            canonical_name = str(canonical_name).strip() or None
+
+        district = title_case_location(first_present(report, "districtName", "district"))
+        state = title_case_location(first_present(report, "stateName", "state"))
+        pin_raw = first_present(report, "pincode", "pinCode", "pin_code")
+        pin_code = normalize_identifier(str(pin_raw)) if pin_raw not in (None, "") else None
+
+        address_line = first_present(profile, "address", "schAddress")
+        if address_line is not None:
+            address_line = str(address_line).strip() or None
+
+        udise_raw = first_present(report, "udiseschCode", "udiseCode", "udiseSchCode", "udise")
+        udise = normalize_identifier(str(udise_raw)) if udise_raw not in (None, "") else None
+
+        return KysSchoolIdentity(
+            canonical_name=canonical_name,
+            district=district,
+            state=state,
+            pin_code=pin_code,
+            address_line=address_line,
+            udise=udise,
+            kys_school_id=kys_school_id,
+            state_school_code=state_school_code,
+            academic_year=academic_year or (str(report.get("yearDesc")).strip() if report.get("yearDesc") else None),
+            year_id=year_id,
+            provenance={
+                "source": DataSource.KYS.value,
+                "endpoints": ["report-card", "profile"],
+                "fields": {
+                    "schoolName": report.get("schoolName"),
+                    "districtName": report.get("districtName"),
+                    "stateName": report.get("stateName"),
+                    "pincode": report.get("pincode"),
+                    "udiseschCode": report.get("udiseschCode"),
+                    "address": profile.get("address"),
+                },
+            },
+        )

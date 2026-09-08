@@ -1,10 +1,11 @@
 import axios from 'axios'
 import type { DirectoryItem, SchoolProfile, YearDetail } from '@/types/profile'
+import type { DatabaseConfig, SetupStatus } from '@/types/setup'
 
 const api = axios.create({
   baseURL: '/api',
   headers: {
-    'x-schol-role': localStorage.getItem('schol_role') || 'viewer',
+    'x-schol-role': localStorage.getItem('schol_role') || 'analyst',
   },
 })
 
@@ -39,5 +40,59 @@ export async function fetchSchoolDirectory(params: {
     '/schools',
     { params },
   )
+  return data
+}
+
+export async function fetchSetupStatus(): Promise<SetupStatus> {
+  const { data } = await api.get<SetupStatus>('/setup/status')
+  return data
+}
+
+export async function testDatabaseConnection(config: DatabaseConfig) {
+  const { data } = await api.post<{ ok: boolean; message: string; database_url_masked: string }>(
+    '/setup/test-connection',
+    config,
+  )
+  return data
+}
+
+export async function configureAndMigrate(config: DatabaseConfig) {
+  const { data } = await api.post<{
+    saved: boolean
+    migration: { ok: boolean; message: string }
+    status: SetupStatus
+  }>('/setup/configure-and-migrate', config)
+  return data
+}
+
+export async function resetDatabasePassword(config: DatabaseConfig) {
+  const { data } = await api.post<{
+    ok: boolean
+    message: string
+    status: SetupStatus
+  }>('/setup/reset-password', config)
+  return data
+}
+
+export async function collectSampleSchool() {
+  const { data } = await api.post<{
+    collection: { ok: boolean; school_name: string; overall_status: string }
+    status: SetupStatus
+  }>('/setup/collect-sample')
+  return data
+}
+
+export async function verifyKysMapping(schoolId: string, kysSchoolId: string) {
+  const { data } = await api.post(`/kys-mapping/schools/${schoolId}/verify`, {
+    kys_school_id: kysSchoolId,
+  })
+  return data
+}
+
+export async function confirmKysMapping(schoolId: string, kysSchoolId: string, udise?: string) {
+  const { data } = await api.post(`/kys-mapping/schools/${schoolId}/confirm`, {
+    kys_school_id: kysSchoolId,
+    udise,
+  })
   return data
 }

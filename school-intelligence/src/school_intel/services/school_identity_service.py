@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from uuid import UUID
 
@@ -17,6 +18,7 @@ from school_intel.domain.enums import (
 from school_intel.domain.schemas import (
     IdentityMatchCandidate,
     IdentityResolutionResult,
+    KysSchoolIdentity,
     SchoolIdentifierInput,
 )
 from school_intel.repositories.saras_repository import MatchCandidateRepository
@@ -123,6 +125,26 @@ class SchoolIdentityService:
             candidates=[],
             requires_manual_review=False,
         )
+
+    def preview_match(self, payload: IdentityLookupInput) -> IdentityResolutionResult:
+        """Read-only identity resolution for collection preview (no DB writes)."""
+        ranked = self._rank_matches(payload)
+        if ranked:
+            best = ranked[0]
+            if best.auto_merge_allowed:
+                return IdentityResolutionResult(
+                    school_id=best.school_id,
+                    created=False,
+                    candidates=[self._to_candidate(best)],
+                    requires_manual_review=False,
+                )
+            return IdentityResolutionResult(
+                school_id=None,
+                created=False,
+                candidates=[self._to_candidate(m) for m in ranked],
+                requires_manual_review=True,
+            )
+        return IdentityResolutionResult(school_id=None, created=False, candidates=[], requires_manual_review=False)
 
     def match_by_udise(self, udise: str) -> IdentityResolutionResult:
         return self.resolve(
@@ -281,6 +303,96 @@ class SchoolIdentityService:
 
     def attach_identifiers(self, school_id: UUID, identifiers: list[SchoolIdentifierInput]) -> None:
         self._attach_identifiers(school_id, identifiers)
+
+    @staticmethod
+    def is_placeholder_canonical_name(name: str | None) -> bool:
+        if not name:
+            return True
+        return bool(re.fullmatch(r"UDISE\s+\d+", name.strip(), flags=re.IGNORECASE))
+
+    def enrich_school_identity(
+        self,
+        school_id: UUID,
+        identity: KysSchoolIdentity | IdentityLookupInput,
+    ) -> bool:
+        school = self.repo.get_by_id(school_id)
+        if not school:
+            return False
+
+        canonical_name = identity.canonical_name if hasattr(identity, "canonical_name") else None
+        district = identity.district if hasattr(identity, "district") else None
+        state = identity.state if hasattr(identity, "state") else None
+        pin_code = identity.pin_code if hasattr(identity, "pin_code") else None
+        address_line = identity.address_line if hasattr(identity, "address_line") else None
+
+        updated = False
+        placeholder = self.is_placeholder_canonical_name(school.canonical_name)
+
+        if canonical_name and (placeholder or not (school.canonical_name or "").strip()):
+            school.canonical_name = canonical_name.strip()
+            school.normalized_name = normalize_school_name(canonical_name)
+            updated = True
+
+        if district and (placeholder or not (school.district or "").strip()):
+            school.district = district.strip()
+            updated = True
+        if state and (placeholder or not (school.state or "").strip()):
+            school.state = state.strip()
+            updated = True
+        if pin_code and (placeholder or not (school.pin_code or "").strip()):
+            school.pin_code = normalize_identifier(pin_code)
+            updated = True
+        if address_line and (placeholder or not (school.address_line or "").strip()):
+            school.address_line = address_line.strip()
+            updated = True
+
+        if updated:
+            self.session.flush()
+        return updated
+
+    def build_lookup_from_kys_identity(
+        self,
+        identity: KysSchoolIdentity,
+        *,
+        udise: str,
+        kys_school_id: str,
+        state_school_code: str | None = None,
+    ) -> IdentityLookupInput:
+        identifiers = [
+            SchoolIdentifierInput(
+                identifier_type=IdentifierType.UDISE,
+                identifier_value=identity.udise or udise,
+                source=DataSource.KYS,
+                is_verified=True,
+            ),
+            SchoolIdentifierInput(
+                identifier_type=IdentifierType.KYS_SCHOOL_ID,
+                identifier_value=kys_school_id,
+                source=DataSource.KYS,
+                is_verified=True,
+            ),
+        ]
+        if state_school_code:
+            identifiers.append(
+                SchoolIdentifierInput(
+                    identifier_type=IdentifierType.STATE_SCHOOL_CODE,
+                    identifier_value=state_school_code,
+                    source=DataSource.KYS,
+                    is_verified=True,
+                )
+            )
+
+        canonical_name = identity.canonical_name or f"UDISE {udise}"
+        return IdentityLookupInput(
+            canonical_name=canonical_name,
+            district=identity.district,
+            state=identity.state,
+            pin_code=identity.pin_code,
+            address_line=identity.address_line,
+            identifiers=identifiers,
+            source=DataSource.KYS,
+            source_payload=identity.provenance,
+        )
 
     def _attach_identifiers(self, school_id: UUID, identifiers: list[SchoolIdentifierInput]) -> None:
         for identifier in identifiers:

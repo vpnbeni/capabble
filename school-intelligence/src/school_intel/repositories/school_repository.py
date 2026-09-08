@@ -32,6 +32,7 @@ class SchoolRepository:
             select(School)
             .where(School.id == school_id)
             .options(selectinload(School.identifiers))
+            .execution_options(populate_existing=True)
         )
         return self.session.scalar(stmt)
 
@@ -99,6 +100,60 @@ class SchoolRepository:
         self.session.add(identifier)
         self.session.flush()
         return identifier
+
+    def get_school_identifier(self, school_id: UUID, identifier_type: str) -> SchoolIdentifier | None:
+        stmt = select(SchoolIdentifier).where(
+            SchoolIdentifier.school_id == school_id,
+            SchoolIdentifier.identifier_type == identifier_type,
+        )
+        return self.session.scalar(stmt)
+
+    def ensure_verified_identifier(
+        self,
+        school_id: UUID,
+        identifier_type: str,
+        identifier_value: str,
+        source: str,
+        source_record_id: UUID | None = None,
+    ) -> SchoolIdentifier:
+        """Idempotent verified identifier upsert; never downgrades or reassigns."""
+        value = normalize_identifier(identifier_value)
+        existing = self.find_identifier(identifier_type, value)
+        if existing:
+            if existing.school_id != school_id:
+                raise ValueError(
+                    f"{identifier_type} {value} already belongs to school {existing.school_id}"
+                )
+            if not existing.is_verified:
+                existing.is_verified = True
+                existing.verified_at = datetime.now(timezone.utc)
+                existing.source = source
+                if source_record_id:
+                    existing.source_record_id = source_record_id
+                self.session.flush()
+            return existing
+
+        on_school = self.get_school_identifier(school_id, identifier_type)
+        if on_school:
+            if on_school.is_verified and on_school.identifier_value != value:
+                raise ValueError(
+                    f"Verified {identifier_type} already set for school {school_id}"
+                )
+            if on_school.identifier_value == value:
+                if not on_school.is_verified:
+                    on_school.is_verified = True
+                    on_school.verified_at = datetime.now(timezone.utc)
+                    self.session.flush()
+                return on_school
+
+        return self.upsert_identifier(
+            school_id,
+            identifier_type,
+            value,
+            source,
+            source_record_id=source_record_id,
+            is_verified=True,
+        )
 
     def upsert_enrollment(
         self,

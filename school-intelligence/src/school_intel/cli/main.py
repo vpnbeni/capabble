@@ -7,7 +7,7 @@ from sqlalchemy import select
 
 from school_intel.db.models import School, SchoolEnrollment, SchoolIdentifier, SchoolStudentDistribution
 from school_intel.db.session import session_scope
-from school_intel.domain.enums import ValidationStatus
+from school_intel.domain.enums import CollectionOutcomeStatus, DataQualityStatus
 from school_intel.services.collection_service import KysCollectionService
 from school_intel.services.validation_service import ValidationService
 
@@ -22,6 +22,10 @@ def migrate() -> None:
     raise typer.Exit(code=run_migrate())
 
 
+def _status_label(status: str) -> str:
+    return status.replace("_", " ").upper()
+
+
 def _print_collection_summary(summary, verbose: bool = False) -> None:
     typer.echo(f"School: {summary.canonical_name}")
     if summary.udise:
@@ -33,32 +37,69 @@ def _print_collection_summary(summary, verbose: bool = False) -> None:
     for year in summary.years:
         ok = year.success_count
         total = year.total_count
-        mark = "✓" if ok == total and total > 0 else "✗" if ok == 0 else "△"
-        typer.echo(f"{year.academic_year}  {mark} {ok}/{total}")
+        skipped = sum(1 for ep in year.endpoints if ep.status == "skipped")
+        satisfied = ok + skipped
+        mark = "OK" if satisfied == total and total > 0 else "FAIL" if satisfied == 0 else "PARTIAL"
+        typer.echo(f"{year.academic_year}  {mark} {satisfied}/{total}")
         if verbose:
             for ep in year.endpoints:
                 typer.echo(f"  {ep.endpoint}: {ep.status}" + (f" ({ep.error})" if ep.error else ""))
 
     typer.echo("")
-    typer.echo("Validation:")
+    typer.echo("Collection:")
+    typer.echo(f"  Status: {_status_label(summary.collection_status)}")
+    typer.echo("")
+    typer.echo("Identity:")
+    typer.echo(f"  Status: {_status_label(summary.identity_status)}")
+    typer.echo("")
+    typer.echo("Data Quality:")
+    typer.echo(f"  Status: {_status_label(summary.data_quality_status)}")
+    issue_count = summary.data_quality_issue_count or len(summary.validation_warnings)
+    if issue_count:
+        typer.echo(f"  Issues: {issue_count}")
+
+    typer.echo("")
     typer.echo("Enrollment:")
     for year_label, total in summary.enrollment_checks.items():
         typer.echo(f"  {year_label} = {total}")
 
-    flag3_warnings = [w for w in summary.validation_warnings if "flag=3" in w]
+    flag3_warnings = [w for w in summary.validation_warnings if "getSocialData:3" in w]
     if flag3_warnings:
         typer.echo("")
         typer.echo("Flag 3:")
         for warning in flag3_warnings:
-            typer.echo(f"  {warning} ⚠")
+            typer.echo(f"  {warning} (warning)")
 
     typer.echo("")
-    if summary.overall_status == "complete":
-        typer.echo("Overall: COLLECTION COMPLETE")
+    collection_complete = summary.collection_status == CollectionOutcomeStatus.COMPLETE.value
+    data_quality_warning = summary.data_quality_status == DataQualityStatus.WARNING.value
+    if collection_complete and data_quality_warning:
+        typer.echo("Result: COMPLETE WITH WARNING")
+    elif collection_complete:
+        typer.echo("Result: COMPLETE")
+    elif summary.collection_status == CollectionOutcomeStatus.PARTIAL.value:
+        typer.echo("Result: PARTIAL")
     else:
-        typer.echo(f"Overall: {summary.overall_status.upper()}")
-    if summary.validation_warnings:
-        typer.echo(f"DATA QUALITY WARNINGS: {len(summary.validation_warnings)}")
+        typer.echo(f"Result: {_status_label(summary.collection_status)}")
+
+
+def _print_validation_report(report) -> None:
+    typer.echo("Collection:")
+    collection_status = report.collection_status.value if report.collection_status else "unknown"
+    typer.echo(f"  Status: {_status_label(collection_status)}")
+    typer.echo("")
+    typer.echo("Identity:")
+    typer.echo(f"  Status: {_status_label(report.identity_status.value)}")
+    typer.echo("")
+    typer.echo("Data Quality:")
+    typer.echo(f"  Status: {_status_label(report.data_quality_status.value)}")
+    if report.issues:
+        typer.echo(f"  Issues: {len(report.issues)}")
+        for issue in report.issues:
+            suffix = " (warning)" if issue.severity == "warning" else ""
+            typer.echo(f"    - {issue.message}{suffix}")
+    typer.echo("")
+    typer.echo(f"Legacy validation_status: {report.validation_status.value}")
 
 
 @app.command("show-school")
@@ -107,7 +148,7 @@ def validate_school(school_id: str = typer.Option(..., "--school-id")) -> None:
 
     with session_scope() as session:
         report = ValidationService().validate_school(session, UUID(school_id))
-        typer.echo(report.model_dump_json(indent=2))
+        _print_validation_report(report)
 
 
 @app.command("collect-school")
@@ -233,6 +274,84 @@ def match_school(udise: str = typer.Option(..., "--udise")) -> None:
                 indent=2,
             )
         )
+
+
+@app.command("kys-map-test")
+def kys_map_test(
+    run_id: str = typer.Option(..., "--run-id"),
+    enrich_saras: bool = typer.Option(False, "--enrich-saras", help="Fetch and persist full SARAS payloads first"),
+    persist: bool = typer.Option(False, "--persist", help="Persist auto-mapped high-confidence results"),
+) -> None:
+    """Run KYS mapping resolver for all schools in a collection run."""
+    from uuid import UUID
+
+    from school_intel.collectors.kys_search_client import KysSearchClient
+    from school_intel.repositories.batch_collection_repository import BatchCollectionRepository
+    from school_intel.services.kys_mapping_resolver import KysMappingResolver
+    from school_intel.services.saras_enrichment_service import SarasEnrichmentService
+
+    parsed_run_id = UUID(run_id)
+    with session_scope() as session:
+        if enrich_saras:
+            enricher = SarasEnrichmentService(session)
+            try:
+                enricher.enrich_run(parsed_run_id, live_fetch=True)
+                session.commit()
+            finally:
+                enricher.close()
+
+        batch_repo = BatchCollectionRepository(session)
+        items = batch_repo.list_run_schools(parsed_run_id)
+        search = KysSearchClient()
+        availability = search.availability()
+        search.close()
+
+        typer.echo(f"KYS programmatic search: {'available' if availability.programmatic_search_available else 'unavailable'}")
+        typer.echo(availability.reason)
+        typer.echo("")
+        typer.echo("School | CBSE | SARAS | Status | KYS ID | UDISE | Confidence | Method | Candidates | Reason")
+        typer.echo("-" * 120)
+
+        resolver = KysMappingResolver(session)
+        try:
+            for item in items:
+                if not item.school_id:
+                    typer.echo(
+                        f"{item.school_name} | {item.affiliation_number} | {item.school_code or '-'} | "
+                        "NO_IDENTITY | - | - | - | - | 0 | Canonical school missing"
+                    )
+                    continue
+                result = resolver.resolve(item.school_id, persist=persist)
+                saras_code = (item.saras_row or {}).get("saras_school_code") or item.school_code or "-"
+                typer.echo(
+                    f"{item.school_name} | {item.affiliation_number} | {saras_code} | "
+                    f"{result.status.value} | {result.kys_school_id or '-'} | {result.udise or '-'} | "
+                    f"{result.confidence.value if result.confidence else '-'} | "
+                    f"{result.method.value if result.method else '-'} | {result.candidate_count} | {result.reason}"
+                )
+            if persist:
+                session.commit()
+        finally:
+            resolver.close()
+
+
+@app.command("saras-enrich-run")
+def saras_enrich_run(
+    run_id: str = typer.Option(..., "--run-id"),
+) -> None:
+    """Persist full SARAS directory/detail payloads for schools in a collection run."""
+    from uuid import UUID
+
+    from school_intel.services.saras_enrichment_service import SarasEnrichmentService
+
+    with session_scope() as session:
+        service = SarasEnrichmentService(session)
+        try:
+            report = service.enrich_run(UUID(run_id), live_fetch=True)
+            session.commit()
+            typer.echo(json.dumps(report, indent=2))
+        finally:
+            service.close()
 
 
 @app.command("match-review")

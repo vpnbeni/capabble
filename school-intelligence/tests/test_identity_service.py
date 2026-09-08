@@ -1,6 +1,7 @@
 import pytest
 from school_intel.domain.enums import DataSource, IdentifierType
 from school_intel.domain.schemas import SchoolIdentifierInput
+from school_intel.repositories.school_repository import SchoolRepository
 from school_intel.services.school_identity_service import IdentityLookupInput, SchoolIdentityService
 
 
@@ -62,3 +63,25 @@ def test_identity_low_confidence_requires_review(pg_session) -> None:
     )
     assert created.school_id is not None
     assert ambiguous.requires_manual_review in {True, False}
+
+
+def test_enrich_placeholder_updates_blank_fields(pg_session) -> None:
+    from school_intel.domain.schemas import KysSchoolIdentity
+
+    repo = SchoolRepository(pg_session)
+    school = repo.create_school(canonical_name="UDISE 06140404094")
+    service = SchoolIdentityService(pg_session)
+    updated = service.enrich_school_identity(
+        school.id,
+        KysSchoolIdentity(
+            canonical_name="HIMALYAN PUBLIC SCHOOL, ROHTAK",
+            district="Rohtak",
+            state="Haryana",
+            pin_code="124001",
+            address_line="Some Address",
+        ),
+    )
+    assert updated is True
+    refreshed = repo.get_by_id(school.id)
+    assert refreshed.canonical_name == "HIMALYAN PUBLIC SCHOOL, ROHTAK"
+    assert refreshed.district == "Rohtak"

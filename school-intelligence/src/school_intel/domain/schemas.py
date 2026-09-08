@@ -7,10 +7,13 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 from school_intel.domain.enums import (
+    CollectionOutcomeStatus,
     CollectionRunStatus,
     CollectionRunType,
+    DataQualityStatus,
     DataSource,
     IdentityMatchConfidence,
+    IdentityStatus,
     IdentifierType,
     ValidationStatus,
 )
@@ -86,6 +89,20 @@ class EnrollmentNormalized(BaseModel):
     provenance: dict[str, Any] = Field(default_factory=dict)
 
 
+class KysSchoolIdentity(BaseModel):
+    canonical_name: str | None = None
+    district: str | None = None
+    state: str | None = None
+    pin_code: str | None = None
+    address_line: str | None = None
+    udise: str | None = None
+    kys_school_id: str | None = None
+    state_school_code: str | None = None
+    academic_year: str | None = None
+    year_id: int | None = None
+    provenance: dict[str, Any] = Field(default_factory=dict)
+
+
 class StudentDistributionNormalized(BaseModel):
     academic_year: str
     distribution_type: str
@@ -137,4 +154,7 @@ class SarasQualityReport(BaseModel):
 class SchoolValidationReport(BaseModel):
     school_id: UUID
     validation_status: ValidationStatus
+    collection_status: CollectionOutcomeStatus | None = None
+    identity_status: IdentityStatus = IdentityStatus.UNVERIFIED
+    data_quality_status: DataQualityStatus = DataQualityStatus.CLEAN
     issues: list[ValidationIssue] = Field(default_factory=list)

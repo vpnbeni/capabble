@@ -94,6 +94,49 @@ class CollectionRun(Base):
     )
 
     source_records: Mapped[list[SourceRecord]] = relationship(back_populates="collection_run")
+    school_items: Mapped[list["CollectionRunSchool"]] = relationship(back_populates="collection_run")
+
+
+class CollectionRunSchool(Base):
+    __tablename__ = "collection_run_schools"
+    __table_args__ = (
+        Index("ix_collection_run_schools_run_status", "collection_run_id", "collection_status"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    collection_run_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("collection_runs.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    position: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    affiliation_number: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
+    school_name: Mapped[str] = mapped_column(String(500), nullable=False)
+    school_code: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    district: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    state: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    saras_row: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    school_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("schools.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    planned_action: Mapped[str] = mapped_column(String(40), nullable=False, default="new")
+    identity_status: Mapped[str] = mapped_column(String(40), nullable=False, default="new")
+    kys_mapping_status: Mapped[str] = mapped_column(String(40), nullable=False, default="pending")
+    collection_status: Mapped[str] = mapped_column(String(40), nullable=False, default="discovered")
+    validation_status: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    current_year: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    current_operation: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    years_total: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    years_complete: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    year_progress: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    error_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    warning_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+    collection_run: Mapped[CollectionRun] = relationship(back_populates="school_items")
 
 
 class SourceRecord(Base):
@@ -438,6 +481,34 @@ class MatchCandidate(Base):
     mismatch_fields: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     requires_manual_review: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     decision_status: Mapped[str] = mapped_column(String(40), nullable=False, default="pending", index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
+class KysMappingCandidate(Base):
+    """KYS source-mapping candidate evidence (not canonical identity match)."""
+
+    __tablename__ = "kys_mapping_candidates"
+    __table_args__ = (
+        Index("ix_kys_mapping_candidates_school_status", "school_id", "decision_status"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    school_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("schools.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    kys_school_id: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    udise: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    matching_method: Mapped[str] = mapped_column(String(60), nullable=False)
+    confidence_score: Mapped[float] = mapped_column(Float, nullable=False)
+    confidence_label: Mapped[str] = mapped_column(String(20), nullable=False)
+    candidate_payload: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    matched_fields: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    mismatch_fields: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    decision_status: Mapped[str] = mapped_column(String(40), nullable=False, default="pending", index=True)
+    provenance: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False

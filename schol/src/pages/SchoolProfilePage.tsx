@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useParams, useSearchParams } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { fetchRawSources, fetchSchoolProfile } from '@/services/api'
+import { KysMappingPanel } from '@/components/profile/KysMappingPanel'
 import { ProfileHeaderCard } from '@/components/profile/ProfileHeaderCard'
 import { ProfileNav } from '@/components/profile/ProfileNav'
 import { ExpandableSection } from '@/components/profile/ExpandableSection'
@@ -20,7 +21,7 @@ import {
 } from '@/components/profile/ProfileSections'
 import { useAuth } from '@/context/AuthContext'
 
-const YEARS = ['2025-26', '2024-25', '2023-24', '2022-23', '2021-22', '2020-21', '2019-20']
+const YEARS = ['2025-26', '2024-25', '2023-24', '2022-23', '2021-22', '2020-21', '2019-20', '2018-19']
 
 const DEFAULT_EXPANDED = new Set(['overview', 'enrollment'])
 
@@ -113,7 +114,27 @@ export function SchoolProfilePage() {
         onViewRaw={handleViewRaw}
       />
 
+      {data.kys_mapping && (
+        <KysMappingPanel
+          schoolId={schoolId}
+          mapping={data.kys_mapping}
+          onUpdated={() => refetch()}
+        />
+      )}
+
       <DataQualityPanel issues={data.data_quality} />
+
+      {data.validation && (
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <h3 className="font-semibold text-slate-900">Validation status</h3>
+          <div className="mt-3 grid gap-2 text-sm sm:grid-cols-3">
+            <div>Collection: <span className="font-medium uppercase">{data.validation.collection_status || 'unknown'}</span></div>
+            <div>Identity: <span className="font-medium uppercase">{data.validation.identity_status || 'unknown'}</span></div>
+            <div>Data Quality: <span className="font-medium uppercase">{data.validation.data_quality_status || 'unknown'}</span></div>
+          </div>
+        </div>
+      )}
+
       <ProfileNav active="overview" />
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
@@ -144,7 +165,11 @@ export function SchoolProfilePage() {
             expanded={expanded.has('students')}
             onToggle={() => toggleSection('students')}
           >
-            <StudentsSection selectedYear={selectedYear} enrollmentRow={enrollmentRow} />
+            {data.kys_mapping?.has_kys_collection ? (
+              <StudentsSection selectedYear={selectedYear} enrollmentRow={enrollmentRow} />
+            ) : (
+              <p className="text-sm text-slate-500">Student demographics appear after verified KYS collection.</p>
+            )}
           </ExpandableSection>
 
           <ExpandableSection
@@ -153,7 +178,11 @@ export function SchoolProfilePage() {
             expanded={expanded.has('staff')}
             onToggle={() => toggleSection('staff')}
           >
-            <StaffSection staff={data.staff} />
+            {data.kys_mapping?.has_kys_collection ? (
+              <StaffSection staff={data.staff} />
+            ) : (
+              <p className="text-sm text-slate-500">Staff intelligence appears after verified KYS collection.</p>
+            )}
           </ExpandableSection>
 
           <ExpandableSection

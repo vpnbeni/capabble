@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from school_intel.db.models import School, SchoolEnrollment, SchoolIdentifier, SchoolTeacherYear
 from school_intel.domain.enums import DataSource, IdentifierType
+from school_intel.services.kys_mapping_resolver import build_kys_mapping_summary
 from school_intel.services.profile_metrics import compute_enrollment_trends, students_per_teacher
 
 ACADEMIC_YEAR_ORDER = [
@@ -77,31 +78,43 @@ class DirectoryService:
 
     def _directory_item(self, school: School) -> dict:
         identifiers = {i.identifier_type: i.identifier_value for i in school.identifiers}
+        kys_summary = build_kys_mapping_summary(school, identifiers)
+        has_kys = kys_summary["status"] == "connected"
+        dq = school.data_quality or {}
+        collection_state = dq.get("collection_status")
+        if not has_kys:
+            collection_state = "kys_pending"
         latest_year = "2025-26"
-        enrollment = self.session.scalar(
-            select(SchoolEnrollment).where(
-                SchoolEnrollment.school_id == school.id,
-                SchoolEnrollment.academic_year == latest_year,
-                SchoolEnrollment.source == DataSource.KYS.value,
-            )
-        )
-        teachers = self.session.scalar(
-            select(SchoolTeacherYear).where(
-                SchoolTeacherYear.school_id == school.id,
-                SchoolTeacherYear.academic_year == latest_year,
-                SchoolTeacherYear.source == DataSource.KYS.value,
-            )
-        )
-        enrollments = list(
-            self.session.scalars(
+        enrollment = None
+        teachers = None
+        if has_kys:
+            enrollment = self.session.scalar(
                 select(SchoolEnrollment).where(
                     SchoolEnrollment.school_id == school.id,
+                    SchoolEnrollment.academic_year == latest_year,
                     SchoolEnrollment.source == DataSource.KYS.value,
                 )
-            ).all()
-        )
-        series = [(y, next((e.total_enrollment for e in enrollments if e.academic_year == y), None)) for y in ACADEMIC_YEAR_ORDER]
-        trend = compute_enrollment_trends(series)
+            )
+            teachers = self.session.scalar(
+                select(SchoolTeacherYear).where(
+                    SchoolTeacherYear.school_id == school.id,
+                    SchoolTeacherYear.academic_year == latest_year,
+                    SchoolTeacherYear.source == DataSource.KYS.value,
+                )
+            )
+        enrollments = []
+        trend = None
+        if has_kys:
+            enrollments = list(
+                self.session.scalars(
+                    select(SchoolEnrollment).where(
+                        SchoolEnrollment.school_id == school.id,
+                        SchoolEnrollment.source == DataSource.KYS.value,
+                    )
+                ).all()
+            )
+            series = [(y, next((e.total_enrollment for e in enrollments if e.academic_year == y), None)) for y in ACADEMIC_YEAR_ORDER]
+            trend = compute_enrollment_trends(series)
 
         return {
             "id": str(school.id),
@@ -109,8 +122,13 @@ class DirectoryService:
             "location": ", ".join(p for p in [school.district, school.state] if p),
             "udise": identifiers.get(IdentifierType.UDISE.value),
             "state_school_code": identifiers.get(IdentifierType.STATE_SCHOOL_CODE.value),
+            "saras_school_code": identifiers.get(IdentifierType.SARAS_SCHOOL_CODE.value),
             "students": enrollment.total_enrollment if enrollment else None,
             "teachers": teachers.teacher_count if teachers else None,
-            "enrollment_change_pct": trend.percentage_change,
-            "consecutive_declines": trend.consecutive_declines,
+            "enrollment_change_pct": trend.percentage_change if trend else None,
+            "consecutive_declines": trend.consecutive_declines if trend else None,
+            "collection_state": collection_state,
+            "kys_enriched": has_kys,
+            "kys_mapping_status": kys_summary["status"],
+            "kys_mapping_label": kys_summary["label"],
         }

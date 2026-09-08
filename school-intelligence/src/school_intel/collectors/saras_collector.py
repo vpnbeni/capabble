@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 import random
 import re
@@ -16,6 +17,7 @@ from school_intel.collectors.saras_endpoints import (
     SARAS_BASE_URL,
     SARAS_DETAIL_PATH,
     SARAS_DIRECTORY_PATH,
+    SARAS_DISTRICT_BIND_PATH,
 )
 from school_intel.config import get_settings
 from school_intel.domain.enums import SarasSearchMode
@@ -105,6 +107,88 @@ class SarasCollector:
             **self._form_tokens,
             "RegiAffNo": "0",
         }
+
+    def fetch_district_directory(self, state_id: str, district_id: str) -> SarasFetchResult:
+        url = f"{SARAS_BASE_URL}{SARAS_DIRECTORY_PATH}"
+        data = {
+            **self._base_form_data(),
+            "MainRadioValue": SarasSearchMode.STATE_WISE.value,
+            "State": state_id,
+            "District": district_id,
+        }
+        response = self._request("POST", url, data=data)
+        raw = {"html": response.text, "request": data, "url": url}
+        return SarasFetchResult(
+            html=response.text,
+            http_status=response.status_code,
+            url=url,
+            request_params=data,
+            fetched_at=datetime.now(timezone.utc),
+            payload_checksum=payload_checksum(raw),
+        )
+
+    def fetch_state_options(self) -> list[dict[str, str]]:
+        url = f"{SARAS_BASE_URL}{SARAS_DIRECTORY_PATH}"
+        response = self._request("GET", url)
+        if response.status_code != 200:
+            raise RuntimeError(f"SARAS form fetch failed: HTTP {response.status_code}")
+        soup = BeautifulSoup(response.text, "html.parser")
+        select = soup.find("select", {"id": "State"}) or soup.find("select", {"name": "State"})
+        if not select:
+            return [{"id": state_id, "name": state_id} for state_id in KNOWN_STATE_IDS]
+        options = []
+        for option in select.find_all("option"):
+            value = (option.get("value") or "").strip()
+            label = option.get_text(" ", strip=True)
+            if value and label and label.lower() not in {"select", "select state"}:
+                options.append({"id": value, "name": label})
+        return options
+
+    def fetch_district_options(self, state_id: str) -> list[dict[str, str]]:
+        # SARAS binds districts via AJAX after loading the directory page.
+        self.refresh_form_tokens()
+        url = f"{SARAS_BASE_URL}{SARAS_DISTRICT_BIND_PATH}"
+        directory_url = f"{SARAS_BASE_URL}{SARAS_DIRECTORY_PATH}"
+        response = self._request(
+            "GET",
+            url,
+            params={"state_id": state_id},
+            headers={
+                "Accept": "application/json, text/javascript, */*; q=0.01",
+                "X-Requested-With": "XMLHttpRequest",
+                "Referer": directory_url,
+            },
+        )
+        if response.status_code != 200:
+            raise RuntimeError(f"SARAS district bind failed: HTTP {response.status_code}")
+        return self._parse_district_options(response.text)
+
+    def _parse_district_options(self, payload: str) -> list[dict[str, str]]:
+        text = payload.strip()
+        if text.startswith("["):
+            items = json.loads(text)
+            options: list[dict[str, str]] = []
+            for item in items:
+                value = str(item.get("value", "")).strip()
+                label = str(item.get("text", "")).strip()
+                if not value or value == "0":
+                    continue
+                if label.lower() in {"select", "select district", "--select--"}:
+                    continue
+                options.append({"id": value, "name": label})
+            return options
+
+        soup = BeautifulSoup(payload, "html.parser")
+        options = []
+        for option in soup.find_all("option"):
+            value = (option.get("value") or "").strip()
+            label = option.get_text(" ", strip=True)
+            if value and value != "0" and label and label.lower() not in {"select", "select district", "--select--"}:
+                options.append({"id": value, "name": label})
+        return options
+
+    def build_district_directory_idempotency_key(self, state_id: str, district_id: str) -> str:
+        return f"saras|directory|state={state_id}|district={district_id}"
 
     def fetch_state_directory(self, state_id: str) -> SarasFetchResult:
         url = f"{SARAS_BASE_URL}{SARAS_DIRECTORY_PATH}"

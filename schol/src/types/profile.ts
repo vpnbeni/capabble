@@ -1,6 +1,8 @@
 export interface SchoolProfile {
   school_id: string
+  validation?: ValidationStatusBlock
   header: ProfileHeader
+  kys_mapping?: KysMappingSummary
   overview: ProfileOverview
   enrollment: EnrollmentBlock
   staff: StaffBlock
@@ -24,11 +26,23 @@ export interface ProfileHeader {
   identifiers: {
     udise: string | null
     state_school_code: string | null
+    saras_school_code?: string | null
     kys_school_id: string | null
     cbse_affiliation: string | null
   }
   established: string | number | null
   classes: string
+}
+
+export interface KysMappingSummary {
+  status: 'pending' | 'connected' | 'review'
+  label: string
+  kys_school_id: string | null
+  udise: string | null
+  saras_school_code?: string | null
+  cbse_affiliation?: string | null
+  can_resolve: boolean
+  has_kys_collection: boolean
 }
 
 export interface ProfileOverview {
@@ -122,6 +136,14 @@ export interface IntelligenceBlock {
   investigation_areas: string[]
 }
 
+export interface ValidationStatusBlock {
+  validation_status: string
+  collection_status: string | null
+  identity_status: string | null
+  data_quality_status: string | null
+  issue_count: number
+}
+
 export interface YearDetail {
   academic_year: string
   enrollment: { total: number | null; rte: number | null }
@@ -140,5 +162,7 @@ export interface DirectoryItem {
   students: number | null
   teachers: number | null
   enrollment_change_pct: number | null
-  consecutive_declines: number
+  consecutive_declines: number | null
+  collection_state?: string | null
+  kys_enriched?: boolean
 }

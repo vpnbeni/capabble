@@ -15,16 +15,17 @@ from school_intel.domain.collection import (
     YearCollectionSummary,
 )
 from school_intel.domain.enums import (
+    CollectionOutcomeStatus,
     CollectionRunStatus,
     CollectionRunType,
     DataSource,
     IdentifierType,
     ValidationStatus,
 )
-from school_intel.domain.schemas import SchoolIdentifierInput
+from school_intel.parsers.kys_parser import KysParser
 from school_intel.repositories.school_repository import CollectionRunRepository, SourceRecordRepository
 from school_intel.services.ingestion_service import IngestionService
-from school_intel.services.school_identity_service import IdentityLookupInput, SchoolIdentityService
+from school_intel.services.school_identity_service import SchoolIdentityService
 from school_intel.services.validation_service import ValidationService
 
 logger = logging.getLogger("school_intel.collection")
@@ -40,7 +41,9 @@ class KysCollectionService:
         self.source_repo = SourceRecordRepository(session)
         self.run_repo = CollectionRunRepository(session)
         self.identity = SchoolIdentityService(session)
+        self.parser = KysParser()
         self._owns_collector = collector is None
+        self._discovered_years: list[AcademicYearMapping] | None = None
 
     def collect_school(
         self,
@@ -76,7 +79,7 @@ class KysCollectionService:
         )
 
         try:
-            years = self.collector.discover_academic_years(resolved_kys_id)
+            years = self._discovered_years or self.collector.discover_academic_years(resolved_kys_id)
             years = self._filter_years(years, target_years, target_year_ids)
             if not years:
                 raise ValueError(f"No academic years discovered for KYS school {resolved_kys_id}")
@@ -101,30 +104,22 @@ class KysCollectionService:
                     enrollment.total_enrollment if enrollment else None
                 )
 
-                flag3 = self.session.scalar(
-                    select(SchoolStudentDistribution).where(
-                        SchoolStudentDistribution.school_id == school.id,
-                        SchoolStudentDistribution.academic_year == year_mapping.academic_year,
-                        SchoolStudentDistribution.distribution_type == "getSocialData:3",
-                    )
-                )
-                if flag3 and flag3.validation_status == ValidationStatus.NON_RECONCILING.value:
-                    summary.validation_warnings.append(
-                        f"{year_mapping.academic_year} flag=3 non_reconciling "
-                        f"({flag3.reported_total} vs {enrollment.total_enrollment if enrollment else '?'})"
-                    )
-
-            report = ValidationService().validate_school(self.session, school.id)
-            for issue in report.issues:
-                if issue.message not in summary.validation_warnings:
-                    summary.validation_warnings.append(issue.message)
-
             summary.compute_totals()
+            report = ValidationService().validate_school(
+                self.session,
+                school.id,
+                collection_status=summary.collection_status,
+            )
+            summary.identity_status = report.identity_status.value
+            summary.data_quality_status = report.data_quality_status.value
+            summary.data_quality_issue_count = len(report.issues)
+            summary.validation_warnings = [issue.message for issue in report.issues]
+
             status = (
                 CollectionRunStatus.COMPLETED.value
-                if summary.overall_status == "complete"
+                if summary.collection_status == CollectionOutcomeStatus.COMPLETE.value
                 else CollectionRunStatus.PAUSED.value
-                if summary.total_success > 0
+                if summary.collection_status == CollectionOutcomeStatus.PARTIAL.value
                 else CollectionRunStatus.FAILED.value
             )
             self.run_repo.update_progress(
@@ -179,51 +174,51 @@ class KysCollectionService:
         kys_school_id: str | None,
         state_school_code: str | None,
     ):
-        identifiers = [
-            SchoolIdentifierInput(
-                identifier_type=IdentifierType.UDISE,
-                identifier_value=udise,
-                source=DataSource.KYS,
-                is_verified=True,
+        resolved_kys_id = kys_school_id
+        if not resolved_kys_id:
+            existing = self.identity.repo.find_identifier(
+                IdentifierType.UDISE.value, udise
             )
-        ]
-        if kys_school_id:
-            identifiers.append(
-                SchoolIdentifierInput(
-                    identifier_type=IdentifierType.KYS_SCHOOL_ID,
-                    identifier_value=kys_school_id,
-                    source=DataSource.KYS,
-                    is_verified=True,
-                )
-            )
-        if state_school_code:
-            identifiers.append(
-                SchoolIdentifierInput(
-                    identifier_type=IdentifierType.STATE_SCHOOL_CODE,
-                    identifier_value=state_school_code,
-                    source=DataSource.KYS,
-                    is_verified=True,
-                )
-            )
+            if existing:
+                school = self.identity.repo.get_by_id(existing.school_id)
+                if school:
+                    for ident in school.identifiers:
+                        if ident.identifier_type == IdentifierType.KYS_SCHOOL_ID.value:
+                            resolved_kys_id = ident.identifier_value
+                            break
+        if not resolved_kys_id:
+            raise ValueError("KYS schoolId required. Pass --kys-school-id or seed the identifier.")
 
-        resolution = self.identity.resolve(
-            IdentityLookupInput(canonical_name=f"UDISE {udise}", identifiers=identifiers)
+        latest_year, discovered_years, report_result, profile_result = (
+            self.collector.fetch_identity_reference(resolved_kys_id)
         )
+        self._discovered_years = discovered_years
+
+        kys_identity = self.parser.parse_school_identity(
+            report_result.raw_payload,
+            profile_result.raw_payload,
+            kys_school_id=resolved_kys_id,
+            state_school_code=state_school_code,
+            academic_year=latest_year.academic_year,
+            year_id=latest_year.year_id,
+        )
+
+        lookup = self.identity.build_lookup_from_kys_identity(
+            kys_identity,
+            udise=udise,
+            kys_school_id=resolved_kys_id,
+            state_school_code=state_school_code,
+        )
+
+        resolution = self.identity.resolve(lookup)
         if not resolution.school_id:
             raise ValueError(f"Could not resolve school for UDISE {udise}")
+
+        self.identity.enrich_school_identity(resolution.school_id, kys_identity)
 
         school = self.identity.repo.get_by_id(resolution.school_id)
         if not school:
             raise ValueError(f"School not found after resolution: {resolution.school_id}")
-
-        resolved_kys_id = kys_school_id
-        if not resolved_kys_id:
-            for ident in school.identifiers:
-                if ident.identifier_type == IdentifierType.KYS_SCHOOL_ID.value:
-                    resolved_kys_id = ident.identifier_value
-                    break
-        if not resolved_kys_id:
-            raise ValueError("KYS schoolId required. Pass --kys-school-id or seed the identifier.")
 
         return school, resolved_kys_id
 

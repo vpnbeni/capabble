@@ -28,3 +28,9 @@ def require_raw_access(role: ScholRole) -> str:
     if role not in {"admin", "analyst"}:
         raise HTTPException(status_code=403, detail="Unauthorized for raw data access")
     return role
+
+
+def require_collection_access(role: ScholRole) -> str:
+    if role not in {"admin", "analyst"}:
+        raise HTTPException(status_code=403, detail="Unauthorized for collection operations")
+    return role

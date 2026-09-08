@@ -46,6 +46,10 @@ class SchoolCollectionSummary(BaseModel):
     total_failed: int = 0
     total_skipped: int = 0
     overall_status: str = "incomplete"
+    collection_status: str = "incomplete"
+    identity_status: str = "unverified"
+    data_quality_status: str = "clean"
+    data_quality_issue_count: int = 0
 
     def compute_totals(self) -> None:
         self.total_success = sum(y.success_count for y in self.years)
@@ -56,12 +60,17 @@ class SchoolCollectionSummary(BaseModel):
             sum(1 for e in y.endpoints if e.status == "skipped") for y in self.years
         )
         expected = sum(y.total_count for y in self.years)
-        if self.total_failed == 0 and self.total_success == expected and expected > 0:
+        satisfied = sum(
+            sum(1 for e in y.endpoints if e.status in {"success", "skipped"})
+            for y in self.years
+        )
+        if self.total_failed == 0 and satisfied == expected and expected > 0:
             self.overall_status = "complete"
-        elif self.total_success > 0:
+        elif satisfied > 0:
             self.overall_status = "partial"
         else:
             self.overall_status = "failed"
+        self.collection_status = self.overall_status
 
 
 class EnrollmentGoldenCheck(BaseModel):

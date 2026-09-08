@@ -19,10 +19,11 @@ from school_intel.db.models import (
     SourceRecord,
 )
 from school_intel.domain.enums import DataSource, IdentifierType, ValidationStatus
+from school_intel.services.kys_mapping_resolver import build_kys_mapping_summary
 from school_intel.services.profile_metrics import compute_enrollment_trends, students_per_teacher
 
 ACADEMIC_YEAR_ORDER = [
-    "2019-20", "2020-21", "2021-22", "2022-23", "2023-24", "2024-25", "2025-26",
+    "2018-19", "2019-20", "2020-21", "2021-22", "2022-23", "2023-24", "2024-25", "2025-26",
 ]
 
 GRADE_KEYS = [
@@ -103,9 +104,11 @@ class ProfileService:
         latest_teacher = next((t for t in teachers if t.academic_year == latest_year), None)
 
         profile_meta = self._profile_meta_for_year(school_id, latest_year)
+        validation_summary = self._validation_summary(school)
 
         return {
             "school_id": str(school.id),
+            "validation": validation_summary,
             "header": {
                 "name": school.canonical_name,
                 "location": self._location_label(school),
@@ -116,6 +119,7 @@ class ProfileService:
                 "identifiers": {
                     "udise": identifiers.get(IdentifierType.UDISE.value),
                     "state_school_code": identifiers.get(IdentifierType.STATE_SCHOOL_CODE.value),
+                    "saras_school_code": identifiers.get(IdentifierType.SARAS_SCHOOL_CODE.value),
                     "kys_school_id": identifiers.get(IdentifierType.KYS_SCHOOL_ID.value),
                     "cbse_affiliation": identifiers.get(IdentifierType.CBSE_AFFILIATION.value),
                 },
@@ -203,6 +207,7 @@ class ProfileService:
             "sources": self._source_provenance(school_id, snapshots),
             "data_quality": data_quality_issues,
             "intelligence": self._intelligence_signals(trend, teacher_series, str_series),
+            "kys_mapping": build_kys_mapping_summary(school, identifiers),
         }
 
     def get_year_detail(self, school_id: UUID, academic_year: str) -> dict:
@@ -326,6 +331,16 @@ class ProfileService:
 
     def _ordered_series(self, order: list[str], data: dict[str, int | None]) -> list[tuple[str, int | None]]:
         return [(year, data.get(year)) for year in order]
+
+    def _validation_summary(self, school: School) -> dict:
+        dq = school.data_quality or {}
+        return {
+            "validation_status": school.validation_status,
+            "collection_status": dq.get("collection_status"),
+            "identity_status": dq.get("identity_status"),
+            "data_quality_status": dq.get("data_quality_status"),
+            "issue_count": dq.get("issue_count", 0),
+        }
 
     def _data_quality_issues(
         self,

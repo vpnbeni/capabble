@@ -1,17 +1,18 @@
 """Live end-to-end Himalyan collection tests — require network + PostgreSQL."""
 
 import json
-import os
 from pathlib import Path
 from uuid import UUID
 
 import pytest
-from sqlalchemy import create_engine, func, select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from school_intel.db.models import SchoolEnrollment, SchoolStudentDistribution, SourceRecord
 from school_intel.domain.enums import DataSource, ValidationStatus
 from school_intel.services.collection_service import KysCollectionService
+
+from tests.db_safety import require_isolated_test_database
 
 FIXTURES = Path(__file__).parent / "fixtures" / "himalyan"
 HIMALYAN_UDISE = "06140404094"
@@ -25,14 +26,18 @@ def expected() -> dict:
 
 
 @pytest.fixture
-def db_session() -> Session:
-    url = os.environ.get("SCHOOL_INTEL_TEST_DATABASE_URL")
-    if not url:
-        pytest.skip("SCHOOL_INTEL_TEST_DATABASE_URL not set")
-    engine = create_engine(url)
-    with Session(engine) as session:
+def db_session(pg_engine) -> Session:
+    """Isolated live-test session; uses the guarded pg_engine from conftest."""
+    require_isolated_test_database(str(pg_engine.url), context="live test")
+    connection = pg_engine.connect()
+    transaction = connection.begin()
+    session = Session(bind=connection)
+    try:
         yield session
-        session.rollback()
+    finally:
+        session.close()
+        transaction.rollback()
+        connection.close()
 
 
 @pytest.mark.live
