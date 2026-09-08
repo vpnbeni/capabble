@@ -1,0 +1,13 @@
+{
+  "school_name": "HIMALYAN PUBLIC SCHOOL, ROHTAK",
+  "identifiers": {
+    "udise": "06140404094",
+    "state_school_code": "25299",
+    "kys_school_id": "1519942"
+  },
+  "saras": {
+    "present_in_directory": false,
+    "note": "Live SARAS keyword search returned no Himalyan Rohtak rows. School is State Board per KYS, not CBSE affiliated."
+  },
+  "expected_single_school_id": true
+}

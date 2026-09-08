@@ -26,6 +26,7 @@ router.delete('/categories/:id', authorize('admin'), requireAsetsPermission(ASET
 
 router.get('/locations', requireAsetsPermission(ASETS_PERMISSIONS.ASETS_VIEW), ctrl.locations.list);
 router.post('/locations', requireAsetsPermission(ASETS_PERMISSIONS.ASETS_EDIT), ctrl.locations.create);
+router.get('/locations/:id', requireAsetsPermission(ASETS_PERMISSIONS.ASETS_VIEW), ctrl.getLocationOverview);
 router.put('/locations/:id', requireAsetsPermission(ASETS_PERMISSIONS.ASETS_EDIT), ctrl.locations.update);
 router.delete('/locations/:id', authorize('admin'), requireAsetsPermission(ASETS_PERMISSIONS.ASETS_DELETE), ctrl.locations.remove);
 

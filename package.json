@@ -22,7 +22,15 @@
     "start": "cd server && npm start",
     "test": "concurrently \"cd server && npm test\" \"cd client && npm test\"",
     "lint": "concurrently \"cd server && npm run lint\" \"cd client && npm run lint\"",
-    "clean": "rimraf node_modules client/node_modules server/node_modules admin/node_modules client/dist server/dist admin/dist"
+    "clean": "rimraf node_modules client/node_modules server/node_modules admin/node_modules client/dist server/dist admin/dist",
+    "school-intel:migrate": "cd school-intelligence && school-intel migrate",
+    "school-intel:test": "cd school-intelligence && python -m pytest -q",
+    "school-intel:test:live": "cd school-intelligence && python -m pytest -m live -q",
+    "school-intel:saras:test": "cd school-intelligence && python -m pytest tests/test_saras_parser.py -q",
+    "school-intel:api": "cd school-intelligence && uvicorn school_intel.api.app:app --reload --port 8001",
+    "schol": "cd schol && npm run dev",
+    "schol:install": "cd schol && npm install",
+    "dev:schol": "concurrently \"npm run school-intel:api\" \"npm run schol\""
   },
   "keywords": [
     "examination",

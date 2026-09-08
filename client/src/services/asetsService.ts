@@ -45,6 +45,10 @@ const asetsService = {
     const res = await api.get('/asets/locations', { params })
     return (res.data.data || []) as any[]
   },
+  getLocationOverview: async (id: string) => {
+    const res = await api.get(`/asets/locations/${id}`)
+    return res.data.data
+  },
   saveLocation: async (payload: Record<string, any>, id?: string) =>
     id ? api.put(`/asets/locations/${id}`, payload) : api.post('/asets/locations', payload),
   removeLocation: async (id: string) => api.delete(`/asets/locations/${id}`),

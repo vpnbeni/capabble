@@ -153,7 +153,7 @@ export const AsetsCategories: React.FC = () => {
   )
 }
 
-export const AsetsLocations: React.FC = () => (
+export const AsetsLocationsLegacy: React.FC = () => (
   <SimpleCrudPage
     title="Locations"
     subtitle="Hierarchical school locations — campus, building, floor, room, store."

@@ -419,7 +419,7 @@ const Header: React.FC<HeaderProps> = ({ isSidebarCollapsed, onToggleSidebar }) 
           dashboard: { title: 'Asset Overview', subtitle: 'Lifecycle KPIs, alerts, and distribution' },
           assets: { title: 'All Assets', subtitle: 'Asset register, batch create, and profiles' },
           categories: { title: 'Categories', subtitle: 'Hierarchical asset categories' },
-          locations: { title: 'Locations', subtitle: 'Campus, building, room, and store hierarchy' },
+          locations: { title: 'Campus', subtitle: 'Campus, blocks, floors, and locations hierarchy' },
           allocations: { title: 'Allocations', subtitle: 'Assign assets to locations and custodians' },
           transfers: { title: 'Transfers', subtitle: 'Move assets with immutable history' },
           maintenance: { title: 'Maintenance', subtitle: 'Issues, repairs, and preventive schedules' },

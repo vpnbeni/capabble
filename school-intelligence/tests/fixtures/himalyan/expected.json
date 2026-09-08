@@ -1,0 +1,23 @@
+{
+  "school_name": "Himalyan Public School",
+  "location": "Rohtak",
+  "identifiers": {
+    "udise": "06140404094",
+    "state_school_code": "25299",
+    "kys_school_id": "1519942"
+  },
+  "expected_enrollment_by_year": {
+    "2019-20": { "total": 444, "rte": 27, "boys": 260, "girls": 184, "ews": 0 },
+    "2020-21": { "total": 413, "rte": 0, "boys": 236, "girls": 177, "ews": 0 },
+    "2021-22": { "total": 395, "rte": 6, "boys": 229, "girls": 166, "ews": 0 },
+    "2022-23": { "total": 316, "rte": 0, "boys": 174, "girls": 142, "ews": 0 },
+    "2023-24": { "total": 286, "rte": 6, "boys": 157, "girls": 129, "ews": 0 },
+    "2024-25": { "total": 240, "rte": 6, "boys": 131, "girls": 109, "ews": 0 },
+    "2025-26": { "total": 222, "rte": 0, "boys": 121, "girls": 101, "ews": 0 }
+  },
+  "expected_2020_21_flag_3": {
+    "validation_status": "non_reconciling",
+    "reported_total": 392,
+    "annual_enrollment_total": 413
+  }
+}

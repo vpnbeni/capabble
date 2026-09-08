@@ -57,7 +57,7 @@ const assetLocationSchema = withMeta({
   code: { type: String, trim: true, default: '' },
   type: {
     type: String,
-    enum: ['School', 'Campus', 'Building', 'Floor', 'Wing', 'Room', 'Classroom', 'Store', 'Lab', 'Office', 'Other'],
+    enum: ['School', 'Campus', 'Block', 'Building', 'Floor', 'Wing', 'Location', 'Room', 'Classroom', 'Store', 'Lab', 'Office', 'Other'],
     default: 'Room',
   },
   parentId: { type: mongoose.Schema.Types.ObjectId, ref: 'AssetLocation', default: null },

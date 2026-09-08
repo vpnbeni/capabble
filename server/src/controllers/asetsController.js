@@ -723,10 +723,40 @@ const categories = makeSimpleCrud(MODEL_KEYS.Category, [
   'name', 'code', 'parentId', 'description', 'trackingModeDefault', 'requiredFields', 'customFieldDefs', 'sortOrder',
 ]);
 
+const validateCampusHierarchy = async (req, payload) => {
+  const Location = getModel(req, MODEL_KEYS.Location);
+  const parent = payload.parentId ? await Location.findById(payload.parentId).lean() : null;
+  if (payload.parentId && !parent) throw new Error('Selected parent location no longer exists.');
+  if (payload.type === 'Campus') throw new Error('Campus is provided by default and cannot be created manually.');
+  if (payload.type === 'Block' && parent?.type !== 'Campus') throw new Error('A block must belong to a campus.');
+  if (payload.type === 'Floor' && parent?.type !== 'Block') throw new Error('A floor must belong to a block.');
+  if (['Location', 'Room', 'Classroom', 'Lab', 'Office', 'Store', 'Other'].includes(payload.type) && !['Block', 'Floor'].includes(parent?.type)) {
+    throw new Error('A location must belong to a block or floor.');
+  }
+};
+
+const ensureDefaultCampus = async (req) => {
+  const Location = getModel(req, MODEL_KEYS.Location);
+  const existing = await Location.findOne({ type: 'Campus', parentId: null, isActive: { $ne: false }, isArchived: { $ne: true } });
+  if (existing) return existing;
+  const SchoolProfile = req.models?.SchoolProfile;
+  const profile = SchoolProfile ? await SchoolProfile.findOne({}).select('schoolName').lean() : null;
+  const name = profile?.schoolName || req.tenant?.name || 'Main Campus';
+  return Location.create({
+    name,
+    code: 'CAMPUS',
+    type: 'Campus',
+    path: name,
+    createdBy: actorFromReq(req),
+    updatedBy: actorFromReq(req),
+  });
+};
+
 const locations = makeSimpleCrud(MODEL_KEYS.Location, [
   'name', 'code', 'type', 'parentId', 'department', 'roomRef', 'capacityHint', 'isStore', 'notes',
 ], {
   beforeCreate: async (req, payload) => {
+    await validateCampusHierarchy(req, payload);
     const Location = getModel(req, MODEL_KEYS.Location);
     payload.path = payload.parentId
       ? `${await buildLocationPath(Location, payload.parentId)} › ${payload.name}`
@@ -737,8 +767,48 @@ const locations = makeSimpleCrud(MODEL_KEYS.Location, [
     record.path = record.parentId
       ? `${await buildLocationPath(Location, record.parentId)} › ${record.name}`
       : record.name;
+    await validateCampusHierarchy(req, record);
   },
 });
+const listLocations = locations.list;
+locations.list = async (req, res) => {
+  try {
+    await ensureDefaultCampus(req);
+    return listLocations(req, res);
+  } catch (error) {
+    return sendError(res, error, 'Failed to prepare default campus.');
+  }
+};
+
+const getLocationOverview = async (req, res) => {
+  try {
+    const Location = getModel(req, MODEL_KEYS.Location);
+    const Asset = getModel(req, MODEL_KEYS.Asset);
+    const Allocation = getModel(req, MODEL_KEYS.Allocation);
+    const Transfer = getModel(req, MODEL_KEYS.Transfer);
+    const location = await Location.findOne({ _id: req.params.id, isActive: { $ne: false }, isArchived: { $ne: true } }).lean();
+    if (!location) return res.status(404).json({ success: false, message: 'Location not found.' });
+    const locationId = location._id;
+    const active = { isActive: { $ne: false } };
+    const [assets, allocations, transfers, children] = await Promise.all([
+      Asset.find({ ...active, locationId }).sort({ name: 1 }).limit(500)
+        .populate('categoryId', 'name code').lean(),
+      Allocation.find({ ...active, $or: [{ fromLocationId: locationId }, { toLocationId: locationId }] })
+        .sort({ allocationDate: -1 }).limit(100).populate('assetId', 'assetId name').populate('fromLocationId', 'name path').populate('toLocationId', 'name path').lean(),
+      Transfer.find({ ...active, $or: [{ sourceLocationId: locationId }, { destinationLocationId: locationId }] })
+        .sort({ transferDate: -1 }).limit(100).populate('assetId', 'assetId name').populate('sourceLocationId', 'name path').populate('destinationLocationId', 'name path').lean(),
+      Location.find({ ...active, parentId: locationId }).sort({ type: 1, name: 1 }).lean(),
+    ]);
+    const custodians = [...new Set(assets.map((asset) => asset.custodianName).filter(Boolean))];
+    return res.json({ success: true, data: {
+      location, assets, allocations, transfers, custodians,
+      children,
+      summary: { assetCount: assets.length, assetValue: assets.reduce((total, asset) => total + (asset.currentValue || 0), 0), childCount: children.length },
+    } });
+  } catch (error) {
+    return sendError(res, error, 'Failed to load location overview.');
+  }
+};
 
 const vendors = makeSimpleCrud(MODEL_KEYS.Vendor, [
   'name', 'code', 'contactPerson', 'phone', 'email', 'address', 'gstin', 'productsServices', 'notes',
@@ -1761,6 +1831,7 @@ module.exports = {
   archiveAsset,
   categories,
   locations,
+  getLocationOverview,
   vendors,
   listAllocations,
   createAllocation,

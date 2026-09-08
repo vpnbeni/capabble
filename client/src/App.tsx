@@ -118,7 +118,9 @@ import MdclSupplies from './pages/mdcl/MdclSupplies'
 import AsetsDashboard from './pages/asets/AsetsDashboard'
 import AsetsAssets from './pages/asets/AsetsAssets'
 import AsetsAssetDetail from './pages/asets/AsetsAssetDetail'
-import { AsetsCategories, AsetsLocations, AsetsVendors } from './pages/asets/AsetsSimplePages'
+import { AsetsCategories, AsetsVendors } from './pages/asets/AsetsSimplePages'
+import AsetsLocations from './pages/asets/AsetsLocations'
+import AsetsLocationDetail from './pages/asets/AsetsLocationDetail'
 import {
   AsetsAllocations,
   AsetsTransfers,
@@ -382,6 +384,7 @@ function App() {
               <Route path="asets/assets/:id" element={<AsetsAssetDetail />} />
               <Route path="asets/categories" element={<AsetsCategories />} />
               <Route path="asets/locations" element={<AsetsLocations />} />
+              <Route path="asets/locations/:id" element={<AsetsLocationDetail />} />
               <Route path="asets/allocations" element={<AsetsAllocations />} />
               <Route path="asets/transfers" element={<AsetsTransfers />} />
               <Route path="asets/maintenance" element={<AsetsMaintenance />} />
