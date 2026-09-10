@@ -6,14 +6,11 @@ dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 const { connectPlatformDB } = require('../../src/config/platformDatabase');
 const { getPlatformModels } = require('../../src/tenancy/platformModels');
+const { DEFAULT_PLATFORM_ADMIN_LOGIN } = require('../../src/constants/platformAdminAuth');
 
 const bootstrapPlatform = async () => {
-  const email = (process.env.PLATFORM_ADMIN_EMAIL || '').trim().toLowerCase();
-  const password = process.env.PLATFORM_ADMIN_PASSWORD;
-
-  if (!email || !password) {
-    throw new Error('PLATFORM_ADMIN_EMAIL and PLATFORM_ADMIN_PASSWORD are required');
-  }
+  const email = (process.env.PLATFORM_ADMIN_EMAIL || DEFAULT_PLATFORM_ADMIN_LOGIN).trim().toLowerCase();
+  const password = process.env.PLATFORM_ADMIN_PASSWORD || email;
 
   await connectPlatformDB();
 

@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { Document, Page, pdfjs } from 'react-pdf'
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 import toast from 'react-hot-toast'
@@ -9,12 +10,14 @@ import {
   useUpdateSeatingPlanTemplateSettingsMutation,
   type SeatingPlanFormat,
 } from '../hooks/useSeatingPlan'
-import type {
-  CBSECopyTemplateSettings,
-  MainGateTemplateSettings,
-  RoomDoorSlipTemplateSettings,
-  RoomFolderSlipTemplateSettings,
-  SeatingPlanTemplateSettings,
+import {
+  seatingPlanService,
+  type CBSECopyTemplateSettings,
+  type MainGateTemplateSettings,
+  type RoomDoorSlipTemplateSettings,
+  type RoomFolderSlipTemplateSettings,
+  type SeatingPlanMode,
+  type SeatingPlanTemplateSettings,
 } from '../services/seatingPlanService'
 import Loader from '../components/common/Loader'
 import { Tabs } from '../components/common/Tabs'
@@ -106,7 +109,12 @@ const ROOM_DOOR_INFO_COLUMN_KEYS: Array<
 const APP_MAIN_SCROLL_ID = 'app-main-scroll'
 
 const SeatingPlan: React.FC = () => {
+  const routerLocation = useLocation()
+  const isExmclRoute = routerLocation.pathname.includes('/exmcl/')
   const [activeTab, setActiveTab] = useState<SeatingPlanFormat>('mainGate')
+  const [seatingPlanMode, setSeatingPlanMode] = useState<SeatingPlanMode>('different_per_day')
+  const [loadingSeatingPlanMode, setLoadingSeatingPlanMode] = useState(false)
+  const [savingSeatingPlanMode, setSavingSeatingPlanMode] = useState(false)
   const [mainGateLayoutDraft, setMainGateLayoutDraft] = useState<MainGateTemplateSettings>(DEFAULT_MAIN_GATE_LAYOUT_SETTINGS)
   const [cbseLayoutDraft, setCbseLayoutDraft] = useState<CBSECopyTemplateSettings>(DEFAULT_CBSE_LAYOUT_SETTINGS)
   const [roomFolderLayoutDraft, setRoomFolderLayoutDraft] = useState<RoomFolderSlipTemplateSettings>(DEFAULT_ROOM_FOLDER_LAYOUT_SETTINGS)
@@ -206,6 +214,38 @@ const SeatingPlan: React.FC = () => {
       if (previousUrl) URL.revokeObjectURL(previousUrl)
       return null
     })
+  }
+
+  useEffect(() => {
+    if (!isExmclRoute) return
+    setLoadingSeatingPlanMode(true)
+    void seatingPlanService.getSeatingPlanMode()
+      .then(setSeatingPlanMode)
+      .catch(() => toast.error('Failed to load seating plan mode.'))
+      .finally(() => setLoadingSeatingPlanMode(false))
+  }, [isExmclRoute])
+
+  useEffect(() => {
+    if (templateSettings?.seatingPlanMode) {
+      setSeatingPlanMode(templateSettings.seatingPlanMode)
+    }
+  }, [templateSettings?.seatingPlanMode])
+
+  const handleSeatingPlanModeChange = async (mode: SeatingPlanMode) => {
+    setSavingSeatingPlanMode(true)
+    try {
+      const saved = await seatingPlanService.updateSeatingPlanMode(mode)
+      setSeatingPlanMode(saved)
+      toast.success(
+        saved === 'same_across_days'
+          ? 'Seating plan mode: same room across all exam days.'
+          : 'Seating plan mode: different seating across exam days.'
+      )
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Failed to update seating plan mode.')
+    } finally {
+      setSavingSeatingPlanMode(false)
+    }
   }
 
   useEffect(() => {
@@ -849,18 +889,58 @@ const SeatingPlan: React.FC = () => {
         ref={scheduleTableRef}
         className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden mb-8"
       >
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between px-4 py-3 bg-gray-50/50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700">
-          <Tabs<SeatingPlanFormat>
-            tabs={[...formatTabs]}
-            activeTab={activeTab}
-            onChange={setActiveTab}
-            variant="pill"
-            size="sm"
-            ariaLabel="Seating plan format"
-          />
-          <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 sm:text-right">
-            Examination Schedule
-          </h3>
+        <div className="flex flex-col gap-3 px-4 py-3 bg-gray-50/50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <Tabs<SeatingPlanFormat>
+              tabs={[...formatTabs]}
+              activeTab={activeTab}
+              onChange={setActiveTab}
+              variant="pill"
+              size="sm"
+              ariaLabel="Seating plan format"
+            />
+            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 sm:text-right">
+              Examination Schedule
+            </h3>
+          </div>
+          {isExmclRoute ? (
+            <div className="flex flex-col gap-2 rounded-xl border border-indigo-100 bg-indigo-50/60 px-4 py-3 dark:border-indigo-900/50 dark:bg-indigo-950/20 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <div className="text-sm font-semibold text-slate-900 dark:text-white">Seating plan mode</div>
+                <div className="text-xs text-slate-600 dark:text-slate-400">
+                  {seatingPlanMode === 'same_across_days'
+                    ? 'Each student keeps the same room on every exam day.'
+                    : 'Students are seated in different rooms across exam days.'}
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={loadingSeatingPlanMode || savingSeatingPlanMode}
+                  onClick={() => void handleSeatingPlanModeChange('same_across_days')}
+                  className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
+                    seatingPlanMode === 'same_across_days'
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 dark:bg-slate-800 dark:text-slate-200 dark:ring-slate-700'
+                  }`}
+                >
+                  Same across all days
+                </button>
+                <button
+                  type="button"
+                  disabled={loadingSeatingPlanMode || savingSeatingPlanMode}
+                  onClick={() => void handleSeatingPlanModeChange('different_per_day')}
+                  className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
+                    seatingPlanMode === 'different_per_day'
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 dark:bg-slate-800 dark:text-slate-200 dark:ring-slate-700'
+                  }`}
+                >
+                  Different each day
+                </button>
+              </div>
+            </div>
+          ) : null}
         </div>
 
         <div className="overflow-x-auto sp-datesheet-scroll-container">

@@ -67,8 +67,22 @@ const assetLocationSchema = withMeta({
   capacityHint: { type: Number, default: 0 },
   isStore: { type: Boolean, default: false },
   notes: { type: String, trim: true, default: '' },
+  address: { type: String, trim: true, default: '' },
+  floorNumber: { type: String, trim: true, default: '' },
+  roomNumber: { type: String, trim: true, default: '' },
+  className: { type: String, trim: true, default: '' },
+  section: { type: String, trim: true, default: '' },
+  roomType: {
+    type: String,
+    enum: ['', 'Classroom', 'Laboratory', 'Office', 'Staff Room', 'Store', 'Library', 'Activity Room', 'Hall', 'Auditorium', 'Reception', 'Other'],
+    default: '',
+  },
+  locationStatus: { type: String, enum: ['Active', 'Inactive'], default: 'Active' },
 });
 assetLocationSchema.index({ parentId: 1, name: 1 });
+assetLocationSchema.index({ parentId: 1, code: 1 });
+assetLocationSchema.index({ className: 1, section: 1 });
+assetLocationSchema.index({ type: 1, isActive: 1 });
 assetLocationSchema.index({ path: 1 });
 assetLocationSchema.index({ isStore: 1, isActive: 1 });
 

@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from school_intel.db.models import (
+    SarasSchoolRecord,
     School,
     SchoolAffiliation,
     SchoolContact,
@@ -105,13 +106,17 @@ class ProfileService:
 
         profile_meta = self._profile_meta_for_year(school_id, latest_year)
         validation_summary = self._validation_summary(school)
+        saras_detail = self._saras_detail_for_school(school, identifiers)
+        established = profile_meta.get("established")
+        if not established and saras_detail:
+            established = saras_detail.get("year_of_foundation")
 
         return {
             "school_id": str(school.id),
             "validation": validation_summary,
             "header": {
                 "name": school.canonical_name,
-                "location": self._location_label(school),
+                "location": self._location_label(school, saras_detail),
                 "status": profile_meta.get("status", "Operational"),
                 "school_type": profile_meta.get("school_type", "Co-educational"),
                 "management": profile_meta.get("management", "Private Unaided"),
@@ -123,9 +128,10 @@ class ProfileService:
                     "kys_school_id": identifiers.get(IdentifierType.KYS_SCHOOL_ID.value),
                     "cbse_affiliation": identifiers.get(IdentifierType.CBSE_AFFILIATION.value),
                 },
-                "established": profile_meta.get("established"),
+                "established": established,
                 "classes": profile_meta.get("classes", "1-10"),
             },
+            "saras_detail": saras_detail,
             "overview": {
                 "selected_year": latest_year,
                 "students": latest_enrollment.total_enrollment if latest_enrollment else None,
@@ -325,9 +331,71 @@ class ProfileService:
             out[ident.identifier_type] = ident.identifier_value
         return out
 
-    def _location_label(self, school: School) -> str:
+    def _location_label(self, school: School, saras_detail: dict | None = None) -> str:
+        if saras_detail and saras_detail.get("address_line"):
+            return saras_detail["address_line"]
+        if school.address_line:
+            return school.address_line
         parts = [p for p in [school.district, school.state] if p]
         return ", ".join(parts) if parts else "Not available"
+
+    def _saras_detail_for_school(self, school: School, identifiers: dict[str, str | None]) -> dict | None:
+        record = self.session.scalar(
+            select(SarasSchoolRecord).where(SarasSchoolRecord.school_id == school.id)
+        )
+        if not record:
+            affiliation = identifiers.get(IdentifierType.CBSE_AFFILIATION.value)
+            if affiliation:
+                record = self.session.scalar(
+                    select(SarasSchoolRecord).where(
+                        SarasSchoolRecord.affiliation_number == affiliation
+                    )
+                )
+        if not record:
+            return None
+
+        fields = record.detail_fields or {}
+
+        def pick(*keys: str) -> str | None:
+            for key in keys:
+                value = fields.get(key)
+                if value is not None and str(value).strip():
+                    return str(value).strip()
+            return None
+
+        def pick_column(column: str, *keys: str) -> str | None:
+            column_value = getattr(record, column, None)
+            if column_value is not None and str(column_value).strip():
+                return str(column_value).strip()
+            return pick(*keys)
+
+        return {
+            "head_name": pick_column(
+                "head_name",
+                "Name of Principal/ Head of Institution",
+                "Head/Principal",
+            ),
+            "address_line": school.address_line or record.address_line or pick("Postal Address", "Address"),
+            "website": pick_column("website", "Website"),
+            "pin_code": school.pin_code or record.pin_code or pick("Pin Code", "PIN"),
+            "year_of_foundation": pick("Year of Foundation"),
+            "first_opening_date": pick("Date of First Opening of School", "First Opening Date"),
+            "principal_gender": pick("Gender"),
+            "principal_qualifications": pick(
+                "Principal's Educational/Professional Qualifications:",
+                "Principal Qualifications",
+            ),
+            "administrative_experience": pick("Administrative:", "Administrative Experience"),
+            "teaching_experience": pick("Teaching:", "Teaching Experience"),
+            "school_status": pick("Status of The School", "Status") or record.status,
+            "school_type": pick("School Type"),
+            "affiliation_period": pick("Affiliation Period", "Period of Affiliation"),
+            "managing_society": pick(
+                "Name of Trust/ Society/ Managing Committee",
+                "Name of Society/Trust",
+            ),
+            "remarks": pick("Remarks, if any", "Remarks"),
+        }
 
     def _ordered_series(self, order: list[str], data: dict[str, int | None]) -> list[tuple[str, int | None]]:
         return [(year, data.get(year)) for year in order]

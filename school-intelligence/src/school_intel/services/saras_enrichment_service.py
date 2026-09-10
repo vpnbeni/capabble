@@ -48,6 +48,35 @@ class SarasEnrichmentService:
             results.append(self.enrich_run_school(item, live_fetch=live_fetch))
         return {"run_id": str(run_id), "schools": results, "enriched": len(results)}
 
+    def re_enrich_run(self, run_id: UUID) -> dict[str, Any]:
+        """Re-apply SARAS enrichment for all schools in an existing collection run.
+
+        Uses stored detail_fields when present (preserves source_records provenance).
+        Does not run KYS mapping or historical collection.
+        """
+        items = self.batch_repo.list_run_schools(run_id)
+        if not items:
+            raise ValueError(f"No schools found for collection run: {run_id}")
+
+        school_results: list[dict[str, Any]] = []
+        for item in items:
+            has_stored_detail = bool((item.saras_row or {}).get("detail_fields"))
+            result = self.enrich_run_school(item, live_fetch=not has_stored_detail)
+            school_results.append(
+                {
+                    **result,
+                    "school_name": item.school_name,
+                    "address_line": (item.saras_row or {}).get("address_line"),
+                }
+            )
+
+        return {
+            "run_id": str(run_id),
+            "total": len(items),
+            "enriched": len(school_results),
+            "schools": school_results,
+        }
+
     def enrich_run_school(self, item: CollectionRunSchool, *, live_fetch: bool = True) -> dict[str, Any]:
         affiliation = item.affiliation_number
         directory_row: SarasDirectoryRow | None = None
@@ -202,6 +231,7 @@ class SarasEnrichmentService:
     ) -> dict[str, Any]:
         existing = dict(item.saras_row or {})
         row = directory_row.model_dump() if directory_row else {}
+        detail_address = self._address_from_detail_fields(detail_fields)
         payload = {
             **existing,
             "affiliation_number": item.affiliation_number,
@@ -212,7 +242,11 @@ class SarasEnrichmentService:
             "district": row.get("district") or existing.get("district") or item.district,
             "status": row.get("status") or existing.get("status"),
             "head_name": row.get("head_name") or existing.get("head_name") or detail_fields.get("Head/Principal"),
-            "address_line": row.get("address_line") or existing.get("address_line") or detail_fields.get("Address"),
+            "address_line": self._coalesce_text(
+                row.get("address_line"),
+                existing.get("address_line"),
+                detail_address,
+            ),
             "pin_code": pin_code,
             "website": row.get("website") or existing.get("website") or detail_fields.get("Website"),
             "detail_url": row.get("detail_url") or existing.get("detail_url"),
@@ -287,6 +321,22 @@ class SarasEnrichmentService:
             if record.collection_run_id is None:
                 record.collection_run_id = run_id
         self.session.flush()
+
+    @staticmethod
+    def _coalesce_text(*candidates: Any) -> str | None:
+        for value in candidates:
+            if value is not None and str(value).strip():
+                return str(value).strip()
+        return None
+
+    @staticmethod
+    def _address_from_detail_fields(detail_fields: dict[str, Any]) -> str | None:
+        """SARAS detail pages expose the postal address under 'Postal Address'."""
+        return SarasEnrichmentService._coalesce_text(
+            detail_fields.get("Postal Address"),
+            detail_fields.get("Address"),
+            detail_fields.get("address"),
+        )
 
     @staticmethod
     def _pin_from_row(row: SarasDirectoryRow) -> str | None:

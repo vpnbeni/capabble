@@ -55,8 +55,8 @@ function App() {
   const [admin, setAdmin] = useState<PlatformAdmin | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
+  const [email, setEmail] = useState('admin.capabble')
+  const [password, setPassword] = useState('admin.capabble')
   const [currentPath, setCurrentPath] = useState(getInitialPath)
 
   const navigateTo = (path: string) => {
@@ -211,10 +211,11 @@ function App() {
 
           <form onSubmit={handleLogin} className="grid" style={{ gap: 16 }}>
             <div className="input-group" style={{ marginBottom: 0 }}>
-              <label className="input-label">Email address</label>
+              <label className="input-label">Username</label>
               <input
-                type="email"
-                placeholder="admin@example.com"
+                type="text"
+                placeholder="admin.capabble"
+                autoComplete="username"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
                 required
@@ -224,7 +225,8 @@ function App() {
               <label className="input-label">Password</label>
               <input
                 type="password"
-                placeholder="********"
+                placeholder="admin.capabble"
+                autoComplete="current-password"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
                 required

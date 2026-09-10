@@ -27,7 +27,7 @@
     "school-intel:test": "cd school-intelligence && python -m pytest -q",
     "school-intel:test:live": "cd school-intelligence && python -m pytest -m live -q",
     "school-intel:saras:test": "cd school-intelligence && python -m pytest tests/test_saras_parser.py -q",
-    "school-intel:api": "cd school-intelligence && uvicorn school_intel.api.app:app --reload --port 8001",
+    "school-intel:api": "cd school-intelligence && python -m uvicorn school_intel.api.app:app --reload --port 8001",
     "schol": "cd schol && npm run dev",
     "schol:install": "cd schol && npm install",
     "dev:schol": "concurrently \"npm run school-intel:api\" \"npm run schol\""

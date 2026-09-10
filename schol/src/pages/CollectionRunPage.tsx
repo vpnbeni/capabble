@@ -1,7 +1,9 @@
 import { Link, useParams } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
-import { fetchCollectionRun, pauseCollectionRun, resumeCollectionRun } from '@/services/collection'
+import { useMutation, useQuery } from '@tanstack/react-query'
+import { fetchCollectionRun, pauseCollectionRun, reEnrichSarasRun, resumeCollectionRun } from '@/services/collection'
+import type { ReEnrichSarasResult } from '@/services/collection'
 import toast from 'react-hot-toast'
+import { useState } from 'react'
 
 function ProgressBar({ percent }: { percent: number }) {
   return (
@@ -13,6 +15,7 @@ function ProgressBar({ percent }: { percent: number }) {
 
 export function CollectionRunPage() {
   const { runId = '' } = useParams()
+  const [reEnrichResult, setReEnrichResult] = useState<ReEnrichSarasResult | null>(null)
   const { data, refetch, isLoading } = useQuery({
     queryKey: ['collection-run', runId],
     queryFn: () => fetchCollectionRun(runId),
@@ -34,6 +37,21 @@ export function CollectionRunPage() {
     toast.success('Collection resumed')
     refetch()
   }
+
+  const reEnrichMutation = useMutation({
+    mutationFn: () => reEnrichSarasRun(runId),
+    onSuccess: (result) => {
+      setReEnrichResult(result)
+      toast.success(`Re-enriched ${result.enriched}/${result.total} schools`)
+      refetch()
+    },
+    onError: () => {
+      toast.error('Re-enrich SARAS failed')
+    },
+  })
+
+  const canReEnrichSaras =
+    data?.status === 'partial' || data?.status === 'completed' || data?.status === 'paused'
 
   if (isLoading || !data) {
     return <div className="text-slate-500">Loading collection run...</div>
@@ -119,6 +137,23 @@ export function CollectionRunPage() {
         </div>
       )}
 
+      {reEnrichResult && (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-6 shadow-sm">
+          <h2 className="font-semibold text-emerald-900">Re-enrich SARAS complete</h2>
+          <p className="mt-1 text-sm text-emerald-800">
+            {reEnrichResult.enriched} / {reEnrichResult.total} schools enriched
+          </p>
+          <ul className="mt-3 space-y-1 text-sm text-emerald-900">
+            {reEnrichResult.schools.map((school) => (
+              <li key={school.affiliation_number}>
+                {school.school_name}
+                {school.address_line ? ` — ${school.address_line}` : ''}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       <div className="flex flex-wrap gap-3">
         {data.status === 'running' && (
           <button onClick={handlePause} className="rounded-lg border border-slate-200 px-4 py-2 text-sm">
@@ -133,6 +168,15 @@ export function CollectionRunPage() {
         {data.status === 'partial' && (
           <button onClick={handleResume} className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white">
             Resume KYS Pipeline
+          </button>
+        )}
+        {canReEnrichSaras && (
+          <button
+            onClick={() => reEnrichMutation.mutate()}
+            disabled={reEnrichMutation.isPending}
+            className="rounded-lg border border-slate-200 px-4 py-2 text-sm disabled:opacity-60"
+          >
+            {reEnrichMutation.isPending ? 'Re-enriching SARAS...' : 'Re-enrich SARAS'}
           </button>
         )}
         <Link to="/schools" className="rounded-lg border border-slate-200 px-4 py-2 text-sm">

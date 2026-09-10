@@ -24,6 +24,10 @@ router.post('/categories', requireAsetsPermission(ASETS_PERMISSIONS.ASETS_EDIT),
 router.put('/categories/:id', requireAsetsPermission(ASETS_PERMISSIONS.ASETS_EDIT), ctrl.categories.update);
 router.delete('/categories/:id', authorize('admin'), requireAsetsPermission(ASETS_PERMISSIONS.ASETS_DELETE), ctrl.categories.remove);
 
+router.get('/locations/tree', requireAsetsPermission(ASETS_PERMISSIONS.ASETS_VIEW), ctrl.getLocationTree);
+router.get('/locations/summary', requireAsetsPermission(ASETS_PERMISSIONS.ASETS_VIEW), ctrl.getLocationSummary);
+router.get('/locations/class-sections', requireAsetsPermission(ASETS_PERMISSIONS.ASETS_VIEW), ctrl.getLocationClassSections);
+router.get('/locations/search', requireAsetsPermission(ASETS_PERMISSIONS.ASETS_VIEW), ctrl.searchLocations);
 router.get('/locations', requireAsetsPermission(ASETS_PERMISSIONS.ASETS_VIEW), ctrl.locations.list);
 router.post('/locations', requireAsetsPermission(ASETS_PERMISSIONS.ASETS_EDIT), ctrl.locations.create);
 router.get('/locations/:id', requireAsetsPermission(ASETS_PERMISSIONS.ASETS_VIEW), ctrl.getLocationOverview);

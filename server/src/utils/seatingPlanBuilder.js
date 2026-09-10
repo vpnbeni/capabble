@@ -93,6 +93,9 @@ class SeatingPlanBuilder {
       allRooms.sort(compareRoomNo);
 
       const allocationMode = options.roomAllocationMode === 'manual' ? 'manual' : 'auto';
+      const seatingPlanMode = options.seatingPlanMode === 'same_across_days'
+        ? 'same_across_days'
+        : 'different_per_day';
       const examDateKey = this.normalizeDateKey(entry.examDate);
 
       const rooms = allocationMode === 'manual'
@@ -241,6 +244,42 @@ class SeatingPlanBuilder {
             `Maximum number of rooms required at the centre is ${maxRoomsRequired}. Add more rooms to switch to Auto mode.`
           );
         }
+      }
+
+      if (seatingPlanMode === 'same_across_days') {
+        const rollNumbers = candidates
+          .map((candidate) => String(candidate?.rollNo || '').trim())
+          .filter(Boolean);
+        const fixedRoomByRoll = await this.buildEarliestFixedRoomMap(rollNumbers);
+        const roomAllocations = this.allocateCandidatesToFixedRooms(
+          candidates,
+          rooms,
+          fixedRoomByRoll,
+          answerSheetAllocations
+        );
+
+        const allocatedCount = roomAllocations.reduce((sum, room) => sum + Number(room.registered || 0), 0);
+        if (allocatedCount < candidates.length) {
+          throw new Error('Insufficient rooms for this exam date. Please allocate more rooms in Exam Room/Hall.');
+        }
+
+        await this.persistRoomAllocationSnapshot(entry, roomAllocations);
+
+        return {
+          datesheet: {
+            _id: entry._id,
+            date: entry.examDate,
+            dayName: entry.dayName,
+            subjectCode: entry.subject.code,
+            subjectName: entry.subject.name,
+            class: entry.subject.class,
+            timeSlot: entry.timeSlot,
+          },
+          rooms: roomAllocations,
+          totalCandidates: candidates.length,
+          answerSheetAllocations,
+          centreIdentity,
+        };
       }
 
       let startRoomIndex = 0;
@@ -654,6 +693,94 @@ class SeatingPlanBuilder {
     // Rule: if class changes on next day, start from first room; else start from second room.
     const startIndex = currentClass !== previousClass ? 0 : 1;
     return Math.min(startIndex, totalRooms - 1);
+  }
+
+  async buildEarliestFixedRoomMap(rollNumbers = []) {
+    const history = new Map();
+    if (!rollNumbers.length) return history;
+
+    const rows = await SeatingPlanAllocation.find({
+      rollNo: { $in: rollNumbers },
+    })
+      .sort({ examDate: 1, createdAt: 1 })
+      .select('rollNo roomNo examDate')
+      .lean();
+
+    rows.forEach((row) => {
+      const rollNo = String(row?.rollNo || '').trim();
+      const roomNo = String(row?.roomNo || '').trim();
+      if (!rollNo || !roomNo || history.has(rollNo)) return;
+      history.set(rollNo, roomNo);
+    });
+
+    return history;
+  }
+
+  allocateCandidatesToFixedRooms(candidates, rooms, fixedRoomByRoll, answerSheetAllocations = null) {
+    const roomLookup = new Map();
+    rooms.forEach((room, index) => {
+      const displayNo = this.formatRoomNoDisplay(room.roomNo);
+      roomLookup.set(displayNo, { room, index });
+      roomLookup.set(String(room.roomNo || '').trim(), { room, index });
+    });
+
+    const buckets = new Map();
+    const unassigned = [];
+
+    candidates.forEach((candidate) => {
+      const rollNo = String(candidate?.rollNo || '').trim();
+      const fixedRoomNo = fixedRoomByRoll.get(rollNo);
+      const roomKey = fixedRoomNo && roomLookup.has(fixedRoomNo) ? fixedRoomNo : null;
+      if (roomKey) {
+        if (!buckets.has(roomKey)) buckets.set(roomKey, []);
+        buckets.get(roomKey).push(candidate);
+        return;
+      }
+      unassigned.push(candidate);
+    });
+
+    if (unassigned.length > 0) {
+      const freshAllocations = this.allocateCandidatesToRoomsWithOffset(
+        unassigned,
+        rooms,
+        0,
+        0,
+        answerSheetAllocations,
+        true
+      );
+      freshAllocations.forEach((allocation) => {
+        const roomKey = String(allocation.roomNo || '').trim();
+        if (!buckets.has(roomKey)) buckets.set(roomKey, []);
+        buckets.get(roomKey).push(...(allocation.candidates || []));
+        (allocation.candidates || []).forEach((candidate) => {
+          const rollNo = String(candidate?.rollNo || '').trim();
+          if (rollNo) fixedRoomByRoll.set(rollNo, roomKey);
+        });
+      });
+    }
+
+    const allocations = [];
+    rooms.forEach((room, roomIdx) => {
+      const displayNo = this.formatRoomNoDisplay(room.roomNo);
+      const roomCandidates = buckets.get(displayNo)
+        || buckets.get(String(room.roomNo || '').trim())
+        || [];
+      if (!roomCandidates.length) return;
+
+      const rows = this.buildRowsWithOffset(roomCandidates, 0, 0, answerSheetAllocations);
+      allocations.push({
+        roomIndex: roomIdx,
+        roomNo: displayNo,
+        roomName: room.roomName || '',
+        floor: room.floor || 'First Floor',
+        candidates: roomCandidates,
+        rows,
+        registered: roomCandidates.length,
+        seatOffset: 0,
+      });
+    });
+
+    return allocations;
   }
 
   getAllocationMapByRollNo(roomAllocations) {

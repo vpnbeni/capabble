@@ -1,10 +1,16 @@
 const Joi = require('joi');
 const { TENANT_FEATURE_KEYS } = require('../constants/tenantFeatures');
+const {
+  PLATFORM_ADMIN_LOGIN_REGEX,
+  PLATFORM_ADMIN_LOGIN_MESSAGE,
+} = require('../constants/platformAdminAuth');
 
 const tenantSlugRegex = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
 
 const platformLoginSchema = Joi.object({
-  email: Joi.string().email().required(),
+  email: Joi.string().pattern(PLATFORM_ADMIN_LOGIN_REGEX).required().messages({
+    'string.pattern.base': PLATFORM_ADMIN_LOGIN_MESSAGE,
+  }),
   password: Joi.string().min(8).required(),
 });
 

@@ -11,6 +11,7 @@ from school_intel.domain.enums import CollectionRunStatus
 from school_intel.repositories.batch_collection_repository import BatchCollectionRepository
 from school_intel.services.batch_collection_orchestrator import BatchCollectionOrchestrator
 from school_intel.services.collection_preview_service import CollectionPreviewService
+from school_intel.services.saras_enrichment_service import SarasEnrichmentService
 
 router = APIRouter(prefix="/api/collection", tags=["collection"])
 
@@ -163,6 +164,27 @@ def resume_collection_run(run_id: str, db: DbSession, role: ScholRole, backgroun
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     finally:
         orchestrator.close()
+
+
+@router.post("/runs/{run_id}/re-enrich-saras")
+def re_enrich_saras_run(run_id: str, db: DbSession, role: ScholRole) -> dict:
+    """Re-apply SARAS detail enrichment for schools in an existing run (no KYS pipeline)."""
+    require_collection_access(role)
+    from school_intel.db.models import CollectionRun
+
+    parsed_id = UUID(run_id)
+    if db.get(CollectionRun, parsed_id) is None:
+        raise HTTPException(status_code=404, detail=f"Collection run not found: {run_id}")
+
+    enricher = SarasEnrichmentService(db)
+    try:
+        report = enricher.re_enrich_run(parsed_id)
+        db.commit()
+        return report
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    finally:
+        enricher.close()
 
 
 @router.post("/runs/{run_id}/cancel")

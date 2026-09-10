@@ -1,4 +1,5 @@
-import type { ContactItem, ProfileHeader } from '@/types/profile'
+import type { ContactItem, ProfileHeader, SarasDetailBlock } from '@/types/profile'
+import { displaySarasValue, sarasWebsiteHref } from '@/utils/sarasDisplay'
 import { MapPin, Phone, Mail, Globe, User } from 'lucide-react'
 
 function findContact(contacts: ContactItem[], type: string) {
@@ -8,14 +9,18 @@ function findContact(contacts: ContactItem[], type: string) {
 export function ContactSidebar({
   header,
   contacts,
+  sarasDetail,
 }: {
   header: ProfileHeader
   contacts: ContactItem[]
+  sarasDetail?: SarasDetailBlock | null
 }) {
   const phone = findContact(contacts, 'phone')
   const email = findContact(contacts, 'email')
-  const website = findContact(contacts, 'website')
-  const head = findContact(contacts, 'head_name')
+  const website = sarasDetail?.website || findContact(contacts, 'website')
+  const head = sarasDetail?.head_name || findContact(contacts, 'head_name')
+  const address = sarasDetail?.address_line || header.location
+  const websiteHref = sarasWebsiteHref(website)
 
   return (
     <div className="space-y-4">
@@ -26,7 +31,14 @@ export function ContactSidebar({
             <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
             <div>
               <dt className="text-slate-500">Address</dt>
-              <dd className="font-medium text-slate-800">{header.location}</dd>
+              <dd className="font-medium text-slate-800">{displaySarasValue(address)}</dd>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
+            <div>
+              <dt className="text-slate-500">PIN</dt>
+              <dd className="font-medium text-slate-800">{displaySarasValue(sarasDetail?.pin_code)}</dd>
             </div>
           </div>
           <div className="flex gap-2">
@@ -47,14 +59,22 @@ export function ContactSidebar({
             <Globe className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
             <div>
               <dt className="text-slate-500">Website</dt>
-              <dd className="font-medium text-slate-800">{website || 'Not available'}</dd>
+              <dd className="font-medium text-slate-800">
+                {websiteHref ? (
+                  <a href={websiteHref} target="_blank" rel="noopener noreferrer" className="text-primary-700 hover:underline">
+                    {displaySarasValue(website)}
+                  </a>
+                ) : (
+                  displaySarasValue(website)
+                )}
+              </dd>
             </div>
           </div>
           <div className="flex gap-2">
             <User className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
             <div>
               <dt className="text-slate-500">Head / Responsible Person</dt>
-              <dd className="font-medium text-slate-800">{head || 'Not available'}</dd>
+              <dd className="font-medium text-slate-800">{displaySarasValue(head)}</dd>
             </div>
           </div>
         </dl>
@@ -65,7 +85,7 @@ export function ContactSidebar({
         <div className="mt-3 flex h-40 items-center justify-center rounded-lg bg-slate-100 text-sm text-slate-500">
           Map placeholder — coordinates not available
         </div>
-        <p className="mt-2 text-sm text-slate-600">{header.location}</p>
+        <p className="mt-2 text-sm text-slate-600">{displaySarasValue(address)}</p>
       </div>
     </div>
   )

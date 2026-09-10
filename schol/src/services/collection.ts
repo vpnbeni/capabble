@@ -74,6 +74,25 @@ export async function resumeCollectionRun(runId: string) {
   return data
 }
 
+export interface ReEnrichSarasSchoolResult {
+  affiliation_number: string
+  school_name: string
+  address_line: string | null
+  school_id?: string | null
+}
+
+export interface ReEnrichSarasResult {
+  run_id: string
+  total: number
+  enriched: number
+  schools: ReEnrichSarasSchoolResult[]
+}
+
+export async function reEnrichSarasRun(runId: string): Promise<ReEnrichSarasResult> {
+  const { data } = await api.post<ReEnrichSarasResult>(`/collection/runs/${runId}/re-enrich-saras`)
+  return data
+}
+
 export async function fetchMatchCandidates() {
   const { data } = await api.get('/match-candidates')
   return data.items

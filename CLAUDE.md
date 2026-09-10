@@ -81,6 +81,7 @@ CAPABBLE ERP is a multi-tenant, full-stack MERN application providing modular sc
 
 ## Deployment & Domains
 
+- **schol.capabble.localhost:5175** — Local SCHOL UI (`/schol` + `/school-intelligence` API on port 8001). Start with `npm run dev:schol`. Optional bare host `schol.capabble` via `schol/scripts/setup-local-host.ps1` (Windows, admin).
 - **cntr.capabble.cloud** — Production deployment of the `/client` app on Vercel. This is the main product website for "Cntr – Exam Centre Control".
   - `/` (root) → shows `CntrLanding` page (public marketing landing page) when not authenticated
   - `/login` → Login page
@@ -248,6 +249,7 @@ See `.env.example` (root and `/server`) for required variables:
 - `VITE_ROOT_APP_DOMAIN`, `VITE_ROOT_API_DOMAIN`, `VITE_LOCAL_API_URL`, `VITE_API_URL`
 
 ## Default Dev Credentials
-- Admin: admin@sems.com / admin123
+- Platform admin: admin.capabble / admin.capabble (`npm run bootstrap:platform` in `/server`)
+- Tenant admin: admin@sems.com / admin123
 - Operator: operator@sems.com / operator123
 - Operator2: operator2@sems.com / operator123

@@ -9,6 +9,7 @@ import { ProfileNav } from '@/components/profile/ProfileNav'
 import { ExpandableSection } from '@/components/profile/ExpandableSection'
 import { DataQualityPanel } from '@/components/profile/DataQualityPanel'
 import { ContactSidebar } from '@/components/profile/ContactSidebar'
+import { SarasProfilePanel } from '@/components/profile/SarasProfilePanel'
 import { EnrollmentSection } from '@/components/profile/EnrollmentSection'
 import { StaffSection } from '@/components/profile/StaffSection'
 import { FacilitiesSection } from '@/components/profile/FacilitiesSection'
@@ -222,7 +223,10 @@ export function SchoolProfilePage() {
           </ExpandableSection>
         </div>
 
-        <ContactSidebar header={data.header} contacts={data.contacts} />
+        <div className="space-y-4">
+          <ContactSidebar header={data.header} contacts={data.contacts} sarasDetail={data.saras_detail} />
+          <SarasProfilePanel saras={data.saras_detail} />
+        </div>
       </div>
 
       {showRaw && (

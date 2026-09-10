@@ -745,7 +745,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       badge: null,
     },
     {
-      name: 'Campus',
+      name: 'Locations',
       href: '/asets/locations',
       module: 'asets',
       icon: (

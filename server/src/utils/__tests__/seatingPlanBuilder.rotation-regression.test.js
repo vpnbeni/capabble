@@ -92,6 +92,7 @@ describe('SeatingPlanBuilder rotation regression', () => {
     expect(position).toEqual({
       startRoomIndex: 2,
       startSeatOffset: 6,
+      allowWrap: false,
     });
   });
 
@@ -147,6 +148,7 @@ describe('SeatingPlanBuilder rotation regression', () => {
     expect(position).toEqual({
       startRoomIndex: 3,
       startSeatOffset: 0,
+      allowWrap: false,
     });
   });
 });

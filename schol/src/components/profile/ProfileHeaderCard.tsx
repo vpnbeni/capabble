@@ -41,7 +41,7 @@ export function ProfileHeaderCard({
             <div>Haryana School Code: <span className="font-medium text-slate-900">{displayId(header.identifiers.state_school_code, 'Not available')}</span></div>
             <div>KYS School ID: <span className="font-medium text-slate-900">{displayId(header.identifiers.kys_school_id, 'Not available')}</span></div>
             <div>CBSE Affiliation: <span className="font-medium text-slate-900">{displayId(header.identifiers.cbse_affiliation, 'Not found')}</span></div>
-            <div>Established: <span className="font-medium text-slate-900">{header.established ?? 'Not available'}</span></div>
+            <div>Established: <span className="font-medium text-slate-900">{header.established != null && String(header.established).trim() ? header.established : 'Not available'}</span></div>
             <div>Classes: <span className="font-medium text-slate-900">{header.classes}</span></div>
           </div>
         </div>

@@ -22,6 +22,20 @@
       "runtimeArgs": ["run", "dev"],
       "cwd": "admin",
       "port": 5174
+    },
+    {
+      "name": "schol",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "cwd": "schol",
+      "port": 5175
+    },
+    {
+      "name": "school-intel-api",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "school-intel:api"],
+      "cwd": ".",
+      "port": 8001
     }
   ]
 }

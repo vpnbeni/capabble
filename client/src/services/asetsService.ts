@@ -45,6 +45,28 @@ const asetsService = {
     const res = await api.get('/asets/locations', { params })
     return (res.data.data || []) as any[]
   },
+  getLocationTree: async () => {
+    const res = await api.get('/asets/locations/tree')
+    return res.data.data as { schoolName: string; tree: any[]; counts: Record<string, number> }
+  },
+  getLocationClassSections: async () => {
+    const res = await api.get('/asets/locations/class-sections')
+    return (res.data.data || []) as { className: string; sections: string[] }[]
+  },
+  getLocationSummary: async () => {
+    const res = await api.get('/asets/locations/summary')
+    return res.data.data as {
+      campuses: number
+      blocks: number
+      floors: number
+      rooms: number
+      assetsAssigned: number
+    }
+  },
+  searchLocations: async (q: string) => {
+    const res = await api.get('/asets/locations/search', { params: { q } })
+    return (res.data.data || []) as any[]
+  },
   getLocationOverview: async (id: string) => {
     const res = await api.get(`/asets/locations/${id}`)
     return res.data.data

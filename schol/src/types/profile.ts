@@ -1,7 +1,26 @@
+export interface SarasDetailBlock {
+  head_name: string | null
+  address_line: string | null
+  website: string | null
+  pin_code: string | null
+  year_of_foundation: string | null
+  first_opening_date: string | null
+  principal_gender: string | null
+  principal_qualifications: string | null
+  administrative_experience: string | null
+  teaching_experience: string | null
+  school_status: string | null
+  school_type: string | null
+  affiliation_period: string | null
+  managing_society: string | null
+  remarks: string | null
+}
+
 export interface SchoolProfile {
   school_id: string
   validation?: ValidationStatusBlock
   header: ProfileHeader
+  saras_detail?: SarasDetailBlock | null
   kys_mapping?: KysMappingSummary
   overview: ProfileOverview
   enrollment: EnrollmentBlock

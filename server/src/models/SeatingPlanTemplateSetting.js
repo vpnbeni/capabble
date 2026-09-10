@@ -96,6 +96,11 @@ const seatingPlanTemplateSettingSchema = new mongoose.Schema({
     enum: ['auto', 'manual'],
     default: 'auto',
   },
+  seatingPlanMode: {
+    type: String,
+    enum: ['same_across_days', 'different_per_day'],
+    default: 'different_per_day',
+  },
   mainGate: {
     type: mainGateSchema,
     default: () => ({}),

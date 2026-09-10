@@ -1,9 +1,19 @@
 const pdfGenerator = require('../utils/pdfGenerator');
 const seatingPlanBuilder = require('../utils/seatingPlanBuilder');
 const Room = require('../models/Room');
+const {
+  listAsetsExamRoomCandidates,
+  syncExamRoomsFromAsets,
+} = require('../utils/asetsExamRoomSync');
+const {
+  calculateLayoutCapacity,
+  normalizeSeatingLayout,
+  DEFAULT_SEATING_LAYOUT,
+} = require('../utils/roomSeatingLayout');
 
 const DEFAULT_TEMPLATE_SETTINGS = Object.freeze({
   roomAllocationMode: 'auto',
+  seatingPlanMode: 'different_per_day',
   functionaryDutyList: {
     pageSize: 'A4',
     orientation: 'landscape',
@@ -324,6 +334,9 @@ const normalizeTemplateSettings = (input = {}) => ({
   roomAllocationMode: String(input?.roomAllocationMode || DEFAULT_TEMPLATE_SETTINGS.roomAllocationMode).toLowerCase() === 'manual'
     ? 'manual'
     : 'auto',
+  seatingPlanMode: String(input?.seatingPlanMode || DEFAULT_TEMPLATE_SETTINGS.seatingPlanMode).toLowerCase() === 'same_across_days'
+    ? 'same_across_days'
+    : 'different_per_day',
   functionaryDutyList: normalizeFunctionaryDutyListSettings(input?.functionaryDutyList),
   mainGate: normalizeMainGateSettings(input?.mainGate),
   cbseCopy: normalizeCbseCopySettings(input?.cbseCopy),
@@ -406,6 +419,9 @@ exports.upsertTemplateSettings = async (req, res) => {
       existing.roomAllocationMode = typeof req.body?.roomAllocationMode === 'string'
         ? payload.roomAllocationMode
         : (existing.roomAllocationMode || DEFAULT_TEMPLATE_SETTINGS.roomAllocationMode);
+      if (typeof req.body?.seatingPlanMode === 'string') {
+        existing.seatingPlanMode = payload.seatingPlanMode;
+      }
       existing.mainGate = payload.mainGate;
       existing.cbseCopy = payload.cbseCopy;
       existing.roomFolderSlip = payload.roomFolderSlip;
@@ -450,6 +466,53 @@ exports.getRoomAllocationMode = async (req, res) => {
   }
 };
 
+exports.getSeatingPlanMode = async (req, res) => {
+  try {
+    const settings = await getResolvedTemplateSettings(req);
+    res.json({
+      success: true,
+      data: {
+        mode: settings.seatingPlanMode || 'different_per_day',
+      },
+    });
+  } catch (error) {
+    console.error('Get Seating Plan Mode Error:', error);
+    res.status(500).json({ message: 'Failed to fetch seating plan mode', error: error.message });
+  }
+};
+
+exports.updateSeatingPlanMode = async (req, res) => {
+  try {
+    const SeatingPlanTemplateSetting = req.models?.SeatingPlanTemplateSetting;
+    if (!SeatingPlanTemplateSetting) {
+      return res.status(500).json({ message: 'Template settings model is unavailable' });
+    }
+
+    const mode = String(req.body?.mode || '').toLowerCase() === 'same_across_days'
+      ? 'same_across_days'
+      : 'different_per_day';
+    const existing = await SeatingPlanTemplateSetting.findOne({}).sort({ updatedAt: -1 });
+
+    if (existing) {
+      existing.seatingPlanMode = mode;
+      await existing.save();
+    } else {
+      await SeatingPlanTemplateSetting.create({
+        ...normalizeTemplateSettings({}),
+        seatingPlanMode: mode,
+      });
+    }
+
+    return res.json({
+      success: true,
+      data: { mode },
+    });
+  } catch (error) {
+    console.error('Update Seating Plan Mode Error:', error);
+    res.status(500).json({ message: 'Failed to update seating plan mode', error: error.message });
+  }
+};
+
 exports.updateRoomAllocationMode = async (req, res) => {
   try {
     const SeatingPlanTemplateSetting = req.models?.SeatingPlanTemplateSetting;
@@ -480,6 +543,37 @@ exports.updateRoomAllocationMode = async (req, res) => {
   }
 };
 
+// List ASETS room locations with exam-room linkage status
+exports.getAsetsExamRoomCandidates = async (req, res) => {
+  try {
+    const candidates = await listAsetsExamRoomCandidates(req);
+    res.json(candidates);
+  } catch (error) {
+    console.error('Get ASETS Exam Room Candidates Error:', error);
+    res.status(error.statusCode || 500).json({
+      message: error.message || 'Failed to load ASETS rooms',
+      error: error.message,
+    });
+  }
+};
+
+// Sync exam Room records from selected ASETS locations
+exports.syncExamRoomsFromAsets = async (req, res) => {
+  try {
+    const result = await syncExamRoomsFromAsets(req, req.body?.locationIds);
+    res.json({
+      message: 'Exam rooms updated from ASETS.',
+      data: result,
+    });
+  } catch (error) {
+    console.error('Sync Exam Rooms From ASETS Error:', error);
+    res.status(error.statusCode || 500).json({
+      message: error.message || 'Failed to sync exam rooms from ASETS',
+      error: error.message,
+    });
+  }
+};
+
 // Get all rooms
 exports.getRooms = async (req, res) => {
   try {
@@ -506,7 +600,13 @@ exports.createRoom = async (req, res) => {
       return res.status(400).json({ message: `Room number '${roomNo}' already exists` });
     }
 
-    const room = new Room(req.body);
+    const payload = { ...req.body };
+    if (payload.seatingLayout) {
+      payload.seatingLayout = normalizeSeatingLayout(payload.seatingLayout);
+      payload.capacity = calculateLayoutCapacity(payload.seatingLayout);
+    }
+
+    const room = new Room(payload);
     await room.save();
     res.status(201).json(room);
   } catch (error) {
@@ -535,9 +635,15 @@ exports.updateRoom = async (req, res) => {
       }
     }
 
+    const payload = { ...req.body };
+    if (payload.seatingLayout !== undefined) {
+      payload.seatingLayout = normalizeSeatingLayout(payload.seatingLayout);
+      payload.capacity = calculateLayoutCapacity(payload.seatingLayout);
+    }
+
     const room = await Room.findByIdAndUpdate(
       req.params.id,
-      req.body,
+      payload,
       { new: true, runValidators: true }
     );
 
@@ -606,6 +712,7 @@ exports.generateMainGate = async (req, res) => {
     const seatingData = await seatingPlanBuilder.buildSeatingData(datesheetId, {
       centreDetails,
       roomAllocationMode: templateSettings.roomAllocationMode,
+      seatingPlanMode: templateSettings.seatingPlanMode,
     });
     const templateData = seatingPlanBuilder.buildMainGateData(seatingData);
     templateData.templateSettings = templateSettings.mainGate;
@@ -628,6 +735,7 @@ exports.generateRoomFolderSlip = async (req, res) => {
     const seatingData = await seatingPlanBuilder.buildSeatingData(datesheetId, {
       centreDetails,
       roomAllocationMode: templateSettings.roomAllocationMode,
+      seatingPlanMode: templateSettings.seatingPlanMode,
     });
     const templateData = seatingPlanBuilder.buildRoomFolderSlipData(seatingData);
     templateData.templateSettings = templateSettings.roomFolderSlip;
@@ -650,6 +758,7 @@ exports.generateRoomDoorSlip = async (req, res) => {
     const seatingData = await seatingPlanBuilder.buildSeatingData(datesheetId, {
       centreDetails,
       roomAllocationMode: templateSettings.roomAllocationMode,
+      seatingPlanMode: templateSettings.seatingPlanMode,
     });
     const templateData = seatingPlanBuilder.buildRoomDoorSlipData(seatingData);
     templateData.templateSettings = templateSettings.roomDoorSlip;
@@ -672,6 +781,7 @@ exports.generateCBSECopy = async (req, res) => {
     const seatingData = await seatingPlanBuilder.buildSeatingData(datesheetId, {
       centreDetails,
       roomAllocationMode: templateSettings.roomAllocationMode,
+      seatingPlanMode: templateSettings.seatingPlanMode,
     });
     const templateData = seatingPlanBuilder.buildCBSECopyData(seatingData);
     templateData.templateSettings = templateSettings.cbseCopy;

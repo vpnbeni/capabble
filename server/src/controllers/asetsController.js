@@ -11,6 +11,23 @@ const {
   normalizeSerial,
   canTransitionStatus,
 } = require('../modules/asets/lifecycle');
+const {
+  CAMPUS,
+  BLOCK,
+  FLOOR,
+  ROOM,
+  ROOM_TYPE_VALUES,
+  normalizeLocationType,
+  validateHierarchy,
+  buildTree,
+  countByType,
+  buildPathSegments,
+} = require('../modules/asets/locationHierarchy');
+const {
+  buildClassSectionOptions,
+  getClassSectionLookupFromRequest,
+  validateRoomClassSection,
+} = require('../utils/classSectionMatrix');
 
 const MODEL_KEYS = {
   Category: 'AssetCategory',
@@ -723,16 +740,129 @@ const categories = makeSimpleCrud(MODEL_KEYS.Category, [
   'name', 'code', 'parentId', 'description', 'trackingModeDefault', 'requiredFields', 'customFieldDefs', 'sortOrder',
 ]);
 
-const validateCampusHierarchy = async (req, payload) => {
-  const Location = getModel(req, MODEL_KEYS.Location);
-  const parent = payload.parentId ? await Location.findById(payload.parentId).lean() : null;
-  if (payload.parentId && !parent) throw new Error('Selected parent location no longer exists.');
-  if (payload.type === 'Campus') throw new Error('Campus is provided by default and cannot be created manually.');
-  if (payload.type === 'Block' && parent?.type !== 'Campus') throw new Error('A block must belong to a campus.');
-  if (payload.type === 'Floor' && parent?.type !== 'Block') throw new Error('A floor must belong to a block.');
-  if (['Location', 'Room', 'Classroom', 'Lab', 'Office', 'Store', 'Other'].includes(payload.type) && !['Block', 'Floor'].includes(parent?.type)) {
-    throw new Error('A location must belong to a block or floor.');
+const LEGACY_LEAF_TYPES = ['Location', 'Classroom', 'Lab', 'Office', 'Store', 'Other'];
+
+const normalizeRoomPayload = (payload) => {
+  if (LEGACY_LEAF_TYPES.includes(payload.type)) {
+    const legacy = payload.type;
+    payload.roomType = payload.roomType || (
+      legacy === 'Lab' ? 'Laboratory'
+        : legacy === 'Location' ? 'Other'
+          : legacy === 'Store' ? 'Store'
+            : legacy
+    );
+    payload.type = ROOM;
   }
+  if (payload.type === ROOM && !payload.roomType) payload.roomType = 'Other';
+  if (payload.locationStatus === 'Inactive') payload.isActive = false;
+  if (payload.locationStatus === 'Active') payload.isActive = true;
+};
+
+const assertUniqueLocationCode = async (Location, payload, excludeId = null) => {
+  const code = String(payload.code || '').trim();
+  if (!code) return;
+  const filter = {
+    parentId: payload.parentId || null,
+    code,
+    isArchived: { $ne: true },
+  };
+  if (excludeId) filter._id = { $ne: excludeId };
+  const duplicate = await Location.findOne(filter).select('_id name').lean();
+  if (duplicate) {
+    const error = new Error(`Location code "${code}" already exists at this level.`);
+    error.statusCode = 400;
+    throw error;
+  }
+};
+
+const validateCampusHierarchy = async (req, payload, { isUpdate = false } = {}) => {
+  const Location = getModel(req, MODEL_KEYS.Location);
+  normalizeRoomPayload(payload);
+
+  if (!String(payload.name || '').trim()) {
+    const error = new Error('Location name is required.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const parent = payload.parentId ? await Location.findById(payload.parentId).lean() : null;
+  if (payload.parentId && !parent) {
+    const error = new Error('Selected parent location no longer exists.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const hierarchyCheck = validateHierarchy({
+    type: payload.type,
+    parentType: parent?.type,
+    parentId: payload.parentId,
+  });
+  if (!hierarchyCheck.ok) {
+    const error = new Error(hierarchyCheck.message);
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (!isUpdate && normalizeLocationType(payload.type) === ROOM && !String(payload.roomNumber || '').trim()) {
+    const error = new Error('Room number is required.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (normalizeLocationType(payload.type) === ROOM) {
+    const lookup = await getClassSectionLookupFromRequest(req);
+    const classSectionCheck = validateRoomClassSection(lookup, payload.className, payload.section);
+    if (!classSectionCheck.ok) {
+      const error = new Error(classSectionCheck.error);
+      error.statusCode = 400;
+      throw error;
+    }
+    payload.className = classSectionCheck.className || '';
+    payload.section = classSectionCheck.section || '';
+
+    if (payload.className && payload.section) {
+      const duplicateFilter = {
+        className: payload.className,
+        section: payload.section,
+        isArchived: { $ne: true },
+        type: { $in: [ROOM, 'Location', 'Classroom', 'Lab', 'Office', 'Store', 'Other'] },
+      };
+      const excludeId = payload._id || (isUpdate ? req.params?.id : null);
+      if (excludeId) duplicateFilter._id = { $ne: excludeId };
+      const duplicateRoom = await Location.findOne(duplicateFilter).select('name').lean();
+      if (duplicateRoom) {
+        const error = new Error(`A room is already linked to ${payload.className} - ${payload.section}.`);
+        error.statusCode = 400;
+        throw error;
+      }
+    }
+  } else {
+    payload.className = '';
+    payload.section = '';
+  }
+
+  if (!isUpdate) {
+    await assertUniqueLocationCode(Location, payload, payload._id);
+  }
+};
+
+const collectDescendantIds = async (Location, rootId) => {
+  const all = await Location.find({ isArchived: { $ne: true } }).select('_id parentId').lean();
+  const childrenMap = new Map();
+  all.forEach((row) => {
+    const parentKey = row.parentId ? String(row.parentId) : '';
+    if (!childrenMap.has(parentKey)) childrenMap.set(parentKey, []);
+    childrenMap.get(parentKey).push(String(row._id));
+  });
+  const ids = [];
+  const queue = [String(rootId)];
+  while (queue.length) {
+    const current = queue.shift();
+    ids.push(current);
+    const kids = childrenMap.get(current) || [];
+    kids.forEach((kid) => queue.push(kid));
+  }
+  return ids;
 };
 
 const ensureDefaultCampus = async (req) => {
@@ -754,6 +884,7 @@ const ensureDefaultCampus = async (req) => {
 
 const locations = makeSimpleCrud(MODEL_KEYS.Location, [
   'name', 'code', 'type', 'parentId', 'department', 'roomRef', 'capacityHint', 'isStore', 'notes',
+  'address', 'floorNumber', 'roomNumber', 'className', 'section', 'roomType', 'locationStatus',
 ], {
   beforeCreate: async (req, payload) => {
     await validateCampusHierarchy(req, payload);
@@ -764,10 +895,16 @@ const locations = makeSimpleCrud(MODEL_KEYS.Location, [
   },
   beforeUpdate: async (req, record) => {
     const Location = getModel(req, MODEL_KEYS.Location);
+    if (req.body.parentId !== undefined && String(req.body.parentId || '') !== String(record.parentId || '')) {
+      const error = new Error('Parent location cannot be changed here. Use Move Location when available.');
+      error.statusCode = 400;
+      throw error;
+    }
     record.path = record.parentId
       ? `${await buildLocationPath(Location, record.parentId)} › ${record.name}`
       : record.name;
-    await validateCampusHierarchy(req, record);
+    await validateCampusHierarchy(req, record, { isUpdate: true });
+    await assertUniqueLocationCode(Location, record, record._id);
   },
 });
 const listLocations = locations.list;
@@ -777,6 +914,164 @@ locations.list = async (req, res) => {
     return listLocations(req, res);
   } catch (error) {
     return sendError(res, error, 'Failed to prepare default campus.');
+  }
+};
+
+locations.remove = async (req, res) => {
+  try {
+    const Location = getModel(req, MODEL_KEYS.Location);
+    const Asset = getModel(req, MODEL_KEYS.Asset);
+    const record = await Location.findById(req.params.id);
+    if (!record || record.isArchived) {
+      return res.status(404).json({ success: false, message: 'Location not found.' });
+    }
+
+    const childCount = await Location.countDocuments({
+      parentId: record._id,
+      isArchived: { $ne: true },
+    });
+    if (childCount > 0) {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot archive location with ${childCount} sub-location(s). Archive or move children first.`,
+        data: { childCount },
+      });
+    }
+
+    const descendantIds = await collectDescendantIds(Location, record._id);
+    const assetCount = await Asset.countDocuments({
+      locationId: { $in: descendantIds },
+      isActive: { $ne: false },
+    });
+    if (assetCount > 0) {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot archive location with ${assetCount} assigned asset(s).`,
+        data: { assetCount },
+      });
+    }
+
+    record.isActive = false;
+    record.isArchived = true;
+    record.locationStatus = 'Inactive';
+    record.updatedBy = actorFromReq(req);
+    await record.save();
+    return res.json({ success: true, message: 'Location archived.' });
+  } catch (error) {
+    return sendError(res, error, 'Failed to archive location.');
+  }
+};
+
+const getSchoolDisplayName = async (req) => {
+  const SchoolProfile = req.models?.SchoolProfile;
+  const profile = SchoolProfile ? await SchoolProfile.findOne({}).select('schoolName').lean() : null;
+  return profile?.schoolName || req.tenant?.name || 'School';
+};
+
+const getLocationAssetCountMap = async (Asset) => {
+  const rows = await Asset.aggregate([
+    { $match: { isActive: { $ne: false }, locationId: { $ne: null } } },
+    {
+      $group: {
+        _id: '$locationId',
+        count: { $sum: 1 },
+        value: { $sum: { $ifNull: ['$currentValue', 0] } },
+      },
+    },
+  ]);
+  const map = {};
+  rows.forEach((row) => {
+    map[String(row._id)] = { count: row.count, value: row.value };
+  });
+  return map;
+};
+
+const getLocationClassSections = async (req, res) => {
+  try {
+    if (!req.models?.TimetableState) {
+      return res.json({ success: true, data: [] });
+    }
+    const filter = req.academicSession ? { academicSession: req.academicSession } : { academicSession: null };
+    const state = await req.models.TimetableState.findOne(filter)
+      .sort({ updatedAt: -1 })
+      .select('matrixClasses matrixSections matrixSelection')
+      .lean();
+    return res.json({ success: true, data: buildClassSectionOptions(state) });
+  } catch (error) {
+    return sendError(res, error, 'Failed to load class-section options.');
+  }
+};
+
+const getLocationTree = async (req, res) => {
+  try {
+    await ensureDefaultCampus(req);
+    const Location = getModel(req, MODEL_KEYS.Location);
+    const Asset = getModel(req, MODEL_KEYS.Asset);
+    const [locations, assetCountMap, schoolName] = await Promise.all([
+      Location.find({ isActive: { $ne: false }, isArchived: { $ne: true } }).sort({ sortOrder: 1, name: 1 }).lean(),
+      getLocationAssetCountMap(Asset),
+      getSchoolDisplayName(req),
+    ]);
+    const tree = buildTree(locations, assetCountMap);
+    return res.json({
+      success: true,
+      data: {
+        schoolName,
+        tree,
+        counts: countByType(locations),
+      },
+    });
+  } catch (error) {
+    return sendError(res, error, 'Failed to load location tree.');
+  }
+};
+
+const getLocationSummary = async (req, res) => {
+  try {
+    await ensureDefaultCampus(req);
+    const Location = getModel(req, MODEL_KEYS.Location);
+    const Asset = getModel(req, MODEL_KEYS.Asset);
+    const locations = await Location.find({ isActive: { $ne: false }, isArchived: { $ne: true } }).select('type').lean();
+    const assetsAssigned = await Asset.countDocuments({ isActive: { $ne: false }, locationId: { $ne: null } });
+    return res.json({
+      success: true,
+      data: {
+        ...countByType(locations),
+        assetsAssigned,
+      },
+    });
+  } catch (error) {
+    return sendError(res, error, 'Failed to load location summary.');
+  }
+};
+
+const searchLocations = async (req, res) => {
+  try {
+    await ensureDefaultCampus(req);
+    const Location = getModel(req, MODEL_KEYS.Location);
+    const q = String(req.query.q || '').trim();
+    if (!q) return res.json({ success: true, data: [] });
+    const regex = new RegExp(escapeRegex(q), 'i');
+    const [matches, all] = await Promise.all([
+      Location.find({
+        isArchived: { $ne: true },
+        isActive: { $ne: false },
+        $or: [{ name: regex }, { code: regex }, { roomNumber: regex }, { className: regex }, { section: regex }],
+      }).sort({ name: 1 }).limit(50).lean(),
+      Location.find({ isArchived: { $ne: true }, isActive: { $ne: false } }).select('_id name type parentId').lean(),
+    ]);
+    const byId = new Map(all.map((row) => [String(row._id), row]));
+    const data = matches.map((row) => {
+      const pathSegments = buildPathSegments(row, byId);
+      return {
+        ...row,
+        pathSegments,
+        pathLabel: pathSegments.map((segment) => segment.name).join(' › '),
+      };
+    });
+    return res.json({ success: true, data });
+  } catch (error) {
+    return sendError(res, error, 'Failed to search locations.');
   }
 };
 
@@ -790,7 +1085,7 @@ const getLocationOverview = async (req, res) => {
     if (!location) return res.status(404).json({ success: false, message: 'Location not found.' });
     const locationId = location._id;
     const active = { isActive: { $ne: false } };
-    const [assets, allocations, transfers, children] = await Promise.all([
+    const [assets, allocations, transfers, children, allLocations, descendantIds] = await Promise.all([
       Asset.find({ ...active, locationId }).sort({ name: 1 }).limit(500)
         .populate('categoryId', 'name code').lean(),
       Allocation.find({ ...active, $or: [{ fromLocationId: locationId }, { toLocationId: locationId }] })
@@ -798,12 +1093,37 @@ const getLocationOverview = async (req, res) => {
       Transfer.find({ ...active, $or: [{ sourceLocationId: locationId }, { destinationLocationId: locationId }] })
         .sort({ transferDate: -1 }).limit(100).populate('assetId', 'assetId name').populate('sourceLocationId', 'name path').populate('destinationLocationId', 'name path').lean(),
       Location.find({ ...active, parentId: locationId }).sort({ type: 1, name: 1 }).lean(),
+      Location.find({ isArchived: { $ne: true } }).select('_id name type parentId').lean(),
+      collectDescendantIds(Location, locationId),
     ]);
+    const byId = new Map(allLocations.map((row) => [String(row._id), row]));
+    const pathSegments = buildPathSegments(location, byId);
+    const parent = location.parentId ? await Location.findById(location.parentId).select('name type _id').lean() : null;
+    const normalizedType = normalizeLocationType(location.type);
+    const typeCounts = {
+      blocks: children.filter((child) => normalizeLocationType(child.type) === BLOCK).length,
+      floors: children.filter((child) => normalizeLocationType(child.type) === FLOOR).length,
+      rooms: children.filter((child) => normalizeLocationType(child.type) === ROOM).length,
+    };
+    const descendantAssets = await Asset.find({ ...active, locationId: { $in: descendantIds } }).select('currentValue').lean();
     const custodians = [...new Set(assets.map((asset) => asset.custodianName).filter(Boolean))];
     return res.json({ success: true, data: {
-      location, assets, allocations, transfers, custodians,
+      location,
+      parent,
+      pathSegments,
+      assets,
+      allocations,
+      transfers,
+      custodians,
       children,
-      summary: { assetCount: assets.length, assetValue: assets.reduce((total, asset) => total + (asset.currentValue || 0), 0), childCount: children.length },
+      summary: {
+        assetCount: assets.length,
+        assetValue: assets.reduce((total, asset) => total + (asset.currentValue || 0), 0),
+        childCount: children.length,
+        totalAssetCount: descendantAssets.length,
+        totalAssetValue: descendantAssets.reduce((total, asset) => total + (asset.currentValue || 0), 0),
+        ...typeCounts,
+      },
     } });
   } catch (error) {
     return sendError(res, error, 'Failed to load location overview.');
@@ -1817,6 +2137,8 @@ const getMeta = async (_req, res) => {
       statuses: ASSET_STATUSES,
       conditions: ASSET_CONDITIONS,
       transitions: require('../modules/asets/lifecycle').STATUS_TRANSITIONS,
+      locationTypes: [CAMPUS, BLOCK, FLOOR, ROOM],
+      roomTypes: ROOM_TYPE_VALUES,
     },
   });
 };
@@ -1831,6 +2153,10 @@ module.exports = {
   archiveAsset,
   categories,
   locations,
+  getLocationTree,
+  getLocationSummary,
+  getLocationClassSections,
+  searchLocations,
   getLocationOverview,
   vendors,
   listAllocations,

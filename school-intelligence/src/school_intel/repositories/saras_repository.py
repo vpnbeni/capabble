@@ -29,9 +29,13 @@ class SarasRepository:
                 "raw_row", "detail_fields", "parser_version", "identity_match_method",
                 "identity_confidence", "requires_manual_review",
             ):
-                setattr(existing, field, getattr(record, field))
+                value = getattr(record, field)
+                if value is not None:
+                    setattr(existing, field, value)
             self.session.flush()
             return existing
+        if record.requires_manual_review is None:
+            record.requires_manual_review = False
         self.session.add(record)
         self.session.flush()
         return record
