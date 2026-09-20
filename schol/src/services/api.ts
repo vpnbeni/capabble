@@ -2,16 +2,54 @@ import axios from 'axios'
 import type { DirectoryItem, SchoolProfile, YearDetail } from '@/types/profile'
 import type { DatabaseConfig, SetupStatus } from '@/types/setup'
 
+const TOKEN_KEY = 'schol_token'
+
 const api = axios.create({
   baseURL: '/api',
   headers: {
-    'x-schol-role': localStorage.getItem('schol_role') || 'analyst',
+    'x-schol-role': localStorage.getItem('schol_role') || 'admin',
   },
 })
+
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem(TOKEN_KEY)
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
+  return config
+})
+
+export function getAuthToken(): string | null {
+  return localStorage.getItem(TOKEN_KEY)
+}
+
+export function setAuthToken(token: string) {
+  localStorage.setItem(TOKEN_KEY, token)
+}
+
+export function clearAuthToken() {
+  localStorage.removeItem(TOKEN_KEY)
+}
 
 export function setScholRole(role: string) {
   localStorage.setItem('schol_role', role)
   api.defaults.headers['x-schol-role'] = role
+}
+
+export async function loginRequest(username: string, password: string) {
+  const { data } = await api.post<{
+    token: string
+    token_type: string
+    username: string
+    role: string
+    expires_in: number
+  }>('/auth/login', { username, password })
+  return data
+}
+
+export async function fetchAuthMe() {
+  const { data } = await api.get<{ username: string; role: string; auth_enabled: boolean }>('/auth/me')
+  return data
 }
 
 export async function fetchSchoolProfile(schoolId: string, year?: string): Promise<SchoolProfile> {

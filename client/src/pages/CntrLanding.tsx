@@ -16,7 +16,7 @@ import {
   Copyright,
   Heart,
 } from 'lucide-react'
-import fullLogo from '../assets/full logo.png'
+import capabbleMark from '../assets/capabble-mark.svg'
 import dashboardPreview from '../assets/dashboard.png'
 import dashboardPreview2 from '../assets/dashboard2.png'
 
@@ -114,14 +114,21 @@ const CntrLanding: React.FC = () => {
         <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 lg:px-8 lg:py-16">
           <div className="grid items-center gap-10 lg:grid-cols-2 lg:gap-12">
             <div>
-              <img
-                src={fullLogo}
-                alt="Cntr - Exam Centre Control"
-                className="h-28 w-auto"
-              />
-              <p className="mt-4 text-lg font-semibold tracking-[0.08em] text-primary-900 sm:text-xl">
-                Exam Centre Control
-              </p>
+              <div className="flex items-center gap-3 sm:gap-4">
+                <img
+                  src={capabbleMark}
+                  alt="capabble"
+                  className="h-14 w-14 shrink-0 drop-shadow-sm sm:h-16 sm:w-16"
+                />
+                <div>
+                  <p className="text-4xl font-black tracking-tight text-[#1a3a8a] sm:text-5xl">
+                    capabble
+                  </p>
+                  <p className="mt-1 text-sm font-semibold tracking-[0.12em] text-sky-700 sm:text-base">
+                    Exam Centre Control
+                  </p>
+                </div>
+              </div>
               <h1 className="mt-8 text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
                 Control The Entire Examination Process Effortlessly
               </h1>
@@ -143,7 +150,7 @@ const CntrLanding: React.FC = () => {
             <div className="flex items-center justify-center lg:justify-end">
               <img
                 src={dashboardPreview}
-                alt="Cntr dashboard preview"
+                alt="capabble dashboard preview"
                 className="block h-auto w-full max-w-3xl"
               />
             </div>
@@ -230,7 +237,7 @@ const CntrLanding: React.FC = () => {
             <div className="flex items-center justify-center lg:justify-start">
               <img
                 src={dashboardPreview2}
-                alt="Cntr room allocation preview"
+                alt="capabble room allocation preview"
                 className="block h-auto w-full max-w-md"
               />
             </div>
@@ -261,7 +268,7 @@ const CntrLanding: React.FC = () => {
       <footer className="border-t border-slate-200 bg-slate-50 py-6 text-center text-sm text-slate-500">
         <span className="inline-flex flex-wrap items-center justify-center gap-1">
           <Copyright className="h-4 w-4" />
-          <span>{new Date().getFullYear()} Cntr - Exam Centre Control. Powered by Capabble.</span>
+          <span>{new Date().getFullYear()} capabble — Exam Centre Control.</span>
           <span>Designed &amp; Developed with</span>
           <Heart className="h-4 w-4 fill-red-500 text-red-500" />
           <span>in Bharat.</span>

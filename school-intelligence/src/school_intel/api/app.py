@@ -3,7 +3,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
+from starlette.middleware.base import BaseHTTPMiddleware
 
+from school_intel.api.deps import enforce_schol_auth
+from school_intel.api.routes.auth import router as auth_router
 from school_intel.api.routes.collection import router as collection_router
 from school_intel.api.routes.geography import router as geography_router
 from school_intel.api.routes.kys_mapping import router as kys_mapping_router
@@ -21,7 +24,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(BaseHTTPMiddleware, dispatch=enforce_schol_auth)
 
+app.include_router(auth_router)
 app.include_router(schools_router)
 app.include_router(setup_router)
 app.include_router(geography_router)

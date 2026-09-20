@@ -1,12 +1,14 @@
-import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard,
+  LogOut,
   Map,
   Search,
   School,
   Users,
 } from 'lucide-react'
 import clsx from 'clsx'
+import { useAuth } from '@/context/AuthContext'
 
 const nav = [
   { to: '/schools', label: 'School Directory', icon: School },
@@ -16,6 +18,14 @@ const nav = [
 ]
 
 export function ScholLayout() {
+  const { username, logout, authRequired } = useAuth()
+  const navigate = useNavigate()
+
+  function handleLogout() {
+    logout()
+    navigate('/login', { replace: true })
+  }
+
   return (
     <div className="min-h-screen bg-slate-50">
       <div className="flex min-h-screen">
@@ -46,7 +56,7 @@ export function ScholLayout() {
           </nav>
         </aside>
 
-        <div className="flex min-w-0 flex-1 flex-col">
+        <div className="flex min-h-0 flex-1 flex-col">
           <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur">
             <div className="flex items-center gap-4 px-4 py-3 lg:px-8">
               <div className="relative hidden flex-1 md:block">
@@ -57,12 +67,23 @@ export function ScholLayout() {
                 />
               </div>
               <div className="ml-auto flex items-center gap-3">
-                <button className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-600">
-                  <Map className="h-4 w-4" />
-                </button>
+                {username ? (
+                  <span className="hidden text-sm text-slate-500 sm:inline">{username}</span>
+                ) : null}
                 <div className="rounded-full bg-primary-100 px-3 py-1 text-sm font-medium text-primary-700">
                   SCHOL
                 </div>
+                {authRequired ? (
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50"
+                    title="Sign out"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    <span className="hidden sm:inline">Sign out</span>
+                  </button>
+                ) : null}
               </div>
             </div>
           </header>

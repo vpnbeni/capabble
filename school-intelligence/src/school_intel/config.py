@@ -57,6 +57,38 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("SCHOOL_INTEL_PRESERVE_RETRIEVAL_HISTORY", "preserve_retrieval_history"),
     )
 
+    # Shared Capabble-team login for SCHOL (optional). When password is set, API requires Bearer auth.
+    schol_dev_username: str = Field(
+        default="capabble",
+        validation_alias=AliasChoices("SCHOL_DEV_USERNAME", "schol_dev_username"),
+    )
+    schol_dev_password: str = Field(
+        default="",
+        validation_alias=AliasChoices("SCHOL_DEV_PASSWORD", "schol_dev_password"),
+    )
+    schol_dev_token_secret: str = Field(
+        default="",
+        validation_alias=AliasChoices("SCHOL_DEV_TOKEN_SECRET", "schol_dev_token_secret"),
+    )
+    schol_dev_token_ttl_seconds: int = Field(
+        default=60 * 60 * 24 * 7,
+        validation_alias=AliasChoices("SCHOL_DEV_TOKEN_TTL_SECONDS", "schol_dev_token_ttl_seconds"),
+    )
+
+    @property
+    def schol_auth_enabled(self) -> bool:
+        return bool(self.schol_dev_password.strip())
+
+    @property
+    def schol_token_secret(self) -> str:
+        """HMAC secret for session tokens; falls back to password-derived value when unset."""
+        secret = self.schol_dev_token_secret.strip()
+        if secret:
+            return secret
+        if self.schol_dev_password.strip():
+            return f"schol-dev:{self.schol_dev_password}"
+        return "schol-dev-insecure-default"
+
 
 @lru_cache
 def get_settings() -> Settings:
