@@ -28,8 +28,8 @@
     "school-intel:test:live": "cd school-intelligence && python -m pytest -m live -q",
     "school-intel:saras:test": "cd school-intelligence && python -m pytest tests/test_saras_parser.py -q",
     "school-intel:api": "cd school-intelligence && python -m uvicorn school_intel.api.app:app --reload --port 8001",
-    "school-intel:db:push-cloud": "bash school-intelligence/scripts/db_push_to_cloud.sh",
-    "school-intel:db:pull-cloud": "bash school-intelligence/scripts/db_pull_from_cloud.sh",
+    "school-intel:db:push-cloud": "node school-intelligence/scripts/db_sync.mjs push",
+    "school-intel:db:pull-cloud": "node school-intelligence/scripts/db_sync.mjs pull",
     "schol": "cd schol && npm run dev",
     "schol:install": "cd schol && npm install",
     "dev:schol": "concurrently \"npm run school-intel:api\" \"npm run schol\""
