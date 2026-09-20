@@ -44,6 +44,19 @@ class SchoolRepository:
         )
         return self.session.scalar(stmt)
 
+    def find_identifiers_map(
+        self, identifier_type: str, identifier_values: list[str]
+    ) -> dict[str, SchoolIdentifier]:
+        """Batch lookup: normalized identifier_value → SchoolIdentifier row."""
+        norms = [normalize_identifier(v) for v in identifier_values if v and str(v).strip()]
+        if not norms:
+            return {}
+        stmt = select(SchoolIdentifier).where(
+            SchoolIdentifier.identifier_type == identifier_type,
+            SchoolIdentifier.identifier_value.in_(norms),
+        )
+        return {row.identifier_value: row for row in self.session.scalars(stmt).all()}
+
     def find_by_normalized_name_district_pin(
         self, canonical_name: str, district: str | None, pin_code: str | None
     ) -> list[School]:

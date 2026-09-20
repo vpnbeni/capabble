@@ -6,12 +6,18 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException
 from pydantic import BaseModel, Field
 
 from school_intel.api.deps import DbSession, ScholRole, require_collection_access
+from school_intel.collectors.saras_collector import SarasBlockedError
 from school_intel.domain.collection_constants import ACADEMIC_YEARS, ALL_DATA_GROUPS
 from school_intel.domain.enums import CollectionRunStatus
 from school_intel.repositories.batch_collection_repository import BatchCollectionRepository
 from school_intel.services.batch_collection_orchestrator import BatchCollectionOrchestrator
 from school_intel.services.collection_preview_service import CollectionPreviewService
 from school_intel.services.saras_enrichment_service import SarasEnrichmentService
+
+SARAS_BLOCKED_DETAIL = (
+    "SARAS appears to be rate-limiting or challenging requests right now. "
+    "Wait a few minutes and try again."
+)
 
 router = APIRouter(prefix="/api/collection", tags=["collection"])
 
@@ -25,6 +31,8 @@ class CollectionPreviewRequest(BaseModel):
     year_from: str = "2018-19"
     year_to: str = "2025-26"
     data_groups: list[str] = Field(default_factory=lambda: ALL_DATA_GROUPS.copy())
+    page: int = Field(1, ge=1)
+    limit: int = Field(20, ge=1, le=200)
 
 
 class CollectionRunCreateRequest(CollectionPreviewRequest):
@@ -45,6 +53,8 @@ def preview_collection(payload: CollectionPreviewRequest, db: DbSession, role: S
     service = CollectionPreviewService(db)
     try:
         return service.preview(**payload.model_dump())
+    except SarasBlockedError as exc:
+        raise HTTPException(status_code=503, detail=SARAS_BLOCKED_DETAIL) from exc
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     finally:

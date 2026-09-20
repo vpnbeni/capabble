@@ -10,8 +10,8 @@ import httpx
 
 from school_intel.collectors.base import logger
 from school_intel.collectors.endpoints import (
-    KYS_API_BASE,
-    KYS_SCHOOL_API_BASE,
+    KYS_API_PATH,
+    KYS_SCHOOL_API_PATH,
     SCHOOL_BY_YEAR,
     SCHOOL_FACILITY,
     SCHOOL_PROFILE,
@@ -19,6 +19,7 @@ from school_intel.collectors.endpoints import (
     SOCIAL_DATA,
     YEAR_DISCOVERY_MAX_YEAR_ID,
 )
+from school_intel.collectors.rate_limiter import get_kys_rate_limiter
 from school_intel.config import get_settings
 from school_intel.domain.collection import AcademicYearMapping
 from school_intel.domain.enums import DataSource, KysEndpoint
@@ -54,6 +55,9 @@ class KysCollector:
     def __init__(self, client: httpx.Client | None = None) -> None:
         settings = get_settings()
         self._settings = settings
+        base_url = settings.kys_base_url.rstrip("/")
+        self._school_api_base = f"{base_url}/{KYS_SCHOOL_API_PATH}"
+        self._api_base = f"{base_url}/{KYS_API_PATH}"
         self._client = client or httpx.Client(
             timeout=settings.http_timeout_seconds,
             headers={
@@ -62,7 +66,6 @@ class KysCollector:
             },
             follow_redirects=True,
         )
-        self._last_request_at = 0.0
 
     def close(self) -> None:
         self._client.close()
@@ -78,11 +81,7 @@ class KysCollector:
         return f"kys|{endpoint}|{school_id}|yearId={year_id}{flag_part}"
 
     def _rate_limit(self) -> None:
-        delay = max(self._settings.kys_request_delay_seconds, 0.0)
-        elapsed = time.monotonic() - self._last_request_at
-        if elapsed < delay:
-            time.sleep(delay - elapsed)
-        self._last_request_at = time.monotonic()
+        get_kys_rate_limiter().wait(self._settings.kys_request_delay_seconds)
 
     def _request_with_retry(self, url: str, params: dict[str, Any]) -> httpx.Response:
         max_attempts = max(self._settings.http_max_retries, 1)
@@ -93,6 +92,9 @@ class KysCollector:
             try:
                 logger.info("kys_fetch url=%s params=%s attempt=%s", url, params, attempt)
                 response = self._client.get(url, params=params)
+
+                if response.status_code == 403:
+                    logger.warning("kys_blocked_or_challenged url=%s params=%s", url, params)
 
                 if response.status_code in RETRYABLE_STATUS_CODES and attempt < max_attempts:
                     backoff = min(2 ** attempt + random.uniform(0, 1), 30)
@@ -138,35 +140,87 @@ class KysCollector:
             return False
         return True
 
+    def _fetch_latest_year_id(self, school_id: str) -> int | None:
+        """Look up the school's current/latest yearId in a single call.
+
+        `SCHOOL_BY_YEAR` with action=1 returns only the current year (no
+        historical list), so this only bounds the probe range below — it
+        does not replace the per-year report-card probing.
+        """
+        url = f"{self._school_api_base}/{SCHOOL_BY_YEAR}"
+        response = self._request_with_retry(url, {"schoolId": school_id, "action": 1})
+        if response.status_code != 200:
+            return None
+        payload = self._parse_json_response(response)
+        if not self.is_api_success(payload, response.status_code):
+            return None
+        data = payload.get("data")
+        if not isinstance(data, dict):
+            return None
+        year_id = data.get("yearId")
+        try:
+            return int(year_id)
+        except (TypeError, ValueError):
+            return None
+
     def discover_academic_years(self, school_id: str) -> list[AcademicYearMapping]:
-        """Discover available academic years by probing report-card for candidate yearIds."""
+        """Discover available academic years by probing report-card for candidate yearIds.
+
+        Bounded by the school's latest known yearId (via SCHOOL_BY_YEAR) when
+        available, instead of always probing all the way to
+        YEAR_DISCOVERY_MAX_YEAR_ID — this avoids wasted rate-limited requests
+        for schools whose latest year is well below the cap.
+        """
         discovered: dict[str, AcademicYearMapping] = {}
 
-        for year_id in range(1, YEAR_DISCOVERY_MAX_YEAR_ID + 1):
-            url = f"{KYS_SCHOOL_API_BASE}/{SCHOOL_REPORT_CARD}"
+        latest_year_id = self._fetch_latest_year_id(school_id)
+        max_year_id = YEAR_DISCOVERY_MAX_YEAR_ID
+        if latest_year_id is not None and 0 < latest_year_id < YEAR_DISCOVERY_MAX_YEAR_ID:
+            max_year_id = latest_year_id
+
+        consecutive_misses = 0
+        for year_id in range(1, max_year_id + 1):
+            url = f"{self._school_api_base}/{SCHOOL_REPORT_CARD}"
             response = self._request_with_retry(url, {"schoolId": school_id, "yearId": year_id})
-            if response.status_code != 200:
+            hit = False
+            if response.status_code == 200:
+                payload = self._parse_json_response(response)
+                if self.is_api_success(payload, response.status_code):
+                    data = payload.get("data")
+                    if isinstance(data, dict):
+                        year_desc = data.get("yearDesc")
+                        response_year_id = data.get("yearId")
+                        year_id_matches = response_year_id is None or int(response_year_id) == year_id
+                        if year_desc and year_id_matches:
+                            academic_year = str(year_desc).strip()
+                            if academic_year not in discovered:
+                                discovered[academic_year] = AcademicYearMapping(
+                                    year_id=year_id,
+                                    year_desc=academic_year,
+                                    academic_year=academic_year,
+                                )
+                            hit = True
+
+            if hit:
+                consecutive_misses = 0
                 continue
-            payload = self._parse_json_response(response)
-            if not self.is_api_success(payload, response.status_code):
-                continue
-            data = payload.get("data")
-            if not isinstance(data, dict):
-                continue
-            year_desc = data.get("yearDesc")
-            if not year_desc:
-                continue
-            response_year_id = data.get("yearId")
-            if response_year_id is not None and int(response_year_id) != year_id:
-                continue
-            academic_year = str(year_desc).strip()
-            if academic_year in discovered:
-                continue
-            discovered[academic_year] = AcademicYearMapping(
-                year_id=year_id,
-                year_desc=academic_year,
-                academic_year=academic_year,
-            )
+
+            consecutive_misses += 1
+            # Academic years are contiguous in the normal case; once we've
+            # found at least one and then miss a few in a row, further
+            # probing is very unlikely to find more and just costs
+            # rate-limited requests. If this cap is ever hit without an
+            # early break, log it so a genuine gap-year case is diagnosable
+            # rather than silently truncated.
+            if discovered and consecutive_misses >= 3:
+                break
+        else:
+            if discovered and max_year_id >= YEAR_DISCOVERY_MAX_YEAR_ID:
+                logger.warning(
+                    "kys_year_discovery_exhausted_range school_id=%s max_year_id=%s",
+                    school_id,
+                    max_year_id,
+                )
 
         return sorted(discovered.values(), key=lambda y: y.year_id)
 
@@ -180,7 +234,7 @@ class KysCollector:
         return self._fetch_school_endpoint(SCHOOL_FACILITY, school_id, year_id)
 
     def fetch_social_data(self, school_id: str, year_id: int, flag: int) -> SourceFetchResult:
-        url = f"{KYS_API_BASE}/{SOCIAL_DATA}"
+        url = f"{self._api_base}/{SOCIAL_DATA}"
         params = {"flag": flag, "schoolId": school_id, "yearId": year_id}
         response = self._request_with_retry(url, params)
         payload = self._parse_json_response(response)
@@ -194,7 +248,7 @@ class KysCollector:
         )
 
     def _fetch_school_endpoint(self, endpoint: str, school_id: str, year_id: int) -> SourceFetchResult:
-        url = f"{KYS_SCHOOL_API_BASE}/{endpoint}"
+        url = f"{self._school_api_base}/{endpoint}"
         params = {"schoolId": school_id, "yearId": year_id}
         response = self._request_with_retry(url, params)
         payload = self._parse_json_response(response)

@@ -314,9 +314,12 @@ class KysMappingResolver:
         *,
         method: KysMappingMethod = KysMappingMethod.OPERATOR_CONFIRMED,
         udise_override: str | None = None,
+        allow_review_override: bool = False,
     ) -> KysMappingResult:
         verification = self.verify_kys_id(school_id, kys_school_id)
-        if verification.verdict != "verified":
+
+        is_operator_override = verification.verdict == "review" and allow_review_override
+        if verification.verdict != "verified" and not is_operator_override:
             status = (
                 KysMappingStatus.REVIEW
                 if verification.verdict == "review"
@@ -335,7 +338,10 @@ class KysMappingResolver:
             raise ValueError(f"School not found: {school_id}")
 
         udise = udise_override or verification.kys_identity.get("udise")
-        return self._persist_verified_mapping(school, kys_school_id.strip(), udise, method, verification)
+        effective_method = KysMappingMethod.OPERATOR_OVERRIDE_REVIEW if is_operator_override else method
+        return self._persist_verified_mapping(
+            school, kys_school_id.strip(), udise, effective_method, verification
+        )
 
     def _persist_verified_mapping(
         self,

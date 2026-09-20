@@ -1,4 +1,4 @@
-import axios from 'axios'
+import { scholApi as api, setScholRole } from '@/services/api'
 import type {
   CollectionPreview,
   CollectionRunCreatePayload,
@@ -8,17 +8,7 @@ import type {
   GeographyState,
 } from '@/types/collection'
 
-const api = axios.create({
-  baseURL: '/api',
-  headers: {
-    'x-schol-role': localStorage.getItem('schol_role') || 'analyst',
-  },
-})
-
-export function setScholRole(role: string) {
-  localStorage.setItem('schol_role', role)
-  api.defaults.headers['x-schol-role'] = role
-}
+export { setScholRole }
 
 export async function fetchStates(): Promise<GeographyState[]> {
   const { data } = await api.get<{ states: GeographyState[] }>('/geography/states')
@@ -39,8 +29,13 @@ export async function previewCollection(payload: {
   year_from?: string
   year_to?: string
   data_groups?: string[]
+  page?: number
+  limit?: number
 }): Promise<CollectionPreview> {
-  const { data } = await api.post<CollectionPreview>('/collection/preview', payload)
+  // SARAS directory scrape can take 30–120s for large districts.
+  const { data } = await api.post<CollectionPreview>('/collection/preview', payload, {
+    timeout: 180_000,
+  })
   return data
 }
 

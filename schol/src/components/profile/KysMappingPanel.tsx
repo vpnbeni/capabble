@@ -34,7 +34,8 @@ export function KysMappingPanel({
   })
 
   const confirmMutation = useMutation({
-    mutationFn: () => confirmKysMapping(schoolId, kysSchoolId, udise || undefined),
+    mutationFn: (allowReviewOverride: boolean) =>
+      confirmKysMapping(schoolId, kysSchoolId, udise || undefined, allowReviewOverride),
     onSuccess: (data) => {
       if (data.status === 'MAPPED') {
         toast.success('KYS mapping saved')
@@ -111,12 +112,22 @@ export function KysMappingPanel({
               Verify
             </button>
             <button
-              onClick={() => confirmMutation.mutate()}
+              onClick={() => confirmMutation.mutate(false)}
               disabled={verification?.verdict !== 'verified' || confirmMutation.isPending}
               className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
             >
               Verify &amp; Save
             </button>
+            {verification?.verdict === 'review' && (
+              <button
+                onClick={() => confirmMutation.mutate(true)}
+                disabled={confirmMutation.isPending}
+                className="rounded-lg border border-amber-400 bg-white px-4 py-2 text-sm font-medium text-amber-800 hover:bg-amber-50 disabled:opacity-50"
+                title="Only the state, district, and pin code matched exactly, or the name/address are a close but not exact match. Confirm only if you've checked the details below and they're clearly the same school."
+              >
+                Confirm match anyway
+              </button>
+            )}
             <button onClick={() => setOpen(false)} className="rounded-lg px-4 py-2 text-sm text-slate-600">
               Cancel
             </button>

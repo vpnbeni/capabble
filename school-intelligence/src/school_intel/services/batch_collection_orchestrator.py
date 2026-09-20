@@ -8,6 +8,7 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 
+from school_intel.collectors.kys_collector import KysCollector
 from school_intel.collectors.saras_collector import SarasCollector
 from school_intel.db.models import CollectionRunSchool
 from school_intel.domain.collection_constants import endpoint_label, years_in_range
@@ -374,34 +375,43 @@ class BatchCollectionOrchestrator:
         udise: str,
         years: list[str],
     ) -> None:
-        service = KysCollectionService(self.session, collector=None)
+        # Pass an explicit collector (not `collector=None`) so KysCollectionService
+        # does not own it — otherwise `collect_school`'s per-call cleanup closes the
+        # shared httpx.Client after the FIRST year, breaking every subsequent year
+        # in this loop with "Cannot send a request, as the client has been closed."
+        collector = KysCollector()
+        service = KysCollectionService(self.session, collector=collector)
         state_code = self._state_school_code(item.school_id) or item.school_code
         item.collection_status = BatchSchoolCollectionStatus.COLLECTING.value
+        item.error_summary = None
         self.batch_repo.update_run_school(item)
-        for year in years:
-            if item.year_progress and item.year_progress.get(year, {}).get("status") == "complete":
-                continue
-            item.current_year = year
-            item.current_operation = f"Collecting {year} intelligence"
-            if item.year_progress:
-                item.year_progress[year] = {"status": "in_progress"}
-            self.batch_repo.update_run_school(item)
-            self.session.commit()
+        try:
+            for year in years:
+                if item.year_progress and item.year_progress.get(year, {}).get("status") == "complete":
+                    continue
+                item.current_year = year
+                item.current_operation = f"Collecting {year} intelligence"
+                if item.year_progress:
+                    item.year_progress[year] = {"status": "in_progress"}
+                self.batch_repo.update_run_school(item)
+                self.session.commit()
 
-            service.collect_school(
-                udise=udise,
-                kys_school_id=kys_id,
-                state_school_code=state_code,
-                verbose=False,
-                target_years=[year],
-            )
-            if item.year_progress:
-                item.year_progress[year] = {"status": "complete"}
-            item.years_complete = sum(
-                1 for y, progress in (item.year_progress or {}).items() if progress.get("status") == "complete"
-            )
-            self.batch_repo.update_run_school(item)
-            self.session.commit()
+                service.collect_school(
+                    udise=udise,
+                    kys_school_id=kys_id,
+                    state_school_code=state_code,
+                    verbose=False,
+                    target_years=[year],
+                )
+                if item.year_progress:
+                    item.year_progress[year] = {"status": "complete"}
+                item.years_complete = sum(
+                    1 for y, progress in (item.year_progress or {}).items() if progress.get("status") == "complete"
+                )
+                self.batch_repo.update_run_school(item)
+                self.session.commit()
+        finally:
+            collector.close()
 
         report = ValidationService().validate_school(
             self.session,

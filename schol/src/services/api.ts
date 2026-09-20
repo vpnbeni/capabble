@@ -19,6 +19,9 @@ api.interceptors.request.use((config) => {
   return config
 })
 
+/** Shared axios client (Bearer + role). Use this for all SCHOL API calls. */
+export { api as scholApi }
+
 export function getAuthToken(): string | null {
   return localStorage.getItem(TOKEN_KEY)
 }
@@ -127,10 +130,16 @@ export async function verifyKysMapping(schoolId: string, kysSchoolId: string) {
   return data
 }
 
-export async function confirmKysMapping(schoolId: string, kysSchoolId: string, udise?: string) {
+export async function confirmKysMapping(
+  schoolId: string,
+  kysSchoolId: string,
+  udise?: string,
+  allowReviewOverride?: boolean,
+) {
   const { data } = await api.post(`/kys-mapping/schools/${schoolId}/confirm`, {
     kys_school_id: kysSchoolId,
     udise,
+    allow_review_override: allowReviewOverride ?? false,
   })
   return data
 }

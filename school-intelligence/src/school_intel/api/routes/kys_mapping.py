@@ -19,6 +19,7 @@ class VerifyKysMappingRequest(BaseModel):
 class ConfirmKysMappingRequest(BaseModel):
     kys_school_id: str = Field(..., min_length=1, max_length=20)
     udise: str | None = None
+    allow_review_override: bool = False
 
 
 @router.get("/schools/{school_id}")
@@ -77,6 +78,7 @@ def confirm_kys_mapping(
             body.kys_school_id,
             method=KysMappingMethod.OPERATOR_CONFIRMED,
             udise_override=body.udise,
+            allow_review_override=body.allow_review_override,
         )
         db.commit()
         return result.model_dump(mode="json")

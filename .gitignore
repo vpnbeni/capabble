@@ -3,6 +3,10 @@ node_modules/
 client/node_modules/
 server/node_modules/
 admin/node_modules/
+schol/node_modules/
+school-intelligence/.venv/
+.venv/
+venv/
 
 # Production builds
 client/dist/

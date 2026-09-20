@@ -10,8 +10,10 @@ src/school_intel/__init__.py
 src/school_intel/config.py
 src/school_intel/api/__init__.py
 src/school_intel/api/app.py
+src/school_intel/api/auth_tokens.py
 src/school_intel/api/deps.py
 src/school_intel/api/routes/__init__.py
+src/school_intel/api/routes/auth.py
 src/school_intel/api/routes/collection.py
 src/school_intel/api/routes/geography.py
 src/school_intel/api/routes/kys_mapping.py
@@ -61,6 +63,7 @@ src/school_intel/services/school_identity_service.py
 src/school_intel/services/setup_service.py
 src/school_intel/services/validation_service.py
 src/school_intel/utils/text.py
+tests/test_auth_tokens.py
 tests/test_batch_collection.py
 tests/test_batch_orchestrator_pipeline.py
 tests/test_collection_pipeline.py

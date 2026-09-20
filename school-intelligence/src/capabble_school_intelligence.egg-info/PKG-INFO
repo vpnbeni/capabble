@@ -110,10 +110,37 @@ python -m pytest -m live tests/test_live_himalyan.py -q
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `SCHOOL_INTEL_DATABASE_URL` | local postgres | Intelligence DB |
+| `SCHOOL_INTEL_DATABASE_URL` | local postgres | Intelligence DB (SQLAlchemy URL; `postgresql+psycopg://…`) |
+| `SCHOOL_INTEL_CLOUD_DATABASE_URL` | (none) | Neon/cloud URL for dump/restore sync — never commit real credentials |
+| `SCHOL_DEV_USERNAME` | `capabble` | Shared team login username for SCHOL UI |
+| `SCHOL_DEV_PASSWORD` | (empty) | When set, API requires Bearer auth (team login enabled) |
+| `SCHOL_DEV_TOKEN_SECRET` | derived | Optional HMAC secret for session tokens |
 | `KYS_REQUEST_DELAY_SECONDS` | 1.0 | Delay between KYS requests |
 | `KYS_MAX_RETRIES` | 3 | Retry count for transient failures |
 | `KYS_TIMEOUT_SECONDS` | 30 | HTTP timeout |
+
+## SCHOL team login
+
+Set `SCHOL_DEV_PASSWORD` in `school-intelligence/.env`. Start with `npm run dev:schol` from the repo root, open the SCHOL UI, and sign in at `/login` with `SCHOL_DEV_USERNAME` / `SCHOL_DEV_PASSWORD`.
+
+When the password is unset, the API stays open (local bootstrap). Setup routes are protected once the password is configured.
+
+## Sync Postgres between machines (via Neon)
+
+1. On the machine with the source data, set `SCHOOL_INTEL_CLOUD_DATABASE_URL` to your Neon URL (`sslmode=require`). Prefer Neon’s **direct** (non-pooler) host if restore fails on the pooler endpoint.
+2. Push local → cloud (destroys cloud data):
+
+```bash
+npm run school-intel:db:push-cloud -- --yes
+```
+
+3. On the other machine, set the same cloud URL and either point `SCHOOL_INTEL_DATABASE_URL` at Neon, or pull into local Postgres:
+
+```bash
+npm run school-intel:db:pull-cloud -- --yes
+```
+
+Requires `pg_dump`, `pg_restore`, and `psql` on PATH. Do not commit `.env`.
 
 ## Phase 2 scope
 

@@ -127,8 +127,12 @@ class SchoolIdentityService:
         )
 
     def preview_match(self, payload: IdentityLookupInput) -> IdentityResolutionResult:
-        """Read-only identity resolution for collection preview (no DB writes)."""
-        ranked = self._rank_matches(payload)
+        """Read-only identity resolution for collection preview (no DB writes).
+
+        Uses deterministic identifiers only so district previews stay fast over
+        remote Postgres (Neon). Fuzzy name matching still runs at collect time.
+        """
+        ranked = self._rank_matches(payload, deterministic_only=True)
         if ranked:
             best = ranked[0]
             if best.auto_merge_allowed:
@@ -161,7 +165,12 @@ class SchoolIdentityService:
             create_if_missing=False,
         )
 
-    def _rank_matches(self, payload: IdentityLookupInput) -> list[RankedMatch]:
+    def _rank_matches(
+        self,
+        payload: IdentityLookupInput,
+        *,
+        deterministic_only: bool = False,
+    ) -> list[RankedMatch]:
         matches: list[RankedMatch] = []
         seen_schools: set[UUID] = set()
 
@@ -195,6 +204,15 @@ class SchoolIdentityService:
                     )
                 )
                 seen_schools.add(existing.school_id)
+
+        # Exact identifier hit is enough — skip expensive fuzzy passes.
+        if matches and any(m.auto_merge_allowed for m in matches):
+            matches.sort(key=lambda m: (self.METHOD_PRIORITY.get(m.method, 99), -m.score))
+            return matches
+
+        if deterministic_only:
+            matches.sort(key=lambda m: (self.METHOD_PRIORITY.get(m.method, 99), -m.score))
+            return matches
 
         if payload.canonical_name and payload.district:
             combo_rows = self.repo.find_by_normalized_name_district_pin(

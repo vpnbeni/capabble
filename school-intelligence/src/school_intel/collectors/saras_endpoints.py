@@ -1,6 +1,10 @@
-"""Verified CBSE SARAS endpoint paths (SARAS 7.0)."""
+"""Verified CBSE SARAS endpoint paths (SARAS 7.0).
 
-SARAS_BASE_URL = "https://saras.cbse.gov.in"
+The base URL is NOT hardcoded here — `SarasCollector` builds it from
+`Settings.saras_base_url` so the host is actually overridable via
+SARAS_BASE_URL, instead of the previous dead config field.
+"""
+
 SARAS_DIRECTORY_PATH = "/saras/AffiliatedList/ListOfSchdirReport"
 SARAS_DETAIL_PATH = "/saras/AffiliatedList/AfflicationDetails/{affiliation_number}"
 SARAS_DISTRICT_BIND_PATH = "/saras/AffiliatedList/Dist_Bind"

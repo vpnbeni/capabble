@@ -35,6 +35,7 @@ export function CollectionNewPage() {
   const [schoolLimit, setSchoolLimit] = useState('5')
   const [dataGroups, setDataGroups] = useState(DATA_GROUP_OPTIONS.map((g) => g.id))
   const [preview, setPreview] = useState<CollectionPreview | null>(null)
+  const [previewPage, setPreviewPage] = useState(1)
 
   const statesQuery = useQuery({ queryKey: ['geography-states'], queryFn: fetchStates })
   const districtsQuery = useQuery({
@@ -47,7 +48,7 @@ export function CollectionNewPage() {
   const selectedDistrict = districtsQuery.data?.find((d) => d.id === districtId)
 
   const previewMutation = useMutation({
-    mutationFn: () =>
+    mutationFn: (vars: { page: number; initial?: boolean }) =>
       previewCollection({
         source: 'saras',
         state_id: stateId,
@@ -57,14 +58,23 @@ export function CollectionNewPage() {
         year_from: yearFrom,
         year_to: yearTo,
         data_groups: [...dataGroups],
+        page: vars.page,
+        limit: 20,
       }),
-    onSuccess: (data) => {
+    onSuccess: (data, vars) => {
       setPreview(data)
-      setStep(2)
-      toast.success(`Discovered ${data.unique_schools} schools`)
+      setPreviewPage(data.pagination.page)
+      if (vars.initial) {
+        setStep(2)
+        toast.success(`Discovered ${data.unique_schools} schools`)
+      }
     },
     onError: (error: Error) => toast.error(error.message || 'Preview failed'),
   })
+
+  const goToPreviewPage = (nextPage: number) => {
+    previewMutation.mutate({ page: nextPage })
+  }
 
   const startMutation = useMutation({
     mutationFn: () =>
@@ -153,7 +163,10 @@ export function CollectionNewPage() {
           )}
           {statesQuery.isError && (
             <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
-              Could not load states from SARAS. Ensure the SCHOL API is running on port 8001, then retry.
+              Could not load states from SARAS.
+              {(statesQuery.error as { response?: { status?: number } })?.response?.status === 401
+                ? ' Sign out and sign in again, then retry.'
+                : ' Ensure the SCHOL API is running (started by npm run dev as schol-api on port 8001), then retry.'}
               <button
                 type="button"
                 onClick={() => statesQuery.refetch()}
@@ -210,11 +223,17 @@ export function CollectionNewPage() {
           </div>
           <button
             disabled={!stateId || !districtId || previewMutation.isPending}
-            onClick={() => previewMutation.mutate()}
+            onClick={() => previewMutation.mutate({ page: 1, initial: true })}
             className="mt-6 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50"
           >
             {previewMutation.isPending ? 'Previewing schools...' : 'Preview Schools'}
           </button>
+          {previewMutation.isPending ? (
+            <p className="mt-3 text-sm text-slate-500">
+              Fetching the CBSE SARAS directory for this district. This often takes 30–90 seconds —
+              keep this tab open.
+            </p>
+          ) : null}
         </div>
       )}
 
@@ -269,6 +288,29 @@ export function CollectionNewPage() {
                 </tbody>
               </table>
             </div>
+            {preview.pagination.pages > 1 && (
+              <div className="flex items-center justify-between border-t border-slate-100 px-4 py-3 text-sm">
+                <div className="text-slate-500">
+                  Showing page {preview.pagination.page} of {preview.pagination.pages} ({preview.pagination.total} schools)
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    disabled={previewPage <= 1 || previewMutation.isPending}
+                    onClick={() => goToPreviewPage(previewPage - 1)}
+                    className="rounded-lg border border-slate-200 px-3 py-1 disabled:opacity-50"
+                  >
+                    Previous
+                  </button>
+                  <button
+                    disabled={previewPage >= preview.pagination.pages || previewMutation.isPending}
+                    onClick={() => goToPreviewPage(previewPage + 1)}
+                    className="rounded-lg border border-slate-200 px-3 py-1 disabled:opacity-50"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           {step === 2 && (

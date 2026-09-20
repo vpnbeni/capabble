@@ -2,7 +2,7 @@
 
 import pytest
 
-from school_intel.collectors.endpoints import KYS_API_BASE, SOCIAL_DATA
+from school_intel.collectors.endpoints import SOCIAL_DATA
 from school_intel.collectors.kys_collector import KysCollector
 
 HIMALYAN_KYS_ID = "1519942"
@@ -56,7 +56,7 @@ def test_kys_year_discovery(collector: KysCollector) -> None:
 def test_kys_get_social_data_requires_flag(collector: KysCollector) -> None:
     """getSocialData without flag returns API error (not HTTP 404)."""
     response = collector._request_with_retry(
-        f"{KYS_API_BASE}/{SOCIAL_DATA}",
+        f"{collector._api_base}/{SOCIAL_DATA}",
         {"schoolId": HIMALYAN_KYS_ID, "yearId": 7},
     )
     payload = response.json()

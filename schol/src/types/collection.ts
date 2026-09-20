@@ -45,6 +45,12 @@ export interface CollectionPreview {
   year_to: string
   data_groups: string[]
   schools: CollectionPreviewSchool[]
+  pagination: {
+    total: number
+    page: number
+    limit: number
+    pages: number
+  }
 }
 
 export interface CollectionRunCreatePayload {

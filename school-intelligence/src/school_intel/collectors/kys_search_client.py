@@ -1,11 +1,38 @@
 """Probe KYS public frontend for legitimate school-search API contracts.
 
-Investigation date: 2026-09-08
+Investigation date: 2026-09-08. Re-verified 2026-09-21 via a manual, human-solved
+browser session (see below) — the 2026-09-08 finding below was WRONG about a
+search endpoint not existing; it was only probing the wrong paths.
+
 Public app: https://kys.udiseplus.gov.in/
 
-Finding: Angular SPA bundles reference search UI tokens (SearchKeyword, searchKeywordUdiseCode)
-but no unauthenticated JSON search endpoints were discovered. Known working KYS API paths require
-an integer schoolId (report-card, profile, etc.) — same contract used by KysCollector.
+2026-09-08 finding (superseded): "Angular SPA bundles reference search UI tokens
+(SearchKeyword, searchKeywordUdiseCode) but no unauthenticated JSON search
+endpoints were discovered." The paths guessed in `_PROBED_SEARCH_PATHS` below
+(all under `/web-app/api/school/...`) do all genuinely 404 — but they are not
+the real search paths, so this was the wrong conclusion from a correct probe.
+
+2026-09-21 correction: a real search API does exist, confirmed live via the
+browser network log while a human manually solved the CAPTCHA on the KYS
+frontend:
+  - `GET /web-app/api/getCaptcha` → returns `{"data": "<base64 PNG>"}`, a real
+    image CAPTCHA (not a decorative/plaintext check).
+  - `GET /web-app/api/verifyCaptcha?captcha=<value>` → verifies the human's
+    solved value against the current session's issued CAPTCHA.
+  - `GET /web-app/api/search-schools?searchType=1&searchParam=<name>&captcha=<value>`
+    → the actual search endpoint (also a typeahead at
+    `/web-app/api/search-school/by-keyword?schoolName=<partial>`).
+
+Because the CAPTCHA is a genuine image challenge validated server-side per
+search, this is NOT something to automate — solving it programmatically would
+be a CAPTCHA bypass. `_PROBED_SEARCH_PATHS` below is deliberately left as the
+(non-existent, 404) paths from the original investigation, not the real
+endpoint, so this module's `availability()`/`search()` continue to correctly
+report "unavailable" rather than accidentally wiring up an automated call
+against the CAPTCHA-gated endpoint. If a human-in-the-loop search feature is
+ever built (a person solves the CAPTCHA themselves and the result is fed to
+the KYS mapping resolver's injected-candidate path), it belongs in a separate,
+explicitly manual code path — not here.
 
 This module does NOT bypass CAPTCHA or invent endpoints.
 """
@@ -19,14 +46,18 @@ from typing import Any, Protocol
 
 import httpx
 
-from school_intel.collectors.endpoints import KYS_SCHOOL_API_BASE
 from school_intel.domain.kys_mapping import KysSearchCandidate
 
 logger = logging.getLogger("school_intel.kys_search")
 
 KYS_FRONTEND_BASE = "https://kys.udiseplus.gov.in"
 
-# Paths probed from frontend bundle analysis — all returned 404 without session/CAPTCHA.
+# Paths probed from frontend bundle analysis — all genuinely 404 (they are not
+# the real search paths). The real search endpoint is
+# `/web-app/api/search-schools` (plural, no `/school/` prefix), gated by a
+# real per-request image CAPTCHA (see module docstring) — deliberately NOT
+# listed here, so this client keeps reporting "unavailable" instead of
+# silently attempting a CAPTCHA-gated call.
 _PROBED_SEARCH_PATHS = (
     "/web-app/api/school/searchSchool",
     "/web-app/api/school/search-school",
@@ -99,8 +130,10 @@ class KysSearchClient:
             self._availability = KysSearchAvailability(
                 programmatic_search_available=False,
                 reason=(
-                    "No public KYS school-search API found. Frontend uses CAPTCHA-protected search; "
-                    "only schoolId-based endpoints (report-card/profile) are accessible."
+                    "A KYS school-search API exists (/web-app/api/search-schools) but requires "
+                    "solving a real per-request image CAPTCHA, verified server-side — not safely "
+                    "automatable. Only schoolId-based endpoints (report-card/profile) are used "
+                    "programmatically; search remains a manual, human-in-the-loop step."
                 ),
                 probed_paths=list(_PROBED_SEARCH_PATHS),
             )

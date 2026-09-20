@@ -36,6 +36,10 @@ class Settings(BaseSettings):
         default=1.0,
         validation_alias=AliasChoices("KYS_REQUEST_DELAY_SECONDS", "kys_request_delay_seconds"),
     )
+    saras_request_delay_seconds: float = Field(
+        default=1.5,
+        validation_alias=AliasChoices("SARAS_REQUEST_DELAY_SECONDS", "saras_request_delay_seconds"),
+    )
     kys_base_url: str = Field(
         default="https://kys.udiseplus.gov.in",
         validation_alias=AliasChoices("KYS_BASE_URL", "kys_base_url"),
