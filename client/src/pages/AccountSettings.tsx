@@ -1,9 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { getStoredUser } from '@/utils/authStorage'
 import schoolProfileService, { type SchoolProfile } from '@/services/schoolProfileService'
+import { schoolProfileKeys } from '@/hooks/useSchoolProfile'
 import toast from 'react-hot-toast'
 
 const AccountSettings: React.FC = () => {
+  const queryClient = useQueryClient()
   const user = getStoredUser<{ email?: string }>()
   const [profile, setProfile] = useState<SchoolProfile | null>(null)
   const [loading, setLoading] = useState(true)
@@ -13,6 +16,7 @@ const AccountSettings: React.FC = () => {
     name: '',
     schoolCode: '',
     affiliationNo: '',
+    affiliationTill: '',
     tagline: '',
     address: '',
     contact: '',
@@ -32,6 +36,7 @@ const AccountSettings: React.FC = () => {
           name: data.name || '',
           schoolCode: data.schoolCode || '',
           affiliationNo: data.affiliationNo || '',
+          affiliationTill: data.affiliationTill || '',
           tagline: data.tagline || '',
           address: data.address || '',
           contact: data.contact || '',
@@ -52,7 +57,7 @@ const AccountSettings: React.FC = () => {
   const logoPreview = useMemo(() => profile?.logoUrl || '', [profile?.logoUrl])
 
   const handleFieldChange = (
-    field: 'name' | 'schoolCode' | 'affiliationNo' | 'tagline' | 'address' | 'contact' | 'email',
+    field: 'name' | 'schoolCode' | 'affiliationNo' | 'affiliationTill' | 'tagline' | 'address' | 'contact' | 'email',
     value: string
   ) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
@@ -67,12 +72,14 @@ const AccountSettings: React.FC = () => {
         name: updated.name || '',
         schoolCode: updated.schoolCode || '',
         affiliationNo: updated.affiliationNo || '',
+        affiliationTill: updated.affiliationTill || '',
         tagline: updated.tagline || '',
         address: updated.address || '',
         contact: updated.contact || '',
         email: updated.email || '',
       })
       toast.success('School profile updated.')
+      void queryClient.invalidateQueries({ queryKey: schoolProfileKeys.all })
     } catch (error: any) {
       toast.error(String(error?.response?.data?.message || error?.message || 'Failed to update profile.'))
     } finally {
@@ -89,6 +96,7 @@ const AccountSettings: React.FC = () => {
       const updated = await schoolProfileService.uploadLogo(file)
       setProfile(updated)
       toast.success('School logo uploaded.')
+      void queryClient.invalidateQueries({ queryKey: schoolProfileKeys.all })
     } catch (error: any) {
       toast.error(String(error?.response?.data?.message || error?.message || 'Failed to upload logo.'))
     } finally {
@@ -166,6 +174,19 @@ const AccountSettings: React.FC = () => {
                   </div>
 
                   <div>
+                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Affiliation till</label>
+                    <input
+                      type="date"
+                      value={formData.affiliationTill}
+                      onChange={(e) => handleFieldChange('affiliationTill', e.target.value)}
+                      className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-gray-100"
+                    />
+                    <p className="mt-1 text-[11px] text-gray-400 dark:text-gray-500">
+                      CBSE affiliation validity end date. Used for renewal reminders.
+                    </p>
+                  </div>
+
+                  <div className="md:col-span-2">
                     <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Tagline</label>
                     <input
                       type="text"

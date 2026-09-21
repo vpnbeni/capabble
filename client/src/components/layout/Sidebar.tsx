@@ -16,6 +16,8 @@ import {
   sidebarKeys,
   type SidebarCount,
 } from '../../hooks/useSidebarCounts'
+import { useSchoolProfile } from '../../hooks/useSchoolProfile'
+import { useLogoBrandTheme } from '../../hooks/useLogoBrandTheme'
 
 const EMPTY_COUNTS = {
   examFunctionaries: null,
@@ -79,13 +81,21 @@ const Sidebar: React.FC<SidebarProps> = ({
   const { data: centreDetails } = useCentreDetails({
     enabled: canAccessCentreDetails,
   })
+  const { data: schoolProfile } = useSchoolProfile(Boolean(currentUser))
 
-  const centreNo = String(centreDetails?.centreNo || '').trim()
   const schoolCode = String(centreDetails?.centreSchoolCode || '').trim()
   const centreName = String(centreDetails?.centreName || '').trim()
-  // Prefer showing Centre No; fall back to school code if missing
-  const centreCode = centreNo || schoolCode
-  const centreLabel = [centreCode, centreName].filter(Boolean).join(' - ')
+  const profileAffiliationNo = String(schoolProfile?.affiliationNo || '').trim()
+  const profileSchoolCode = String(schoolProfile?.schoolCode || '').trim()
+  const profileSchoolName = String(schoolProfile?.name || '').trim()
+  const schoolLogoUrl = String(schoolProfile?.logoUrl || '').trim()
+  const logoBrandTheme = useLogoBrandTheme(schoolLogoUrl)
+  const hasLogoBrandMenu = Boolean(logoBrandTheme && schoolLogoUrl)
+
+  const schoolDisplayName = profileSchoolName || centreName || currentUser?.role || 'School'
+  const affiliationDisplay = profileAffiliationNo || '—'
+  const cbseCodeDisplay = profileSchoolCode || schoolCode || '—'
+  const footerFallbackInitial = (schoolDisplayName || currentUser?.email || 'A').charAt(0).toUpperCase()
 
   // Module switcher state
   const [moduleSwitcherOpen, setModuleSwitcherOpen] = useState(false)
@@ -101,6 +111,38 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   const activeModule = selectedModule
   const isStdntNav = activeModule === 'stdnt'
+
+  const renderSchoolLogoAvatar = (
+    sizeClass = 'w-10 h-10',
+    roundedClass = 'rounded-xl',
+    onBrandBackground = false
+  ) => {
+    if (schoolLogoUrl) {
+      return (
+        <div
+          className={`${sizeClass} flex-shrink-0 overflow-hidden ${roundedClass} ${
+            onBrandBackground
+              ? 'bg-white/95 shadow-sm ring-1 ring-white/70'
+              : 'bg-white shadow-md ring-1 ring-black/5'
+          }`}
+        >
+          <img src={schoolLogoUrl} alt="School logo" className="h-full w-full object-contain p-0.5" />
+        </div>
+      )
+    }
+
+    return (
+      <div
+        className={`${sizeClass} flex-shrink-0 ${roundedClass} flex items-center justify-center shadow-md transition-all ${
+          isStdntNav
+            ? 'bg-gradient-to-br from-[#7b61ff] to-[#a855f7] shadow-violet-500/20'
+            : 'bg-gradient-to-br from-primary-500 to-indigo-600 shadow-primary-500/10 ring-2 ring-white dark:ring-secondary-800 group-hover:ring-primary-100 dark:group-hover:ring-primary-900/30'
+        }`}
+      >
+        <span className="text-sm font-bold text-white">{footerFallbackInitial}</span>
+      </div>
+    )
+  }
 
   const accessibleModules = useMemo(
     () => getAccessibleModules(currentUser?.featureToggles),
@@ -665,6 +707,162 @@ const Sidebar: React.FC<SidebarProps> = ({
       icon: (
         <svg className="w-5 h-5 transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+        </svg>
+      ),
+      badge: null,
+    },
+    {
+      name: 'Asset Overview',
+      href: '/asets/dashboard',
+      module: 'asets',
+      icon: (
+        <svg className="w-5 h-5 transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 13h8V3H3v10zm10 8h8V11h-8v10zM3 21h8v-6H3v6zm10-18v6h8V3h-8z" />
+        </svg>
+      ),
+      badge: null,
+    },
+    {
+      name: 'All Assets',
+      href: '/asets/assets',
+      module: 'asets',
+      icon: (
+        <svg className="w-5 h-5 transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+        </svg>
+      ),
+      badge: null,
+    },
+    {
+      name: 'Categories',
+      href: '/asets/categories',
+      module: 'asets',
+      icon: (
+        <svg className="w-5 h-5 transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h10M4 18h7" />
+        </svg>
+      ),
+      badge: null,
+    },
+    {
+      name: 'Locations',
+      href: '/asets/locations',
+      module: 'asets',
+      icon: (
+        <svg className="w-5 h-5 transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.243-4.243a8 8 0 1111.314 0z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+        </svg>
+      ),
+      badge: null,
+    },
+    {
+      name: 'Allocations',
+      href: '/asets/allocations',
+      module: 'asets',
+      icon: (
+        <svg className="w-5 h-5 transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+        </svg>
+      ),
+      badge: null,
+    },
+    {
+      name: 'Transfers',
+      href: '/asets/transfers',
+      module: 'asets',
+      icon: (
+        <svg className="w-5 h-5 transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+        </svg>
+      ),
+      badge: null,
+    },
+    {
+      name: 'Maintenance',
+      href: '/asets/maintenance',
+      module: 'asets',
+      icon: (
+        <svg className="w-5 h-5 transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+        </svg>
+      ),
+      badge: null,
+    },
+    {
+      name: 'Stock / Store',
+      href: '/asets/stock',
+      module: 'asets',
+      icon: (
+        <svg className="w-5 h-5 transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z" />
+        </svg>
+      ),
+      badge: null,
+    },
+    {
+      name: 'Audits',
+      href: '/asets/audits',
+      module: 'asets',
+      icon: (
+        <svg className="w-5 h-5 transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+        </svg>
+      ),
+      badge: null,
+    },
+    {
+      name: 'Vendors',
+      href: '/asets/vendors',
+      module: 'asets',
+      icon: (
+        <svg className="w-5 h-5 transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1" />
+        </svg>
+      ),
+      badge: null,
+    },
+    {
+      name: 'Procurement',
+      href: '/asets/procurement',
+      module: 'asets',
+      icon: (
+        <svg className="w-5 h-5 transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+        </svg>
+      ),
+      badge: null,
+    },
+    {
+      name: 'Disposal',
+      href: '/asets/disposals',
+      module: 'asets',
+      icon: (
+        <svg className="w-5 h-5 transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+        </svg>
+      ),
+      badge: null,
+    },
+    {
+      name: 'Reports',
+      href: '/asets/reports',
+      module: 'asets',
+      icon: (
+        <svg className="w-5 h-5 transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        </svg>
+      ),
+      badge: null,
+    },
+    {
+      name: 'ASETS Settings',
+      href: '/asets/settings',
+      module: 'asets',
+      icon: (
+        <svg className="w-5 h-5 transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
         </svg>
       ),
       badge: null,
@@ -1636,49 +1834,78 @@ const Sidebar: React.FC<SidebarProps> = ({
       )}
 
       {/* Account at bottom - fixed */}
-      <div className={`flex-shrink-0 p-4 backdrop-blur-sm ${
+      <div className={`flex-shrink-0 backdrop-blur-sm ${
+        isCollapsed ? 'px-2 py-3' : 'p-[0.8rem]'
+      } ${
         isStdntNav
           ? 'border-t border-white/10 bg-black/10'
           : 'border-t border-secondary-100 dark:border-secondary-800 bg-white/50 dark:bg-secondary-900/50'
-      } ${isCollapsed ? 'flex justify-center px-2' : ''}`}>
+      } ${isCollapsed ? 'flex justify-center' : ''}`}>
         <div className="relative w-full">
           <button
             onClick={() => setAccountDropdownOpen(!accountDropdownOpen)}
             className={`w-full flex items-center rounded-xl transition-all duration-200 group outline-none ${
               isCollapsed
                 ? 'justify-center p-0'
-                : isStdntNav
-                  ? 'p-2 hover:bg-white/10'
-                  : 'p-2 hover:bg-white dark:hover:bg-secondary-800 hover:shadow-sm ring-1 ring-transparent hover:ring-secondary-200 dark:hover:ring-secondary-700'
+                : hasLogoBrandMenu
+                  ? 'p-2 ring-1 hover:brightness-[1.03]'
+                  : isStdntNav
+                    ? 'p-2 hover:bg-white/10'
+                    : 'p-2 hover:bg-white dark:hover:bg-secondary-800 hover:shadow-sm ring-1 ring-transparent hover:ring-secondary-200 dark:hover:ring-secondary-700'
             }`}
+            style={
+              hasLogoBrandMenu && !isCollapsed && logoBrandTheme
+                ? {
+                    background: `linear-gradient(135deg, ${logoBrandTheme.primary} 0%, ${logoBrandTheme.dark} 100%)`,
+                    boxShadow: `0 10px 24px ${logoBrandTheme.primary}33`,
+                    borderColor: logoBrandTheme.ring,
+                  }
+                : undefined
+            }
           >
-            <div className={`w-10 h-10 flex-shrink-0 rounded-xl flex items-center justify-center shadow-md transition-all ${
-              isStdntNav
-                ? 'bg-gradient-to-br from-[#7b61ff] to-[#a855f7] shadow-violet-500/20'
-                : 'bg-gradient-to-br from-primary-500 to-indigo-600 shadow-primary-500/10 ring-2 ring-white dark:ring-secondary-800 group-hover:ring-primary-100 dark:group-hover:ring-primary-900/30'
-            }`}>
-              <span className="text-sm font-bold text-white">
-                {(centreCode || currentUser?.email || 'A').charAt(0).toUpperCase()}
-              </span>
-            </div>
+            {renderSchoolLogoAvatar('w-10 h-10', 'rounded-xl', hasLogoBrandMenu && !isCollapsed)}
             {!isCollapsed && (
-              <div className="flex-1 min-w-0 text-left ml-3">
-                <p className={`text-sm font-semibold truncate transition-colors ${
-                  isStdntNav
-                    ? 'text-white'
-                    : 'text-secondary-900 dark:text-white group-hover:text-primary-600 dark:group-hover:text-primary-400'
-                }`}>
-                  {centreCode || '—'}
+              <div className="flex-1 min-w-0 text-left ml-2.5">
+                <p
+                  className={`text-sm font-semibold truncate transition-colors ${
+                    hasLogoBrandMenu
+                      ? ''
+                      : isStdntNav
+                        ? 'text-white'
+                        : 'text-secondary-900 dark:text-white group-hover:text-primary-600 dark:group-hover:text-primary-400'
+                  }`}
+                  style={hasLogoBrandMenu && logoBrandTheme ? { color: logoBrandTheme.textPrimary } : undefined}
+                >
+                  {schoolDisplayName}
                 </p>
-                <p className={`text-xs truncate ${isStdntNav ? 'text-white/55' : 'text-secondary-500 dark:text-secondary-400'}`}>
-                  {centreName || currentUser?.role || 'Administrator'}
+                <p
+                  className={`text-xs truncate ${
+                    hasLogoBrandMenu
+                      ? ''
+                      : isStdntNav
+                        ? 'text-white/55'
+                        : 'text-secondary-500 dark:text-secondary-400'
+                  }`}
+                  style={hasLogoBrandMenu && logoBrandTheme ? { color: logoBrandTheme.textMuted } : undefined}
+                >
+                  {affiliationDisplay !== '—' ? `Aff. No. ${affiliationDisplay}` : 'Aff. No. —'}
                 </p>
               </div>
             )}
             {!isCollapsed && (
-              <svg className={`w-4 h-4 transition-transform duration-200 ${accountDropdownOpen ? 'rotate-180' : ''} ${
-                isStdntNav ? 'text-white/50' : 'text-secondary-400 group-hover:text-secondary-600 dark:text-secondary-500 dark:group-hover:text-secondary-300'
-              }`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg
+                className={`w-4 h-4 transition-transform duration-200 ${accountDropdownOpen ? 'rotate-180' : ''} ${
+                  hasLogoBrandMenu
+                    ? ''
+                    : isStdntNav
+                      ? 'text-white/50'
+                      : 'text-secondary-400 group-hover:text-secondary-600 dark:text-secondary-500 dark:group-hover:text-secondary-300'
+                }`}
+                style={hasLogoBrandMenu && logoBrandTheme ? { color: logoBrandTheme.textMuted } : undefined}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
               </svg>
             )}
@@ -1693,20 +1920,53 @@ const Sidebar: React.FC<SidebarProps> = ({
                 onClick={() => setAccountDropdownOpen(false)}
                 aria-hidden="true"
               />
-              <div className={`absolute bottom-full left-0 mb-3 w-64 bg-white dark:bg-secondary-900 rounded-2xl shadow-hard border border-secondary-100 dark:border-secondary-700 z-50 animate-fade-in-up origin-bottom-left ring-1 ring-black/5 ${isCollapsed ? 'left-full ml-4 bottom-0' : ''}`}>
-                <div className="p-4 border-b border-secondary-100 dark:border-secondary-800 bg-secondary-50/50 dark:bg-secondary-800/50 rounded-t-2xl">
+              <div
+                className={`absolute bottom-full left-0 mb-3 w-64 bg-white dark:bg-secondary-900 rounded-2xl shadow-hard border border-secondary-100 dark:border-secondary-700 z-50 animate-fade-in-up origin-bottom-left ring-1 ring-black/5 ${isCollapsed ? 'left-full ml-4 bottom-0' : ''}`}
+              >
+                <div
+                  className={`p-4 border-b border-secondary-100 dark:border-secondary-800 rounded-t-2xl ${
+                    hasLogoBrandMenu ? '' : 'bg-secondary-50/50 dark:bg-secondary-800/50'
+                  }`}
+                  style={
+                    hasLogoBrandMenu && logoBrandTheme
+                      ? {
+                          background: `linear-gradient(135deg, ${logoBrandTheme.light} 0%, ${logoBrandTheme.primary} 100%)`,
+                        }
+                      : undefined
+                  }
+                >
                   <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-indigo-600 rounded-lg flex items-center justify-center flex-shrink-0 shadow-sm">
-                      <span className="text-sm font-bold text-white">
-                        {(currentUser?.email || 'A').charAt(0).toUpperCase()}
-                      </span>
-                    </div>
+                    {renderSchoolLogoAvatar('w-10 h-10', 'rounded-lg', hasLogoBrandMenu)}
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-semibold text-secondary-900 dark:text-white truncate">
-                        {centreLabel || currentUser?.email || 'admin@becms.edu'}
+                      <p
+                        className={`text-sm font-semibold truncate ${
+                          hasLogoBrandMenu ? '' : 'text-secondary-900 dark:text-white'
+                        }`}
+                        style={
+                          hasLogoBrandMenu && logoBrandTheme ? { color: logoBrandTheme.textPrimary } : undefined
+                        }
+                      >
+                        {schoolDisplayName}
                       </p>
-                      <p className="text-xs text-secondary-500 dark:text-secondary-400 truncate">
-                        {centreCode || currentUser?.role || 'Administrator'}
+                      <p
+                        className={`text-xs truncate ${
+                          hasLogoBrandMenu ? '' : 'text-secondary-500 dark:text-secondary-400'
+                        }`}
+                        style={
+                          hasLogoBrandMenu && logoBrandTheme ? { color: logoBrandTheme.textMuted } : undefined
+                        }
+                      >
+                        {affiliationDisplay !== '—' ? `Aff. No. ${affiliationDisplay}` : 'Aff. No. —'}
+                      </p>
+                      <p
+                        className={`text-xs truncate ${
+                          hasLogoBrandMenu ? '' : 'text-secondary-500 dark:text-secondary-400'
+                        }`}
+                        style={
+                          hasLogoBrandMenu && logoBrandTheme ? { color: logoBrandTheme.textMuted } : undefined
+                        }
+                      >
+                        {cbseCodeDisplay !== '—' ? `CBSE Code ${cbseCodeDisplay}` : 'CBSE Code —'}
                       </p>
                     </div>
                   </div>

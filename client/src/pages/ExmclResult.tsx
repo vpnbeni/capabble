@@ -2,13 +2,14 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { X } from 'lucide-react'
 import { Tabs } from '@/components/common/Tabs'
 import exmclExamService, { type ExmclExamDefinition } from '@/services/exmclExamService'
-import exmclResultService from '@/services/exmclResultService'
+import exmclResultService, { type ResultClassSectionStatus } from '@/services/exmclResultService'
 import subjectService from '@/services/subjectService'
 import api from '@/services/api'
 import toast from 'react-hot-toast'
 import { useTimetable } from '@/contexts/TimetableContext'
 import { sortSectionNames } from '@/constants/studentClasses'
 import { resolveApiBaseUrl } from '@/utils/tenantRuntime'
+import ResultEntryStatusPanel from '@/components/exmcl/ResultEntryStatusPanel'
 
 type ResultTab = 'exam'
 
@@ -113,6 +114,9 @@ const ExmclResult: React.FC = () => {
   const [absentByStudent, setAbsentByStudent] = useState<Record<string, Record<string, boolean>>>({})
   const [deletedSubjectIds, setDeletedSubjectIds] = useState<Set<string>>(new Set())
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [statusRows, setStatusRows] = useState<ResultClassSectionStatus[]>([])
+  const [statusLoading, setStatusLoading] = useState(false)
+  const [statusRefreshToken, setStatusRefreshToken] = useState(0)
 
   useEffect(() => {
     let cancelled = false
@@ -345,6 +349,36 @@ const ExmclResult: React.FC = () => {
     }
   }, [selectedExamId, selectedClass, selectedSection])
 
+  useEffect(() => {
+    if (!selectedExamId) {
+      setStatusRows([])
+      return
+    }
+
+    let cancelled = false
+    setStatusLoading(true)
+
+    exmclResultService
+      .getEntryStatus(selectedExamId)
+      .then((rows) => {
+        if (!cancelled) setStatusRows(rows)
+      })
+      .catch(() => {
+        if (!cancelled) setStatusRows([])
+      })
+      .finally(() => {
+        if (!cancelled) setStatusLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [selectedExamId, statusRefreshToken])
+
+  const refreshEntryStatus = useCallback(() => {
+    setStatusRefreshToken((prev) => prev + 1)
+  }, [])
+
   const selectedExam = exams.find((exam) => exam._id === selectedExamId)
   const maxMarks = Number(selectedExam?.maximumMarks)
   const hasMaxMarks = Number.isFinite(maxMarks) && maxMarks > 0
@@ -485,6 +519,7 @@ const ExmclResult: React.FC = () => {
       })
 
       toast.success('Results saved successfully.')
+      refreshEntryStatus()
     } catch (error: any) {
       const message = String(error?.response?.data?.message || error?.message || 'Failed to save results.')
       toast.error(message)
@@ -898,6 +933,21 @@ const ExmclResult: React.FC = () => {
           Double click the cell to mark student absent in the subject.
         </p>
       </div>
+
+      {selectedExamId ? (
+        <div className="mt-5">
+          <ResultEntryStatusPanel
+            loading={statusLoading}
+            rows={statusRows}
+            selectedClass={selectedClass}
+            selectedSection={selectedSection}
+            onSelectClassSection={(className, section) => {
+              setSelectedClass(className)
+              setSelectedSection(section)
+            }}
+          />
+        </div>
+      ) : null}
     </div>
   )
 }

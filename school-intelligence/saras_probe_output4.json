@@ -1,0 +1,278 @@
+{
+  "search_0": {
+    "payload": {
+      "MainRadioValue": "Keyword_wise",
+      "Keyword": "DELHI PUBLIC SCHOOL"
+    },
+    "status": 200,
+    "length": 41683155,
+    "row_count_estimate": 33148,
+    "rows": [
+      {
+        "cells": [
+          "1",
+          "Aff. No. : Sch. Code:",
+          "State : ARUNACHAL PRADESH District : LEPARADA",
+          "Secondary Level",
+          "Name : EKLAVYA MODEL RESIDENTIAL SCHOOL Head/Principal Name: OMANAKUTTAN V",
+          "Address : SODO DOKE, PO-TIRBIN, PS- TIRBIN Website : https://www.vkvapt.org/about-school-emrs-tirbin.ht",
+          "View"
+        ],
+        "links": [
+          "/saras/AffiliatedList/AfflicationDetails/%20%20%20%20%20%20%20"
+        ],
+        "html": "<tr>\n<td>1</td>\n<td>\n<b>Aff. No. :</b> <br/>\n<b>Sch. Code:</b>\n</td>\n<td><b>State : </b>ARUNACHAL PRADESH<br/><b>District : </b>LEPARADA</td>\n<td>Secondary Level</td>\n<td><b>Name : </b> EKLAVYA MODEL RESIDENTIAL SCHOOL <br/> <b>Head/Principal Name: </b>OMANAKUTTAN V</td>\n<td>\n<b>Address : </b>SODO DOKE, PO-TIRBIN, PS- TIRBIN<br/>\n<b>Website : </b>https://www.vkvapt.org/about-school-emrs-tirbin.ht\r\n                                        </td>\n<td>\n<a href=\"/saras/AffiliatedList/AfflicationDetails/%20%20%20%20%20%20%20\" rel=\"noopener noreferrer\" target=\"_blank\">View</a>\n</td>\n</tr>"
+      },
+      {
+        "cells": [
+          "2",
+          "Aff. No. : 1000001 Sch. Code: 54070",
+          "State : MADHYA PRADESH District : BHOPAL",
+          "Senior Secondary Level",
+          "Name : PM SHRI KENDRIYA VIDYALAYA NO. 1 Head/Principal Name: GAURAV KUMAR DWIVEDI",
+          "Address : OPP CENTRAL INDIA FLOUR MILLS BHOPAL MADHYA PRADESH Website : www.kv1bhopal.edu.in",
+          "View"
+        ],
+        "links": [
+          "/saras/AffiliatedList/AfflicationDetails/1000001"
+        ],
+        "html": "<tr>\n<td>2</td>\n<td>\n<b>Aff. No. :</b>1000001<br/>\n<b>Sch. Code:</b>54070\r\n                                            </td>\n<td><b>State : </b>MADHYA PRADESH<br/><b>District : </b>BHOPAL</td>\n<td>Senior Secondary Level</td>\n<td><b>Name : </b> PM SHRI KENDRIYA VIDYALAYA NO. 1 <br/> <b>Head/Principal Name: </b>GAURAV KUMAR DWIVEDI</td>\n<td>\n<b>Address : </b>OPP CENTRAL INDIA FLOUR MILLS BHOPAL MADHYA PRADESH<br/>\n<b>Website : </b>www.kv1bhopal.edu.in\r\n                                        </td>\n<td>\n<a href=\"/saras/AffiliatedList/AfflicationDetails/1000001\" rel=\"noopener noreferrer\" target=\"_blank\">View</a>\n</td>\n</tr>"
+      },
+      {
+        "cells": [
+          "3",
+          "Aff. No. : 1000002 Sch. Code: 54068",
+          "State : MADHYA PRADESH District : BETUL",
+          "Senior Secondary Level",
+          "Name : PM SHRI KENDRIYA VIDYALAYA Head/Principal Name: MADAN MOHAN KATIYAR",
+          "Address : AIR FORCE STATION AMLA POST AMLA DEPOT BETUL DISTT MADHYA PRADESH Website : https://afsamla.kvs.ac.in",
+          "View"
+        ],
+        "links": [
+          "/saras/AffiliatedList/AfflicationDetails/1000002"
+        ],
+        "html": "<tr>\n<td>3</td>\n<td>\n<b>Aff. No. :</b>1000002<br/>\n<b>Sch. Code:</b>54068\r\n                                            </td>\n<td><b>State : </b>MADHYA PRADESH<br/><b>District : </b>BETUL</td>\n<td>Senior Secondary Level</td>\n<td><b>Name : </b> PM SHRI KENDRIYA VIDYALAYA <br/> <b>Head/Principal Name: </b>MADAN MOHAN KATIYAR</td>\n<td>\n<b>Address : </b>AIR FORCE STATION AMLA POST AMLA DEPOT BETUL DISTT MADHYA PRADESH<br/>\n<b>Website : </b>https://afsamla.kvs.ac.in\r\n                                        </td>\n<td>\n<a href=\"/saras/AffiliatedList/AfflicationDetails/1000002\" rel=\"noopener noreferrer\" target=\"_blank\">View</a>\n</td>\n</tr>"
+      },
+      {
+        "cells": [
+          "4",
+          "Aff. No. : 1000003 Sch. Code: 54082",
+          "State : MADHYA PRADESH District : GWALIOR",
+          "Senior Secondary Level",
+          "Name : KENDRIYA VIDYALAYA NO 1 Head/Principal Name: RAJESH PANDEY",
+          "Address : SHAKTI NAGAR GWALIOR MADHYA PRADESH Website : https://no1gwalior.kvs.ac.in",
+          "View"
+        ],
+        "links": [
+          "/saras/AffiliatedList/AfflicationDetails/1000003"
+        ],
+        "html": "<tr>\n<td>4</td>\n<td>\n<b>Aff. No. :</b>1000003<br/>\n<b>Sch. Code:</b>54082\r\n                                            </td>\n<td><b>State : </b>MADHYA PRADESH<br/><b>District : </b>GWALIOR</td>\n<td>Senior Secondary Level</td>\n<td><b>Name : </b> KENDRIYA VIDYALAYA NO 1 <br/> <b>Head/Principal Name: </b>RAJESH PANDEY</td>\n<td>\n<b>Address : </b>SHAKTI NAGAR GWALIOR MADHYA PRADESH<br/>\n<b>Website : </b>https://no1gwalior.kvs.ac.in\r\n                                        </td>\n<td>\n<a href=\"/saras/AffiliatedList/AfflicationDetails/1000003\" rel=\"noopener noreferrer\" target=\"_blank\">View</a>\n</td>\n</tr>"
+      },
+      {
+        "cells": [
+          "5",
+          "Aff. No. : 1000004 Sch. Code: 54086",
+          "State : MADHYA PRADESH District : GWALIOR",
+          "Senior Secondary Level",
+          "Name : PM SHRI KENDRIYA VIDYALAYA NO. II Head/Principal Name: SANJEEV KUMAR SAMBHARIA",
+          "Address : A F S MAHARAJPUR GWALIOR MADHYA PRADESH Website : https://no2gwalior.kvs.ac.in/",
+          "View"
+        ],
+        "links": [
+          "/saras/AffiliatedList/AfflicationDetails/1000004"
+        ],
+        "html": "<tr>\n<td>5</td>\n<td>\n<b>Aff. No. :</b>1000004<br/>\n<b>Sch. Code:</b>54086\r\n                                            </td>\n<td><b>State : </b>MADHYA PRADESH<br/><b>District : </b>GWALIOR</td>\n<td>Senior Secondary Level</td>\n<td><b>Name : </b> PM SHRI KENDRIYA VIDYALAYA NO. II  <br/> <b>Head/Principal Name: </b>SANJEEV KUMAR SAMBHARIA</td>\n<td>\n<b>Address : </b>A F S MAHARAJPUR GWALIOR MADHYA PRADESH<br/>\n<b>Website : </b>https://no2gwalior.kvs.ac.in/\r\n                                        </td>\n<td>\n<a href=\"/saras/AffiliatedList/AfflicationDetails/1000004\" rel=\"noopener noreferrer\" target=\"_blank\">View</a>\n</td>\n</tr>"
+      }
+    ]
+  },
+  "search_1": {
+    "payload": {
+      "MainRadioValue": "Keyword_wise",
+      "InstName_orAddress": "DELHI PUBLIC SCHOOL"
+    },
+    "status": 200,
+    "length": 449687,
+    "row_count_estimate": 342,
+    "rows": [
+      {
+        "cells": [
+          "1",
+          "Aff. No. : 1030029 Sch. Code: 50030",
+          "State : MADHYA PRADESH District : GUNA",
+          "Senior Secondary Level",
+          "Name : DELHI PUBLIC SCHOOL Head/Principal Name: RAKESH SINGH CHOUDHARY",
+          "Address : N F L VIJAIPUR PROJECT GUNA DISTT MADHYA PRADESH Website : www.dpsvijaipur.com",
+          "View"
+        ],
+        "links": [
+          "/saras/AffiliatedList/AfflicationDetails/1030029"
+        ],
+        "html": "<tr>\n<td>1</td>\n<td>\n<b>Aff. No. :</b>1030029<br/>\n<b>Sch. Code:</b>50030\r\n                                            </td>\n<td><b>State : </b>MADHYA PRADESH<br/><b>District : </b>GUNA</td>\n<td>Senior Secondary Level</td>\n<td><b>Name : </b> DELHI PUBLIC SCHOOL <br/> <b>Head/Principal Name: </b>RAKESH SINGH CHOUDHARY </td>\n<td>\n<b>Address : </b>N F L VIJAIPUR PROJECT GUNA DISTT MADHYA PRADESH<br/>\n<b>Website : </b>www.dpsvijaipur.com\r\n                                        </td>\n<td>\n<a href=\"/saras/AffiliatedList/AfflicationDetails/1030029\" rel=\"noopener noreferrer\" target=\"_blank\">View</a>\n</td>\n</tr>"
+      },
+      {
+        "cells": [
+          "2",
+          "Aff. No. : 1030032 Sch. Code: 50101",
+          "State : MADHYA PRADESH District : SINGRAULI",
+          "Senior Secondary Level",
+          "Name : DELHI PUBLIC SCHOOL Head/Principal Name: JANARDAN PANDEY",
+          "Address : VINDHYA NAGAR DISTT SINGRAULI MADHYA PRADESH Website : www.dpsvindhyanagar.edu.in",
+          "View"
+        ],
+        "links": [
+          "/saras/AffiliatedList/AfflicationDetails/1030032"
+        ],
+        "html": "<tr>\n<td>2</td>\n<td>\n<b>Aff. No. :</b>1030032<br/>\n<b>Sch. Code:</b>50101\r\n                                            </td>\n<td><b>State : </b>MADHYA PRADESH<br/><b>District : </b>SINGRAULI</td>\n<td>Senior Secondary Level</td>\n<td><b>Name : </b> DELHI PUBLIC SCHOOL <br/> <b>Head/Principal Name: </b>JANARDAN PANDEY</td>\n<td>\n<b>Address : </b>VINDHYA NAGAR DISTT SINGRAULI MADHYA PRADESH<br/>\n<b>Website : </b>www.dpsvindhyanagar.edu.in\r\n                                        </td>\n<td>\n<a href=\"/saras/AffiliatedList/AfflicationDetails/1030032\" rel=\"noopener noreferrer\" target=\"_blank\">View</a>\n</td>\n</tr>"
+      },
+      {
+        "cells": [
+          "3",
+          "Aff. No. : 1030126 Sch. Code: 50116",
+          "State : MADHYA PRADESH District : SINGRAULI",
+          "Senior Secondary Level",
+          "Name : DELHI PUBLIC SCHOOL Head/Principal Name: PARTHA SARATHI SARKAR",
+          "Address : NIGAHI DISTRICT, SINGRAULI, SIDHI DISTT, MADHYA PRADESH Website : www.dpsnigahi.org",
+          "View"
+        ],
+        "links": [
+          "/saras/AffiliatedList/AfflicationDetails/1030126"
+        ],
+        "html": "<tr>\n<td>3</td>\n<td>\n<b>Aff. No. :</b>1030126<br/>\n<b>Sch. Code:</b>50116\r\n                                            </td>\n<td><b>State : </b>MADHYA PRADESH<br/><b>District : </b>SINGRAULI</td>\n<td>Senior Secondary Level</td>\n<td><b>Name : </b> DELHI PUBLIC SCHOOL <br/> <b>Head/Principal Name: </b>PARTHA SARATHI SARKAR</td>\n<td>\n<b>Address : </b>NIGAHI DISTRICT, SINGRAULI, SIDHI DISTT, MADHYA PRADESH<br/>\n<b>Website : </b>www.dpsnigahi.org\r\n                                        </td>\n<td>\n<a href=\"/saras/AffiliatedList/AfflicationDetails/1030126\" rel=\"noopener noreferrer\" target=\"_blank\">View</a>\n</td>\n</tr>"
+      },
+      {
+        "cells": [
+          "4",
+          "Aff. No. : 1030140 Sch. Code: 50123",
+          "State : MADHYA PRADESH District : BHOPAL",
+          "Senior Secondary Level",
+          "Name : DELHI PUBLIC SCHOOL Head/Principal Name: VINITA MALIK",
+          "Address : NEAR NEEL BAD CROSSING BHADBHADA ROAD BHOPAL MADHYA PRADESH Website : www.dpsbhopal.org",
+          "View"
+        ],
+        "links": [
+          "/saras/AffiliatedList/AfflicationDetails/1030140"
+        ],
+        "html": "<tr>\n<td>4</td>\n<td>\n<b>Aff. No. :</b>1030140<br/>\n<b>Sch. Code:</b>50123\r\n                                            </td>\n<td><b>State : </b>MADHYA PRADESH<br/><b>District : </b>BHOPAL</td>\n<td>Senior Secondary Level</td>\n<td><b>Name : </b> DELHI PUBLIC SCHOOL <br/> <b>Head/Principal Name: </b>VINITA MALIK</td>\n<td>\n<b>Address : </b>NEAR NEEL BAD CROSSING BHADBHADA ROAD BHOPAL MADHYA PRADESH<br/>\n<b>Website : </b>www.dpsbhopal.org\r\n                                        </td>\n<td>\n<a href=\"/saras/AffiliatedList/AfflicationDetails/1030140\" rel=\"noopener noreferrer\" target=\"_blank\">View</a>\n</td>\n</tr>"
+      },
+      {
+        "cells": [
+          "5",
+          "Aff. No. : 1030176 Sch. Code: 50154",
+          "State : MADHYA PRADESH District : INDORE",
+          "Senior Secondary Level",
+          "Name : DELHI PUBLIC SCHOOL Head/Principal Name: Mr. Parminder Chopra",
+          "Address : PIPLIA KUMAR NEPANIA ROAD NEAR WATER WORLD NEPANIA INDORE MADHYA PRADESH Website : www.dpsindore.org",
+          "View"
+        ],
+        "links": [
+          "/saras/AffiliatedList/AfflicationDetails/1030176"
+        ],
+        "html": "<tr>\n<td>5</td>\n<td>\n<b>Aff. No. :</b>1030176<br/>\n<b>Sch. Code:</b>50154\r\n                                            </td>\n<td><b>State : </b>MADHYA PRADESH<br/><b>District : </b>INDORE</td>\n<td>Senior Secondary Level</td>\n<td><b>Name : </b> DELHI PUBLIC SCHOOL <br/> <b>Head/Principal Name: </b>Mr. Parminder Chopra</td>\n<td>\n<b>Address : </b>PIPLIA KUMAR NEPANIA ROAD NEAR WATER WORLD NEPANIA INDORE MADHYA PRADESH<br/>\n<b>Website : </b>www.dpsindore.org\r\n                                        </td>\n<td>\n<a href=\"/saras/AffiliatedList/AfflicationDetails/1030176\" rel=\"noopener noreferrer\" target=\"_blank\">View</a>\n</td>\n</tr>"
+      }
+    ]
+  },
+  "search_2": {
+    "payload": {
+      "MainRadioValue": "Affiliation_wise",
+      "RegiAffNo": "2730011"
+    },
+    "status": 403,
+    "length": 0,
+    "row_count_estimate": 0,
+    "rows": []
+  },
+  "search_3": {
+    "payload": {
+      "MainRadioValue": "State_wise",
+      "State": "5",
+      "District": ""
+    },
+    "status": 200,
+    "length": 3288898,
+    "row_count_estimate": 2620,
+    "rows": [
+      {
+        "cells": [
+          "1",
+          "Aff. No. : 500001 Sch. Code: 44524",
+          "State : HARYANA District : AMBALA",
+          "Senior Secondary Level",
+          "Name : PM SHRI KENDRIYA VIDYALAYA NO 1 Head/Principal Name: AJEET KUMAR YADAV",
+          "Address : (PATEL PARK) AMBALA CANTT HARYANA Website : https://no1ambalacantt.kvs.ac.in",
+          "View"
+        ],
+        "links": [
+          "/saras/AffiliatedList/AfflicationDetails/500001%20"
+        ],
+        "html": "<tr>\n<td>1</td>\n<td>\n<b>Aff. No. :</b>500001 <br/>\n<b>Sch. Code:</b>44524\r\n                                            </td>\n<td><b>State : </b>HARYANA<br/><b>District : </b>AMBALA</td>\n<td>Senior Secondary Level</td>\n<td><b>Name : </b> PM SHRI KENDRIYA VIDYALAYA NO 1 <br/> <b>Head/Principal Name: </b>AJEET KUMAR YADAV</td>\n<td>\n<b>Address : </b>(PATEL PARK) AMBALA CANTT HARYANA<br/>\n<b>Website : </b>https://no1ambalacantt.kvs.ac.in\r\n                                        </td>\n<td>\n<a href=\"/saras/AffiliatedList/AfflicationDetails/500001%20\" rel=\"noopener noreferrer\" target=\"_blank\">View</a>\n</td>\n</tr>"
+      },
+      {
+        "cells": [
+          "2",
+          "Aff. No. : 500002 Sch. Code: 44525",
+          "State : HARYANA District : AMBALA",
+          "Senior Secondary Level",
+          "Name : PM SHRI KENDRIYA VIDYALAYA NO 2 Head/Principal Name: HARINDER SINGH LAMBA",
+          "Address : 16 MAJUMDAR LINES AMBALA CANTT HARYANA Website : www.no2ambalacantt.kvs.ac.in",
+          "View"
+        ],
+        "links": [
+          "/saras/AffiliatedList/AfflicationDetails/500002%20"
+        ],
+        "html": "<tr>\n<td>2</td>\n<td>\n<b>Aff. No. :</b>500002 <br/>\n<b>Sch. Code:</b>44525\r\n                                            </td>\n<td><b>State : </b>HARYANA<br/><b>District : </b>AMBALA</td>\n<td>Senior Secondary Level</td>\n<td><b>Name : </b> PM SHRI KENDRIYA VIDYALAYA NO 2 <br/> <b>Head/Principal Name: </b>HARINDER SINGH LAMBA</td>\n<td>\n<b>Address : </b>16 MAJUMDAR LINES AMBALA CANTT HARYANA<br/>\n<b>Website : </b>www.no2ambalacantt.kvs.ac.in\r\n                                        </td>\n<td>\n<a href=\"/saras/AffiliatedList/AfflicationDetails/500002%20\" rel=\"noopener noreferrer\" target=\"_blank\">View</a>\n</td>\n</tr>"
+      },
+      {
+        "cells": [
+          "3",
+          "Aff. No. : 500003 Sch. Code: 44531",
+          "State : HARYANA District : FARIDABAD",
+          "Senior Secondary Level",
+          "Name : KENDRIYA VIDYALAYA NO 1 Head/Principal Name: BEER SINGH",
+          "Address : N H IV N I T FARIDABAD HARYANA Website : https://no1faridabad.kvs.ac.in",
+          "View"
+        ],
+        "links": [
+          "/saras/AffiliatedList/AfflicationDetails/500003%20"
+        ],
+        "html": "<tr>\n<td>3</td>\n<td>\n<b>Aff. No. :</b>500003 <br/>\n<b>Sch. Code:</b>44531\r\n                                            </td>\n<td><b>State : </b>HARYANA<br/><b>District : </b>FARIDABAD</td>\n<td>Senior Secondary Level</td>\n<td><b>Name : </b> KENDRIYA VIDYALAYA NO 1 <br/> <b>Head/Principal Name: </b>BEER SINGH</td>\n<td>\n<b>Address : </b>N H IV N I T FARIDABAD HARYANA<br/>\n<b>Website : </b>https://no1faridabad.kvs.ac.in\r\n                                        </td>\n<td>\n<a href=\"/saras/AffiliatedList/AfflicationDetails/500003%20\" rel=\"noopener noreferrer\" target=\"_blank\">View</a>\n</td>\n</tr>"
+      },
+      {
+        "cells": [
+          "4",
+          "Aff. No. : 500004 Sch. Code: 44532",
+          "State : HARYANA District : FARIDABAD",
+          "Senior Secondary Level",
+          "Name : PM SHRI KENDRIYA VIDYALAYA NO 2 Head/Principal Name: MAMTA SHEKHAR",
+          "Address : N H IV N I T FARIDABAD HARYANA Website : https://no2faridabad.kvs.ac.in",
+          "View"
+        ],
+        "links": [
+          "/saras/AffiliatedList/AfflicationDetails/500004%20"
+        ],
+        "html": "<tr>\n<td>4</td>\n<td>\n<b>Aff. No. :</b>500004 <br/>\n<b>Sch. Code:</b>44532\r\n                                            </td>\n<td><b>State : </b>HARYANA<br/><b>District : </b>FARIDABAD</td>\n<td>Senior Secondary Level</td>\n<td><b>Name : </b> PM SHRI KENDRIYA VIDYALAYA NO 2 <br/> <b>Head/Principal Name: </b>MAMTA SHEKHAR</td>\n<td>\n<b>Address : </b>N H IV N I T FARIDABAD HARYANA<br/>\n<b>Website : </b>https://no2faridabad.kvs.ac.in\r\n                                        </td>\n<td>\n<a href=\"/saras/AffiliatedList/AfflicationDetails/500004%20\" rel=\"noopener noreferrer\" target=\"_blank\">View</a>\n</td>\n</tr>"
+      },
+      {
+        "cells": [
+          "5",
+          "Aff. No. : 500005 Sch. Code: 44529",
+          "State : HARYANA District : ROHTAK",
+          "Senior Secondary Level",
+          "Name : KENDRIYA VIDYALAYA Head/Principal Name: MITA ADHIKARY",
+          "Address : JHAJJAR DISTT JHAJJAR HARYANA Website : https://jhajjar.kvs.ac.in",
+          "View"
+        ],
+        "links": [
+          "/saras/AffiliatedList/AfflicationDetails/500005%20"
+        ],
+        "html": "<tr>\n<td>5</td>\n<td>\n<b>Aff. No. :</b>500005 <br/>\n<b>Sch. Code:</b>44529\r\n                                            </td>\n<td><b>State : </b>HARYANA<br/><b>District : </b>ROHTAK</td>\n<td>Senior Secondary Level</td>\n<td><b>Name : </b> KENDRIYA VIDYALAYA <br/> <b>Head/Principal Name: </b>MITA ADHIKARY</td>\n<td>\n<b>Address : </b>JHAJJAR DISTT JHAJJAR HARYANA<br/>\n<b>Website : </b>https://jhajjar.kvs.ac.in\r\n                                        </td>\n<td>\n<a href=\"/saras/AffiliatedList/AfflicationDetails/500005%20\" rel=\"noopener noreferrer\" target=\"_blank\">View</a>\n</td>\n</tr>"
+      }
+    ]
+  },
+  "detail_sample": {
+    "url": "https://saras.cbse.gov.in/saras/AffiliatedList/AfflicationDetails/%20%20%20%20%20%20%20",
+    "status": 200,
+    "length": 6123,
+    "snippet": "<!DOCTYPE html>\r\n<html lang=\"en\">\r\n<head>\r\n    <meta charset=\"utf-8\" />\r\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\r\n    <title> - SARAS</title>\r\n    <link rel=\"stylesheet\" href=\"/saras/lib/bootstrap/dist/css/bootstrap.min.css\" />\r\n    <link rel=\"stylesheet\" href=\"/saras/css/site.css\" />\r\n\r\n    <link href=\"/saras/assets/bootstrap/css/bootstrap.min.css\" rel=\"stylesheet\" />\r\n    <link href=\"/saras/assets/bootstrap/css/bootstrap-datepicker.css\" rel=\"stylesheet\" />\r\n    <link href=\"/saras/css/fonts.css\" rel=\"stylesheet\" />\r\n    <link href=\"/saras/assets/select2/css/select2.min.css\" rel=\"stylesheet\" />\r\n    <link href=\"/saras/assets/font-awesome/css/font-awesome.min.css\" rel=\"stylesheet\" />\r\n    <link href=\"/saras/assets/magnific-popup/css/magnific-popup.css\" rel=\"stylesheet\" />\r\n    <link href=\"/saras/assets/iconmoon/css/iconmoon.css\" rel=\"stylesheet\" />\r\n    <link href=\"/saras/assets/owl-carousel/css/owl.carousel.min.css\" rel=\"stylesheet\" />\r\n    <link href=\"/saras/css/animate.css\" rel=\"stylesheet\" />\r\n    <link href=\"/saras/css/custom.css\" rel=\"stylesheet\" />\r\n\r\n    <script language=\"JavaScript\" type=\"text/javascript\" src=\"/saras/js/custom.js\"></script>\r\n    <script language=\"JavaScript\" type=\"text/javascript\" src=\"/saras/js/jquery.validate.min.js\"></script>\r\n    <script language=\"JavaScript\" type=\"text/javascript\" src=\"/saras/js/modernizr.custom.js\"></script>\r\n    <script language=\"JavaScript\" type=\"text/javascript\" src=\"/saras/js/site.js\"></script>\r\n    <script language=\"JavaScript\" type=\"text/javascript\" src=\"/saras/js/ValiadtionCustom.js\"></script>\r\n\r\n    <script language=\"JavaScript\" type=\"text/javascript\" src=\"/js/sprinkle.js\"></script>\r\n  \r\n    <!-- Global stylesheet start -->\r\n    <link href=\"/saras/css/global.css\" rel=\"stylesheet\" />\r\n    <!-- Global stylesheet end -->\r\n    <link href=\"/saras/css/affiliation-table.css\" rel=\"stylesheet\" />\r\n   \r\n    <style>\r\n        \r\n\r\n        .disable_menu_css {\r\n            pointer-events: none;\r\n        }\r\n\r\n        .star_new {\r\n            color: red;\r\n        }\r\n    </style>\r\n</head>\r\n<head>\r\n    <title>Footer</title>\r\n    <meta charset=\"utf-8\">\r\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\r\n    <link rel=\"shortcut icon\" type=\"image/x-icon\" href=\"/saras/images/favicon.png\">\r\n    <link href=\"/saras/css/header-style.css\" rel=\"stylesheet\" />\r\n    \r\n</head>\r\n\r\n<div class=\"banner responsStyle\">\r\n    <div class=\"container\">\r\n        <div class=\"col-lg-12 headerContain\">\r\n            <img src=\"/saras/images/logo2.png\" alt=\"\" class=\"cbseLogo\">\r\n            <div class=\"banner_text\">\r\n                <h2>\u0915\u0947\u0928\u094d\u0926\u094d\u0930\u0940\u092f \u092e\u093e\u0927\u094d\u092f\u092e\u093f\u0915 \u0936\u093f\u0915\u094d\u0937\u093e \u092c\u094b\u0930\u094d\u0921</h2>\r\n                <h2>Central Board of Secondary Education</h2>\r\n                <h1>\r\n                    School Affiliation Re-engineered Automation System 7.0<br />\r\n                    (SARAS 7.0) (\u0938\u0902\u092c\u0926\u094d\u0927\u0924\u093e)\r\n                </h1>               \r\n            </div>\r\n            <img src=\"/saras/images/logo1.png\" alt=\"\" class=\"cbseDigiLogo\">\r\n        </div>\r\n    </div>\r\n</div>\r\n\r\n<body>\r\n    \r\n    <div style=\"padding:20px;\">\r\n        \r\n\r\n\r\n\r\n<div class=\"container\">\r\n    <div topmargin=\"0\" marginwidth=\"0\" marginheight=\"0\">\r\n        <div align=\"center\">\r\n            <font face=\"Courier New\" color=\"#ff6600\" size=\"5\">\r\n                <b>\r\n                    Details OF SCHOOL AFFILIATED TO\r\n                </b>\r\n            </font>\r\n            <br>\r\n            <font face=\"Arial\" color=\"#3399ff\" size=\"4\">\r\n                Central Board of Secondary Education<br>\r\n            </font>\r\n        </div>\r\n        <div align=\"center\">\r\n        </div>\r\n        <br />\r\n        <br />\r\n    </div>\r\n</div>\r\n\r\n\r\n<script type=\"text/javascript\" language=\"javascript\">\r\n    function Show_hide_ul(id) {\r\n\r\n        var ContenID = document.getElementById(id);\r\n        if (ContenID.style.display == \"none\") {\r\n            ContenID.style.display = \"block\";\r\n        }\r\n        else {\r\n            ContenID.style.display"
+  },
+  "detail_fields": {}
+}

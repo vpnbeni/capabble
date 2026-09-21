@@ -77,6 +77,12 @@ const TENANT_MODULE_CATALOG = Object.freeze({
     description: 'School medical clinic: minor treatment log book, prescriptions, first aid, and medical supplies.',
     dependencies: ['core'],
   },
+  asets: {
+    key: 'asets',
+    label: 'ASETS — Asset Management',
+    description: 'School asset lifecycle: ownership, locations, allocations, stock, maintenance, audits, and disposal.',
+    dependencies: ['core'],
+  },
 });
 
 const TENANT_MODULE_KEYS = Object.freeze(Object.keys(TENANT_MODULE_CATALOG));

@@ -65,6 +65,23 @@ const {
   MedicalCase,
   MedicalSupply,
 } = require('../models/MedicalRecords');
+const {
+  AssetCategory,
+  AssetLocation,
+  AssetVendor,
+  Asset,
+  AssetAllocation,
+  AssetTransfer,
+  AssetMaintenance,
+  AssetAudit,
+  AssetAuditItem,
+  AssetProcurement,
+  AssetDisposal,
+  AssetLifecycleEvent,
+  AssetStockItem,
+  AssetStockTransaction,
+  AssetSettings,
+} = require('../models/AssetRecords');
 
 const tenantModelExports = {
   User,
@@ -132,6 +149,21 @@ const tenantModelExports = {
   ActivityCouncilRegistration,
   MedicalCase,
   MedicalSupply,
+  AssetCategory,
+  AssetLocation,
+  AssetVendor,
+  Asset,
+  AssetAllocation,
+  AssetTransfer,
+  AssetMaintenance,
+  AssetAudit,
+  AssetAuditItem,
+  AssetProcurement,
+  AssetDisposal,
+  AssetLifecycleEvent,
+  AssetStockItem,
+  AssetStockTransaction,
+  AssetSettings,
 };
 
 const registerModelOnConnection = (modelExport, connection) => {

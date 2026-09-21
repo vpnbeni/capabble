@@ -1,0 +1,177 @@
+{
+  "form_inputs": {
+    "MainRadioValue": {
+      "type": "radio",
+      "value": "Disaffiliated_schools",
+      "id": "SearchMainRadioDisaffiliated_schools"
+    },
+    "State": {
+      "type": null,
+      "value": null,
+      "id": "State"
+    },
+    "District": {
+      "type": null,
+      "value": null,
+      "id": "District"
+    },
+    "Region": {
+      "type": null,
+      "value": null,
+      "id": "Region"
+    },
+    "InstName_orAddress": {
+      "type": "text",
+      "value": "",
+      "id": "InstName_orAddress"
+    },
+    "RegiAffNo": {
+      "type": "number",
+      "value": "0",
+      "id": "RegiAffNo"
+    },
+    "__Invariant": {
+      "type": "hidden",
+      "value": "RegiAffNo",
+      "id": null
+    },
+    "SchoolStatusWise": {
+      "type": null,
+      "value": null,
+      "id": "SchoolStatusWise"
+    },
+    "__RequestVerificationToken": {
+      "type": "hidden",
+      "value": "CfDJ8KgoaovmfDZEgbYwZtdtIEp6SWgmoVT31HUaMOFdY1bwecqaGB8qG3ZTY8atQNWGLoDN1SIlxPYkyRKvzGZ1i8M6_TgpR3mqExXv2GHn5h4tnt2F82XGVtmOO0F4OiQHuaU1_XreMiC1JfkaNjcsfZc",
+      "id": null
+    },
+    "__ncforminfo": {
+      "type": "hidden",
+      "value": "yLwC5tVSSkDshsf1M8hVeWCD4K4H6phV3McHjYz9VDHYmvdAIv7MUHPOU2-mHL5zx7a5JlB2XNYXN4iwL7DJYh1-SlZm0HHkXOeXfWs4c8ImMNk7c9kjckry3miLridVGXOXnQdYHw7CnI-n-z70H6ASLYmqv2ZTKTLokQR5tWySZDR0swQMu_BUeByENeQlO7oFrAYRh41UffsalWz8XvQBGzYRKVEww9MAWtSnhO_SGhc5h06SRLboiGGayuCrIp5syHb_f8aymZyUkqEGmolQtmfIWKtNRgPXxlB877v5BWUztTQSgeWDNfC-fqsNLNJwNfLnYaPKZTdMbWTtZjUMddNo0yTURlavLZNUn7nEXfrk3PIrLx5BLOSJHpKZ1i5vzdL6lytNIajY4vgBauuUvMhAyiv0Z5FOMm5yUEKo4JwPaACLN9F21tjHzJgMY7Qtn6aoeMDEZus6L2zHYQ==",
+      "id": null
+    }
+  },
+  "form_action": "/saras/AffiliatedList/ListOfSchdirReport",
+  "state_options": [
+    {
+      "value": "",
+      "text": "--select--"
+    },
+    {
+      "value": "25",
+      "text": "ANDAMAN & NICOBAR"
+    },
+    {
+      "value": "1",
+      "text": "ANDHRA PRADESH"
+    },
+    {
+      "value": "22",
+      "text": "ARUNACHAL PRADESH"
+    },
+    {
+      "value": "2",
+      "text": "ASSAM"
+    },
+    {
+      "value": "3",
+      "text": "BIHAR"
+    },
+    {
+      "value": "26",
+      "text": "CHANDIGARH"
+    },
+    {
+      "value": "33",
+      "text": "CHATTISGARH"
+    },
+    {
+      "value": "30",
+      "text": "DADAR & NAGAR HAVELI"
+    },
+    {
+      "value": "31",
+      "text": "DAMAN & DIU"
+    },
+    {
+      "value": "27",
+      "text": "DELHI"
+    },
+    {
+      "value": "50",
+      "text": "FOREIGN SCHOOLS"
+    },
+    {
+      "value": "28",
+      "text": "GOA"
+    },
+    {
+      "value": "4",
+      "text": "GUJARAT"
+    },
+    {
+      "value": "5",
+      "text": "HARYANA"
+    },
+    {
+      "value": "6",
+      "text": "HIMACHAL PRADESH"
+    },
+    {
+      "value": "7",
+      "text": "JAMMU & KASHMIR"
+    },
+    {
+      "value": "34",
+      "text": "JHARKHAND"
+    },
+    {
+      "value": "8",
+      "text": "KARNATAKA"
+    },
+    {
+      "value": "9",
+      "text": "KERALA"
+    }
+  ],
+  "all_input_names": [
+    "InstName_orAddress",
+    "MainRadioValue",
+    "RegiAffNo",
+    "__Invariant",
+    "__RequestVerificationToken",
+    "__ncforminfo"
+  ],
+  "csrf_token_present": true,
+  "search_0": {
+    "payload": {
+      "MainRadioValue": "Keyword_wise",
+      "Keyword": "HIMALYAN",
+      "__RequestVerificationToken": "CfDJ8KgoaovmfDZEgbYwZtdtIEp6SWgmoVT31HUaMOFdY1bwecqaGB8qG3ZTY8atQNWGLoDN1SIlxPYkyRKvzGZ1i8M6_TgpR3mqExXv2GHn5h4tnt2F82XGVtmOO0F4OiQHuaU1_XreMiC1JfkaNjcsfZc"
+    },
+    "status": 200,
+    "length": 41683155,
+    "has_himalyan": true,
+    "has_table_rows": true,
+    "snippet": "HIMALAYA INTERNATIONAL SCHOOL <br /> <b>Head/Principal Name: </b>SONAL BHATT</td>\r\n                                        <td>\r\n                                            <b>Address : </b>MHOW NEEMUCH ROAD<br />\r\n                                            <b>Website : </b>www.himalayainternational.in\r\n                                        </td>\r\n                                        <td>\r\n                                            <a target=\"_blank\" rel=\"noopener noreferrer\" href=\"/saras"
+  },
+  "search_1": {
+    "payload": {
+      "MainRadioValue": "State_wise",
+      "State": "HARYANA",
+      "District": "ROHTAK",
+      "__RequestVerificationToken": "CfDJ8KgoaovmfDZEgbYwZtdtIEp6SWgmoVT31HUaMOFdY1bwecqaGB8qG3ZTY8atQNWGLoDN1SIlxPYkyRKvzGZ1i8M6_TgpR3mqExXv2GHn5h4tnt2F82XGVtmOO0F4OiQHuaU1_XreMiC1JfkaNjcsfZc"
+    },
+    "status": 403,
+    "length": 0,
+    "has_himalyan": false,
+    "has_table_rows": false,
+    "snippet": ""
+  },
+  "ajax_urls_in_page": [
+    "/saras/AffiliatedList/Dist_Bind"
+  ],
+  "table_ids": [
+    "myTable"
+  ]
+}

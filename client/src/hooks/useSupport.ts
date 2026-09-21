@@ -1,7 +1,8 @@
-import { useMutation, type UseMutationOptions } from '@tanstack/react-query'
+import { useMutation, useQuery, type UseMutationOptions } from '@tanstack/react-query'
 import supportService, {
   type FeedbackPayload,
   type SupportTicketPayload,
+  type SystemStatusResponse,
 } from '../services/supportService'
 
 export function useCreateSupportTicketMutation(
@@ -19,5 +20,14 @@ export function useCreateFeedbackMutation(
   return useMutation({
     mutationFn: (payload) => supportService.submitFeedback(payload),
     ...options,
+  })
+}
+
+export function useSystemStatusQuery() {
+  return useQuery<SystemStatusResponse>({
+    queryKey: ['support', 'system-status'],
+    queryFn: () => supportService.getSystemStatus(),
+    staleTime: 60_000,
+    refetchInterval: 120_000,
   })
 }

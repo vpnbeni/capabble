@@ -1,0 +1,14 @@
+{
+  "httpStatus": 200,
+  "status": true,
+  "message": "success",
+  "data": {
+    "schEnrollmentYearDataDTOS": [],
+    "schEnrollmentYearDataTotal": {
+      "rowBoyTotal": 226,
+      "rowGirlTotal": 166,
+      "rowTotal": 392,
+      "finalTotal": 392
+    }
+  }
+}

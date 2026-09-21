@@ -1,5 +1,9 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
+const {
+  PLATFORM_ADMIN_LOGIN_REGEX,
+  PLATFORM_ADMIN_LOGIN_MESSAGE,
+} = require('../../constants/platformAdminAuth');
 
 const platformAdminSchema = new mongoose.Schema({
   email: {
@@ -8,7 +12,7 @@ const platformAdminSchema = new mongoose.Schema({
     unique: true,
     lowercase: true,
     trim: true,
-    match: [/^[^\s@]+@[^\s@]+\.[^\s@]+$/, 'Please provide a valid email'],
+    match: [PLATFORM_ADMIN_LOGIN_REGEX, PLATFORM_ADMIN_LOGIN_MESSAGE],
   },
   password: {
     type: String,

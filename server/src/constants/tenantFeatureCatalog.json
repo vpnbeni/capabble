@@ -106,6 +106,15 @@
     "fallbackPriority": 36
   },
   {
+    "key": "asets_dashboard",
+    "label": "ASETS - Asset Management",
+    "path": "/asets/dashboard",
+    "group": "Asset Hub",
+    "module": "asets",
+    "prefixes": ["/asets"],
+    "fallbackPriority": 37
+  },
+  {
     "key": "timetable_bell_timings",
     "label": "Time Table - Bell Timings",
     "path": "/time-table/bell-timings",

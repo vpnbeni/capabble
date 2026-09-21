@@ -1,0 +1,103 @@
+.help-centre-page {
+  --hc-purple: #7c3aed;
+  --hc-purple-light: #ede9fe;
+  --hc-surface: #f8fafc;
+  min-height: 100%;
+  background:
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(124, 58, 237, 0.08), transparent),
+    radial-gradient(ellipse 60% 40% at 100% 0%, rgba(59, 130, 246, 0.06), transparent),
+    var(--hc-surface);
+}
+
+.help-centre-hero {
+  background: linear-gradient(135deg, #f5f3ff 0%, #eef2ff 45%, #f0f9ff 100%);
+  border: 1px solid rgba(124, 58, 237, 0.12);
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.04),
+    0 12px 40px rgba(124, 58, 237, 0.08);
+}
+
+.help-centre-search:focus-within {
+  box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.12);
+}
+
+.help-module-card {
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.help-module-card:hover:not(.help-module-card--disabled) {
+  transform: translateY(-2px);
+  box-shadow:
+    0 8px 24px rgba(15, 23, 42, 0.08),
+    0 2px 6px rgba(124, 58, 237, 0.06);
+  border-color: rgba(124, 58, 237, 0.22);
+}
+
+.help-module-card--active {
+  border-color: rgba(124, 58, 237, 0.45) !important;
+  box-shadow:
+    0 0 0 3px rgba(124, 58, 237, 0.12),
+    0 8px 24px rgba(124, 58, 237, 0.1);
+}
+
+.help-sidebar-card {
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  box-shadow: 0 4px 20px rgba(15, 23, 42, 0.04);
+}
+
+.help-contact-row {
+  transition: background-color 0.15s ease, transform 0.15s ease;
+}
+
+.help-contact-row:hover {
+  background: rgba(124, 58, 237, 0.04);
+}
+
+.help-status-pulse {
+  animation: helpStatusPulse 2s ease-in-out infinite;
+}
+
+@keyframes helpStatusPulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+.help-getting-started {
+  background: linear-gradient(145deg, #faf5ff 0%, #eff6ff 55%, #ecfeff 100%);
+  border: 1px solid rgba(124, 58, 237, 0.14);
+}
+
+.help-chip {
+  transition: all 0.15s ease;
+}
+
+.help-chip:hover {
+  background: rgba(124, 58, 237, 0.08);
+  border-color: rgba(124, 58, 237, 0.25);
+  color: #6d28d9;
+}
+
+.help-detail-enter {
+  animation: helpDetailEnter 0.28s ease-out;
+}
+
+@keyframes helpDetailEnter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

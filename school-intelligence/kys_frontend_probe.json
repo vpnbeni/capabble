@@ -1,0 +1,42 @@
+{
+  "home_status": 200,
+  "script_count": 3,
+  "api_hits_unique": [
+    "token:Search",
+    "token:SearchBtn",
+    "token:SearchComponent",
+    "token:SearchInline",
+    "token:SearchInputChange",
+    "token:SearchName",
+    "token:SearchResult",
+    "token:SearchWithElastic",
+    "token:search",
+    "token:searchBy",
+    "token:searchInput",
+    "token:searchKey",
+    "token:searchKeyWord",
+    "token:searchKeyword",
+    "token:searchKeywordUdiseCode",
+    "token:searchType"
+  ],
+  "/web-app/": {
+    "status": 404,
+    "body": ""
+  },
+  "/web-app/api/school/searchSchool": {
+    "status": 404,
+    "body": ""
+  },
+  "/web-app/api/school/search-school": {
+    "status": 404,
+    "body": ""
+  },
+  "/web-app/api/search-school": {
+    "status": 404,
+    "body": ""
+  },
+  "/web-app/api/school/search": {
+    "status": 404,
+    "body": ""
+  }
+}

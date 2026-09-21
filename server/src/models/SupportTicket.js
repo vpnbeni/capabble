@@ -4,20 +4,61 @@ const academicSessionPlugin = require('./plugins/academicSessionPlugin');
 
 const supportTicketSchema = new mongoose.Schema(
   {
+    productModule: {
+      type: String,
+      required: [true, 'Product module is required'],
+      trim: true,
+      maxlength: [40, 'Product module cannot exceed 40 characters'],
+    },
+    productModuleLabel: {
+      type: String,
+      trim: true,
+      maxlength: [120, 'Product module label cannot exceed 120 characters'],
+      default: '',
+    },
+    pageOrArea: {
+      type: String,
+      required: [true, 'Page or area is required'],
+      trim: true,
+      maxlength: [120, 'Page or area cannot exceed 120 characters'],
+    },
+    pagePath: {
+      type: String,
+      trim: true,
+      maxlength: [200, 'Page path cannot exceed 200 characters'],
+      default: '',
+    },
+    schoolCode: {
+      type: String,
+      trim: true,
+      maxlength: [20, 'School code cannot exceed 20 characters'],
+      default: '',
+    },
+    affiliationNo: {
+      type: String,
+      trim: true,
+      maxlength: [30, 'Affiliation number cannot exceed 30 characters'],
+      default: '',
+    },
+    issueDate: {
+      type: Date,
+      default: null,
+    },
     centreCode: {
       type: String,
-      required: [true, 'Centre code is required'],
       trim: true,
       maxlength: [20, 'Centre code cannot exceed 20 characters'],
+      default: '',
     },
     examDate: {
       type: Date,
-      required: [true, 'Exam date is required'],
+      default: null,
     },
     module: {
       type: String,
-      required: [true, 'Module is required'],
-      enum: ['Candidates', 'Seating Plan', 'Duties', 'Answer Sheets', 'Reports', 'Other'],
+      trim: true,
+      maxlength: [160, 'Module label cannot exceed 160 characters'],
+      default: '',
     },
     description: {
       type: String,
@@ -42,6 +83,7 @@ const supportTicketSchema = new mongoose.Schema(
 );
 
 supportTicketSchema.index({ createdAt: -1 });
+supportTicketSchema.index({ productModule: 1, status: 1 });
 supportTicketSchema.index({ centreCode: 1, status: 1 });
 
 supportTicketSchema.plugin(academicSessionPlugin);

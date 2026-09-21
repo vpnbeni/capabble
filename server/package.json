@@ -9,6 +9,7 @@
     "dev": "nodemon src/server.js",
     "seed": "node src/seeders/index.js",
     "seed:subjects": "node scripts/seeds/seed-subjects.js",
+    "seed:asets": "node scripts/seeds/seed-asets.js",
     "bootstrap:platform": "node scripts/tenants/bootstrap-platform.js",
     "backfill:tenant-user-directory": "node scripts/tenants/backfill-tenant-user-directory.js",
     "backfill:academic-session": "node scripts/migrations/backfill-academic-session.js",

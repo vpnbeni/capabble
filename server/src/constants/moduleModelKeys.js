@@ -128,6 +128,23 @@ const MODULE_MODEL_KEYS = Object.freeze({
     'MedicalCase',
     'MedicalSupply',
   ]),
+  asets: Object.freeze([
+    'AssetCategory',
+    'AssetLocation',
+    'AssetVendor',
+    'Asset',
+    'AssetAllocation',
+    'AssetTransfer',
+    'AssetMaintenance',
+    'AssetAudit',
+    'AssetAuditItem',
+    'AssetProcurement',
+    'AssetDisposal',
+    'AssetLifecycleEvent',
+    'AssetStockItem',
+    'AssetStockTransaction',
+    'AssetSettings',
+  ]),
 });
 
 /**
@@ -144,6 +161,7 @@ const MODULE_FEATURE_KEYS = Object.freeze({
   acdmc: Object.freeze(getModuleFeatureKeys('acdmc')),
   actvt: Object.freeze(getModuleFeatureKeys('actvt')),
   mdcl: Object.freeze(getModuleFeatureKeys('mdcl')),
+  asets: Object.freeze(getModuleFeatureKeys('asets')),
 });
 
 /**
@@ -206,6 +224,10 @@ const getActiveModelKeys = (featureToggles) => {
 
   if (isModuleActive('mdcl', featureToggles)) {
     keys.push(...MODULE_MODEL_KEYS.mdcl);
+  }
+
+  if (isModuleActive('asets', featureToggles)) {
+    keys.push(...MODULE_MODEL_KEYS.asets);
   }
 
   return keys;

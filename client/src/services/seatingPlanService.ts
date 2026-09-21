@@ -1,4 +1,5 @@
 import api from './api';
+import type { RoomSeatingLayout } from '../constants/examRoomLayout';
 
 export interface Room {
   _id: string;
@@ -6,9 +7,27 @@ export interface Room {
   roomName?: string;
   floor?: string;
   capacity: number;
+  seatingLayout?: RoomSeatingLayout;
   allocatedExamDates?: string[];
   allocationOrderByDate?: Record<string, number>;
   isActive: boolean;
+  assetLocationId?: string;
+}
+
+export interface AsetsExamRoomCandidate {
+  locationId: string;
+  roomNumber: string;
+  name: string;
+  className?: string;
+  section?: string;
+  classSection?: string;
+  floor: string;
+  floorName?: string;
+  blockName?: string;
+  path?: string;
+  capacity: number;
+  useForExams: boolean;
+  examRoomId?: string | null;
 }
 
 export interface CBSECopyTemplateSettings {
@@ -91,8 +110,11 @@ export interface FunctionaryDutyListFormatSettings {
   };
 }
 
+export type SeatingPlanMode = 'same_across_days' | 'different_per_day';
+
 export interface SeatingPlanTemplateSettings {
   roomAllocationMode?: 'auto' | 'manual';
+  seatingPlanMode?: SeatingPlanMode;
   functionaryDutyList?: FunctionaryDutyListFormatSettings;
   mainGate: MainGateTemplateSettings;
   cbseCopy: CBSECopyTemplateSettings;
@@ -104,6 +126,16 @@ export const seatingPlanService = {
   // Room management
   async getRooms(): Promise<Room[]> {
     const response = await api.get('/seating-plan/rooms');
+    return response.data;
+  },
+
+  async getAsetsExamRoomCandidates(): Promise<AsetsExamRoomCandidate[]> {
+    const response = await api.get('/seating-plan/rooms/asets-candidates');
+    return response.data;
+  },
+
+  async syncExamRoomsFromAsets(locationIds: string[]): Promise<{ message: string; data: Record<string, number> }> {
+    const response = await api.post('/seating-plan/rooms/sync-from-asets', { locationIds });
     return response.data;
   },
 
@@ -168,6 +200,16 @@ export const seatingPlanService = {
   async updateRoomAllocationMode(mode: 'auto' | 'manual'): Promise<'auto' | 'manual'> {
     const response = await api.put('/seating-plan/room-allocation-mode', { mode });
     return response.data?.data?.mode === 'manual' ? 'manual' : 'auto';
+  },
+
+  async getSeatingPlanMode(): Promise<SeatingPlanMode> {
+    const response = await api.get('/seating-plan/seating-plan-mode');
+    return response.data?.data?.mode === 'same_across_days' ? 'same_across_days' : 'different_per_day';
+  },
+
+  async updateSeatingPlanMode(mode: SeatingPlanMode): Promise<SeatingPlanMode> {
+    const response = await api.put('/seating-plan/seating-plan-mode', { mode });
+    return response.data?.data?.mode === 'same_across_days' ? 'same_across_days' : 'different_per_day';
   },
 
   // Helper to download PDF

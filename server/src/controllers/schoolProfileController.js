@@ -21,6 +21,9 @@ const buildProfileResponse = (tenant, profile) => ({
   name: profile?.schoolName || tenant?.name || '',
   schoolCode: profile?.schoolCode || tenant?.metadata?.schoolCode || '',
   affiliationNo: profile?.affiliationNo || tenant?.metadata?.affiliationNo || '',
+  affiliationTill: profile?.affiliationTill
+    ? new Date(profile.affiliationTill).toISOString().slice(0, 10)
+    : '',
   logoUrl: profile?.logoUrl || '',
   logoPublicId: profile?.logoPublicId || '',
   tagline: profile?.tagline || '',
@@ -64,6 +67,22 @@ exports.updateProfile = asyncHandler(async (req, res) => {
   for (const field of ALLOWED_UPDATE_FIELDS) {
     if (req.body[field] !== undefined) {
       updates[field] = String(req.body[field] || '').trim();
+    }
+  }
+
+  if (req.body.affiliationTill !== undefined) {
+    const raw = String(req.body.affiliationTill || '').trim();
+    if (!raw) {
+      updates.affiliationTill = null;
+    } else {
+      const parsed = new Date(raw);
+      if (Number.isNaN(parsed.getTime())) {
+        return res.status(HTTP_STATUS.BAD_REQUEST).json({
+          success: false,
+          message: 'affiliationTill must be a valid date.',
+        });
+      }
+      updates.affiliationTill = parsed;
     }
   }
 

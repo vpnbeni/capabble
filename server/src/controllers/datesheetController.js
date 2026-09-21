@@ -520,7 +520,7 @@ exports.importFromPdf = asyncHandler(async (req, res) => {
 // GET /api/datesheets - Get all datesheets
 exports.getAllDatesheets = asyncHandler(async (req, res) => {
   const DateSheet = require('../models/DateSheet')
-  const { class: className, examType, status, academicYear } = req.query
+  const { class: className, examType, status, academicYear, examId } = req.query
 
   const query = { isActive: true }
   
@@ -528,10 +528,12 @@ exports.getAllDatesheets = asyncHandler(async (req, res) => {
   if (examType) query.examType = examType
   if (status) query.status = status
   if (academicYear) query.academicYear = academicYear
+  if (examId) query.examId = examId
 
   const datesheets = await DateSheet.find(query)
     .populate('createdBy', 'name email')
     .populate('publishedBy', 'name email')
+    .populate('examId', 'name code')
     .sort({ createdAt: -1 })
 
   return res.status(HTTP_STATUS.OK).json({
@@ -568,7 +570,17 @@ exports.getDatesheetById = asyncHandler(async (req, res) => {
 // POST /api/datesheets - Create new datesheet
 exports.createDatesheet = asyncHandler(async (req, res) => {
   const DateSheet = require('../models/DateSheet')
-  const { title, examType, class: className, academicYear, startDate, endDate, generalInstructions } = req.body
+  const {
+    title,
+    examType,
+    class: className,
+    academicYear,
+    startDate,
+    endDate,
+    generalInstructions,
+    examId,
+    section,
+  } = req.body
 
   // Validate required fields
   if (!title || !examType || !className || !academicYear || !startDate || !endDate) {
@@ -576,6 +588,35 @@ exports.createDatesheet = asyncHandler(async (req, res) => {
       success: false,
       message: 'Missing required fields'
     })
+  }
+
+  if (examType === 'internal' && !examId) {
+    return res.status(HTTP_STATUS.BAD_REQUEST).json({
+      success: false,
+      message: 'examId is required for internal exam datesheets.',
+    })
+  }
+
+  const normalizedSection = String(section || '').trim()
+
+  if (examId) {
+    const duplicateQuery = {
+      examId,
+      class: className,
+      academicYear,
+      examType,
+      isActive: true,
+      section: normalizedSection,
+    }
+    const existing = await DateSheet.findOne(duplicateQuery).select('_id title').lean()
+    if (existing) {
+      return res.status(HTTP_STATUS.CONFLICT).json({
+        success: false,
+        message: normalizedSection
+          ? `A datesheet already exists for this exam, class, and section (${existing.title}).`
+          : `A datesheet already exists for this exam and class (${existing.title}).`,
+      })
+    }
   }
 
   // Validate date range
@@ -595,6 +636,8 @@ exports.createDatesheet = asyncHandler(async (req, res) => {
     startDate,
     endDate,
     generalInstructions: generalInstructions || [],
+    examId: examId || null,
+    section: normalizedSection,
     createdBy: req.user._id,
     subjects: []
   })
@@ -610,7 +653,7 @@ exports.createDatesheet = asyncHandler(async (req, res) => {
 exports.updateDatesheet = asyncHandler(async (req, res) => {
   const DateSheet = require('../models/DateSheet')
   const { id } = req.params
-  const { title, examType, class: className, academicYear, startDate, endDate, generalInstructions, subjects } = req.body
+  const { title, examType, class: className, academicYear, startDate, endDate, generalInstructions, subjects, examId, section } = req.body
 
   const datesheet = await DateSheet.findOne({ _id: id, isActive: true })
 
@@ -637,6 +680,8 @@ exports.updateDatesheet = asyncHandler(async (req, res) => {
   if (startDate) datesheet.startDate = startDate
   if (endDate) datesheet.endDate = endDate
   if (generalInstructions) datesheet.generalInstructions = generalInstructions
+  if (examId !== undefined) datesheet.examId = examId || null
+  if (section !== undefined) datesheet.section = String(section || '').trim()
 
   // Replace subjects if provided
   if (Array.isArray(subjects)) {

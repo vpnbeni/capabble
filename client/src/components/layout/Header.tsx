@@ -188,8 +188,8 @@ const Header: React.FC<HeaderProps> = ({ isSidebarCollapsed, onToggleSidebar }) 
         }
       case 'help-support':
         return {
-          pageTitle: 'Help Support',
-          pageSubtitle: 'Get assistance with Cntr issues, report exam-day problems, and share feedback.',
+          pageTitle: 'Help Centre',
+          pageSubtitle: 'Search guides, browse modules, and get support for your school ERP.',
           showBackButton: isDetailRoute,
           backTo: backToPath,
         }
@@ -412,6 +412,32 @@ const Header: React.FC<HeaderProps> = ({ isSidebarCollapsed, onToggleSidebar }) 
         }
         const info = titleMap[subPage] || { title: 'MDCL', subtitle: 'School medical clinic log book and supplies' }
         return { pageTitle: info.title, pageSubtitle: info.subtitle, showBackButton: false, backTo: null }
+      }
+      case 'asets': {
+        const subPage = segments[1] || ''
+        const titleMap: Record<string, { title: string; subtitle: string }> = {
+          dashboard: { title: 'Asset Overview', subtitle: 'Lifecycle KPIs, alerts, and distribution' },
+          assets: { title: 'All Assets', subtitle: 'Asset register, batch create, and profiles' },
+          categories: { title: 'Categories', subtitle: 'Hierarchical asset categories' },
+          locations: { title: 'Campus', subtitle: 'Campus, blocks, floors, and locations hierarchy' },
+          allocations: { title: 'Allocations', subtitle: 'Assign assets to locations and custodians' },
+          transfers: { title: 'Transfers', subtitle: 'Move assets with immutable history' },
+          maintenance: { title: 'Maintenance', subtitle: 'Issues, repairs, and preventive schedules' },
+          stock: { title: 'Stock / Store', subtitle: 'Consumables and quantity-based inventory' },
+          audits: { title: 'Audits', subtitle: 'Physical verification and scan workflow' },
+          vendors: { title: 'Vendors', subtitle: 'Suppliers and service providers' },
+          procurement: { title: 'Procurement', subtitle: 'Acquisition and asset generation on receipt' },
+          disposals: { title: 'Disposal', subtitle: 'Formal retirement and disposal workflow' },
+          reports: { title: 'Reports', subtitle: 'Registers, valuation, and operational reports' },
+          settings: { title: 'ASETS Settings', subtitle: 'Alerts, approvals, and module defaults' },
+        }
+        const info = titleMap[subPage] || { title: 'ASETS', subtitle: 'School asset management' }
+        return {
+          pageTitle: info.title,
+          pageSubtitle: info.subtitle,
+          showBackButton: subPage === 'assets' && Boolean(segments[2]),
+          backTo: subPage === 'assets' && segments[2] ? '/asets/assets' : null,
+        }
       }
       case 'trnst': {
         const subPage = segments[1] || ''

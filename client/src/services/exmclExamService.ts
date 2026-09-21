@@ -23,7 +23,10 @@ type ExamPayload = Pick<ExmclExamDefinition, 'name' | 'code' | 'displayOrder' | 
 
 const getAll = async (): Promise<ExmclExamDefinition[]> => {
   const response = await api.get('/exam-definitions')
-  return Array.isArray(response?.data?.data) ? response.data.data : []
+  const payload = response?.data?.data ?? response?.data
+  if (Array.isArray(payload)) return payload
+  if (Array.isArray(payload?.exams)) return payload.exams
+  return []
 }
 
 const getSubjectMatrix = async (): Promise<ExamSubjectMatrixPayload> => {

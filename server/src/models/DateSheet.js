@@ -21,6 +21,17 @@ const dateSheetSchema = new mongoose.Schema({
     required: [true, 'Class is required'],
     enum: Object.values(STUDENT_CLASSES)
   },
+  examId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'ExamDefinition',
+    default: null,
+  },
+  section: {
+    type: String,
+    trim: true,
+    default: '',
+    maxlength: [50, 'Section cannot be more than 50 characters'],
+  },
   academicYear: {
     type: String,
     required: [true, 'Academic year is required'],
@@ -196,6 +207,7 @@ dateSheetSchema.index({ 'subjects.examDate': 1 });
 
 // Compound indexes
 dateSheetSchema.index({ class: 1, examType: 1, academicYear: 1 });
+dateSheetSchema.index({ examId: 1, class: 1, section: 1, academicYear: 1 });
 dateSheetSchema.index({ status: 1, isActive: 1 });
 
 dateSheetSchema.plugin(academicSessionPlugin);

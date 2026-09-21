@@ -21,6 +21,21 @@ const roomSchema = new mongoose.Schema({
     type: Number,
     default: 24
   },
+  seatingLayout: {
+    rows: [{
+      benchCount: {
+        type: Number,
+        min: 0,
+        max: 50,
+        default: 12,
+      },
+      benchType: {
+        type: String,
+        enum: ['single', 'double', 'triple'],
+        default: 'double',
+      },
+    }],
+  },
   allocatedExamDates: {
     type: [String],
     default: []
@@ -33,11 +48,17 @@ const roomSchema = new mongoose.Schema({
   isActive: {
     type: Boolean,
     default: true
-  }
+  },
+  assetLocationId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'AssetLocation',
+    default: null,
+  },
 }, {
   timestamps: true
 });
 
+roomSchema.index({ assetLocationId: 1 }, { sparse: true });
 roomSchema.plugin(academicSessionPlugin);
 
 module.exports = createContextModelProxy('Room', roomSchema);

@@ -1,14 +1,23 @@
 import React, { useState, useEffect, useRef } from 'react'
+import { useLocation } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
-import { seatingPlanService, Room } from '../services/seatingPlanService'
+import { seatingPlanService, Room, type AsetsExamRoomCandidate } from '../services/seatingPlanService'
 import centreDatesheetService, { type CentreDatesheetEntry } from '../services/centreDatesheetService'
 import { sidebarKeys } from '../hooks/useSidebarCounts'
+import ExamRoomLayoutDesigner from '../components/exmcl/ExamRoomLayoutDesigner'
+import { calculateLayoutCapacity, getRoomSeatingLayout } from '../constants/examRoomLayout'
 import './RoomAllocation.css'
 
 const RoomAllocation: React.FC = () => {
   const queryClient = useQueryClient()
+  const routerLocation = useLocation()
+  const isExmclRoute = routerLocation.pathname.includes('/exmcl/')
   const [rooms, setRooms] = useState<Room[]>([])
+  const [asetsCandidates, setAsetsCandidates] = useState<AsetsExamRoomCandidate[]>([])
+  const [examLocationSelection, setExamLocationSelection] = useState<Set<string>>(new Set())
+  const [loadingAsets, setLoadingAsets] = useState(false)
+  const [savingExamSelection, setSavingExamSelection] = useState(false)
   const [loading, setLoading] = useState(true)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingData, setEditingData] = useState<Partial<Room>>({})
@@ -53,9 +62,87 @@ const RoomAllocation: React.FC = () => {
 
   useEffect(() => {
     fetchRooms()
-    fetchExamDates()
-    fetchAllocationMode()
-  }, [])
+    if (isExmclRoute) {
+      void fetchAsetsCandidates()
+    } else {
+      fetchExamDates()
+      fetchAllocationMode()
+    }
+  }, [isExmclRoute])
+
+  const sortedAsetsCandidates = React.useMemo(
+    () => [...asetsCandidates].sort((left, right) => {
+      const a = left.roomNumber || left.name
+      const b = right.roomNumber || right.name
+      return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })
+    }),
+    [asetsCandidates],
+  )
+
+  const selectedExamRooms = React.useMemo(() => {
+    if (!isExmclRoute) return rooms
+
+    const roomByLocationId = new Map(
+      rooms
+        .filter((room) => room.assetLocationId)
+        .map((room) => [String(room.assetLocationId), room]),
+    )
+
+    return sortedAsetsCandidates
+      .filter((candidate) => examLocationSelection.has(candidate.locationId))
+      .map((candidate) => roomByLocationId.get(candidate.locationId))
+      .filter((room): room is Room => Boolean(room))
+  }, [isExmclRoute, rooms, examLocationSelection, sortedAsetsCandidates])
+
+  const pendingExamRoomSaveCount = React.useMemo(() => {
+    if (!isExmclRoute) return 0
+    return sortedAsetsCandidates.filter(
+      (candidate) => examLocationSelection.has(candidate.locationId) && !candidate.examRoomId,
+    ).length
+  }, [isExmclRoute, sortedAsetsCandidates, examLocationSelection])
+
+  const totalExamRoomCapacity = React.useMemo(
+    () => selectedExamRooms.reduce((sum, room) => sum + calculateLayoutCapacity(getRoomSeatingLayout(room)), 0),
+    [selectedExamRooms],
+  )
+
+  const fetchAsetsCandidates = async () => {
+    try {
+      setLoadingAsets(true)
+      const data = await seatingPlanService.getAsetsExamRoomCandidates()
+      setAsetsCandidates(data)
+      setExamLocationSelection(new Set(data.filter((row) => row.useForExams).map((row) => row.locationId)))
+    } catch (error) {
+      console.error('Failed to fetch ASETS exam room candidates:', error)
+      toast.error('Failed to load rooms from ASETS Locations.')
+    } finally {
+      setLoadingAsets(false)
+    }
+  }
+
+  const toggleExamLocation = (locationId: string) => {
+    setExamLocationSelection((prev) => {
+      const next = new Set(prev)
+      if (next.has(locationId)) next.delete(locationId)
+      else next.add(locationId)
+      return next
+    })
+  }
+
+  const handleSaveExamRoomSelection = async () => {
+    setSavingExamSelection(true)
+    try {
+      await seatingPlanService.syncExamRoomsFromAsets([...examLocationSelection])
+      await Promise.all([fetchRooms(), fetchAsetsCandidates()])
+      queryClient.invalidateQueries({ queryKey: sidebarKeys.all })
+      toast.success('Exam rooms updated from ASETS selection.')
+    } catch (error: any) {
+      console.error('Failed to save exam room selection:', error)
+      toast.error(error?.response?.data?.message || 'Failed to save exam room selection.')
+    } finally {
+      setSavingExamSelection(false)
+    }
+  }
 
   const normalizeDateKey = (value: string | Date) => {
     const date = new Date(value)
@@ -1178,58 +1265,114 @@ const RoomAllocation: React.FC = () => {
                 </svg>
               </div>
               <div>
-                <div className="ra-stat-value">{rooms.length}</div>
-                <div className="ra-stat-label">Total Rooms</div>
+                <div className="ra-stat-value">{isExmclRoute ? asetsCandidates.length : rooms.length}</div>
+                <div className="ra-stat-label">{isExmclRoute ? 'ASETS Rooms' : 'Total Rooms'}</div>
               </div>
             </div>
-            <div className="ra-stat-card ra-stat-card-inline ra-bg-green-soft">
-              <div className="ra-stat-icon ra-bg-green-grad">
-                <svg fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
-                </svg>
-              </div>
-              <div>
-                <div className="ra-stat-value">{examDates.length}</div>
-                <div className="ra-stat-label">Exam Dates</div>
-              </div>
-            </div>
-            <div className="ra-stat-card ra-stat-card-inline ra-bg-amber-soft">
-              <div className="ra-stat-icon ra-bg-amber-grad">
-                <svg fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 7.5L7.5 3m0 0L12 7.5M7.5 3v13.5m13.5 0L16.5 21m0 0L12 16.5m4.5 4.5V7.5" />
-                </svg>
-              </div>
-              <div>
-                <div className="ra-stat-value ra-text-capitalize">{allocationMode}</div>
-                <div className="ra-stat-label">Mode</div>
-              </div>
-            </div>
+            {isExmclRoute ? (
+              <>
+                <div className="ra-stat-card ra-stat-card-inline ra-bg-green-soft">
+                  <div className="ra-stat-icon ra-bg-green-grad">
+                    <svg fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <div className="ra-stat-value">{examLocationSelection.size}</div>
+                    <div className="ra-stat-label">Used for Exams</div>
+                  </div>
+                </div>
+                <div className="ra-stat-card ra-stat-card-inline ra-bg-amber-soft">
+                  <div className="ra-stat-icon ra-bg-amber-grad">
+                    <svg fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <div className="ra-stat-value">{totalExamRoomCapacity}</div>
+                    <div className="ra-stat-label">Total Seats</div>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="ra-stat-card ra-stat-card-inline ra-bg-green-soft">
+                  <div className="ra-stat-icon ra-bg-green-grad">
+                    <svg fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
+                    </svg>
+                  </div>
+                  <div>
+                    <div className="ra-stat-value">{examDates.length}</div>
+                    <div className="ra-stat-label">Exam Dates</div>
+                  </div>
+                </div>
+                <div className="ra-stat-card ra-stat-card-inline ra-bg-amber-soft">
+                  <div className="ra-stat-icon ra-bg-amber-grad">
+                    <svg fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 7.5L7.5 3m0 0L12 7.5M7.5 3v13.5m13.5 0L16.5 21m0 0L12 16.5m4.5 4.5V7.5" />
+                    </svg>
+                  </div>
+                  <div>
+                    <div className="ra-stat-value ra-text-capitalize">{allocationMode}</div>
+                    <div className="ra-stat-label">Mode</div>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
           <div className="ra-btn-group">
-            {selectedIds.size > 0 && (
-              <button
-                onClick={handleDeleteSelected}
-                disabled={isDeleting}
-                className="ra-btn ra-btn-danger"
-              >
-                <svg fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
-                </svg>
-                Delete {selectedIds.size}
-              </button>
+            {isExmclRoute ? (
+              <>
+                <button
+                  onClick={() => void fetchAsetsCandidates()}
+                  disabled={loadingAsets}
+                  className="ra-btn ra-btn-secondary"
+                >
+                  Refresh from ASETS
+                </button>
+                <button
+                  onClick={handleSaveExamRoomSelection}
+                  disabled={savingExamSelection || loadingAsets}
+                  className="ra-btn ra-btn-primary"
+                >
+                  Save Exam Rooms
+                </button>
+              </>
+            ) : (
+              <>
+                {selectedIds.size > 0 && (
+                  <button
+                    onClick={handleDeleteSelected}
+                    disabled={isDeleting}
+                    className="ra-btn ra-btn-danger"
+                  >
+                    <svg fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                    </svg>
+                    Delete {selectedIds.size}
+                  </button>
+                )}
+                <button
+                  onClick={() => setIsAddingNew(true)}
+                  disabled={isAddingNew}
+                  className="ra-btn ra-btn-primary"
+                >
+                  <svg fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m6-6H6" />
+                  </svg>
+                  Add Room
+                </button>
+              </>
             )}
-            <button
-              onClick={() => setIsAddingNew(true)}
-              disabled={isAddingNew}
-              className="ra-btn ra-btn-primary"
-            >
-              <svg fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m6-6H6" />
-              </svg>
-              Add Room
-            </button>
           </div>
         </div>
+
+        {isExmclRoute ? (
+          <div className="ra-msg" style={{ borderTop: '1px solid #e2e8f0' }}>
+            Rooms are loaded from <b>ASETS → Locations</b>. Tick the rooms to use for exams, then click <b>Save Exam Rooms</b>.
+          </div>
+        ) : null}
 
         {/* Rooms list table */}
         <div className="ra-table-wrap ra-room-table-wrap">
@@ -1237,27 +1380,84 @@ const RoomAllocation: React.FC = () => {
             <thead>
               <tr>
                 <th>
-                  <label className="ra-checkbox-label">
-                    <input
-                      type="checkbox"
-                      checked={allOnPageSelected}
-                      ref={(el) => {
-                        if (el) el.indeterminate = someOnPageSelected && !allOnPageSelected
-                      }}
-                      onChange={selectAllOnPage}
-                      className="ra-checkbox"
-                      aria-label="Select all on page"
-                    />
-                  </label>
+                  {isExmclRoute ? 'Use for Exams' : (
+                    <label className="ra-checkbox-label">
+                      <input
+                        type="checkbox"
+                        checked={allOnPageSelected}
+                        ref={(el) => {
+                          if (el) el.indeterminate = someOnPageSelected && !allOnPageSelected
+                        }}
+                        onChange={selectAllOnPage}
+                        className="ra-checkbox"
+                        aria-label="Select all on page"
+                      />
+                    </label>
+                  )}
                 </th>
                 <th>Sr No</th>
                 <th>Room No</th>
                 <th>Room Name</th>
+                {isExmclRoute ? <th>Class / Section</th> : null}
                 <th>Floor</th>
-                <th>Actions</th>
+                {!isExmclRoute ? <th>Actions</th> : null}
               </tr>
             </thead>
             <tbody>
+              {isExmclRoute ? (
+                loadingAsets ? (
+                  <tr>
+                    <td colSpan={6}>
+                      <div className="ra-msg">Loading rooms from ASETS Locations...</div>
+                    </td>
+                  </tr>
+                ) : sortedAsetsCandidates.length === 0 ? (
+                  <tr>
+                    <td colSpan={6}>
+                      <div className="ra-empty">
+                        <div className="ra-empty-icon">
+                          <svg fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 21v-3.375c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125V21" />
+                          </svg>
+                        </div>
+                        <h3>No ASETS Rooms Found</h3>
+                        <p>Add rooms under ASETS → Locations first, then return here to select exam rooms.</p>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  sortedAsetsCandidates.map((candidate, index) => {
+                    const floorClass =
+                      candidate.floor === 'Ground Floor' ? 'ra-floor-ground' :
+                        candidate.floor === 'First Floor' ? 'ra-floor-first' :
+                          candidate.floor === 'Second Floor' ? 'ra-floor-second' :
+                            candidate.floor === 'Third Floor' ? 'ra-floor-third' :
+                              'ra-floor-default'
+
+                    return (
+                      <tr key={candidate.locationId}>
+                        <td>
+                          <label className="ra-checkbox-label">
+                            <input
+                              type="checkbox"
+                              checked={examLocationSelection.has(candidate.locationId)}
+                              onChange={() => toggleExamLocation(candidate.locationId)}
+                              className="ra-checkbox"
+                              aria-label={`Use ${candidate.name} for exams`}
+                            />
+                          </label>
+                        </td>
+                        <td><span className="ra-sr">{index + 1}</span></td>
+                        <td><span className="ra-room-no">{candidate.roomNumber || '—'}</span></td>
+                        <td><span className="ra-room-name">{candidate.name}</span></td>
+                        <td><span className="ra-room-name">{candidate.classSection || '—'}</span></td>
+                        <td><span className={`ra-floor-badge ${floorClass}`}>{candidate.floor}</span></td>
+                      </tr>
+                    )
+                  })
+                )
+              ) : (
+                <>
               {/* Add New Room Row */}
               {isAddingNew && (
                 <tr className="ra-new-row">
@@ -1414,59 +1614,75 @@ const RoomAllocation: React.FC = () => {
                   </td>
                 </tr>
               )}
+                </>
+              )}
             </tbody>
           </table>
         </div>
       </div>
 
-      {/* ═══════ Room Allocation Matrix Card ═══════ */}
+      {/* ═══════ Room Layout (EXMCL) / Allocation Matrix (CNTR) ═══════ */}
       <div className="ra-card">
         <div className="ra-card-header">
           <div>
             <h3>
-              <span className="ra-header-icon ra-bg-green-grad">
+              <span className={`ra-header-icon ${isExmclRoute ? 'ra-bg-indigo-grad' : 'ra-bg-green-grad'}`}>
                 <svg fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
+                  {isExmclRoute ? (
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 8.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
+                  ) : (
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
+                  )}
                 </svg>
               </span>
-              Room Allocation by Date
+              {isExmclRoute ? 'Room Seating Layout' : 'Room Allocation by Date'}
             </h3>
             <div className="ra-card-subtitle">
-              {allocationMode === 'auto'
-                ? 'Auto mode active: system will allocate rooms automatically by allocation guidelines.'
-                : 'Manual mode active: select rooms in any order for each date. Selection order determines usage priority.'}
+              {isExmclRoute
+                ? 'Design the physical seating layout for each selected exam room. Capacity is calculated from rows, benches, and bench type.'
+                : allocationMode === 'auto'
+                  ? 'Auto mode active: system will allocate rooms automatically by allocation guidelines.'
+                  : 'Manual mode active: select rooms in any order for each date. Selection order determines usage priority.'}
             </div>
           </div>
-          <div className="ra-btn-group">
-            <div className="ra-mode-switch-wrap">
-              <span className="ra-mode-switch-label">Manual</span>
-              <button
-                type="button"
-                aria-label={allocationMode === 'manual' ? 'Allocation mode: Manual. Click to switch to Auto.' : 'Allocation mode: Auto. Click to switch to Manual.'}
-                disabled={loadingAllocationMode}
-                onClick={() => handleModeChange(allocationMode === 'auto' ? 'manual' : 'auto')}
-                className={`ra-mode-switch ${allocationMode === 'auto' ? 'ra-mode-switch-on' : ''}`}
-              >
-                <span className={`ra-mode-switch-thumb ${allocationMode === 'auto' ? 'ra-mode-switch-thumb-right' : ''}`} />
-              </button>
-              <span className="ra-mode-switch-label">Auto</span>
+          {!isExmclRoute ? (
+            <div className="ra-btn-group">
+              <div className="ra-mode-switch-wrap">
+                <span className="ra-mode-switch-label">Manual</span>
+                <button
+                  type="button"
+                  aria-label={allocationMode === 'manual' ? 'Allocation mode: Manual. Click to switch to Auto.' : 'Allocation mode: Auto. Click to switch to Manual.'}
+                  disabled={loadingAllocationMode}
+                  onClick={() => handleModeChange(allocationMode === 'auto' ? 'manual' : 'auto')}
+                  className={`ra-mode-switch ${allocationMode === 'auto' ? 'ra-mode-switch-on' : ''}`}
+                >
+                  <span className={`ra-mode-switch-thumb ${allocationMode === 'auto' ? 'ra-mode-switch-thumb-right' : ''}`} />
+                </button>
+                <span className="ra-mode-switch-label">Auto</span>
+              </div>
+              {allocationMode === 'manual' && (
+                <button
+                  onClick={handleSaveRoomAllocations}
+                  disabled={isSavingAllocation || rooms.length === 0 || examDates.length === 0}
+                  className="ra-btn ra-btn-save"
+                >
+                  <svg fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                  </svg>
+                  {isSavingAllocation ? 'Saving...' : 'Save Allocation'}
+                </button>
+              )}
             </div>
-            {allocationMode === 'manual' && (
-              <button
-                onClick={handleSaveRoomAllocations}
-                disabled={isSavingAllocation || rooms.length === 0 || examDates.length === 0}
-                className="ra-btn ra-btn-save"
-              >
-                <svg fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                </svg>
-                {isSavingAllocation ? 'Saving...' : 'Save Allocation'}
-              </button>
-            )}
-          </div>
+          ) : null}
         </div>
 
-        {loadingExamDates ? (
+        {isExmclRoute ? (
+          <ExamRoomLayoutDesigner
+            rooms={selectedExamRooms}
+            pendingSaveCount={pendingExamRoomSaveCount}
+            onSaved={() => void Promise.all([fetchRooms(), fetchAsetsCandidates()])}
+          />
+        ) : loadingExamDates ? (
           <div className="ra-msg">
             <svg className="ra-spin" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />

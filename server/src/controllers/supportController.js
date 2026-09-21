@@ -11,28 +11,72 @@ const getModelFromRequest = (req, modelName) => {
   return Model;
 };
 
+const parseOptionalDate = (value) => {
+  if (!value) return null;
+  const parsedDate = new Date(value);
+  if (Number.isNaN(parsedDate.getTime())) {
+    return null;
+  }
+  return parsedDate;
+};
+
 exports.createTicket = asyncHandler(async (req, res) => {
   const SupportTicket = getModelFromRequest(req, 'SupportTicket');
-  const { centreCode, examDate, module, description, screenshot } = req.body || {};
+  const {
+    productModule,
+    productModuleLabel,
+    pageOrArea,
+    pagePath,
+    schoolCode,
+    affiliationNo,
+    issueDate,
+    centreCode,
+    examDate,
+    module,
+    description,
+    screenshot,
+  } = req.body || {};
 
-  if (!centreCode || !examDate || !module || !description) {
+  const resolvedProductModule = productModule || module;
+  const resolvedPageOrArea = pageOrArea || module;
+  const resolvedDescription = description ? String(description).trim() : '';
+
+  if (!resolvedProductModule || !resolvedPageOrArea || !resolvedDescription) {
     return res
       .status(HTTP_STATUS.BAD_REQUEST)
-      .json(generateResponse(false, 'centreCode, examDate, module and description are required'));
+      .json(
+        generateResponse(
+          false,
+          'productModule, pageOrArea and description are required'
+        )
+      );
   }
 
-  const parsedDate = new Date(examDate);
-  if (Number.isNaN(parsedDate.getTime())) {
+  const parsedIssueDate = parseOptionalDate(issueDate || examDate);
+  if ((issueDate || examDate) && !parsedIssueDate) {
     return res
       .status(HTTP_STATUS.BAD_REQUEST)
-      .json(generateResponse(false, 'examDate must be a valid date'));
+      .json(generateResponse(false, 'issueDate must be a valid date'));
   }
+
+  const resolvedSchoolCode = String(schoolCode || centreCode || '').trim();
+  const resolvedAffiliationNo = String(affiliationNo || '').trim();
+  const resolvedModuleLabel =
+    String(productModuleLabel || '').trim() ||
+    `${String(resolvedProductModule).trim()} · ${String(resolvedPageOrArea).trim()}`;
 
   const ticket = await SupportTicket.create({
-    centreCode: String(centreCode).trim(),
-    examDate: parsedDate,
-    module,
-    description: String(description).trim(),
+    productModule: String(resolvedProductModule).trim(),
+    productModuleLabel: resolvedModuleLabel,
+    pageOrArea: String(resolvedPageOrArea).trim(),
+    pagePath: pagePath ? String(pagePath).trim() : '',
+    schoolCode: resolvedSchoolCode,
+    affiliationNo: resolvedAffiliationNo,
+    issueDate: parsedIssueDate,
+    centreCode: resolvedSchoolCode || resolvedAffiliationNo,
+    examDate: parsedIssueDate,
+    module: resolvedModuleLabel,
+    description: resolvedDescription,
     screenshot: screenshot ? String(screenshot).trim() : undefined,
   });
 
@@ -116,4 +160,3 @@ exports.getSystemStatus = asyncHandler(async (_req, res) => {
       })
     );
 });
-

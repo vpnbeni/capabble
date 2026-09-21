@@ -1,0 +1,2 @@
+[console_scripts]
+school-intel = school_intel.cli.main:app

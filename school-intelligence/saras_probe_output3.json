@@ -1,0 +1,63 @@
+{
+  "keyword_HIMALYAN PUBLIC SCHOOL": {
+    "status": 200,
+    "length": 23248,
+    "sample_rows": [
+      {
+        "cells": [
+          "S No",
+          "Aff. No & School Code",
+          "State & District",
+          "Status",
+          "School & Head Name",
+          "Address",
+          "Details"
+        ],
+        "links": []
+      }
+    ],
+    "himalyan_rohtak_matches": []
+  },
+  "keyword_HIMALYAN ROHTAK": {
+    "status": 200,
+    "length": 23241,
+    "sample_rows": [
+      {
+        "cells": [
+          "S No",
+          "Aff. No & School Code",
+          "State & District",
+          "Status",
+          "School & Head Name",
+          "Address",
+          "Details"
+        ],
+        "links": []
+      }
+    ],
+    "himalyan_rohtak_matches": []
+  },
+  "keyword_HIMALYAN": {
+    "status": 200,
+    "length": 23234,
+    "sample_rows": [
+      {
+        "cells": [
+          "S No",
+          "Aff. No & School Code",
+          "State & District",
+          "Status",
+          "School & Head Name",
+          "Address",
+          "Details"
+        ],
+        "links": []
+      }
+    ],
+    "himalyan_rohtak_matches": []
+  },
+  "dist_bind_haryana": {
+    "status": 403,
+    "body": ""
+  }
+}

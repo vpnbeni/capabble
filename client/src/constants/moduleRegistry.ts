@@ -8,8 +8,9 @@ import trnstIcon from '../assets/TRNST.png'
 import acdmcIcon from '../assets/ACDMC.png'
 import actvtIcon from '../assets/ACTVT.png'
 import mdclIcon from '../assets/MDCL.png'
+import asetsIcon from '../assets/ASETS.png'
 
-export type ModuleId = 'cntr' | 'exmcl' | 'timetable' | 'stdnt' | 'staaf' | 'attnd' | 'trnst' | 'acdmc' | 'actvt' | 'mdcl'
+export type ModuleId = 'cntr' | 'exmcl' | 'timetable' | 'stdnt' | 'staaf' | 'attnd' | 'trnst' | 'acdmc' | 'actvt' | 'mdcl' | 'asets'
 
 export type ModuleDefinition = {
   id: ModuleId
@@ -68,6 +69,13 @@ export const MODULE_REGISTRY: ModuleDefinition[] = [
     title: 'Medical Clinic',
     defaultRoute: '/mdcl/cases',
     icon: mdclIcon,
+  },
+  {
+    id: 'asets',
+    abbreviation: 'ASETS',
+    title: 'Asset Management',
+    defaultRoute: '/asets/dashboard',
+    icon: asetsIcon,
   },
   {
     id: 'trnst',

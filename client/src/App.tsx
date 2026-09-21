@@ -115,6 +115,23 @@ import ActvtSports from './pages/actvt/ActvtSports'
 import ActvtFunctions from './pages/actvt/ActvtFunctions'
 import MdclCases from './pages/mdcl/MdclCases'
 import MdclSupplies from './pages/mdcl/MdclSupplies'
+import AsetsDashboard from './pages/asets/AsetsDashboard'
+import AsetsAssets from './pages/asets/AsetsAssets'
+import AsetsAssetDetail from './pages/asets/AsetsAssetDetail'
+import { AsetsCategories, AsetsVendors } from './pages/asets/AsetsSimplePages'
+import AsetsLocations from './pages/asets/AsetsLocations'
+import AsetsLocationDetail from './pages/asets/AsetsLocationDetail'
+import {
+  AsetsAllocations,
+  AsetsTransfers,
+  AsetsMaintenance,
+  AsetsStock,
+  AsetsAudits,
+  AsetsProcurement,
+  AsetsDisposals,
+  AsetsReports,
+  AsetsSettings,
+} from './pages/asets/AsetsWorkflowPages'
 import { OnboardingPage, ValidationReportPage } from './pages/Onboarding'
 import { getPublicBrandVariant } from './utils/publicBranding'
 
@@ -362,6 +379,23 @@ function App() {
               <Route path="mdcl/cases" element={<MdclCases />} />
               <Route path="mdcl/supplies" element={<MdclSupplies />} />
               <Route path="mdcl" element={<Navigate to="/mdcl/cases" replace />} />
+              <Route path="asets/dashboard" element={<AsetsDashboard />} />
+              <Route path="asets/assets" element={<AsetsAssets />} />
+              <Route path="asets/assets/:id" element={<AsetsAssetDetail />} />
+              <Route path="asets/categories" element={<AsetsCategories />} />
+              <Route path="asets/locations" element={<AsetsLocations />} />
+              <Route path="asets/locations/:id" element={<AsetsLocationDetail />} />
+              <Route path="asets/allocations" element={<AsetsAllocations />} />
+              <Route path="asets/transfers" element={<AsetsTransfers />} />
+              <Route path="asets/maintenance" element={<AsetsMaintenance />} />
+              <Route path="asets/stock" element={<AsetsStock />} />
+              <Route path="asets/audits" element={<AsetsAudits />} />
+              <Route path="asets/vendors" element={<AsetsVendors />} />
+              <Route path="asets/procurement" element={<AsetsProcurement />} />
+              <Route path="asets/disposals" element={<AsetsDisposals />} />
+              <Route path="asets/reports" element={<AsetsReports />} />
+              <Route path="asets/settings" element={<AsetsSettings />} />
+              <Route path="asets" element={<Navigate to="/asets/dashboard" replace />} />
               <Route path="centre-details" element={<CentreDetails />} />
               <Route
                 path="exam-functionaries"

@@ -5,6 +5,7 @@ const schoolProfileSchema = new mongoose.Schema({
   schoolName: { type: String, default: '', trim: true },
   schoolCode: { type: String, default: '', trim: true },
   affiliationNo: { type: String, default: '', trim: true },
+  affiliationTill: { type: Date, default: null },
   logoUrl: { type: String, default: '' },
   logoPublicId: { type: String, default: '' },
   tagline: { type: String, default: '', trim: true },

@@ -8,7 +8,7 @@
  * These routes are available only when the tenant has at least one cntr
  * feature enabled. Per-route feature guards enforce granular access.
  */
-const { requireTenantFeature } = require('../../middleware/tenantFeatureAccess');
+const { requireTenantFeature, requireAnyTenantFeature } = require('../../middleware/tenantFeatureAccess');
 
 const studentRoutes = require('../../routes/studentRoutes');
 const candidateRoutes = require('../../routes/candidateRoutes');
@@ -37,7 +37,7 @@ const cbseRegistrationRoutes = require('../../routes/cbseRegistrationRoutes');
 const mountRoutes = (router) => {
   router.use('/students', requireTenantFeature('candidates'), studentRoutes);
   router.use('/candidates', requireTenantFeature('candidates'), candidateRoutes);
-  router.use('/datesheets', requireTenantFeature('datesheets'), datesheetRoutes);
+  router.use('/datesheets', requireAnyTenantFeature('datesheets', 'exmcl_datesheets'), datesheetRoutes);
   router.use('/centre-datesheet', requireTenantFeature('datesheets'), centreDatesheetRoutes);
   router.use('/answersheets', requireTenantFeature('answersheets'), answerSheetRoutes);
   router.use('/dispatch', requireTenantFeature('answersheets'), dispatchRoutes);
@@ -51,7 +51,7 @@ const mountRoutes = (router) => {
   router.use('/attendance', requireTenantFeature('attendance'), attendanceRoutes);
   router.use('/remuneration', requireTenantFeature('remuneration'), remunerationRoutes);
   router.use('/exam-circulars', requireTenantFeature('exmcl_centre_guidelines'), examCircularRoutes);
-  router.use('/exam-definitions', requireTenantFeature('exmcl_exams'), examDefinitionRoutes);
+  router.use('/exam-definitions', requireAnyTenantFeature('exmcl_exams', 'exmcl_datesheets'), examDefinitionRoutes);
   router.use('/exam-results', requireTenantFeature('exmcl_exams'), examResultRoutes);
   router.use('/report-card', requireTenantFeature('exmcl_exams'), reportCardRoutes);
   router.use('/award-list', requireTenantFeature('exmcl_award_list'), awardListRoutes);

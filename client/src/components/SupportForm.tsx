@@ -1,33 +1,92 @@
-import React, { useState, useEffect } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
+import { useLocation } from 'react-router-dom'
+import { useSelector } from 'react-redux'
+import { selectUser } from '@/redux/slices/authSlice'
 import { useCreateSupportTicketMutation } from '@/hooks/useSupport'
+import { useSchoolProfile } from '@/hooks/useSchoolProfile'
+import { findSupportSelectionFromPath, getSupportModules } from '@/constants/supportCatalog'
+import toast from 'react-hot-toast'
 
 type SupportFormProps = {
   onSubmitted?: () => void
+  initialModuleId?: string
+  initialPageId?: string
+  embedded?: boolean
 }
 
-type ModuleOption = 'Candidates' | 'Seating Plan' | 'Duties' | 'Answer Sheets' | 'Reports'
+const SupportForm: React.FC<SupportFormProps> = ({
+  onSubmitted,
+  initialModuleId,
+  initialPageId,
+  embedded = false,
+}) => {
+  const location = useLocation()
+  const currentUser = useSelector(selectUser)
+  const { data: schoolProfile } = useSchoolProfile(Boolean(currentUser))
 
-const moduleOptions: ModuleOption[] = ['Candidates', 'Seating Plan', 'Duties', 'Answer Sheets', 'Reports']
+  const moduleOptions = useMemo(
+    () => getSupportModules(currentUser?.featureToggles),
+    [currentUser?.featureToggles]
+  )
 
-const SupportForm: React.FC<SupportFormProps> = ({ onSubmitted }) => {
-  const [centreCode, setCentreCode] = useState('')
-  const [examDate, setExamDate] = useState('')
-  const [module, setModule] = useState<ModuleOption>('Candidates')
+  const [productModule, setProductModule] = useState('')
+  const [pageId, setPageId] = useState('')
+  const [issueDate, setIssueDate] = useState('')
   const [description, setDescription] = useState('')
   const [screenshot, setScreenshot] = useState<File | null>(null)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const submitTicketMutation = useCreateSupportTicketMutation()
   const submitting = submitTicketMutation.isPending
 
+  const selectedModule = moduleOptions.find((mod) => mod.id === productModule)
+  const pageOptions = selectedModule?.pages || []
+  const selectedPage = pageOptions.find((page) => page.id === pageId)
+
+  const schoolCode = String(schoolProfile?.schoolCode || '').trim()
+  const affiliationNo = String(schoolProfile?.affiliationNo || '').trim()
+
   useEffect(() => {
-    const stored = localStorage.getItem('centreSchoolCode') || localStorage.getItem('centreCode')
-    if (stored) setCentreCode(stored)
-  }, [])
+    if (initialModuleId && moduleOptions.some((mod) => mod.id === initialModuleId)) {
+      setProductModule(initialModuleId)
+      if (initialPageId) {
+        const pages = moduleOptions.find((mod) => mod.id === initialModuleId)?.pages || []
+        if (pages.some((page) => page.id === initialPageId)) {
+          setPageId(initialPageId)
+          return
+        }
+      }
+      const pages = moduleOptions.find((mod) => mod.id === initialModuleId)?.pages || []
+      setPageId(pages[0]?.id || '')
+      return
+    }
+
+    if (moduleOptions.length === 0) return
+
+    const isHelpPage = location.pathname.includes('/help-support')
+    if (!isHelpPage) {
+      const fromPath = findSupportSelectionFromPath(location.pathname, currentUser?.featureToggles)
+      if (fromPath && moduleOptions.some((mod) => mod.id === fromPath.moduleId)) {
+        setProductModule(fromPath.moduleId)
+        setPageId(fromPath.pageId)
+        return
+      }
+    }
+
+    setProductModule((prev) => prev || moduleOptions[0].id)
+    setPageId((prev) => prev || moduleOptions[0].pages[0]?.id || '')
+  }, [moduleOptions, location.pathname, currentUser?.featureToggles, initialModuleId, initialPageId])
+
+  useEffect(() => {
+    if (!selectedModule) return
+    if (!pageOptions.some((page) => page.id === pageId)) {
+      setPageId(pageOptions[0]?.id || '')
+    }
+  }, [selectedModule, pageOptions, pageId])
 
   const validate = () => {
     const next: Record<string, string> = {}
-    if (!centreCode.trim()) next.centreCode = 'Centre code is required'
-    if (!examDate) next.examDate = 'Exam date is required'
+    if (!productModule) next.productModule = 'Select a module'
+    if (!pageId) next.pageId = 'Select the page or area'
     if (!description.trim()) next.description = 'Please describe the issue'
     setErrors(next)
     return Object.keys(next).length === 0
@@ -35,82 +94,132 @@ const SupportForm: React.FC<SupportFormProps> = ({ onSubmitted }) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!validate()) return
+    if (!validate() || !selectedModule || !selectedPage) return
     try {
-      let screenshotUrl: string | undefined
-      if (screenshot) {
-        // In this version we assume screenshot is already uploaded elsewhere; you can extend this to use an upload endpoint.
-        screenshotUrl = screenshot.name
-      }
       await submitTicketMutation.mutateAsync({
-        centreCode: centreCode.trim(),
-        examDate,
-        module,
+        productModule: selectedModule.id,
+        productModuleLabel: `${selectedModule.abbreviation} — ${selectedModule.label}`,
+        pageOrArea: selectedPage.label,
+        pagePath: selectedPage.path,
+        schoolCode,
+        affiliationNo,
+        issueDate: issueDate || undefined,
         description: description.trim(),
-        screenshot: screenshotUrl,
+        screenshot: screenshot?.name,
       })
       setDescription('')
       setScreenshot(null)
-      if (!localStorage.getItem('centreSchoolCode') && centreCode.trim()) {
-        localStorage.setItem('centreSchoolCode', centreCode.trim())
-      }
+      toast.success('Issue reported successfully.')
       if (onSubmitted) onSubmitted()
     } catch {
       // API interceptor already shows message.
     }
   }
 
+  if (moduleOptions.length === 0) {
+    return (
+      <div className="rounded-xl border border-gray-200 bg-white p-4 text-sm text-gray-500 shadow-sm">
+        No modules are enabled for this tenant. Contact your administrator to activate modules before reporting issues.
+      </div>
+    )
+  }
+
   return (
     <form
       onSubmit={handleSubmit}
-      className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 space-y-3"
+      className={
+        embedded
+          ? 'space-y-4'
+          : 'space-y-4 rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5'
+      }
     >
-      <h2 className="text-sm font-semibold text-gray-900">Report an Issue</h2>
-      <p className="text-xs text-gray-500">
-        Share exam-day issues with the board support team. Include as much detail as possible.
-      </p>
+      {!embedded ? (
+        <div>
+          <h2 className="text-sm font-semibold text-gray-900">Report an Issue</h2>
+          <p className="mt-1 text-xs text-gray-500">
+            Choose the module and page where you faced the problem, then describe what happened.
+          </p>
+        </div>
+      ) : null}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
-          <label className="block text-[11px] font-medium text-gray-600 mb-1">Centre Code</label>
-          <input
-            type="text"
-            value={centreCode}
-            onChange={(e) => setCentreCode(e.target.value)}
-            title="Centre code"
-            placeholder="Enter centre code"
-            className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-          />
-          {errors.centreCode && <p className="mt-1 text-[11px] text-red-500">{errors.centreCode}</p>}
-        </div>
-        <div>
-          <label className="block text-[11px] font-medium text-gray-600 mb-1">Exam Date</label>
-          <input
-            type="date"
-            value={examDate}
-            onChange={(e) => setExamDate(e.target.value)}
-            title="Exam date"
-            className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-          />
-          {errors.examDate && <p className="mt-1 text-[11px] text-red-500">{errors.examDate}</p>}
-        </div>
-        <div>
-          <label className="block text-[11px] font-medium text-gray-600 mb-1">Module</label>
+          <label className="mb-1 block text-[11px] font-medium text-gray-600">Module</label>
           <select
-            value={module}
-            onChange={(e) => setModule(e.target.value as ModuleOption)}
+            value={productModule}
+            onChange={(e) => {
+              const nextModule = e.target.value
+              setProductModule(nextModule)
+              const nextPages = moduleOptions.find((mod) => mod.id === nextModule)?.pages || []
+              setPageId(nextPages[0]?.id || '')
+            }}
             title="Module"
-            className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 bg-white"
+            className="w-full rounded-lg border border-gray-300 bg-white px-2.5 py-2 text-xs focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
           >
-            {moduleOptions.map((opt) => (
-              <option key={opt} value={opt}>
-                {opt}
+            {moduleOptions.map((mod) => (
+              <option key={mod.id} value={mod.id}>
+                {mod.abbreviation} — {mod.label}
               </option>
             ))}
           </select>
+          {errors.productModule ? <p className="mt-1 text-[11px] text-red-500">{errors.productModule}</p> : null}
         </div>
+
         <div>
-          <label className="block text-[11px] font-medium text-gray-600 mb-1">Screenshot (optional)</label>
+          <label className="mb-1 block text-[11px] font-medium text-gray-600">Page / Area</label>
+          <select
+            value={pageId}
+            onChange={(e) => setPageId(e.target.value)}
+            title="Page or area"
+            className="w-full rounded-lg border border-gray-300 bg-white px-2.5 py-2 text-xs focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+          >
+            {pageOptions.map((page) => (
+              <option key={page.id} value={page.id}>
+                {page.label}
+              </option>
+            ))}
+          </select>
+          {errors.pageId ? <p className="mt-1 text-[11px] text-red-500">{errors.pageId}</p> : null}
+          {selectedPage?.path ? (
+            <p className="mt-1 truncate text-[11px] text-gray-400">Route: {selectedPage.path}</p>
+          ) : null}
+        </div>
+
+        <div>
+          <label className="mb-1 block text-[11px] font-medium text-gray-600">Aff. No.</label>
+          <input
+            type="text"
+            value={affiliationNo || '—'}
+            readOnly
+            title="Affiliation number"
+            className="w-full rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-2 text-xs text-gray-700"
+          />
+        </div>
+
+        <div>
+          <label className="mb-1 block text-[11px] font-medium text-gray-600">CBSE Code</label>
+          <input
+            type="text"
+            value={schoolCode || '—'}
+            readOnly
+            title="CBSE code"
+            className="w-full rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-2 text-xs text-gray-700"
+          />
+        </div>
+
+        <div>
+          <label className="mb-1 block text-[11px] font-medium text-gray-600">Issue date (optional)</label>
+          <input
+            type="date"
+            value={issueDate}
+            onChange={(e) => setIssueDate(e.target.value)}
+            title="Issue date"
+            className="w-full rounded-lg border border-gray-300 bg-white px-2.5 py-2 text-xs focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+          />
+        </div>
+
+        <div>
+          <label className="mb-1 block text-[11px] font-medium text-gray-600">Screenshot (optional)</label>
           <input
             type="file"
             accept="image/*"
@@ -121,25 +230,25 @@ const SupportForm: React.FC<SupportFormProps> = ({ onSubmitted }) => {
         </div>
       </div>
 
-      <div className="text-xs">
-        <label className="block text-[11px] font-medium text-gray-600 mb-1">Description</label>
+      <div>
+        <label className="mb-1 block text-[11px] font-medium text-gray-600">Description</label>
         <textarea
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           rows={4}
-          className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 resize-y"
-          placeholder="Describe the issue, steps to reproduce, and any error messages."
+          className="w-full resize-y rounded-lg border border-gray-300 px-2.5 py-2 text-xs focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+          placeholder="What were you trying to do? What happened instead? Include steps and any error messages."
         />
-        {errors.description && <p className="mt-1 text-[11px] text-red-500">{errors.description}</p>}
+        {errors.description ? <p className="mt-1 text-[11px] text-red-500">{errors.description}</p> : null}
       </div>
 
       <div className="flex justify-end">
         <button
           type="submit"
           disabled={submitting}
-          className="inline-flex items-center px-3 py-1.5 rounded-md bg-blue-600 text-white text-xs font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="inline-flex items-center rounded-xl bg-violet-600 px-4 py-2 text-xs font-semibold text-white hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {submitting ? 'Submitting...' : 'Submit Issue'}
+          {submitting ? 'Submitting…' : 'Submit Issue'}
         </button>
       </div>
     </form>
