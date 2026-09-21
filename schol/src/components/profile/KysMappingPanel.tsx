@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
-import { confirmKysMapping, verifyKysMapping } from '@/services/api'
+import { confirmKysMapping, syncKysData, verifyKysMapping } from '@/services/api'
+import { useActiveKysSyncs } from '@/hooks/useActiveKysSyncs'
 import type { KysMappingSummary } from '@/types/profile'
 
 export function KysMappingPanel({
@@ -48,14 +49,44 @@ export function KysMappingPanel({
     onError: () => toast.error('Unable to save KYS mapping'),
   })
 
+  const { data: activeSyncs } = useActiveKysSyncs()
+  const activeSyncForThisSchool = activeSyncs?.find((run) => run.school_id === schoolId)
+
+  const syncMutation = useMutation({
+    mutationFn: () => syncKysData(schoolId),
+    onSuccess: () => {
+      toast('Sync started — progress shown in the top-right corner', { icon: '⏳' })
+    },
+    onError: (error: Error) => toast.error(error.message || 'Unable to start KYS sync'),
+  })
+
   if (mapping.status === 'connected') {
+    const isSyncing = Boolean(activeSyncForThisSchool) || syncMutation.isPending
     return (
       <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 shadow-sm">
-        <div className="font-semibold text-emerald-900">KYS Connected</div>
-        <div className="mt-2 grid gap-1 text-sm text-emerald-900">
-          <div>UDISE: <span className="font-medium">{mapping.udise || '—'}</span></div>
-          <div>KYS ID: <span className="font-medium">{mapping.kys_school_id}</span></div>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <div className="font-semibold text-emerald-900">KYS Connected</div>
+            <div className="mt-2 grid gap-1 text-sm text-emerald-900">
+              <div>UDISE: <span className="font-medium">{mapping.udise || '—'}</span></div>
+              <div>KYS ID: <span className="font-medium">{mapping.kys_school_id}</span></div>
+            </div>
+          </div>
+          <button
+            onClick={() => syncMutation.mutate()}
+            disabled={isSyncing}
+            className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-800 disabled:opacity-50"
+          >
+            {isSyncing ? 'Syncing...' : 'Sync KYS Data'}
+          </button>
         </div>
+        {isSyncing && (
+          <p className="mt-3 text-sm text-emerald-800">
+            Fetching historical report-card, enrollment, and staff data from KYS across all academic years —
+            this keeps running in the background even if you leave this page. Watch the top-right corner for
+            progress{activeSyncForThisSchool?.current_year ? ` (currently on ${activeSyncForThisSchool.current_year})` : ''}.
+          </p>
+        )}
       </div>
     )
   }

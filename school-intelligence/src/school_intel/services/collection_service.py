@@ -45,21 +45,32 @@ class KysCollectionService:
         self._owns_collector = collector is None
         self._discovered_years: list[AcademicYearMapping] | None = None
 
-    def collect_school(
+    def start_school_collection(
         self,
         udise: str,
         kys_school_id: str | None = None,
         state_school_code: str | None = None,
-        verbose: bool = False,
-        target_years: list[str] | None = None,
-        target_year_ids: list[int] | None = None,
-    ) -> SchoolCollectionSummary:
+    ):
+        """Fast, synchronous setup: resolve identity and create/mark the
+        CollectionRun. Callers that want to run the actual (slow, multi-year)
+        collection loop in a background thread can call this first to obtain
+        a `run.id` to return to the client immediately, then call
+        `run_school_collection(...)` for the rest."""
         school, resolved_kys_id = self._resolve_school(
             udise=udise,
             kys_school_id=kys_school_id,
             state_school_code=state_school_code,
         )
+        run = self.create_run_for_school(school, resolved_kys_id, udise)
+        return school, resolved_kys_id, run
 
+    def create_run_for_school(self, school, resolved_kys_id: str, udise: str):
+        """Create/mark a CollectionRun for a school + KYS ID the caller
+        already trusts (e.g. an existing verified identifier) — skips the
+        live identity-verification round trip `_resolve_school` does (year
+        discovery + report-card + profile fetch), which is not actually
+        cheap. Use this when you just need a run_id fast, e.g. to return to
+        a client immediately before running the real collection loop."""
         run = self.run_repo.create(
             run_type=CollectionRunType.SCHOOL.value,
             source=DataSource.KYS.value,
@@ -70,7 +81,46 @@ class KysCollectionService:
             },
         )
         self.run_repo.mark_running(run.id)
+        return run
 
+    def collect_school(
+        self,
+        udise: str,
+        kys_school_id: str | None = None,
+        state_school_code: str | None = None,
+        verbose: bool = False,
+        target_years: list[str] | None = None,
+        target_year_ids: list[int] | None = None,
+    ) -> SchoolCollectionSummary:
+        school, resolved_kys_id, run = self.start_school_collection(
+            udise=udise,
+            kys_school_id=kys_school_id,
+            state_school_code=state_school_code,
+        )
+        return self.run_school_collection(
+            school,
+            resolved_kys_id,
+            run,
+            udise,
+            verbose=verbose,
+            target_years=target_years,
+            target_year_ids=target_year_ids,
+        )
+
+    def run_school_collection(
+        self,
+        school,
+        resolved_kys_id: str,
+        run,
+        udise: str,
+        verbose: bool = False,
+        target_years: list[str] | None = None,
+        target_year_ids: list[int] | None = None,
+    ) -> SchoolCollectionSummary:
+        """The actual (potentially slow) multi-year collection loop, given an
+        already-resolved school and already-created run. Safe to run in a
+        background thread on its own session — checks `run.status` for
+        cancellation between years."""
         summary = SchoolCollectionSummary(
             school_id=str(school.id),
             canonical_name=school.canonical_name,
@@ -79,12 +129,22 @@ class KysCollectionService:
         )
 
         try:
-            years = self._discovered_years or self.collector.discover_academic_years(resolved_kys_id)
-            years = self._filter_years(years, target_years, target_year_ids)
+            # Cache discovery across calls on this service instance — this was
+            # previously read (`self._discovered_years or ...`) but never
+            # written, so every call (e.g. once per year from an external
+            # per-year loop) silently re-ran full year discovery from scratch.
+            if self._discovered_years is None:
+                self._discovered_years = self.collector.discover_academic_years(resolved_kys_id)
+            years = self._filter_years(self._discovered_years, target_years, target_year_ids)
             if not years:
                 raise ValueError(f"No academic years discovered for KYS school {resolved_kys_id}")
 
+            cancelled = False
             for year_mapping in years:
+                self.session.refresh(run)
+                if run.status == CollectionRunStatus.CANCELLED.value:
+                    cancelled = True
+                    break
                 year_summary = self._collect_year(
                     school_id=school.id,
                     kys_school_id=resolved_kys_id,
@@ -104,6 +164,19 @@ class KysCollectionService:
                     enrollment.total_enrollment if enrollment else None
                 )
 
+                # Checkpoint progress after each year — and actually commit
+                # (update_progress only flushes), so a poller on a different
+                # DB connection (e.g. the sync-status/active-syncs endpoints)
+                # can see live progress instead of nothing until the very end.
+                failed_so_far = sum(1 for y in summary.years for e in y.endpoints if e.status == "failed")
+                self.run_repo.update_progress(
+                    run.id,
+                    processed_count=len(summary.years),
+                    failed_count=failed_so_far,
+                    cursor_value=year_mapping.academic_year,
+                )
+                self.session.commit()
+
             summary.compute_totals()
             report = ValidationService().validate_school(
                 self.session,
@@ -116,19 +189,25 @@ class KysCollectionService:
             summary.validation_warnings = [issue.message for issue in report.issues]
 
             status = (
-                CollectionRunStatus.COMPLETED.value
+                CollectionRunStatus.CANCELLED.value
+                if cancelled
+                else CollectionRunStatus.COMPLETED.value
                 if summary.collection_status == CollectionOutcomeStatus.COMPLETE.value
                 else CollectionRunStatus.PAUSED.value
                 if summary.collection_status == CollectionOutcomeStatus.PARTIAL.value
                 else CollectionRunStatus.FAILED.value
             )
+            error_summary = "; ".join(summary.validation_warnings[:5]) or None
+            if cancelled:
+                next_year = years[len(summary.years)].academic_year if len(summary.years) < len(years) else None
+                error_summary = f"Cancelled before collecting {next_year}" if next_year else "Cancelled"
             self.run_repo.update_progress(
                 run.id,
                 processed_count=summary.total_success + summary.total_skipped,
                 failed_count=summary.total_failed,
                 cursor_value=summary.years[-1].academic_year if summary.years else None,
                 status=status,
-                error_summary="; ".join(summary.validation_warnings[:5]) or None,
+                error_summary=error_summary,
             )
             return summary
         except Exception as exc:

@@ -178,10 +178,20 @@ export interface DirectoryItem {
   location: string
   udise: string | null
   state_school_code: string | null
+  saras_school_code?: string | null
   students: number | null
   teachers: number | null
   enrollment_change_pct: number | null
   consecutive_declines: number | null
   collection_state?: string | null
   kys_enriched?: boolean
+  kys_mapping_status?: string
+  kys_mapping_label?: string
+}
+
+export interface DirectoryFilterOptions {
+  states: string[]
+  districts: string[]
+  kys_status: string[]
+  validation_status: string[]
 }

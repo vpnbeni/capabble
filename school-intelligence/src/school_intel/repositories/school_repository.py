@@ -433,7 +433,11 @@ class CollectionRunRepository:
             run.cursor_value = cursor_value
         if status is not None:
             run.status = status
-            if status in {CollectionRunStatus.COMPLETED.value, CollectionRunStatus.FAILED.value}:
+            if status in {
+                CollectionRunStatus.COMPLETED.value,
+                CollectionRunStatus.FAILED.value,
+                CollectionRunStatus.CANCELLED.value,
+            }:
                 run.completed_at = datetime.now(timezone.utc)
         if error_summary is not None:
             run.error_summary = error_summary

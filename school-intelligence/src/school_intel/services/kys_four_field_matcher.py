@@ -144,7 +144,7 @@ class KysFourFieldMatcher:
                 mismatched["pin_code"] = {"saras": s_pin, "kys": k_pin}
 
         confidence = self._classify_confidence(name_score, address_score, matched, mismatched)
-        composite = self._composite_score(name_score, address_score, matched)
+        composite = self._composite_score(name_score, address_score, matched, mismatched)
 
         return FourFieldScore(
             accepted=True,
@@ -205,12 +205,25 @@ class KysFourFieldMatcher:
             return IdentityMatchConfidence.LOW
 
         district_ok = "district" in matched
+        pin_mismatch = "pin_code" in mismatched
         has_strong_name = name_score >= NAME_HIGH
         has_strong_address = address_score >= ADDRESS_HIGH
-        has_medium_address = address_score >= ADDRESS_MEDIUM
 
         if has_strong_name and has_strong_address and district_ok:
-            return IdentityMatchConfidence.HIGH
+            # A conflicting pin code alongside an otherwise very strong
+            # name+address match reads as a data-quality discrepancy worth a
+            # human glance, not proof these are different schools — demote
+            # rather than drop.
+            return IdentityMatchConfidence.MEDIUM if pin_mismatch else IdentityMatchConfidence.HIGH
+
+        if pin_mismatch:
+            # Outside a strong combined name+address match, a conflicting
+            # pin code is a strong signal these are different schools that
+            # merely share common vocabulary ("GLOBAL SCHOOL", "PUBLIC
+            # SCHOOL", ...). District alone doesn't disambiguate when
+            # matching many candidates from the same district (e.g. a bulk
+            # import), so don't let a name-only match survive.
+            return IdentityMatchConfidence.LOW
 
         if has_strong_name and district_ok and not has_strong_address:
             # Name strong, address ambiguous or weaker
@@ -222,7 +235,12 @@ class KysFourFieldMatcher:
         return IdentityMatchConfidence.LOW
 
     @staticmethod
-    def _composite_score(name_score: float, address_score: float, matched: dict[str, Any]) -> float:
+    def _composite_score(
+        name_score: float,
+        address_score: float,
+        matched: dict[str, Any],
+        mismatched: dict[str, Any] | None = None,
+    ) -> float:
         weights = [name_score * 0.5]
         if "district" in matched:
             weights.append(20.0)
@@ -232,6 +250,8 @@ class KysFourFieldMatcher:
             weights.append(address_score * 0.25)
         if "pin_code" in matched:
             weights.append(10.0)
+        if mismatched and "pin_code" in mismatched:
+            weights.append(-15.0)
         return sum(weights)
 
 

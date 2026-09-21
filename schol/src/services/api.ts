@@ -1,5 +1,5 @@
 import axios from 'axios'
-import type { DirectoryItem, SchoolProfile, YearDetail } from '@/types/profile'
+import type { DirectoryFilterOptions, DirectoryItem, SchoolProfile, YearDetail } from '@/types/profile'
 import type { DatabaseConfig, SetupStatus } from '@/types/setup'
 
 const TOKEN_KEY = 'schol_token'
@@ -70,10 +70,56 @@ export async function fetchRawSources(schoolId: string) {
   return data
 }
 
+export interface KysSyncRun {
+  run_id: string
+  school_id: string | null
+  school_name?: string | null
+  status: string
+  current_year: string | null
+  processed_count: number
+  failed_count: number
+  error_summary?: string | null
+  started_at?: string | null
+  completed_at?: string | null
+}
+
+export interface StartKysSyncResult {
+  school_id: string
+  run_id: string
+  status: string
+}
+
+export async function syncKysData(schoolId: string): Promise<StartKysSyncResult> {
+  // Starts the job and returns immediately; the actual multi-year collection
+  // runs in a background thread on the server — poll fetchKysSyncStatus or
+  // fetchActiveKysSyncs for progress.
+  const { data } = await api.post<StartKysSyncResult>(`/schools/${schoolId}/sync-kys`)
+  return data
+}
+
+export async function fetchKysSyncStatus(schoolId: string, runId: string): Promise<KysSyncRun> {
+  const { data } = await api.get<KysSyncRun>(`/schools/${schoolId}/sync-kys/${runId}`)
+  return data
+}
+
+export async function cancelKysSync(schoolId: string, runId: string): Promise<KysSyncRun> {
+  const { data } = await api.post<KysSyncRun>(`/schools/${schoolId}/sync-kys/${runId}/cancel`)
+  return data
+}
+
+export async function fetchActiveKysSyncs(): Promise<KysSyncRun[]> {
+  const { data } = await api.get<{ active_syncs: KysSyncRun[] }>('/kys-mapping/active-syncs')
+  return data.active_syncs
+}
+
 export async function fetchSchoolDirectory(params: {
   q?: string
   state?: string
   district?: string
+  kys_status?: string
+  validation_status?: string
+  sort?: string
+  order?: string
   page?: number
   limit?: number
 }) {
@@ -81,6 +127,11 @@ export async function fetchSchoolDirectory(params: {
     '/schools',
     { params },
   )
+  return data
+}
+
+export async function fetchSchoolFilterOptions(): Promise<DirectoryFilterOptions> {
+  const { data } = await api.get<DirectoryFilterOptions>('/schools/filter-options')
   return data
 }
 
@@ -140,6 +191,48 @@ export async function confirmKysMapping(
     kys_school_id: kysSchoolId,
     udise,
     allow_review_override: allowReviewOverride ?? false,
+  })
+  return data
+}
+
+export interface BulkKysImportMatch {
+  school_id: string
+  school_name: string
+  school_district?: string | null
+  school_pin_code?: string | null
+  school_address?: string | null
+  kys_school_id: string
+  kys_school_name: string | null
+  kys_district?: string | null
+  kys_pin_code?: string | null
+  kys_address?: string | null
+  confidence: string
+  score: number
+  matched_fields?: Record<string, unknown>
+  mismatch_fields?: Record<string, unknown>
+  persisted?: boolean
+  reason?: string
+}
+
+export interface BulkKysImportResult {
+  error?: string
+  candidates_parsed: number
+  district_used: string | null
+  schools_checked: number
+  auto_mapped: BulkKysImportMatch[]
+  needs_review: BulkKysImportMatch[]
+  no_match: { school_id: string; school_name: string }[]
+}
+
+export async function bulkImportKysMapping(
+  rawText: string,
+  district?: string,
+  autoConfirm = true,
+): Promise<BulkKysImportResult> {
+  const { data } = await api.post<BulkKysImportResult>('/kys-mapping/bulk-import', {
+    raw_text: rawText,
+    district: district || undefined,
+    auto_confirm: autoConfirm,
   })
   return data
 }

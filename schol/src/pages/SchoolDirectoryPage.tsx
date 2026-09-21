@@ -1,16 +1,62 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { fetchSchoolDirectory } from '@/services/api'
-import { ArrowRight, TrendingDown } from 'lucide-react'
+import { fetchSchoolDirectory, fetchSchoolFilterOptions } from '@/services/api'
+import { ArrowRight, ChevronDown, TrendingDown } from 'lucide-react'
+
+const SORT_OPTIONS = [
+  { value: 'name', label: 'Name' },
+  { value: 'district', label: 'District' },
+  { value: 'state', label: 'State' },
+  { value: 'validation_status', label: 'Validation status' },
+  { value: 'students', label: 'Students' },
+  { value: 'teachers', label: 'Teachers' },
+]
+
+const KYS_STATUS_LABELS: Record<string, string> = {
+  connected: 'KYS Connected',
+  pending: 'KYS Pending',
+}
+
+const VALIDATION_STATUS_LABELS: Record<string, string> = {
+  pending: 'Pending',
+  valid: 'Valid',
+  partial: 'Partial',
+  non_reconciling: 'Non-reconciling',
+  failed: 'Failed',
+}
 
 export function SchoolDirectoryPage() {
   const [q, setQ] = useState('')
   const [page, setPage] = useState(1)
+  const [filtersOpen, setFiltersOpen] = useState(false)
+  const [state, setState] = useState('')
+  const [district, setDistrict] = useState('')
+  const [kysStatus, setKysStatus] = useState('')
+  const [validationStatus, setValidationStatus] = useState('')
+  const [sort, setSort] = useState('name')
+  const [order, setOrder] = useState('asc')
+
+  const filterOptionsQuery = useQuery({
+    queryKey: ['school-directory-filter-options'],
+    queryFn: fetchSchoolFilterOptions,
+    retry: false,
+  })
 
   const { data, isLoading, isError, error, refetch } = useQuery({
-    queryKey: ['school-directory', q, page],
-    queryFn: () => fetchSchoolDirectory({ q, page, limit: 20 }),
+    queryKey: ['school-directory', q, state, district, kysStatus, validationStatus, sort, order, page],
+    queryFn: () =>
+      fetchSchoolDirectory({
+        q,
+        state: state || undefined,
+        district: district || undefined,
+        kys_status: kysStatus || undefined,
+        validation_status: validationStatus || undefined,
+        sort,
+        order,
+        page,
+        limit: 20,
+      }),
     retry: false,
   })
 
@@ -18,6 +64,18 @@ export function SchoolDirectoryPage() {
     error && typeof error === 'object' && 'response' in error
       ? (error as { response?: { data?: { detail?: string } } }).response?.data?.detail
       : undefined
+
+  const activeFilterCount = [state, district, kysStatus, validationStatus].filter(Boolean).length
+
+  const resetToFirstPage = () => setPage(1)
+
+  const clearFilters = () => {
+    setState('')
+    setDistrict('')
+    setKysStatus('')
+    setValidationStatus('')
+    resetToFirstPage()
+  }
 
   return (
     <div className="space-y-6">
@@ -35,15 +93,141 @@ export function SchoolDirectoryPage() {
       </div>
 
       <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-        <input
-          value={q}
-          onChange={(e) => {
-            setQ(e.target.value)
-            setPage(1)
-          }}
-          placeholder="Search by school name, UDISE, district..."
-          className="w-full rounded-lg border border-slate-200 px-4 py-2 text-sm"
-        />
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+          <input
+            value={q}
+            onChange={(e) => {
+              setQ(e.target.value)
+              resetToFirstPage()
+            }}
+            placeholder="Search by school name, UDISE, district..."
+            className="w-full rounded-lg border border-slate-200 px-4 py-2 text-sm lg:flex-1"
+          />
+          <div className="flex items-center gap-2">
+            <label className="text-sm text-slate-500">Sort by</label>
+            <select
+              value={sort}
+              onChange={(e) => {
+                setSort(e.target.value)
+                resetToFirstPage()
+              }}
+              className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
+            >
+              {SORT_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+            <select
+              value={order}
+              onChange={(e) => {
+                setOrder(e.target.value)
+                resetToFirstPage()
+              }}
+              className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
+            >
+              <option value="asc">Asc</option>
+              <option value="desc">Desc</option>
+            </select>
+          </div>
+          <button
+            onClick={() => setFiltersOpen((v) => !v)}
+            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium hover:bg-slate-50"
+          >
+            Filters
+            {activeFilterCount > 0 && (
+              <span className="rounded-full bg-primary-600 px-1.5 py-0.5 text-xs font-semibold text-white">
+                {activeFilterCount}
+              </span>
+            )}
+            <ChevronDown className={`h-4 w-4 transition-transform ${filtersOpen ? 'rotate-180' : ''}`} />
+          </button>
+        </div>
+
+        {filtersOpen && (
+          <div className="mt-4 grid gap-3 border-t border-slate-100 pt-4 sm:grid-cols-2 lg:grid-cols-4">
+            <label className="text-sm">
+              <span className="mb-1 block text-slate-600">State</span>
+              <select
+                value={state}
+                onChange={(e) => {
+                  setState(e.target.value)
+                  resetToFirstPage()
+                }}
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+              >
+                <option value="">Any state</option>
+                {filterOptionsQuery.data?.states.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="text-sm">
+              <span className="mb-1 block text-slate-600">District</span>
+              <select
+                value={district}
+                onChange={(e) => {
+                  setDistrict(e.target.value)
+                  resetToFirstPage()
+                }}
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+              >
+                <option value="">Any district</option>
+                {filterOptionsQuery.data?.districts.map((d) => (
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="text-sm">
+              <span className="mb-1 block text-slate-600">KYS status</span>
+              <select
+                value={kysStatus}
+                onChange={(e) => {
+                  setKysStatus(e.target.value)
+                  resetToFirstPage()
+                }}
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+              >
+                <option value="">Any</option>
+                {filterOptionsQuery.data?.kys_status.map((s) => (
+                  <option key={s} value={s}>
+                    {KYS_STATUS_LABELS[s] || s}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="text-sm">
+              <span className="mb-1 block text-slate-600">Validation status</span>
+              <select
+                value={validationStatus}
+                onChange={(e) => {
+                  setValidationStatus(e.target.value)
+                  resetToFirstPage()
+                }}
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+              >
+                <option value="">Any</option>
+                {filterOptionsQuery.data?.validation_status.map((s) => (
+                  <option key={s} value={s}>
+                    {VALIDATION_STATUS_LABELS[s] || s}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {activeFilterCount > 0 && (
+              <div className="sm:col-span-2 lg:col-span-4">
+                <button onClick={clearFilters} className="text-sm font-medium text-primary-700 hover:underline">
+                  Clear filters
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {isLoading && <div className="text-slate-500">Loading schools...</div>}
@@ -122,9 +306,9 @@ export function SchoolDirectoryPage() {
         ))}
         {!isLoading && !isError && data?.items.length === 0 && (
           <div className="rounded-xl border border-slate-200 bg-white p-8 text-center">
-            <div className="font-medium text-slate-900">No schools in the intelligence database yet</div>
+            <div className="font-medium text-slate-900">No schools match these filters</div>
             <p className="mt-2 text-sm text-slate-500">
-              Collect at least one school from KYS to populate the directory.
+              Try clearing a filter, or collect at least one school from KYS to populate the directory.
             </p>
             <Link
               to="/setup"

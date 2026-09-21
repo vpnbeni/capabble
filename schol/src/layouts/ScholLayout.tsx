@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import clsx from 'clsx'
 import { useAuth } from '@/context/AuthContext'
+import { KysSyncToaster } from '@/components/KysSyncToaster'
 
 const nav = [
   { to: '/schools', label: 'School Directory', icon: School },
@@ -93,6 +94,7 @@ export function ScholLayout() {
           </main>
         </div>
       </div>
+      <KysSyncToaster />
     </div>
   )
 }
