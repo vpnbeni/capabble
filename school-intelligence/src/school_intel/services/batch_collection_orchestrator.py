@@ -11,12 +11,11 @@ from sqlalchemy.orm.attributes import flag_modified
 from school_intel.collectors.kys_collector import KysCollector
 from school_intel.collectors.saras_collector import SarasCollector
 from school_intel.db.models import CollectionRunSchool
-from school_intel.domain.collection_constants import endpoint_label, years_in_range
+from school_intel.domain.collection_constants import years_in_range
 from school_intel.domain.collection_contract import (
     aggregate_run_progress,
     compute_stage_progress as contract_compute_stage_progress,
     derive_run_status,
-    is_kys_pending,
     is_terminal_school_status,
     is_terminal_success,
     normalize_school_status,
@@ -39,6 +38,7 @@ from school_intel.repositories.school_repository import CollectionRunRepository,
 from school_intel.services.collection_assessment_service import CollectionAssessmentService
 from school_intel.services.collection_preview_service import CollectionPreviewService
 from school_intel.services.collection_service import KysCollectionService
+from school_intel.services.kys_bulk_import_service import extract_kys_listing_rows, row_to_kys_candidate
 from school_intel.services.kys_mapping_resolver import KysMappingResolver
 from school_intel.services.saras_enrichment_service import SarasEnrichmentService
 from school_intel.services.school_identity_service import IdentityLookupInput, SchoolIdentityService
@@ -73,6 +73,12 @@ class BatchCollectionOrchestrator:
         self.preview.close()
 
     def create_run(self, payload: dict, requested_by: str | None = None) -> UUID:
+        source = payload.get("source", DataSource.SARAS.value)
+        if source == DataSource.KYS.value or payload.get("source_mode") == "kys":
+            return self._create_kys_direct_run(payload, requested_by=requested_by)
+        return self._create_saras_run(payload, requested_by=requested_by)
+
+    def _create_saras_run(self, payload: dict, requested_by: str | None = None) -> UUID:
         preview = self.preview.preview(
             source=payload["source"],
             state_id=payload["state_id"],
@@ -91,7 +97,7 @@ class BatchCollectionOrchestrator:
 
         parameters = {
             **payload,
-            **pipeline_metadata_for_source(payload.get("source", DataSource.SARAS.value)),
+            **pipeline_metadata_for_source(DataSource.SARAS.value),
             "requested_by": requested_by,
             "preview_summary": {
                 key: preview[key]
@@ -144,6 +150,113 @@ class BatchCollectionOrchestrator:
 
         parameters["stage_progress"]["saras_discovery"]["complete"] = len(schools)
         run.parameters = parameters
+        self.session.flush()
+        return run.id
+
+    def _create_kys_direct_run(self, payload: dict, requested_by: str | None = None) -> UUID:
+        """Seed a batch run from pasted KYS Advance Search JSON (CAPTCHA already solved)."""
+        raw = payload.get("kys_district_json")
+        rows = extract_kys_listing_rows(raw)
+        candidates = [c for c in (row_to_kys_candidate(r) for r in rows) if c is not None]
+        if not candidates:
+            raise ValueError("No school records found in kys_district_json")
+
+        # Deduplicate by kys_school_id (first wins).
+        seen: set[str] = set()
+        unique: list = []
+        for candidate in candidates:
+            if candidate.kys_school_id in seen:
+                continue
+            seen.add(candidate.kys_school_id)
+            unique.append(candidate)
+
+        school_limit = payload.get("school_limit")
+        schools = unique
+        if school_limit not in (None, "all", "All"):
+            schools = schools[: int(school_limit)]
+
+        inferred_district = next((c.district for c in schools if c.district), None)
+        inferred_state = next((c.state for c in schools if c.state), None)
+        state_name = (payload.get("state_name") or "").strip() or inferred_state or ""
+        district_name = (payload.get("district_name") or "").strip() or inferred_district or ""
+
+        pipeline = pipeline_metadata_for_source(DataSource.KYS.value)
+        parameters = {
+            **payload,
+            **pipeline,
+            "source": DataSource.KYS.value,
+            "source_mode": "kys",
+            "state_id": payload.get("state_id") or "",
+            "district_id": payload.get("district_id") or "",
+            "state_name": state_name,
+            "district_name": district_name,
+            "requested_by": requested_by,
+            # Drop the bulky JSON from stored parameters after seeding — keep a count only.
+            "kys_district_json": None,
+            "kys_schools_pasted": len(unique),
+            "preview_summary": {
+                "schools_found": len(rows),
+                "unique_schools": len(unique),
+                "duplicates": max(len(candidates) - len(unique), 0),
+                "malformed_records": max(len(rows) - len(candidates), 0),
+                "existing_canonical_schools": 0,
+                "existing_complete": 0,
+                "existing_incomplete": 0,
+                "new_schools": len(schools),
+                "unresolved_matches": 0,
+                "conflicts": 0,
+            },
+            "stage_progress": {
+                "kys_discovery": {"complete": 0, "total": len(schools)},
+                "identity_resolution": {"complete": 0, "total": len(schools)},
+                "historical_collection": {"complete": 0, "total": len(schools)},
+                "validation": {"complete": 0, "total": len(schools)},
+            },
+            "options": payload.get("options", {}),
+        }
+
+        run = self.run_repo.create(
+            run_type=CollectionRunType.BATCH.value,
+            source=DataSource.KYS.value,
+            parameters=parameters,
+        )
+        self.batch_repo.set_total_count(run.id, len(schools))
+
+        for index, candidate in enumerate(schools):
+            udise = candidate.udise or ""
+            # affiliation_number is required on CollectionRunSchool; for KYS-only
+            # we use UDISE (or a kys- synthetic key) as the stable row key.
+            affiliation_key = udise or f"kys-{candidate.kys_school_id}"
+            discovery_row = {
+                **(candidate.raw or {}),
+                "kys_school_id": candidate.kys_school_id,
+                "udise": udise or None,
+                "school_name": candidate.school_name,
+                "district": candidate.district,
+                "state": candidate.state,
+                "pin_code": candidate.pin_code,
+                "address_line": candidate.address_line,
+                "discovery_source": DataSource.KYS.value,
+            }
+            self.batch_repo.create_run_school(
+                collection_run_id=run.id,
+                position=index,
+                affiliation_number=affiliation_key,
+                school_name=candidate.school_name or affiliation_key,
+                school_code=None,
+                district=candidate.district or district_name or None,
+                state=candidate.state or state_name or None,
+                saras_row=discovery_row,
+                school_id=None,
+                planned_action=CollectionSchoolAction.NEW.value,
+                identity_status="new",
+                kys_mapping_status="mapped",  # IDs came from the paste itself
+                collection_status=BatchSchoolCollectionStatus.DISCOVERED.value,
+            )
+
+        parameters["stage_progress"]["kys_discovery"]["complete"] = len(schools)
+        run.parameters = parameters
+        flag_modified(run, "parameters")
         self.session.flush()
         return run.id
 
@@ -254,6 +367,10 @@ class BatchCollectionOrchestrator:
         if not item.started_at:
             item.started_at = datetime.now(timezone.utc)
 
+        if params.get("pipeline_type") == "kys_direct" or params.get("source") == DataSource.KYS.value:
+            self._process_kys_direct_item(item, run_id, params, resume_incomplete=resume_incomplete)
+            return
+
         if normalize_school_status(item.collection_status) not in {
             BatchSchoolCollectionStatus.KYS_MAPPING_PENDING.value,
             BatchSchoolCollectionStatus.KYS_MAPPING_REVIEW.value,
@@ -336,6 +453,86 @@ class BatchCollectionOrchestrator:
             return
 
         self._collect_historical_kys(item, run_id, params, kys_id=kys_id, udise=udise or "", years=years)
+
+    def _process_kys_direct_item(
+        self,
+        item: CollectionRunSchool,
+        run_id: UUID,
+        params: dict,
+        *,
+        resume_incomplete: bool,
+    ) -> None:
+        """KYS-only path: paste already provided schoolId + UDISE; skip SARAS + mapping."""
+        _ = resume_incomplete  # reserved for future per-endpoint resume parity
+        row = item.saras_row or {}
+        kys_id = str(row.get("kys_school_id") or row.get("schoolId") or "").strip()
+        udise = str(row.get("udise") or row.get("udiseschCode") or "").strip()
+        if not udise and item.affiliation_number and not item.affiliation_number.startswith("kys-"):
+            udise = item.affiliation_number.strip()
+
+        if not kys_id:
+            item.collection_status = BatchSchoolCollectionStatus.FAILED.value
+            item.error_summary = "KYS schoolId missing from discovery row"
+            item.completed_at = datetime.now(timezone.utc)
+            self.batch_repo.update_run_school(item)
+            return
+        if not udise:
+            item.collection_status = BatchSchoolCollectionStatus.FAILED.value
+            item.error_summary = "UDISE code missing from discovery row"
+            item.completed_at = datetime.now(timezone.utc)
+            self.batch_repo.update_run_school(item)
+            return
+
+        item.collection_status = BatchSchoolCollectionStatus.COLLECTING.value
+        item.current_operation = "Resolving school identity from KYS"
+        self.batch_repo.update_run_school(item)
+        self.session.commit()
+
+        collector = KysCollector()
+        service = KysCollectionService(self.session, collector=collector)
+        try:
+            school, resolved_kys_id = service._resolve_school(
+                udise=udise,
+                kys_school_id=kys_id,
+                state_school_code=None,
+            )
+        except Exception as exc:
+            item.collection_status = BatchSchoolCollectionStatus.FAILED.value
+            item.error_summary = f"KYS identity resolve failed: {exc}"
+            item.completed_at = datetime.now(timezone.utc)
+            self.batch_repo.update_run_school(item)
+            return
+        finally:
+            collector.close()
+
+        item.school_id = school.id
+        item.identity_status = BatchSchoolCollectionStatus.IDENTITY_RESOLVED.value
+        item.kys_mapping_status = "mapped"
+        item.collection_status = BatchSchoolCollectionStatus.KYS_MAPPED.value
+        years = years_in_range(params.get("year_from", "2018-19"), params.get("year_to", "2025-26"))
+        item.years_total = len(years)
+        if not item.year_progress:
+            item.year_progress = {year: {"status": "pending"} for year in years}
+        self.batch_repo.update_run_school(item)
+        self.session.commit()
+
+        if self.assessment.is_school_complete(
+            item.school_id,
+            params.get("year_from", "2018-19"),
+            params.get("year_to", "2025-26"),
+            params.get("data_groups", []),
+        ):
+            self._mark_skipped(item, "Golden record already complete")
+            return
+
+        self._collect_historical_kys(
+            item,
+            run_id,
+            params,
+            kys_id=resolved_kys_id,
+            udise=udise,
+            years=years,
+        )
 
     def _enrich_saras_detail(self, item: CollectionRunSchool) -> None:
         enricher = self._saras_enricher or SarasEnrichmentService(self.session, collector=self.collector)
@@ -456,15 +653,18 @@ class BatchCollectionOrchestrator:
         return None
 
     @staticmethod
-    def compute_stage_progress(items: list[CollectionRunSchool]) -> dict[str, dict[str, int]]:
-        return contract_compute_stage_progress(items)
+    def compute_stage_progress(items: list[CollectionRunSchool], pipeline_type: str | None = None) -> dict[str, dict[str, int]]:
+        return contract_compute_stage_progress(items, pipeline_type=pipeline_type)
 
     def _update_stage_progress(self, run_id: UUID, items: list[CollectionRunSchool]) -> None:
         run = self.run_repo.get(run_id)
         if not run or not run.parameters:
             return
         params = dict(run.parameters)
-        params["stage_progress"] = contract_compute_stage_progress(items)
+        params["stage_progress"] = contract_compute_stage_progress(
+            items,
+            pipeline_type=params.get("pipeline_type"),
+        )
         run.parameters = params
         flag_modified(run, "parameters")
         self.session.flush()

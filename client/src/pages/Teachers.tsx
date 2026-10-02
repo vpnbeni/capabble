@@ -752,7 +752,13 @@ const Teachers: React.FC<TeachersProps> = ({
   };
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <div
+      className={
+        hidePagination
+          ? 'flex h-[calc(100dvh-4.75rem)] min-h-0 flex-col p-4'
+          : 'mx-auto max-w-7xl p-6'
+      }
+    >
       {/* Error Message */}
       {error && (
         <div className="mb-4 p-4 bg-error-50 dark:bg-error-900/20 border border-error-200 dark:border-error-800 rounded-lg">
@@ -808,10 +814,10 @@ const Teachers: React.FC<TeachersProps> = ({
       </div>}
 
       {/* Teachers Table */}
-      <div className="card overflow-hidden">
+      <div className={`card overflow-hidden ${hidePagination ? 'flex min-h-0 flex-1 flex-col' : ''}`}>
         {/* Toolbar: search + actions (inside table card) */}
-        <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-          <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
+        <div className="flex-shrink-0 border-b border-gray-200 p-3 dark:border-gray-700">
+          <div className="flex flex-col items-start justify-between gap-3 lg:flex-row lg:items-center">
             <div className="flex-1 w-full max-w-md">
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -991,22 +997,24 @@ const Teachers: React.FC<TeachersProps> = ({
         </div>
 
         <div
-          className={`overflow-x-auto overflow-y-auto ${hidePagination ? 'max-h-[60vh]' : 'max-h-[calc(100vh-20rem)]'}`}
+          className={`overflow-x-auto overflow-y-auto ${
+            hidePagination ? 'min-h-0 flex-1' : 'max-h-[calc(100vh-16rem)]'
+          }`}
         >
           <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
             <thead className="sticky top-0 z-20 bg-gray-50 dark:bg-gray-800">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-300">
                   <input
                     type="checkbox"
                     title="Select all functionaries on this page"
                     aria-label="Select all functionaries on this page"
                     checked={allVisibleSelected}
                     onChange={(e) => toggleSelectAllVisible(e.target.checked)}
-                    className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                    className="h-3.5 w-3.5 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
                   />
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-300">
                   Sr No
                 </th>
                 {[
@@ -1021,7 +1029,7 @@ const Teachers: React.FC<TeachersProps> = ({
                 ].map(({ label, field }) => (
                   <th
                     key={field}
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer select-none hover:text-gray-900 dark:hover:text-white transition-colors group"
+                    className="group cursor-pointer select-none px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500 transition-colors hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
                     onClick={() => {
                       if (sortField === field) {
                         setSortDirection((d) => (d === "asc" ? "desc" : "asc"));
@@ -1087,7 +1095,7 @@ const Teachers: React.FC<TeachersProps> = ({
                     }}
                   >
                     <td
-                      className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white"
+                      className="whitespace-nowrap px-3 py-1.5 text-sm text-gray-900 dark:text-white"
                       onClick={(e) => e.stopPropagation()}
                     >
                       <input
@@ -1096,27 +1104,27 @@ const Teachers: React.FC<TeachersProps> = ({
                         aria-label={`Select ${teacher.name}`}
                         checked={Boolean(selectedTeacherIds[getTeacherId(teacher)])}
                         onChange={(e) => toggleTeacherSelection(getTeacherId(teacher), e.target.checked)}
-                        className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                        className="h-3.5 w-3.5 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
                       />
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                    <td className="whitespace-nowrap px-3 py-1.5 text-sm text-gray-900 dark:text-white">
                       {srNoOffset + index + 1}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="whitespace-nowrap px-3 py-1.5">
                       <div className="flex items-center">
-                        <div className="w-10 h-10 bg-gradient-to-br from-primary-400 to-primary-600 rounded-lg flex items-center justify-center shadow-sm">
-                          <span className="text-sm font-bold text-white">
+                        <div className="flex h-7 w-7 items-center justify-center rounded-md bg-gradient-to-br from-primary-400 to-primary-600">
+                          <span className="text-xs font-bold text-white">
                             {teacher.avatar}
                           </span>
                         </div>
-                        <div className="ml-3">
+                        <div className="ml-2.5">
                           <div className="text-sm font-medium text-gray-900 dark:text-white">
                             {String(teacher.name || "").toUpperCase()}
                           </div>
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                    <td className="whitespace-nowrap px-3 py-1.5 text-sm text-gray-900 dark:text-white">
                       {(() => {
                         const currentDuty =
                           dutyTypeOverrides[teacher._id || teacher.id!] ?? teacher.dutyType ?? "";
@@ -1128,7 +1136,7 @@ const Teachers: React.FC<TeachersProps> = ({
                     </td>
                     {!hideDutyType && (
                       <td
-                        className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white"
+                        className="whitespace-nowrap px-3 py-1.5 text-sm text-gray-900 dark:text-white"
                         onClick={(e) => e.stopPropagation()}
                       >
                         {(() => {
@@ -1183,22 +1191,22 @@ const Teachers: React.FC<TeachersProps> = ({
                         })()}
                       </td>
                     )}
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                    <td className="whitespace-nowrap px-3 py-1.5 text-sm text-gray-900 dark:text-white">
                       {teacher.designation || "N/A"}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                    <td className="whitespace-nowrap px-3 py-1.5 text-sm text-gray-900 dark:text-white">
                       {getPrimarySubjectCode(teacher)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                    <td className="whitespace-nowrap px-3 py-1.5 text-sm text-gray-900 dark:text-white">
                       {getPrimarySubjectName(teacher)}
                     </td>
                     {!hideSchoolCode && (
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                      <td className="whitespace-nowrap px-3 py-1.5 text-sm text-gray-900 dark:text-white">
                         {teacher.schoolCode || "N/A"}
                       </td>
                     )}
                     {!hideSchoolName && (
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                      <td className="whitespace-nowrap px-3 py-1.5 text-sm text-gray-900 dark:text-white">
                         {teacher.schoolName || 'N/A'}
                       </td>
                     )}

@@ -56,12 +56,19 @@ export function KysSyncToaster() {
             if (finalRun.status === 'completed' || finalRun.status === 'paused') {
               toast.success(
                 `${finalRun.school_name || previousRun.school_name || 'School'} KYS sync finished (${finalRun.processed_count} succeeded, ${finalRun.failed_count} failed)`,
-                { id: runId },
+                { id: runId, duration: 5000 },
               )
             } else if (finalRun.status === 'cancelled') {
-              toast(`${finalRun.school_name || previousRun.school_name || 'School'} sync cancelled`, { id: runId, icon: '⚠️' })
+              toast(`${finalRun.school_name || previousRun.school_name || 'School'} sync cancelled`, {
+                id: runId,
+                icon: '⚠️',
+                duration: 5000,
+              })
             } else {
-              toast.error(finalRun.error_summary || `${previousRun.school_name || 'School'} KYS sync failed`, { id: runId })
+              toast.error(finalRun.error_summary || `${previousRun.school_name || 'School'} KYS sync failed`, {
+                id: runId,
+                duration: 8000,
+              })
             }
           })
           .catch(() => toast.dismiss(runId))

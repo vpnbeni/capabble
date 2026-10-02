@@ -30,6 +30,8 @@ class BulkImportKysMappingRequest(BaseModel):
     raw_text: str = Field(..., min_length=1)
     district: str | None = None
     auto_confirm: bool = True
+    collection_run_id: str | None = None
+    school_ids: list[str] | None = None
 
 
 @router.get("/schools/{school_id}")
@@ -113,9 +115,21 @@ def bulk_import_kys_mapping(
     except json.JSONDecodeError as exc:
         raise HTTPException(status_code=400, detail=f"Invalid JSON: {exc}") from exc
 
+    try:
+        run_id = UUID(body.collection_run_id) if body.collection_run_id else None
+        parsed_school_ids = [UUID(s) for s in body.school_ids] if body.school_ids else None
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=f"Invalid id: {exc}") from exc
+
     service = KysBulkImportService(db)
     try:
-        return service.import_dump(raw, district=body.district, auto_confirm=body.auto_confirm)
+        return service.import_dump(
+            raw,
+            district=body.district,
+            auto_confirm=body.auto_confirm,
+            collection_run_id=run_id,
+            school_ids=parsed_school_ids,
+        )
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 

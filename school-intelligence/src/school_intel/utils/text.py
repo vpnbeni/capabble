@@ -144,6 +144,16 @@ def normalize_identifier(value: str) -> str:
     return re.sub(r"\s+", "", str(value or "").strip())
 
 
+def normalize_obfuscated_email(value: str | None) -> str:
+    """Decode CBSE/KYS obfuscation: name[at]domain[dot]com → name@domain.com."""
+    text = str(value or "").strip()
+    if not text:
+        return text
+    text = re.sub(r"\s*[\[\(\{]\s*at\s*[\]\)\}]\s*", "@", text, flags=re.IGNORECASE)
+    text = re.sub(r"\s*[\[\(\{]\s*dot\s*[\]\)\}]\s*", ".", text, flags=re.IGNORECASE)
+    return text.strip()
+
+
 def payload_checksum(payload: dict | list | None) -> str:
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str)
     return hashlib.sha256(encoded.encode("utf-8")).hexdigest()

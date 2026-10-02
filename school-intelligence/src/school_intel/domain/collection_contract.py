@@ -198,20 +198,31 @@ def aggregate_run_progress(items: list[Any], run) -> dict[str, Any]:
             "conflict": status_counts_raw.get(BatchSchoolCollectionStatus.CONFLICT.value, 0),
             "collected": complete,
         },
-        "stage_progress": compute_stage_progress(items),
+        "stage_progress": compute_stage_progress(
+            items,
+            pipeline_type=(run.parameters or {}).get("pipeline_type") if getattr(run, "parameters", None) else None,
+        ),
     }
 
 
-def compute_stage_progress(items: list[Any]) -> dict[str, dict[str, int]]:
+def compute_stage_progress(
+    items: list[Any],
+    *,
+    pipeline_type: str | None = None,
+) -> dict[str, dict[str, int]]:
     total = len(items)
+    discovery_key = "kys_discovery" if pipeline_type == "kys_direct" else "saras_discovery"
     if total == 0:
-        return {
-            "saras_discovery": {"complete": 0, "total": 0},
-            "identity_resolution": {"complete": 0, "total": 0},
-            "kys_mapping": {"complete": 0, "total": 0},
-            "historical_collection": {"complete": 0, "total": 0},
-            "validation": {"complete": 0, "total": 0},
+        empty = {"complete": 0, "total": 0}
+        stages = {
+            discovery_key: empty.copy(),
+            "identity_resolution": empty.copy(),
+            "historical_collection": empty.copy(),
+            "validation": empty.copy(),
         }
+        if pipeline_type != "kys_direct":
+            stages["kys_mapping"] = empty.copy()
+        return stages
 
     identity_complete = sum(
         1
@@ -233,13 +244,15 @@ def compute_stage_progress(items: list[Any]) -> dict[str, dict[str, int]]:
     )
     validation_complete = sum(1 for item in items if getattr(item, "validation_status", None))
 
-    return {
-        "saras_discovery": {"complete": total, "total": total},
+    stages = {
+        discovery_key: {"complete": total, "total": total},
         "identity_resolution": {"complete": identity_complete, "total": total},
-        "kys_mapping": {"complete": kys_mapped, "total": total},
         "historical_collection": {"complete": historical_complete, "total": total},
         "validation": {"complete": validation_complete, "total": total},
     }
+    if pipeline_type != "kys_direct":
+        stages["kys_mapping"] = {"complete": kys_mapped, "total": total}
+    return stages
 
 
 def school_satisfies_contract(

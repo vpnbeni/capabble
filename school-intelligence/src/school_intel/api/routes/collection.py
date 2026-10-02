@@ -1,14 +1,15 @@
 from __future__ import annotations
 
+from typing import Any, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from school_intel.api.deps import DbSession, ScholRole, require_collection_access
 from school_intel.collectors.saras_collector import SarasBlockedError
 from school_intel.domain.collection_constants import ACADEMIC_YEARS, ALL_DATA_GROUPS
-from school_intel.domain.enums import CollectionRunStatus
+from school_intel.domain.enums import CollectionRunStatus, DataSource
 from school_intel.repositories.batch_collection_repository import BatchCollectionRepository
 from school_intel.services.batch_collection_orchestrator import BatchCollectionOrchestrator
 from school_intel.services.collection_preview_service import CollectionPreviewService
@@ -24,10 +25,10 @@ router = APIRouter(prefix="/api/collection", tags=["collection"])
 
 class CollectionPreviewRequest(BaseModel):
     source: str = "saras"
-    state_id: str
-    state_name: str
-    district_id: str
-    district_name: str
+    state_id: str = ""
+    state_name: str = ""
+    district_id: str = ""
+    district_name: str = ""
     year_from: str = "2018-19"
     year_to: str = "2025-26"
     data_groups: list[str] = Field(default_factory=lambda: ALL_DATA_GROUPS.copy())
@@ -36,6 +37,12 @@ class CollectionPreviewRequest(BaseModel):
 
 
 class CollectionRunCreateRequest(CollectionPreviewRequest):
+    # source="saras" discovers via SARAS directory. source="kys" seeds schools
+    # from a manually pasted KYS Advance Search JSON (CAPTCHA solved by the
+    # operator) and then auto-collects detail APIs — no SARAS involved.
+    # source_mode records the UX path the operator chose.
+    source_mode: Literal["saras", "saras+kys", "kys"] = "saras"
+    kys_district_json: Any | None = None
     school_limit: str | int = "all"
     options: dict = Field(
         default_factory=lambda: {
@@ -46,10 +53,31 @@ class CollectionRunCreateRequest(CollectionPreviewRequest):
     )
     start_immediately: bool = False
 
+    @model_validator(mode="after")
+    def _validate_source_inputs(self) -> "CollectionRunCreateRequest":
+        is_kys = self.source == DataSource.KYS.value or self.source_mode == "kys"
+        if is_kys:
+            if self.kys_district_json is None:
+                raise ValueError("kys_district_json is required for KYS-only collection runs")
+            # Normalize so create_run always sees source=kys
+            self.source = DataSource.KYS.value
+            self.source_mode = "kys"
+            return self
+        if self.source != DataSource.SARAS.value:
+            raise ValueError(f"Unsupported collection source: {self.source}")
+        if not self.state_id or not self.district_id:
+            raise ValueError("state_id and district_id are required for SARAS collection runs")
+        return self
+
 
 @router.post("/preview")
 def preview_collection(payload: CollectionPreviewRequest, db: DbSession, role: ScholRole) -> dict:
     require_collection_access(role)
+    if payload.source == DataSource.KYS.value:
+        raise HTTPException(
+            status_code=400,
+            detail="KYS-only runs do not use SARAS preview. Paste the district JSON and start the run directly.",
+        )
     service = CollectionPreviewService(db)
     try:
         return service.preview(**payload.model_dump())
@@ -183,8 +211,11 @@ def re_enrich_saras_run(run_id: str, db: DbSession, role: ScholRole) -> dict:
     from school_intel.db.models import CollectionRun
 
     parsed_id = UUID(run_id)
-    if db.get(CollectionRun, parsed_id) is None:
+    run = db.get(CollectionRun, parsed_id)
+    if run is None:
         raise HTTPException(status_code=404, detail=f"Collection run not found: {run_id}")
+    if run.source == DataSource.KYS.value or (run.parameters or {}).get("pipeline_type") == "kys_direct":
+        raise HTTPException(status_code=400, detail="SARAS re-enrich is not available for KYS-only runs")
 
     enricher = SarasEnrichmentService(db)
     try:

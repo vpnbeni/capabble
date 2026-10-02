@@ -609,14 +609,13 @@ const TimetableClasses: React.FC = () => {
         .tc-card {
           background: #fff;
           border-radius: 16px;
-          box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 6px 24px rgba(0,0,0,0.04);
+          box-shadow: none;
           overflow: hidden;
           margin-bottom: 32px;
           border: 1px solid #e8ecf1;
-          transition: box-shadow 0.3s ease;
         }
         .tc-card:hover {
-          box-shadow: 0 2px 6px rgba(0,0,0,0.08), 0 10px 36px rgba(0,0,0,0.06);
+          border-color: #dbe3ec;
         }
         .dark .tc-card {
           background: #1e293b;
@@ -764,7 +763,7 @@ const TimetableClasses: React.FC = () => {
         .tc-table-wrap { overflow-x: auto; }
         .tc-table {
           width: 100%;
-          border-collapse: separate;
+          border-collapse: collapse;
           border-spacing: 0;
         }
         .tc-table thead th {
@@ -775,7 +774,8 @@ const TimetableClasses: React.FC = () => {
           letter-spacing: 0.06em;
           color: #64748b;
           background: #f8fafc;
-          border-bottom: 2px solid #e2e8f0;
+          border-bottom: 1px solid #e2e8f0;
+          border-top: none;
           text-align: left;
           white-space: nowrap;
         }
@@ -795,12 +795,16 @@ const TimetableClasses: React.FC = () => {
           padding: 14px 20px;
           font-size: 0.88rem;
           color: #334155;
+          border-top: none;
           border-bottom: 1px solid #f1f5f9;
           white-space: nowrap;
         }
         .dark .tc-table tbody td {
           color: #e2e8f0;
           border-color: #1e293b;
+        }
+        .tc-table tbody tr:first-child td {
+          border-top: none;
         }
         .tc-table thead th:first-child,
         .tc-table tbody td:first-child {
@@ -1078,14 +1082,15 @@ const TimetableClasses: React.FC = () => {
 
         /* ————————— Summary table ————————— */
         .tc-summary-card {
-          margin-bottom: 20px;
+          margin-bottom: 14px;
+          border-radius: 12px;
         }
         .tc-summary-header {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          gap: 12px;
-          padding: 14px 24px;
+          gap: 10px;
+          padding: 8px 14px;
           border-bottom: 1px solid #e2e8f0;
           background: linear-gradient(90deg, #f8fafc 0%, #eef2ff 100%);
         }
@@ -1095,7 +1100,7 @@ const TimetableClasses: React.FC = () => {
         }
         .tc-summary-header h4 {
           margin: 0;
-          font-size: 0.95rem;
+          font-size: 0.84rem;
           font-weight: 700;
           color: #1e293b;
         }
@@ -1105,13 +1110,13 @@ const TimetableClasses: React.FC = () => {
         .tc-summary-actions {
           display: flex;
           align-items: center;
-          gap: 8px;
+          gap: 6px;
           flex-wrap: wrap;
         }
         .tc-summary-btn {
-          padding: 7px 12px;
-          font-size: 0.76rem;
-          border-radius: 8px;
+          padding: 5px 10px;
+          font-size: 0.72rem;
+          border-radius: 7px;
         }
         .tc-summary-card .tc-table-wrap {
           width: 100%;
@@ -1123,44 +1128,66 @@ const TimetableClasses: React.FC = () => {
         .tc-summary-table thead th {
           background: #f1f5f9;
           width: auto;
-          padding-left: 10px;
-          padding-right: 10px;
+          padding: 6px;
+          font-size: 0.65rem;
+          letter-spacing: 0.04em;
+          vertical-align: middle;
         }
         .dark .tc-summary-table thead th {
           background: #1f2c3f;
         }
         .tc-summary-table tbody td {
           width: auto;
-          padding-left: 10px;
-          padding-right: 10px;
+          padding: 4px 6px;
+          vertical-align: middle;
         }
         .tc-summary-table thead th:first-child,
         .tc-summary-table tbody td:first-child {
-          width: 36px;
-          padding-left: 12px;
+          width: 32px;
+          padding-left: 6px;
           padding-right: 6px;
         }
-        .tc-matrix-class-cell {
+        .tc-summary-table .tc-sr {
+          font-size: 0.75rem;
+          min-width: 20px;
+          display: inline-flex;
+          justify-content: center;
+          width: 100%;
+        }
+        .tc-summary-table .tc-matrix-sr-col,
+        .tc-summary-table .tc-matrix-class-col,
+        .tc-summary-table .tc-matrix-class-cell,
+        .tc-summary-table .tc-matrix-section-col,
+        .tc-summary-table .tc-matrix-cell,
+        .tc-summary-table .tc-matrix-select-col {
+          text-align: center;
+        }
+        .tc-summary-table .tc-matrix-class-cell {
           min-width: 0;
         }
         .tc-matrix-class-input,
         .tc-matrix-section-input {
           width: auto;
-          min-width: 3.5rem;
+          max-width: 100%;
+          min-width: 2.75rem;
           field-sizing: content;
-          padding: 6px 10px;
-          border: 1.5px solid #dbe4f0;
-          border-radius: 8px;
-          font-size: 0.82rem;
+          padding: 3px 8px;
+          border: 1px solid #dbe4f0;
+          border-radius: 6px;
+          font-size: 0.75rem;
+          font-weight: 600;
           background: #fff;
           color: #334155;
           outline: none;
-          transition: border-color 0.2s ease, box-shadow 0.2s ease;
+          text-align: center;
+          display: block;
+          margin-inline: auto;
+          transition: border-color 0.15s ease, box-shadow 0.15s ease;
         }
         .tc-matrix-class-input:focus,
         .tc-matrix-section-input:focus {
           border-color: #6366f1;
-          box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+          box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.14);
         }
         .dark .tc-matrix-class-input,
         .dark .tc-matrix-section-input {
@@ -1168,22 +1195,95 @@ const TimetableClasses: React.FC = () => {
           border-color: #475569;
           color: #e2e8f0;
         }
-        .tc-matrix-cell {
-          text-align: center;
+        .tc-matrix-cell .tc-checkbox-label,
+        .tc-matrix-select-col .tc-checkbox-label {
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          width: 100%;
+          margin: 0;
+          padding: 0;
         }
         .tc-matrix-checkbox {
+          appearance: none;
+          -webkit-appearance: none;
           width: 16px;
           height: 16px;
-          accent-color: #4f46e5;
+          margin: 0 auto;
+          flex-shrink: 0;
+          border: 1.5px solid #cbd5e1;
+          border-radius: 4px;
+          background: #fff;
+          cursor: pointer;
+          position: relative;
+          display: block;
+          transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease, transform 0.12s ease;
+        }
+        .tc-matrix-checkbox:hover {
+          border-color: #818cf8;
+          background: #f5f3ff;
+        }
+        .tc-matrix-checkbox:focus-visible {
+          outline: none;
+          box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25);
+          border-color: #6366f1;
+        }
+        .tc-matrix-checkbox:checked {
+          background: linear-gradient(145deg, #6366f1 0%, #4f46e5 100%);
+          border-color: #4f46e5;
+          box-shadow: 0 1px 3px rgba(79, 70, 229, 0.35);
+        }
+        .tc-matrix-checkbox:checked:hover {
+          background: linear-gradient(145deg, #4f46e5 0%, #4338ca 100%);
+          border-color: #4338ca;
+        }
+        .tc-matrix-checkbox:checked::after {
+          content: '';
+          position: absolute;
+          left: 4.5px;
+          top: 1.5px;
+          width: 4px;
+          height: 8px;
+          border: solid #fff;
+          border-width: 0 1.75px 1.75px 0;
+          transform: rotate(45deg);
+        }
+        .tc-matrix-checkbox:indeterminate {
+          background: linear-gradient(145deg, #6366f1 0%, #4f46e5 100%);
+          border-color: #4f46e5;
+        }
+        .tc-matrix-checkbox:indeterminate::after {
+          content: '';
+          position: absolute;
+          left: 3px;
+          top: 6px;
+          width: 8px;
+          height: 0;
+          border: none;
+          border-top: 2px solid #fff;
+          transform: none;
+        }
+        .dark .tc-matrix-checkbox {
+          background: #0f172a;
+          border-color: #64748b;
+        }
+        .dark .tc-matrix-checkbox:hover {
+          background: #1e1b4b;
+          border-color: #818cf8;
+        }
+        .dark .tc-matrix-checkbox:checked,
+        .dark .tc-matrix-checkbox:indeterminate {
+          background: linear-gradient(145deg, #818cf8 0%, #6366f1 100%);
+          border-color: #6366f1;
         }
         .tc-matrix-select-col {
-          width: 36px;
+          width: 32px;
           text-align: center;
         }
         .tc-summary-empty {
-          padding: 14px 18px;
+          padding: 10px 14px;
           color: #94a3b8;
-          font-size: 0.86rem;
+          font-size: 0.8rem;
         }
       `}</style>
 
@@ -1230,11 +1330,11 @@ const TimetableClasses: React.FC = () => {
                     />
                   </label>
                 </th>
-                <th>Sr No</th>
-                <th>Class</th>
+                <th className="tc-matrix-sr-col">Sr No</th>
+                <th className="tc-matrix-class-col">Class</th>
                 {matrixSections.length > 0 ? (
                   matrixSections.map((section, index) => (
-                    <th key={section.id}>
+                    <th key={section.id} className="tc-matrix-section-col">
                       <input
                         type="text"
                         value={matrixSectionDrafts[section.id] ?? section.name}
@@ -1256,7 +1356,7 @@ const TimetableClasses: React.FC = () => {
                     </th>
                   ))
                 ) : (
-                  <th>Sections</th>
+                  <th className="tc-matrix-section-col">Sections</th>
                 )}
               </tr>
             </thead>
@@ -1275,7 +1375,7 @@ const TimetableClasses: React.FC = () => {
                         />
                       </label>
                     </td>
-                    <td><span className="tc-sr">{index + 1}</span></td>
+                    <td className="tc-matrix-sr-col"><span className="tc-sr">{index + 1}</span></td>
                     <td className="tc-matrix-class-cell">
                       <input
                         type="text"

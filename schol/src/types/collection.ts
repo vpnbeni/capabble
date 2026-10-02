@@ -1,4 +1,11 @@
-export type CollectionSource = 'saras'
+export type CollectionSource = 'saras' | 'kys'
+
+/**
+ * What the operator chose in the Source step.
+ * - saras / saras+kys: discovery via CBSE SARAS (API `source` stays "saras")
+ * - kys: paste KYS Advance Search JSON (CAPTCHA solved manually), then auto-collect detail APIs
+ */
+export type SourceMode = 'saras' | 'saras+kys' | 'kys'
 
 export interface GeographyState {
   id: string
@@ -53,8 +60,18 @@ export interface CollectionPreview {
   }
 }
 
+/** Lightweight client-side preview for pasted KYS district JSON. */
+export interface KysPasteSchool {
+  schoolId: string
+  udise: string
+  schoolName: string
+  district: string | null
+  state: string | null
+}
+
 export interface CollectionRunCreatePayload {
-  source: string
+  source: CollectionSource
+  source_mode: SourceMode
   state_id: string
   state_name: string
   district_id: string
@@ -69,6 +86,8 @@ export interface CollectionRunCreatePayload {
     skip_completed_endpoints: boolean
   }
   start_immediately?: boolean
+  /** Raw pasted KYS Advance Search response — required when source/source_mode is kys. */
+  kys_district_json?: unknown
 }
 
 export interface CollectionRunSummary {
