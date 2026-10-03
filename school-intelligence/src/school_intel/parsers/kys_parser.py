@@ -4,7 +4,13 @@ from typing import Any
 
 from school_intel.domain.enums import DataSource, ValidationStatus
 from school_intel.domain.schemas import EnrollmentNormalized, KysSchoolIdentity, StudentDistributionNormalized
-from school_intel.utils.text import coerce_optional_int, first_present, normalize_identifier, title_case_location
+from school_intel.utils.text import (
+    coerce_optional_int,
+    first_present,
+    normalize_identifier,
+    normalize_obfuscated_email,
+    title_case_location,
+)
 
 
 class KysParser:
@@ -166,7 +172,13 @@ class KysParser:
         data = self._api_data(payload)
         contacts: list[dict[str, Any]] = []
         if data.get("email"):
-            contacts.append({"contact_type": "email", "contact_value": str(data["email"]), "label": "profile"})
+            contacts.append(
+                {
+                    "contact_type": "email",
+                    "contact_value": normalize_obfuscated_email(str(data["email"])),
+                    "label": "profile",
+                }
+            )
         if data.get("schPhone"):
             contacts.append({"contact_type": "phone", "contact_value": str(data["schPhone"]), "label": "profile"})
         if data.get("address"):

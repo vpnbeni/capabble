@@ -22,6 +22,7 @@ from school_intel.db.models import (
 from school_intel.domain.enums import DataSource, IdentifierType, ValidationStatus
 from school_intel.services.kys_mapping_resolver import build_kys_mapping_summary
 from school_intel.services.profile_metrics import compute_enrollment_trends, students_per_teacher
+from school_intel.utils.text import normalize_obfuscated_email
 
 ACADEMIC_YEAR_ORDER = [
     "2018-19", "2019-20", "2020-21", "2021-22", "2022-23", "2023-24", "2024-25", "2025-26",
@@ -197,7 +198,11 @@ class ProfileService:
             "contacts": [
                 {
                     "type": c.contact_type,
-                    "value": c.contact_value,
+                    "value": (
+                        normalize_obfuscated_email(c.contact_value)
+                        if c.contact_type == "email"
+                        else c.contact_value
+                    ),
                     "label": c.label,
                 }
                 for c in contacts

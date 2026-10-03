@@ -18,13 +18,16 @@ const EMPTY_PAIR_FORM = {
   subjectB: '',
 }
 
-const TYPE_COLORS: Record<string, { bg: string; color: string; darkBg: string; darkColor: string }> = {
-  Language: { bg: '#eff6ff', color: '#2563eb', darkBg: '#1e3a5f33', darkColor: '#60a5fa' },
-  Skill: { bg: '#ecfdf5', color: '#059669', darkBg: '#064e3b33', darkColor: '#34d399' },
-  Core: { bg: '#eef2ff', color: '#4f46e5', darkBg: '#312e8133', darkColor: '#a5b4fc' },
-  Elective: { bg: '#fef3c7', color: '#d97706', darkBg: '#78350f33', darkColor: '#fbbf24' },
-  'Co-Curricular': { bg: '#f3e8ff', color: '#7c3aed', darkBg: '#4c1d9533', darkColor: '#a78bfa' },
-  Other: { bg: '#f1f5f9', color: '#475569', darkBg: '#33415533', darkColor: '#94a3b8' },
+const TYPE_COLORS: Record<
+  string,
+  { bg: string; color: string; border: string; icon: string; chip: string; darkBg: string; darkColor: string }
+> = {
+  Language: { bg: '#eff6ff', color: '#1d4ed8', border: '#bfdbfe', icon: '#2563eb', chip: '#eff6ff', darkBg: '#1e3a5f33', darkColor: '#93c5fd' },
+  Skill: { bg: '#ecfdf5', color: '#047857', border: '#a7f3d0', icon: '#059669', chip: '#ecfdf5', darkBg: '#064e3b33', darkColor: '#6ee7b7' },
+  Core: { bg: '#eef2ff', color: '#4338ca', border: '#c7d2fe', icon: '#4f46e5', chip: '#eef2ff', darkBg: '#312e8133', darkColor: '#a5b4fc' },
+  Elective: { bg: '#fffbeb', color: '#b45309', border: '#fde68a', icon: '#d97706', chip: '#fffbeb', darkBg: '#78350f33', darkColor: '#fcd34d' },
+  'Co-Curricular': { bg: '#f5f3ff', color: '#6d28d9', border: '#ddd6fe', icon: '#7c3aed', chip: '#f5f3ff', darkBg: '#4c1d9533', darkColor: '#c4b5fd' },
+  Other: { bg: '#f8fafc', color: '#475569', border: '#e2e8f0', icon: '#64748b', chip: '#f8fafc', darkBg: '#33415533', darkColor: '#94a3b8' },
 }
 
 const ROMAN_CLASS_LEVELS: Record<string, number> = {
@@ -723,15 +726,15 @@ const TimetableSubjects: React.FC<TimetableSubjectsProps> = ({
         /* ───────── Card ───────── */
         .ts-card {
           background: #fff;
-          border-radius: 16px;
-          box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 6px 24px rgba(0,0,0,0.04);
+          border-radius: 12px;
+          box-shadow: none;
           overflow: hidden;
-          margin-bottom: 32px;
-          border: 1px solid #e8ecf1;
-          transition: box-shadow 0.3s ease;
+          margin-bottom: 24px;
+          border: 1px solid #e5e7eb;
         }
         .ts-card:hover {
-          box-shadow: 0 2px 6px rgba(0,0,0,0.08), 0 10px 36px rgba(0,0,0,0.06);
+          box-shadow: none;
+          border-color: #d4d4d8;
         }
         .dark .ts-card {
           background: #1e293b;
@@ -743,39 +746,51 @@ const TimetableSubjects: React.FC<TimetableSubjectsProps> = ({
           display: flex;
           align-items: center;
           justify-content: space-between;
-          padding: 20px 28px;
-          background: linear-gradient(135deg, #f0f4ff 0%, #faf5ff 100%);
+          padding: 14px 20px;
+          background: linear-gradient(180deg, #f8faff 0%, #ffffff 55%);
           border-bottom: 1px solid #e2e8f0;
+          position: relative;
+        }
+        .ts-card-header::before {
+          content: '';
+          position: absolute;
+          left: 0;
+          top: 0;
+          bottom: 0;
+          width: 3px;
+          background: linear-gradient(180deg, #2563eb 0%, #6366f1 100%);
+          border-radius: 0 2px 2px 0;
         }
         .dark .ts-card-header {
-          background: linear-gradient(135deg, #1e2a3e 0%, #2a1e3e 100%);
+          background: linear-gradient(180deg, #1e293b 0%, #1a2332 100%);
           border-color: #334155;
         }
         .ts-card-header h3 {
-          font-size: 1.15rem;
-          font-weight: 700;
+          font-size: 0.95rem;
+          font-weight: 650;
           color: #1e293b;
           margin: 0;
           display: flex;
           align-items: center;
           gap: 10px;
+          letter-spacing: -0.01em;
         }
         .dark .ts-card-header h3 {
           color: #f1f5f9;
         }
         .ts-header-icon {
-          width: 28px;
-          height: 28px;
-          border-radius: 8px;
+          width: 26px;
+          height: 26px;
+          border-radius: 7px;
           display: flex;
           align-items: center;
           justify-content: center;
           flex-shrink: 0;
-          background: linear-gradient(135deg, #6366f1, #8b5cf6);
+          background: linear-gradient(135deg, #2563eb 0%, #6366f1 100%);
         }
         .ts-header-icon svg {
-          width: 18px;
-          height: 18px;
+          width: 14px;
+          height: 14px;
           color: #fff;
         }
 
@@ -783,7 +798,7 @@ const TimetableSubjects: React.FC<TimetableSubjectsProps> = ({
         .ts-header-stats {
           display: flex;
           align-items: center;
-          gap: 10px;
+          gap: 8px;
           flex: 1;
           justify-content: center;
           min-width: 0;
@@ -791,54 +806,59 @@ const TimetableSubjects: React.FC<TimetableSubjectsProps> = ({
           padding: 2px 8px;
         }
         .ts-stat-card-inline {
-          min-width: 82px;
+          min-width: 72px;
           flex: 0 0 auto;
-          padding: 6px 7px;
+          padding: 5px 8px;
           border-radius: 8px;
           gap: 6px;
           display: flex;
           align-items: center;
+          border: 1px solid #e2e8f0;
+        }
+        .dark .ts-stat-card-inline {
+          border-color: #334155;
         }
         .ts-stat-icon {
-          width: 22px;
-          height: 22px;
-          border-radius: 6px;
+          width: 20px;
+          height: 20px;
+          border-radius: 5px;
           display: flex;
           align-items: center;
           justify-content: center;
           flex-shrink: 0;
         }
-        .ts-stat-icon svg { width: 12px; height: 12px; color: #fff; }
+        .ts-stat-icon svg { width: 11px; height: 11px; color: #fff; }
         .ts-stat-value {
-          font-size: 0.95rem;
+          font-size: 0.9rem;
           line-height: 1.05;
-          font-weight: 800;
+          font-weight: 700;
           color: #1e293b;
+          letter-spacing: -0.02em;
         }
         .dark .ts-stat-value { color: #f1f5f9; }
         .ts-stat-label {
-          font-size: 0.5rem;
-          letter-spacing: 0.04em;
+          font-size: 0.55rem;
+          letter-spacing: 0.06em;
           font-weight: 600;
-          color: #94a3b8;
+          color: #64748b;
           text-transform: uppercase;
         }
 
-        .ts-bg-indigo-soft { background: linear-gradient(135deg, #eef2ff 0%, #f5f3ff 100%); }
-        .ts-bg-green-soft { background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%); }
-        .ts-bg-amber-soft { background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%); }
-        .ts-bg-indigo-grad { background: linear-gradient(135deg, #6366f1, #8b5cf6); }
-        .ts-bg-green-grad { background: linear-gradient(135deg, #10b981, #059669); }
-        .ts-bg-amber-grad { background: linear-gradient(135deg, #f59e0b, #d97706); }
+        .ts-bg-indigo-soft { background: #eff6ff; border-color: #bfdbfe; }
+        .ts-bg-green-soft { background: #ecfdf5; border-color: #a7f3d0; }
+        .ts-bg-amber-soft { background: #fffbeb; border-color: #fde68a; }
+        .ts-bg-indigo-grad { background: linear-gradient(135deg, #2563eb, #4f46e5); }
+        .ts-bg-green-grad { background: linear-gradient(135deg, #059669, #047857); }
+        .ts-bg-amber-grad { background: linear-gradient(135deg, #d97706, #b45309); }
 
-        .dark .ts-bg-indigo-soft { background: linear-gradient(135deg, #312e81 0%, #3b2f6b 100%); }
-        .dark .ts-bg-green-soft { background: linear-gradient(135deg, #064e3b 0%, #065f46 100%); }
-        .dark .ts-bg-amber-soft { background: linear-gradient(135deg, #78350f 0%, #92400e 100%); }
+        .dark .ts-bg-indigo-soft { background: #1e3a5f33; border-color: #1e40af; }
+        .dark .ts-bg-green-soft { background: #064e3b33; border-color: #047857; }
+        .dark .ts-bg-amber-soft { background: #78350f33; border-color: #b45309; }
 
         /* ───────── Buttons ───────── */
         .ts-btn-group {
           display: flex;
-          gap: 10px;
+          gap: 8px;
           align-items: center;
           flex-wrap: wrap;
         }
@@ -846,58 +866,55 @@ const TimetableSubjects: React.FC<TimetableSubjectsProps> = ({
           display: inline-flex;
           align-items: center;
           gap: 6px;
-          padding: 8px 18px;
-          border-radius: 10px;
-          font-size: 0.82rem;
+          padding: 7px 14px;
+          border-radius: 8px;
+          font-size: 0.78rem;
           font-weight: 600;
-          border: none;
+          border: 1px solid transparent;
           cursor: pointer;
-          transition: all 0.2s ease;
+          transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
           white-space: nowrap;
+          box-shadow: none;
         }
-        .ts-btn svg { width: 16px; height: 16px; }
-        .ts-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .ts-btn svg { width: 14px; height: 14px; }
+        .ts-btn:disabled { opacity: 0.45; cursor: not-allowed; }
         .ts-btn-primary {
-          background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+          background: linear-gradient(135deg, #2563eb 0%, #4f46e5 100%);
           color: #fff;
-          box-shadow: 0 2px 10px rgba(99, 102, 241, 0.35);
         }
         .ts-btn-primary:hover:not(:disabled) {
-          transform: translateY(-1px);
-          box-shadow: 0 4px 16px rgba(99, 102, 241, 0.45);
+          background: linear-gradient(135deg, #1d4ed8 0%, #4338ca 100%);
         }
         .ts-btn-success {
-          background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-          color: #fff;
-          box-shadow: 0 2px 10px rgba(16, 185, 129, 0.32);
+          background: #fff;
+          color: #047857;
+          border-color: #6ee7b7;
         }
         .ts-btn-success:hover:not(:disabled) {
-          transform: translateY(-1px);
-          box-shadow: 0 4px 16px rgba(16, 185, 129, 0.42);
+          background: #ecfdf5;
+          border-color: #34d399;
         }
         .ts-btn-danger {
           background: #fff;
-          color: #ef4444;
-          border: 1.5px solid #fecaca;
-          box-shadow: 0 1px 3px rgba(239, 68, 68, 0.1);
+          color: #b91c1c;
+          border-color: #e5e7eb;
         }
         .ts-btn-danger:hover:not(:disabled) {
-          background: #fef2f2;
+          background: #fafafa;
           border-color: #fca5a5;
-          transform: translateY(-1px);
         }
 
         /* ───────── Table ───────── */
         .ts-table-wrap { overflow-x: auto; }
         .ts-matrix-vert-scroll {
-          --ts-matrix-row-height: 56px;
+          --ts-matrix-row-height: 44px;
           /* Show ~10 subject rows, then allow vertical scrolling */
-          max-height: calc(var(--ts-matrix-row-height) * 10 + 56px);
+          max-height: calc(var(--ts-matrix-row-height) * 10 + 44px);
           overflow-y: auto;
         }
         .ts-table {
           width: 100%;
-          border-collapse: separate;
+          border-collapse: collapse;
           border-spacing: 0;
         }
         .ts-subject-matrix-table {
@@ -905,14 +922,15 @@ const TimetableSubjects: React.FC<TimetableSubjectsProps> = ({
           table-layout: auto;
         }
         .ts-table thead th {
-          padding: 14px 20px;
-          font-size: 0.72rem;
-          font-weight: 700;
+          padding: 10px 14px;
+          font-size: 0.68rem;
+          font-weight: 600;
           text-transform: uppercase;
-          letter-spacing: 0.06em;
-          color: #64748b;
-          background: #f8fafc;
-          border-bottom: 2px solid #e2e8f0;
+          letter-spacing: 0.08em;
+          color: #52525b;
+          background: #fafafa;
+          border-bottom: 1px solid #e5e7eb;
+          border-top: none;
           text-align: left;
           white-space: nowrap;
         }
@@ -921,37 +939,46 @@ const TimetableSubjects: React.FC<TimetableSubjectsProps> = ({
           width: 1%;
           min-width: 0;
           padding: 8px 6px !important;
-          font-size: 0.68rem;
-          letter-spacing: 0.03em;
+          font-size: 0.65rem;
+          letter-spacing: 0.06em;
+          color: #4338ca;
+          background: #f5f7ff !important;
+          border-bottom-color: #c7d2fe;
+        }
+        .dark .ts-th-matrix {
+          color: #a5b4fc;
+          background: #1e1b4b !important;
+          border-bottom-color: #4338ca;
         }
         .dark .ts-table thead th {
-          background: #1e293b;
-          color: #94a3b8;
+          background: #0f172a;
+          color: #a1a1aa;
           border-color: #334155;
         }
-        .ts-table tbody tr { transition: background 0.15s ease; }
-        .ts-table tbody tr:hover { background: #f1f5f9; }
+        .ts-table tbody tr { transition: background 0.12s ease; }
+        .ts-table tbody tr:hover { background: #fafafa; }
         .dark .ts-table tbody tr:hover { background: #283548; }
-        .ts-table tbody tr:nth-child(even) { background: #fafbfd; }
+        .ts-table tbody tr:nth-child(even) { background: #fff; }
         .dark .ts-table tbody tr:nth-child(even) { background: #1a2536; }
-        .ts-table tbody tr:nth-child(even):hover { background: #f1f5f9; }
+        .ts-table tbody tr:nth-child(even):hover { background: #fafafa; }
         .dark .ts-table tbody tr:nth-child(even):hover { background: #283548; }
         .ts-table tbody td {
-          padding: 14px 20px;
-          font-size: 0.88rem;
-          color: #334155;
-          border-bottom: 1px solid #f1f5f9;
+          padding: 8px 14px;
+          font-size: 0.84rem;
+          color: #27272a;
+          border-top: none;
+          border-bottom: 1px solid #f4f4f5;
           white-space: nowrap;
         }
         .ts-td-matrix {
           text-align: center;
           width: 1%;
           min-width: 0;
-          padding: 8px 6px !important;
+          padding: 6px !important;
         }
         .ts-td-matrix .ts-checkbox {
-          width: 16px;
-          height: 16px;
+          width: 15px;
+          height: 15px;
         }
         .ts-matrix-note {
           font-size: 0.75rem;
@@ -961,6 +988,9 @@ const TimetableSubjects: React.FC<TimetableSubjectsProps> = ({
         .dark .ts-table tbody td {
           color: #e2e8f0;
           border-color: #1e293b;
+        }
+        .ts-table tbody tr:first-child td {
+          border-top: none;
         }
         .ts-table thead th:first-child,
         .ts-table tbody td:first-child {
@@ -976,30 +1006,30 @@ const TimetableSubjects: React.FC<TimetableSubjectsProps> = ({
         }
         .ts-subject-matrix-table thead .ts-sticky-col {
           z-index: 8;
-          background: #f8fafc;
+          background: #fafafa;
         }
         .dark .ts-subject-matrix-table thead .ts-sticky-col {
-          background: #1e293b;
+          background: #0f172a;
         }
         /* Freeze header while scrolling vertically */
         .ts-subject-matrix-table thead th {
           position: sticky;
           top: 0;
           z-index: 20;
-          background: #f8fafc;
+          background: #fafafa;
         }
         .dark .ts-subject-matrix-table thead th {
-          background: #1e293b;
+          background: #0f172a;
         }
         .ts-subject-matrix-table tbody .ts-sticky-col {
           z-index: 4;
           background: #fff;
         }
         .ts-subject-matrix-table tbody tr:nth-child(even) .ts-sticky-col {
-          background: #fafbfd;
+          background: #fff;
         }
         .ts-subject-matrix-table tbody tr:hover .ts-sticky-col {
-          background: #f1f5f9;
+          background: #fafafa;
         }
         .dark .ts-subject-matrix-table tbody .ts-sticky-col {
           background: #1e293b;
@@ -1045,27 +1075,32 @@ const TimetableSubjects: React.FC<TimetableSubjectsProps> = ({
           width: auto;
           min-width: 0;
           max-width: none;
+          text-align: center;
+        }
+        .ts-subject-matrix-table .ts-sticky-col-5 .ts-action-group {
+          justify-content: center;
         }
         .ts-subject-matrix-table .ts-sticky-divider {
-          box-shadow: 2px 0 0 #e2e8f0, 6px 0 10px -8px rgba(15, 23, 42, 0.35);
+          box-shadow: 1px 0 0 #e5e7eb;
         }
         .dark .ts-subject-matrix-table .ts-sticky-divider {
-          box-shadow: 2px 0 0 #334155, 6px 0 10px -8px rgba(2, 6, 23, 0.65);
+          box-shadow: 1px 0 0 #334155;
         }
 
         /* ───────── Serial number ───────── */
         .ts-sr {
           font-weight: 600;
-          color: #94a3b8;
-          font-size: 0.82rem;
+          color: #a1a1aa;
+          font-size: 0.78rem;
           display: inline-block;
         }
 
         /* ───────── Value styles ───────── */
         .ts-subject-name {
-          font-weight: 700;
-          color: #1e293b;
-          font-size: 0.9rem;
+          font-weight: 600;
+          color: #18181b;
+          font-size: 0.84rem;
+          letter-spacing: -0.01em;
         }
         .dark .ts-subject-name { color: #f1f5f9; }
 
@@ -1074,16 +1109,17 @@ const TimetableSubjects: React.FC<TimetableSubjectsProps> = ({
           display: inline-flex;
           align-items: center;
           gap: 4px;
-          padding: 3px 8px;
-          border-radius: 20px;
-          font-size: 0.72rem;
+          padding: 2px 8px;
+          border-radius: 6px;
+          font-size: 0.68rem;
           font-weight: 600;
-          letter-spacing: 0.01em;
+          letter-spacing: 0.04em;
+          text-transform: uppercase;
         }
 
         /* ───────── Action links ───────── */
         .ts-action-link {
-          font-size: 0.78rem;
+          font-size: 0.75rem;
           font-weight: 600;
           padding: 2px 6px;
           border-radius: 6px;
@@ -1093,12 +1129,12 @@ const TimetableSubjects: React.FC<TimetableSubjectsProps> = ({
           transition: all 0.15s ease;
           white-space: nowrap;
         }
-        .ts-action-edit { color: #6366f1; }
-        .ts-action-edit:hover { background: #eef2ff; color: #4f46e5; }
-        .dark .ts-action-edit { color: #818cf8; }
-        .dark .ts-action-edit:hover { background: #312e8133; }
-        .ts-action-save { color: #10b981; }
-        .ts-action-save:hover { background: #ecfdf5; color: #059669; }
+        .ts-action-edit { color: #2563eb; }
+        .ts-action-edit:hover { background: #eff6ff; color: #1d4ed8; }
+        .dark .ts-action-edit { color: #60a5fa; }
+        .dark .ts-action-edit:hover { background: #1e3a5f33; }
+        .ts-action-save { color: #059669; }
+        .ts-action-save:hover { background: #ecfdf5; color: #047857; }
         .ts-action-cancel { color: #94a3b8; }
         .ts-action-cancel:hover { background: #f1f5f9; color: #64748b; }
         .ts-action-group { display: flex; gap: 8px; }
@@ -1114,31 +1150,32 @@ const TimetableSubjects: React.FC<TimetableSubjectsProps> = ({
         .ts-checkbox-label {
           display: flex;
           align-items: center;
+          justify-content: center;
           cursor: pointer;
         }
         .ts-checkbox {
-          width: 16px;
-          height: 16px;
+          width: 15px;
+          height: 15px;
           border-radius: 4px;
-          accent-color: #6366f1;
+          accent-color: #4f46e5;
         }
 
         /* ───────── New row ───────── */
         .ts-new-row {
-          background: linear-gradient(90deg, #eef2ff 0%, #f5f3ff 100%) !important;
+          background: #fafafa !important;
         }
         .dark .ts-new-row {
-          background: linear-gradient(90deg, #1e2a4a 0%, #2a1e4a 100%) !important;
+          background: #0f172a !important;
         }
 
         /* ───────── Input ───────── */
         .ts-input {
           width: 100%;
           padding: 6px 12px;
-          border: 1.5px solid #e2e8f0;
+          border: 1px solid #e5e7eb;
           border-radius: 8px;
           font-size: 0.85rem;
-          transition: all 0.2s ease;
+          transition: border-color 0.15s ease, box-shadow 0.15s ease;
           outline: none;
           background: #fff;
           color: #334155;
@@ -1150,7 +1187,7 @@ const TimetableSubjects: React.FC<TimetableSubjectsProps> = ({
         }
         .ts-input:focus {
           border-color: #6366f1;
-          box-shadow: 0 0 0 3px rgba(99,102,241,0.15);
+          box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.12);
         }
 
         /* ───────── Empty state ───────── */
@@ -1163,7 +1200,7 @@ const TimetableSubjects: React.FC<TimetableSubjectsProps> = ({
           height: 64px;
           margin: 0 auto 16px;
           border-radius: 16px;
-          background: linear-gradient(135deg, #f0f4ff 0%, #faf5ff 100%);
+          background: #f4f4f5;
           display: flex;
           align-items: center;
           justify-content: center;
@@ -1220,9 +1257,9 @@ const TimetableSubjects: React.FC<TimetableSubjectsProps> = ({
                 <div
                   key={type}
                   className="ts-stat-card-inline"
-                  style={{ background: colors.bg }}
+                  style={{ background: colors.chip, borderColor: colors.border }}
                 >
-                  <div className="ts-stat-icon" style={{ background: colors.color }}>
+                  <div className="ts-stat-icon" style={{ background: colors.icon }}>
                     <svg fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z" />
                       <path strokeLinecap="round" strokeLinejoin="round" d="M6 6h.008v.008H6V6z" />
@@ -1418,7 +1455,7 @@ const TimetableSubjects: React.FC<TimetableSubjectsProps> = ({
                     <td className="ts-sticky-col ts-sticky-col-4">
                       <span
                         className="ts-type-badge"
-                        style={{ background: colors.bg, color: colors.color }}
+                        style={{ background: colors.bg, color: colors.color, border: `1px solid ${colors.border}` }}
                       >
                         {item.type}
                       </span>

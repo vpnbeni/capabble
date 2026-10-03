@@ -12,11 +12,12 @@ from __future__ import annotations
 
 import logging
 from typing import Any
+from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from school_intel.db.models import School
+from school_intel.db.models import CollectionRunSchool, School
 from school_intel.domain.enums import IdentifierType, IdentityMatchConfidence
 from school_intel.domain.kys_mapping import KysSearchCandidate
 from school_intel.services.kys_four_field_matcher import KysFourFieldMatcher, SarasMappingFields
@@ -25,7 +26,7 @@ from school_intel.services.kys_mapping_resolver import KysMappingResolver
 logger = logging.getLogger("school_intel.kys_bulk_import")
 
 
-def _extract_rows(raw: Any) -> list[dict]:
+def extract_kys_listing_rows(raw: Any) -> list[dict]:
     """Best-effort extraction of a flat school-record list from a pasted KYS
     API response. Handles the shapes seen across KYS endpoints: a bare list,
     {"data": [...]}, or {"data": {"content": [...]}}."""
@@ -42,7 +43,11 @@ def _extract_rows(raw: Any) -> list[dict]:
     return []
 
 
-def _row_to_candidate(row: dict) -> KysSearchCandidate | None:
+# Back-compat alias for older call sites / tests.
+_extract_rows = extract_kys_listing_rows
+
+
+def row_to_kys_candidate(row: dict) -> KysSearchCandidate | None:
     school_id = row.get("schoolId")
     if school_id is None:
         return None
@@ -58,6 +63,10 @@ def _row_to_candidate(row: dict) -> KysSearchCandidate | None:
     )
 
 
+# Back-compat alias for older call sites / tests.
+_row_to_candidate = row_to_kys_candidate
+
+
 class KysBulkImportService:
     def __init__(self, session: Session) -> None:
         self.session = session
@@ -69,9 +78,11 @@ class KysBulkImportService:
         *,
         district: str | None = None,
         auto_confirm: bool = True,
+        collection_run_id: UUID | None = None,
+        school_ids: list[UUID] | None = None,
     ) -> dict:
-        rows = _extract_rows(raw_payload)
-        candidates = [c for c in (_row_to_candidate(r) for r in rows) if c is not None]
+        rows = extract_kys_listing_rows(raw_payload)
+        candidates = [c for c in (row_to_kys_candidate(r) for r in rows) if c is not None]
         if not candidates:
             return {
                 "error": "No school records found in the pasted data.",
@@ -79,8 +90,16 @@ class KysBulkImportService:
                 "candidates_parsed": 0,
             }
 
-        inferred_district = district or self._infer_district(candidates)
-        pending_schools = self._pending_schools(inferred_district)
+        # An explicit school_ids/collection_run_id scope (e.g. a single
+        # collection run's resolved schools) takes precedence over inferring
+        # a district from the pasted rows — the caller already knows exactly
+        # which schools it wants matched.
+        inferred_district = None if (school_ids or collection_run_id) else (district or self._infer_district(candidates))
+        pending_schools = self._pending_schools(
+            inferred_district,
+            collection_run_id=collection_run_id,
+            school_ids=school_ids,
+        )
 
         auto_mapped: list[dict] = []
         needs_review: list[dict] = []
@@ -146,9 +165,23 @@ class KysBulkImportService:
             return None
         return max(counts, key=counts.get)
 
-    def _pending_schools(self, district: str | None) -> list[School]:
+    def _pending_schools(
+        self,
+        district: str | None,
+        *,
+        collection_run_id: UUID | None = None,
+        school_ids: list[UUID] | None = None,
+    ) -> list[School]:
         stmt = select(School).where(School.is_active.is_(True))
-        if district:
+        if school_ids:
+            stmt = stmt.where(School.id.in_(school_ids))
+        elif collection_run_id:
+            run_school_ids = select(CollectionRunSchool.school_id).where(
+                CollectionRunSchool.collection_run_id == collection_run_id,
+                CollectionRunSchool.school_id.isnot(None),
+            )
+            stmt = stmt.where(School.id.in_(run_school_ids))
+        elif district:
             stmt = stmt.where(School.district.ilike(district))
         schools = list(self.session.scalars(stmt).all())
         pending = []

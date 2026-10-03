@@ -31,10 +31,11 @@ export async function previewCollection(payload: {
   data_groups?: string[]
   page?: number
   limit?: number
-}): Promise<CollectionPreview> {
+}, signal?: AbortSignal): Promise<CollectionPreview> {
   // SARAS directory scrape can take 30–120s for large districts.
   const { data } = await api.post<CollectionPreview>('/collection/preview', payload, {
     timeout: 180_000,
+    signal,
   })
   return data
 }

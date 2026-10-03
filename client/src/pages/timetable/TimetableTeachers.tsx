@@ -78,7 +78,7 @@ const TimetableTeachers: React.FC = () => {
   )
 
   return (
-    <div>
+    <div className="h-full min-h-0">
       <Teachers
         hideStats
         hideDutyType

@@ -224,15 +224,23 @@ export interface BulkKysImportResult {
   no_match: { school_id: string; school_name: string }[]
 }
 
+export interface KysMappingScope {
+  collectionRunId?: string
+  schoolIds?: string[]
+}
+
 export async function bulkImportKysMapping(
   rawText: string,
   district?: string,
   autoConfirm = true,
+  scope?: KysMappingScope,
 ): Promise<BulkKysImportResult> {
   const { data } = await api.post<BulkKysImportResult>('/kys-mapping/bulk-import', {
     raw_text: rawText,
     district: district || undefined,
     auto_confirm: autoConfirm,
+    collection_run_id: scope?.collectionRunId || undefined,
+    school_ids: scope?.schoolIds && scope.schoolIds.length > 0 ? scope.schoolIds : undefined,
   })
   return data
 }

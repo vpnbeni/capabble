@@ -111,7 +111,7 @@ const Layout: React.FC = () => {
         onContentWidthChange={handleContentWidthChange}
       />
 
-      {/* Resize handle sits on the sidebar's right border */}
+      {/* Resize handle sits on the sidebar's right border (below sidebar z so account menus stay on top) */}
       <div
         role="separator"
         aria-orientation="vertical"
@@ -120,12 +120,12 @@ const Layout: React.FC = () => {
         onMouseDown={handleResizeStart}
         onDoubleClick={handleResizeDoubleClick}
         style={{ left: currentSidebarWidth }}
-        className={`group absolute inset-y-0 z-50 w-3 -translate-x-1/2 cursor-col-resize ${
+        className={`group absolute inset-y-0 z-20 w-3 cursor-col-resize ${
           isSidebarCollapsed ? 'pointer-events-none' : ''
         }`}
       >
         <div
-          className={`absolute inset-y-0 left-1/2 w-[3px] -translate-x-1/2 bg-blue-500/80 transition-opacity ${
+          className={`absolute inset-y-0 left-0 w-[3px] bg-blue-500/80 transition-opacity ${
             isResizingSidebar ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
           }`}
         />

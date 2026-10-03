@@ -1,5 +1,5 @@
 import type { ContactItem, ProfileHeader, SarasDetailBlock } from '@/types/profile'
-import { displaySarasValue, sarasWebsiteHref } from '@/utils/sarasDisplay'
+import { displayEmail, displaySarasValue, sarasWebsiteHref } from '@/utils/sarasDisplay'
 import { MapPin, Phone, Mail, Globe, User } from 'lucide-react'
 
 function findContact(contacts: ContactItem[], type: string) {
@@ -52,7 +52,7 @@ export function ContactSidebar({
             <Mail className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
             <div>
               <dt className="text-slate-500">Email</dt>
-              <dd className="font-medium text-slate-800">{email || 'Not available'}</dd>
+              <dd className="font-medium text-slate-800">{displayEmail(email)}</dd>
             </div>
           </div>
           <div className="flex gap-2">

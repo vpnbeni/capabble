@@ -1389,11 +1389,11 @@ const Sidebar: React.FC<SidebarProps> = ({
   ])
 
   const stdntItemClass = (isActive: boolean, collapsed: boolean) =>
-    `group relative flex items-center text-[13px] font-medium rounded-xl transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-violet-400 ${
-      collapsed ? 'justify-center w-11 h-11 p-0' : 'px-3 py-2.5'
+    `group relative flex items-center text-[13px] font-medium rounded-lg transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-violet-400 ${
+      collapsed ? 'justify-center w-10 h-10 p-0' : 'px-2.5 py-1.5'
     } ${
       isActive
-        ? 'bg-gradient-to-r from-[#7b61ff] to-[#a855f7] text-white shadow-lg shadow-violet-500/25'
+        ? 'bg-gradient-to-r from-[#7b61ff] to-[#a855f7] text-white'
         : 'text-white/80 hover:bg-white/10 hover:text-white'
     }`
 
@@ -1408,42 +1408,40 @@ const Sidebar: React.FC<SidebarProps> = ({
       style={{ width: currentSidebarWidth }}
     >
       {/* Module Switcher Header */}
-      <div className={`flex-shrink-0 transition-all duration-300 ${isCollapsed ? 'px-2 py-4' : 'px-4 py-4'} relative z-10`} data-sidebar-fit>
+      <div className={`flex-shrink-0 transition-all duration-300 ${isCollapsed ? 'px-2 py-2.5' : 'px-3 py-2.5'} relative z-10`} data-sidebar-fit>
         <div className="relative">
           <div
             aria-hidden
-            className={`pointer-events-none absolute -inset-1.5 ${
+            className={`pointer-events-none absolute -inset-0.5 rounded-[10px] ${
               isStdntNav
-                ? 'rounded-[14px] bg-white/20 shadow-[0_8px_24px_rgba(255,255,255,0.16)]'
-                : 'rounded-[14px] bg-sky-100/80 shadow-[0_8px_22px_rgba(56,189,248,0.22)]'
+                ? 'bg-white/10'
+                : 'bg-sky-50'
             }`}
           />
           <button
             onClick={() => hasMultipleModules && setModuleSwitcherOpen(!moduleSwitcherOpen)}
-            className={`relative w-full flex items-center rounded-xl transition-all duration-200 group outline-none focus-visible:ring-2 ${isStdntNav ? 'bg-[#1e3a8a]/35 ring-1 ring-white/25 focus-visible:ring-violet-400' : 'bg-white ring-1 ring-secondary-200/80 focus-visible:ring-primary-500'} ${isCollapsed ? 'justify-center p-2' : 'px-3 py-3'} ${hasMultipleModules ? (isStdntNav ? 'hover:bg-white/10 cursor-pointer' : 'hover:bg-white hover:shadow-sm cursor-pointer') : 'cursor-default'} ${moduleSwitcherOpen ? (isStdntNav ? 'bg-white/10' : 'bg-white/80 dark:bg-secondary-800/60 shadow-sm') : ''}`}
+            className={`relative w-full flex items-center gap-2 rounded-lg transition-all duration-200 group outline-none focus-visible:ring-2 ${isStdntNav ? 'bg-[#1e3a8a]/35 ring-1 ring-white/25 focus-visible:ring-violet-400' : 'bg-white ring-1 ring-secondary-200/80 focus-visible:ring-primary-500'} ${isCollapsed ? 'justify-center p-1.5' : 'px-2 py-1.5'} ${hasMultipleModules ? (isStdntNav ? 'hover:bg-white/10 cursor-pointer' : 'hover:bg-white cursor-pointer') : 'cursor-default'} ${moduleSwitcherOpen ? (isStdntNav ? 'bg-white/10' : 'bg-white/80 dark:bg-secondary-800/60') : ''}`}
           >
-            <div className={`relative flex-shrink-0 transition-transform duration-300 ${isCollapsed ? 'scale-85' : 'scale-95'}`}>
-              <div className="relative flex h-12 w-12 items-center justify-center overflow-hidden rounded-xl bg-white shadow-sm">
-                <img
-                  src={activeModuleDef.icon || logoMark}
-                  alt={activeModuleDef.title}
-                  className="h-12 w-12 rounded-xl object-cover"
-                />
-              </div>
+            <div className="relative flex h-8 w-8 flex-shrink-0 items-center justify-center overflow-hidden rounded-md bg-white ring-1 ring-secondary-200/70">
+              <img
+                src={activeModuleDef.icon || logoMark}
+                alt={activeModuleDef.title}
+                className="h-8 w-8 rounded-md object-cover"
+              />
             </div>
             {!isCollapsed && (
               <>
-                <div className="min-w-0 flex flex-col justify-center ml-3 text-left">
-                  <h2 className={`text-[1.5rem] font-black leading-none tracking-tight ${isStdntNav ? 'text-white' : 'text-slate-800 dark:text-white'}`}>
+                <div className="min-w-0 flex-1 flex items-baseline gap-1.5 text-left">
+                  <h2 className={`text-[13px] font-bold leading-none tracking-tight shrink-0 ${isStdntNav ? 'text-white' : 'text-slate-800 dark:text-white'}`}>
                     {activeModuleDef.abbreviation}
                   </h2>
-                  <p className={`mt-0.5 text-[11px] font-semibold leading-tight tracking-tight truncate ${isStdntNav ? 'text-white/60' : 'text-slate-500 dark:text-slate-400'}`}>
+                  <p className={`text-[11px] font-medium leading-none tracking-tight truncate ${isStdntNav ? 'text-white/60' : 'text-slate-500 dark:text-slate-400'}`}>
                     {activeModuleDef.title}
                   </p>
                 </div>
                 {hasMultipleModules && (
                   <svg
-                    className={`ml-auto w-4 h-4 flex-shrink-0 transition-transform duration-200 ${moduleSwitcherOpen ? 'rotate-180' : ''} ${isStdntNav ? 'text-white/50' : 'text-secondary-400 dark:text-secondary-500'}`}
+                    className={`w-3.5 h-3.5 flex-shrink-0 transition-transform duration-200 ${moduleSwitcherOpen ? 'rotate-180' : ''} ${isStdntNav ? 'text-white/50' : 'text-secondary-400 dark:text-secondary-500'}`}
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -1465,13 +1463,13 @@ const Sidebar: React.FC<SidebarProps> = ({
                 onClick={() => setModuleSwitcherOpen(false)}
                 aria-hidden="true"
               />
-              <div className={`absolute z-50 bg-white dark:bg-secondary-900 rounded-2xl shadow-hard border border-secondary-100 dark:border-secondary-700 animate-fade-in-up ring-1 ring-black/5 overflow-hidden ${isCollapsed ? 'left-full ml-3 top-0 w-64' : 'top-full left-0 right-0 mt-2'}`}>
-                <div className="px-3 pt-3 pb-1.5">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-secondary-400 dark:text-secondary-500 px-1">
+              <div className={`absolute z-50 bg-white dark:bg-secondary-900 rounded-xl border border-secondary-200 dark:border-secondary-700 animate-fade-in-up overflow-hidden ${isCollapsed ? 'left-full ml-3 top-0 w-64' : 'top-full left-0 right-0 mt-1.5'}`}>
+                <div className="px-2.5 pt-2 pb-1">
+                  <p className="text-[9px] font-bold uppercase tracking-wider text-secondary-400 dark:text-secondary-500 px-1">
                     Switch Module
                   </p>
                 </div>
-                <div className="px-2 pb-2 space-y-0.5">
+                <div className="max-h-[min(52vh,360px)] overflow-y-auto px-1.5 pb-1.5 space-y-px">
                   {MODULE_REGISTRY
                     .filter(m => accessibleModules.has(m.id))
                     .map(mod => {
@@ -1487,28 +1485,28 @@ const Sidebar: React.FC<SidebarProps> = ({
                               navigate(targetPath)
                             }
                           }}
-                          className={`w-full flex items-center px-3 py-2.5 rounded-xl transition-all duration-200 text-left ${isActive
+                          className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg transition-all duration-150 text-left ${isActive
                             ? 'bg-primary-50 dark:bg-primary-900/20'
                             : 'hover:bg-secondary-50 dark:hover:bg-secondary-800/50'
                           }`}
                         >
-                          <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-secondary-200 dark:bg-secondary-800 dark:ring-secondary-700">
+                          <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center overflow-hidden rounded-md bg-white ring-1 ring-secondary-200 dark:bg-secondary-800 dark:ring-secondary-700">
                             <img
                               src={mod.icon}
                               alt=""
-                              className="h-9 w-9 rounded-lg object-cover"
+                              className="h-6 w-6 rounded-md object-cover"
                             />
                           </div>
-                          <div className="min-w-0 flex-1 ml-3">
-                            <p className={`text-sm font-semibold truncate ${isActive ? 'text-primary-700 dark:text-primary-400' : 'text-secondary-900 dark:text-white'}`}>
+                          <div className="min-w-0 flex-1 flex items-baseline gap-1.5">
+                            <span className={`text-[12px] font-semibold shrink-0 ${isActive ? 'text-primary-700 dark:text-primary-400' : 'text-secondary-900 dark:text-white'}`}>
                               {mod.abbreviation}
-                            </p>
-                            <p className="text-[11px] text-secondary-500 dark:text-secondary-400 truncate">
+                            </span>
+                            <span className="text-[11px] text-secondary-500 dark:text-secondary-400 truncate">
                               {mod.title}
-                            </p>
+                            </span>
                           </div>
                           {isActive && (
-                            <div className="ml-2 w-2 h-2 rounded-full bg-primary-500 flex-shrink-0" />
+                            <div className="w-1.5 h-1.5 rounded-full bg-primary-500 flex-shrink-0" />
                           )}
                         </button>
                       )
@@ -1765,7 +1763,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                     ? stdntItemClass(isActive, isCollapsed)
                     : `group relative flex items-center text-[12.5px] font-medium rounded-xl transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-primary-500 ${isCollapsed
                       ? 'justify-center w-11 h-11 p-0'
-                      : 'px-2.5 py-2.5'
+                      : 'px-2.5 py-2'
                       } ${isActive
                         ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400'
                         : 'text-secondary-600 dark:text-secondary-400 hover:bg-secondary-50 dark:hover:bg-secondary-800/50 hover:text-secondary-900 dark:hover:text-secondary-200'
@@ -1921,7 +1919,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                 aria-hidden="true"
               />
               <div
-                className={`absolute bottom-full left-0 mb-3 w-64 bg-white dark:bg-secondary-900 rounded-2xl shadow-hard border border-secondary-100 dark:border-secondary-700 z-50 animate-fade-in-up origin-bottom-left ring-1 ring-black/5 ${isCollapsed ? 'left-full ml-4 bottom-0' : ''}`}
+                className={`absolute bottom-full left-0 mb-3 w-64 bg-white dark:bg-secondary-900 rounded-2xl border border-secondary-200 dark:border-secondary-700 z-[60] animate-fade-in-up origin-bottom-left ${isCollapsed ? 'left-full ml-4 bottom-0' : ''}`}
               >
                 <div
                   className={`p-4 border-b border-secondary-100 dark:border-secondary-800 rounded-t-2xl ${
