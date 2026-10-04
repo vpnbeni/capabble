@@ -413,6 +413,40 @@ const Header: React.FC<HeaderProps> = ({ isSidebarCollapsed, onToggleSidebar }) 
         const info = titleMap[subPage] || { title: 'MDCL', subtitle: 'School medical clinic log book and supplies' }
         return { pageTitle: info.title, pageSubtitle: info.subtitle, showBackButton: false, backTo: null }
       }
+      case 'cpitl': {
+        const subPage = segments[1] || ''
+        const titleMap: Record<string, { title: string; subtitle: string }> = {
+          dashboard: { title: 'Fee Dashboard', subtitle: 'Class-wise collection and pending dues' },
+          'fee-structures': { title: 'Fee Structures', subtitle: 'Fee heads, installments and version history' },
+          collection: { title: 'Fee Collection', subtitle: 'Student dues, payments and receipts' },
+          students: { title: 'Student Fee Ledger', subtitle: 'Installments, concessions and payments' },
+          'fee-slips': { title: 'Fee Slips', subtitle: 'Print fee slips for pending dues' },
+          payments: { title: 'Receipts', subtitle: 'Day book of fee receipts' },
+          settings: { title: 'Fee Settings', subtitle: 'Fee heads, receipts and concession presets' },
+          expenses: { title: 'Expense Overview', subtitle: 'Spend by type, income vs expense' },
+          operating: { title: 'Operating Costs', subtitle: 'Day-to-day spending by category' },
+          fuel: { title: 'Fuel', subtitle: 'Fuel log, cost per vehicle and next-year budget' },
+          electricity: { title: 'Electricity', subtitle: 'Bills, units and cost per connection' },
+          infra: { title: 'Infrastructure', subtitle: 'Development projects, budgets and payments' },
+          budgets: { title: 'Budgets', subtitle: 'Budget vs actual and next-year planning' },
+          salary: { title: 'Staff Salaries', subtitle: 'Salary structures and statutory settings' },
+          payroll: { title: 'Payroll', subtitle: 'Monthly salary runs and payslips' },
+        }
+        const info = titleMap[subPage] || { title: 'CPITL', subtitle: 'Capital & finance' }
+        const detailBack: Record<string, string> = {
+          'fee-structures': '/cpitl/fee-structures',
+          students: '/cpitl/collection',
+          infra: '/cpitl/infra',
+          payroll: '/cpitl/payroll',
+        }
+        const hasDetail = Boolean(detailBack[subPage]) && Boolean(segments[2])
+        return {
+          pageTitle: info.title,
+          pageSubtitle: info.subtitle,
+          showBackButton: hasDetail,
+          backTo: hasDetail ? detailBack[subPage] : null,
+        }
+      }
       case 'asets': {
         const subPage = segments[1] || ''
         const titleMap: Record<string, { title: string; subtitle: string }> = {

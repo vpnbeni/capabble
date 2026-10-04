@@ -10,6 +10,7 @@ import {
 import { fetchSubjects } from "../../redux/slices/subjectSlice";
 import api from "../../services/api";
 import Modal from "../common/Modal";
+import StaffSalaryCard from "../cpitl/StaffSalaryCard";
 
 interface Subject {
   _id: string;
@@ -615,6 +616,8 @@ const TeacherModal: React.FC<TeacherModalProps> = ({ mode, onSuccess, entityLabe
           </div>
 
         </div>
+
+        {mode === "edit" && selectedTeacher?._id ? <StaffSalaryCard teacherId={selectedTeacher._id} /> : null}
 
         <div className="flex justify-end gap-3 pt-6 border-t border-gray-200 dark:border-gray-700">
           <button type="button" onClick={handleClose} className="btn btn-outline" disabled={loading}>

@@ -9,8 +9,9 @@ import acdmcIcon from '../assets/ACDMC.png'
 import actvtIcon from '../assets/ACTVT.png'
 import mdclIcon from '../assets/MDCL.png'
 import asetsIcon from '../assets/ASETS.png'
+import cpitlIcon from '../assets/CPITL.svg'
 
-export type ModuleId = 'cntr' | 'exmcl' | 'timetable' | 'stdnt' | 'staaf' | 'attnd' | 'trnst' | 'acdmc' | 'actvt' | 'mdcl' | 'asets'
+export type ModuleId = 'cntr' | 'exmcl' | 'timetable' | 'stdnt' | 'staaf' | 'attnd' | 'trnst' | 'acdmc' | 'actvt' | 'mdcl' | 'asets' | 'cpitl'
 
 export type ModuleDefinition = {
   id: ModuleId
@@ -76,6 +77,13 @@ export const MODULE_REGISTRY: ModuleDefinition[] = [
     title: 'Asset Management',
     defaultRoute: '/asets/dashboard',
     icon: asetsIcon,
+  },
+  {
+    id: 'cpitl',
+    abbreviation: 'CPITL',
+    title: 'Capital & Finance',
+    defaultRoute: '/cpitl/dashboard',
+    icon: cpitlIcon,
   },
   {
     id: 'trnst',

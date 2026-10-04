@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react'
+import { createPortal } from 'react-dom'
 
 interface ModalProps {
   isOpen: boolean
@@ -36,8 +37,10 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, size = 
     xl: 'max-w-4xl'
   }
 
-  return (
-    <div className="fixed inset-0 z-50">
+  // Portal to <body>: rendered inline, the modal is trapped in the page's stacking
+  // context and the sticky header (z-40) paints over the backdrop as a white strip.
+  return createPortal(
+    <div className="fixed inset-0 z-[100]" role="dialog" aria-modal="true" aria-label={title}>
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/50 backdrop-blur-sm transition-opacity"
@@ -70,7 +73,8 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, size = 
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 

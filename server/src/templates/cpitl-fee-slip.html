@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Fee Slip</title>
+    <style>
+      @page { size: A4; margin: 0; }
+      * { box-sizing: border-box; }
+      body { margin: 0; font-family: Arial, Helvetica, sans-serif; color: #111; font-size: 10.5px; }
+      .page { width: 210mm; height: 297mm; page-break-after: always; }
+      .page:last-child { page-break-after: auto; }
+      .copy { height: 148.5mm; padding: 8mm 12mm; }
+      .copy + .copy { border-top: 1px dashed #999; }
+      .frame { border: 1.2px solid #222; height: 100%; padding: 4.5mm 6mm; display: flex; flex-direction: column; }
+      .head { display: flex; align-items: center; gap: 10px; border-bottom: 1.2px solid #222; padding-bottom: 2.5mm; }
+      .head img { width: 14mm; height: 14mm; object-fit: contain; }
+      .school { flex: 1; text-align: center; }
+      .school h1 { margin: 0; font-size: 15px; text-transform: uppercase; }
+      .school p { margin: 1px 0 0; font-size: 9.5px; color: #333; }
+      .tag { font-size: 9px; border: 1px solid #222; padding: 2px 6px; border-radius: 3px; white-space: nowrap; }
+      .title { text-align: center; font-weight: bold; font-size: 12.5px; margin: 2.5mm 0 2mm; letter-spacing: 1px; }
+      .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 1.2mm 8mm; margin-bottom: 2.5mm; }
+      .meta div span { color: #555; display: inline-block; min-width: 24mm; }
+      table { width: 100%; border-collapse: collapse; }
+      th, td { border: 1px solid #444; padding: 1.3mm 2mm; text-align: left; vertical-align: top; }
+      th { background: #f0f0f0; font-size: 9.5px; text-transform: uppercase; }
+      td.amt, th.amt { text-align: right; width: 28mm; }
+      td.due { width: 24mm; white-space: nowrap; }
+      .lines { margin: 0; padding: 0; list-style: none; }
+      .lines li { display: flex; justify-content: space-between; gap: 6mm; }
+      tr.total td { font-weight: bold; font-size: 11.5px; }
+      .foot { margin-top: auto; display: flex; justify-content: space-between; align-items: flex-end; font-size: 9px; color: #333; gap: 8mm; }
+      .sign { text-align: center; border-top: 1px solid #333; padding-top: 1mm; min-width: 36mm; }
+      .late { color: #a00; }
+    </style>
+  </head>
+  <body>
+    {{#each slips}}
+    <div class="page">
+      {{#each copies}}
+      <div class="copy">
+        <div class="frame">
+          <div class="head">
+            {{#if @root.school.logoUrl}}<img src="{{@root.school.logoUrl}}" alt="" />{{/if}}
+            <div class="school">
+              <h1>{{@root.school.name}}</h1>
+              {{#if @root.school.address}}<p>{{@root.school.address}}</p>{{/if}}
+              {{#if @root.school.contact}}<p>Ph: {{@root.school.contact}}</p>{{/if}}
+            </div>
+            <div class="tag">{{title}}</div>
+          </div>
+
+          <div class="title">FEE SLIP — SESSION {{@root.session}}</div>
+
+          <div class="meta">
+            <div><span>Student</span><b>{{../student.name}}</b></div>
+            <div><span>Roll No.</span>{{../student.rollNumber}}</div>
+            <div><span>Class / Section</span>{{../student.class}}{{#if ../student.section}} - {{../student.section}}{{/if}}</div>
+            <div><span>Father's Name</span>{{../student.fatherName}}</div>
+            <div><span>Pay by</span><b>{{../dueDate}}</b></div>
+            <div><span>Issued on</span>{{@root.generatedOn}}</div>
+          </div>
+
+          <table>
+            <thead>
+              <tr><th>Installment</th><th class="due">Due Date</th><th>Fee Heads</th><th class="amt">Amount (₹)</th></tr>
+            </thead>
+            <tbody>
+              {{#each ../rows}}
+              <tr>
+                <td>{{label}}</td>
+                <td class="due">{{dueDate}}</td>
+                <td>
+                  <ul class="lines">
+                    {{#each lines}}<li><span>{{name}}</span><span>{{amount}}</span></li>{{/each}}
+                    {{#if lateFee}}<li class="late"><span>Late fee (as of today)</span><span>{{lateFee}}</span></li>{{/if}}
+                  </ul>
+                </td>
+                <td class="amt">{{amount}}</td>
+              </tr>
+              {{/each}}
+              <tr><td colspan="3">Outstanding dues</td><td class="amt">{{../balance}}</td></tr>
+              {{#if ../lateFee}}<tr class="late"><td colspan="3">Late fee</td><td class="amt">{{../lateFee}}</td></tr>{{/if}}
+              <tr class="total"><td colspan="3">Total Payable</td><td class="amt">{{../total}}</td></tr>
+            </tbody>
+          </table>
+
+          <div class="foot">
+            <div>
+              {{#if @root.settings.bankDetails}}<div><b>Bank:</b> {{@root.settings.bankDetails}}</div>{{/if}}
+              {{#if @root.settings.footer}}<div>{{@root.settings.footer}}</div>{{/if}}
+            </div>
+            <div class="sign">Accounts Office</div>
+          </div>
+        </div>
+      </div>
+      {{/each}}
+    </div>
+    {{/each}}
+  </body>
+</html>

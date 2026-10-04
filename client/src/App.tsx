@@ -132,6 +132,24 @@ import {
   AsetsReports,
   AsetsSettings,
 } from './pages/asets/AsetsWorkflowPages'
+import CpitlDashboard from './pages/cpitl/CpitlDashboard'
+import CpitlFeeStructures from './pages/cpitl/CpitlFeeStructures'
+import CpitlFeeStructureDetail from './pages/cpitl/CpitlFeeStructureDetail'
+import CpitlCollection from './pages/cpitl/CpitlCollection'
+import CpitlStudentLedger from './pages/cpitl/CpitlStudentLedger'
+import CpitlFeeSlips from './pages/cpitl/CpitlFeeSlips'
+import CpitlPayments from './pages/cpitl/CpitlPayments'
+import CpitlSettings from './pages/cpitl/CpitlSettings'
+import CpitlExpenses from './pages/cpitl/CpitlExpenses'
+import CpitlOperating from './pages/cpitl/CpitlOperating'
+import CpitlFuel from './pages/cpitl/CpitlFuel'
+import CpitlElectricity from './pages/cpitl/CpitlElectricity'
+import CpitlInfra from './pages/cpitl/CpitlInfra'
+import CpitlInfraDetail from './pages/cpitl/CpitlInfraDetail'
+import CpitlBudgets from './pages/cpitl/CpitlBudgets'
+import CpitlSalary from './pages/cpitl/CpitlSalary'
+import CpitlPayroll from './pages/cpitl/CpitlPayroll'
+import CpitlPayrollRun from './pages/cpitl/CpitlPayrollRun'
 import { OnboardingPage, ValidationReportPage } from './pages/Onboarding'
 import { getPublicBrandVariant } from './utils/publicBranding'
 
@@ -396,6 +414,25 @@ function App() {
               <Route path="asets/reports" element={<AsetsReports />} />
               <Route path="asets/settings" element={<AsetsSettings />} />
               <Route path="asets" element={<Navigate to="/asets/dashboard" replace />} />
+              <Route path="cpitl/dashboard" element={<CpitlDashboard />} />
+              <Route path="cpitl/fee-structures" element={<CpitlFeeStructures />} />
+              <Route path="cpitl/fee-structures/:id" element={<CpitlFeeStructureDetail />} />
+              <Route path="cpitl/collection" element={<CpitlCollection />} />
+              <Route path="cpitl/students/:id" element={<CpitlStudentLedger />} />
+              <Route path="cpitl/fee-slips" element={<CpitlFeeSlips />} />
+              <Route path="cpitl/payments" element={<CpitlPayments />} />
+              <Route path="cpitl/settings" element={<CpitlSettings />} />
+              <Route path="cpitl/expenses" element={<CpitlExpenses />} />
+              <Route path="cpitl/operating" element={<CpitlOperating />} />
+              <Route path="cpitl/fuel" element={<CpitlFuel />} />
+              <Route path="cpitl/electricity" element={<CpitlElectricity />} />
+              <Route path="cpitl/infra" element={<CpitlInfra />} />
+              <Route path="cpitl/infra/:id" element={<CpitlInfraDetail />} />
+              <Route path="cpitl/budgets" element={<CpitlBudgets />} />
+              <Route path="cpitl/salary" element={<CpitlSalary />} />
+              <Route path="cpitl/payroll" element={<CpitlPayroll />} />
+              <Route path="cpitl/payroll/:month" element={<CpitlPayrollRun />} />
+              <Route path="cpitl" element={<Navigate to="/cpitl/dashboard" replace />} />
               <Route path="centre-details" element={<CentreDetails />} />
               <Route
                 path="exam-functionaries"
