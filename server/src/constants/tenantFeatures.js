@@ -83,6 +83,12 @@ const TENANT_MODULE_CATALOG = Object.freeze({
     description: 'School asset lifecycle: ownership, locations, allocations, stock, maintenance, audits, and disposal.',
     dependencies: ['core'],
   },
+  cpitl: {
+    key: 'cpitl',
+    label: 'CPITL — Capital & Finance',
+    description: 'School finance: fee structures, fee collection, receipts and fee slips, with expense tracking.',
+    dependencies: ['core'],
+  },
 });
 
 const TENANT_MODULE_KEYS = Object.freeze(Object.keys(TENANT_MODULE_CATALOG));

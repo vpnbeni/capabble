@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Payslip</title>
+    <style>
+      @page { size: A4; margin: 0; }
+      * { box-sizing: border-box; }
+      body { margin: 0; font-family: Arial, Helvetica, sans-serif; color: #111; font-size: 11px; }
+      .page { width: 210mm; height: 148.5mm; padding: 9mm 12mm; position: relative; }
+      .page:nth-child(odd) { border-bottom: 1px dashed #999; }
+      .page:nth-child(even) { page-break-after: always; }
+      .page:last-child { page-break-after: auto; }
+      .frame { border: 1.2px solid #222; height: 100%; padding: 5mm 6mm; display: flex; flex-direction: column; }
+      .head { display: flex; align-items: center; gap: 10px; border-bottom: 1.2px solid #222; padding-bottom: 3mm; }
+      .head img { width: 14mm; height: 14mm; object-fit: contain; }
+      .school { flex: 1; text-align: center; }
+      .school h1 { margin: 0; font-size: 15px; text-transform: uppercase; }
+      .school p { margin: 1px 0 0; font-size: 10px; color: #333; }
+      .title { text-align: center; font-weight: bold; font-size: 12.5px; margin: 3mm 0 2.5mm; letter-spacing: 1px; }
+      .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 1.3mm 8mm; margin-bottom: 3mm; }
+      .meta div span { color: #555; display: inline-block; min-width: 28mm; }
+      table { width: 100%; border-collapse: collapse; }
+      th, td { border: 1px solid #444; padding: 1.5mm 2mm; }
+      th { background: #f0f0f0; font-size: 10px; text-transform: uppercase; text-align: left; }
+      td.amt, th.amt { text-align: right; width: 26mm; }
+      tr.total td { font-weight: bold; }
+      .net { margin-top: 3mm; display: flex; justify-content: space-between; align-items: center; border: 1.2px solid #222; padding: 2mm 3mm; font-size: 12.5px; font-weight: bold; }
+      .words { margin-top: 1.5mm; font-size: 10px; }
+      .foot { margin-top: auto; display: flex; justify-content: space-between; align-items: flex-end; font-size: 9.5px; color: #444; }
+      .draft { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-20deg); font-size: 64px; font-weight: bold; color: rgba(0, 0, 0, .07); }
+    </style>
+  </head>
+  <body>
+    {{#each slips}}
+    <div class="page">
+      {{#if @root.draft}}<div class="draft">DRAFT</div>{{/if}}
+      <div class="frame">
+        <div class="head">
+          {{#if @root.school.logoUrl}}<img src="{{@root.school.logoUrl}}" alt="" />{{/if}}
+          <div class="school">
+            <h1>{{@root.school.name}}</h1>
+            {{#if @root.school.address}}<p>{{@root.school.address}}</p>{{/if}}
+          </div>
+        </div>
+        <div class="title">PAYSLIP — {{@root.title}}</div>
+        <div class="meta">
+          <div><span>Employee</span><b>{{name}}</b></div>
+          <div><span>Employee ID</span>{{employeeId}}</div>
+          <div><span>Designation</span>{{designation}}</div>
+          <div><span>Department</span>{{department}}</div>
+          <div><span>Bank / A/C</span>{{bankName}} {{accountNumber}}</div>
+          <div><span>Paid days</span>{{paidDays}} of {{daysInMonth}}{{#if lopDays}} (LOP {{lopDays}}){{/if}}</div>
+        </div>
+        <table>
+          <thead>
+            <tr><th>Earnings</th><th class="amt">Amount (₹)</th><th>Deductions</th><th class="amt">Amount (₹)</th></tr>
+          </thead>
+          <tbody>
+            {{#each rows}}
+            <tr><td>{{earning}}</td><td class="amt">{{earningAmount}}</td><td>{{deduction}}</td><td class="amt">{{deductionAmount}}</td></tr>
+            {{/each}}
+            <tr class="total"><td>Gross earnings</td><td class="amt">{{gross}}</td><td>Total deductions</td><td class="amt">{{totalDeductions}}</td></tr>
+          </tbody>
+        </table>
+        <div class="net"><span>Net pay</span><span>₹ {{net}}</span></div>
+        <div class="words">{{netWords}}</div>
+        {{#if remarks}}<div class="words"><b>Remarks:</b> {{remarks}}</div>{{/if}}
+        <div class="foot">
+          <div>
+            {{#if employerPf}}Employer PF: ₹{{employerPf}}{{/if}}
+            {{#if employerEsi}} &nbsp;·&nbsp; Employer ESI: ₹{{employerEsi}}{{/if}}
+            <div>This is a computer-generated payslip.</div>
+          </div>
+          <div style="text-align:center;border-top:1px solid #333;padding-top:1mm;min-width:40mm">Authorised Signatory</div>
+        </div>
+      </div>
+    </div>
+    {{/each}}
+  </body>
+</html>

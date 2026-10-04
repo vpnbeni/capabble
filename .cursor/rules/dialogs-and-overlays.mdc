@@ -1,0 +1,39 @@
+---
+description: Rules for modals, dialogs, drawers, popovers and any full-screen overlay in the client/admin/schol React apps
+globs: client/src/**/*.tsx,admin/src/**/*.tsx,schol/src/**/*.tsx
+alwaysApply: false
+---
+
+# Dialogs & overlays
+
+The app layout has a **sticky header (`z-40`)** and page content that sits in its own
+stacking context. An overlay rendered *inline* inside a page is trapped in that context:
+its `z-50` only competes with siblings, so the header paints over the backdrop and you
+get a **white strip across the top of every dialog**. This shipped once (CPITL dialogs)
+and was fixed at the root — don't reintroduce it.
+
+## Use the shared components — never hand-roll an overlay
+- `@/components/common/Modal` — simple modal (`isOpen`, `onClose`, `title`, `size`). It
+  renders through `createPortal(…, document.body)` at `z-[100]`.
+- `@/components/common/Dialog` — richer dialog (stacking, focus, animations). Portals by
+  default (`portal` prop) and manages z-index via `useDialogStack`.
+
+## If you truly need a custom overlay (drawer, sheet, lightbox, full-screen loader)
+1. Render it with `createPortal(node, document.body)` — never inline in the page tree.
+2. Root element: `fixed inset-0` with `z-[100]` (above the sticky header `z-40` and
+   header dropdowns `z-50`; below toasts).
+3. The backdrop must be `absolute inset-0` *inside* that fixed root so it covers the
+   whole viewport, header and sidebar included.
+4. Lock body scroll while open (`document.body.style.overflow = 'hidden'`) and restore it
+   on close; close on `Escape`.
+5. Add `role="dialog"` and `aria-modal="true"`.
+
+## Never
+- Don't put `fixed inset-0` overlays directly in page JSX without a portal.
+- Don't "fix" a covered header by bumping the overlay's z-index while it is still inline —
+  z-index can't escape the parent stacking context.
+- Don't fork `Modal.tsx` per module; extend it (e.g. a new `size`) if something is missing.
+
+## Verify before you finish
+Open the dialog in the running app and check that the **top edge (header area) is dimmed
+by the backdrop** — no white band — at desktop width and at 375px.

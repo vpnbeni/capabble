@@ -145,6 +145,28 @@ const MODULE_MODEL_KEYS = Object.freeze({
     'AssetStockTransaction',
     'AssetSettings',
   ]),
+  cpitl: Object.freeze([
+    'Student',
+    'TransportVehicle',
+    'FeeHead',
+    'FeeStructure',
+    'FeeStructureRevision',
+    'StudentFeeAccount',
+    'FeeDemand',
+    'FeePayment',
+    'CapitalSettings',
+    'CapitalCounter',
+    'CapitalExpense',
+    'ExpenseCategory',
+    'CapitalBudget',
+    'SalaryComponent',
+    'StaffSalaryStructure',
+    'PayrollRun',
+    'FuelLog',
+    'ElectricityConnection',
+    'ElectricityBill',
+    'InfraProject',
+  ]),
 });
 
 /**
@@ -162,6 +184,7 @@ const MODULE_FEATURE_KEYS = Object.freeze({
   actvt: Object.freeze(getModuleFeatureKeys('actvt')),
   mdcl: Object.freeze(getModuleFeatureKeys('mdcl')),
   asets: Object.freeze(getModuleFeatureKeys('asets')),
+  cpitl: Object.freeze(getModuleFeatureKeys('cpitl')),
 });
 
 /**
@@ -228,6 +251,10 @@ const getActiveModelKeys = (featureToggles) => {
 
   if (isModuleActive('asets', featureToggles)) {
     keys.push(...MODULE_MODEL_KEYS.asets);
+  }
+
+  if (isModuleActive('cpitl', featureToggles)) {
+    keys.push(...MODULE_MODEL_KEYS.cpitl);
   }
 
   return keys;

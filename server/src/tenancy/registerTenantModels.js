@@ -82,6 +82,26 @@ const {
   AssetStockTransaction,
   AssetSettings,
 } = require('../models/AssetRecords');
+const {
+  FeeHead,
+  FeeStructure,
+  FeeStructureRevision,
+  StudentFeeAccount,
+  FeeDemand,
+  FeePayment,
+  CapitalSettings,
+  CapitalCounter,
+  CapitalExpense,
+  ExpenseCategory,
+  CapitalBudget,
+  SalaryComponent,
+  StaffSalaryStructure,
+  PayrollRun,
+  FuelLog,
+  ElectricityConnection,
+  ElectricityBill,
+  InfraProject,
+} = require('../models/CapitalRecords');
 
 const tenantModelExports = {
   User,
@@ -164,6 +184,24 @@ const tenantModelExports = {
   AssetStockItem,
   AssetStockTransaction,
   AssetSettings,
+  FeeHead,
+  FeeStructure,
+  FeeStructureRevision,
+  StudentFeeAccount,
+  FeeDemand,
+  FeePayment,
+  CapitalSettings,
+  CapitalCounter,
+  CapitalExpense,
+  ExpenseCategory,
+  CapitalBudget,
+  SalaryComponent,
+  StaffSalaryStructure,
+  PayrollRun,
+  FuelLog,
+  ElectricityConnection,
+  ElectricityBill,
+  InfraProject,
 };
 
 const registerModelOnConnection = (modelExport, connection) => {

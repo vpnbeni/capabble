@@ -24,7 +24,7 @@ Each module is fully functional as a standalone product and supports integration
 |------|------|-------------|--------|
 | **STAAF** | Staff Management | Manage school staff | Planned |
 | **ATTND** | Attendance | Manage attendance of staff | Planned |
-| **CPITL** | Capital / Finance | Manage income & expenses | Planned |
+| **CPITL** | Capital / Finance | Income (fee structures, collection, receipts, slips) + expenses (payroll with PF/ESI/PT, fuel per vehicle, electricity, operating costs, infra projects, budgets) | Done |
 | **ACDMC** | Academic / Curriculum | Manage curriculum | Planned |
 | **ACTVT** | Activities | Manage co-curricular activities | Planned |
 | **TRNST** | Transport | Manage transport | Planned |
@@ -215,6 +215,12 @@ The system uses a **database-per-tenant** isolation strategy:
 - Security middleware: Helmet, rate limiting, mongo-sanitize, xss-clean, hpp
 - CORS: Dynamic origin validation — allows `ROOT_APP_DOMAIN` subdomains + explicit `CLIENT_URL`/`CLIENT_URLS`
 - Tenant header: Requests include `x-tenant-slug` to identify the target tenant
+
+### Dialogs & overlays (must follow — see `.cursor/rules/dialogs-and-overlays.mdc`)
+- Always use the shared `@/components/common/Modal` or `@/components/common/Dialog`. Both render through `createPortal(…, document.body)`.
+- Never render a `fixed inset-0` overlay inline in page JSX. The sticky header (`z-40`) sits outside the page's stacking context and paints over an inline overlay, leaving a **white strip at the top of the dialog**. Raising `z-index` on an inline overlay does not fix this.
+- A custom overlay (drawer, sheet, lightbox) must portal to `document.body`, use `fixed inset-0 z-[100]` with an `absolute inset-0` backdrop inside it, lock body scroll, close on Escape, and set `role="dialog" aria-modal="true"`.
+- Before finishing, open the dialog in the running app and confirm the backdrop dims the header area too, at desktop width and at 375px.
 
 ## Environment Variables
 

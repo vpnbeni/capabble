@@ -151,6 +151,42 @@
     "fallbackPriority": 37
   },
   {
+    "key": "cpitl_dashboard",
+    "label": "CPITL - Finance Dashboard",
+    "path": "/cpitl/dashboard",
+    "group": "Capital Hub",
+    "module": "cpitl",
+    "prefixes": ["/cpitl/dashboard"],
+    "fallbackPriority": 38
+  },
+  {
+    "key": "cpitl_fees",
+    "label": "CPITL - Fee Management",
+    "path": "/cpitl/collection",
+    "group": "Capital Hub",
+    "module": "cpitl",
+    "prefixes": ["/cpitl/fee-structures", "/cpitl/collection", "/cpitl/students", "/cpitl/fee-slips", "/cpitl/payments", "/cpitl/settings"],
+    "fallbackPriority": 39
+  },
+  {
+    "key": "cpitl_expenses",
+    "label": "CPITL - Expenses",
+    "path": "/cpitl/expenses",
+    "group": "Capital Hub",
+    "module": "cpitl",
+    "prefixes": ["/cpitl/expenses", "/cpitl/operating", "/cpitl/fuel", "/cpitl/electricity", "/cpitl/infra", "/cpitl/budgets"],
+    "fallbackPriority": 40
+  },
+  {
+    "key": "cpitl_payroll",
+    "label": "CPITL - Salary & Payroll",
+    "path": "/cpitl/payroll",
+    "group": "Capital Hub",
+    "module": "cpitl",
+    "prefixes": ["/cpitl/salary", "/cpitl/payroll"],
+    "fallbackPriority": 41
+  },
+  {
     "key": "timetable_bell_timings",
     "label": "Time Table - Bell Timings",
     "path": "/time-table/bell-timings",

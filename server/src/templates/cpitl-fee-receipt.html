@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Fee Receipt</title>
+    <style>
+      @page { size: A4; margin: 0; }
+      * { box-sizing: border-box; }
+      body { margin: 0; font-family: Arial, Helvetica, sans-serif; color: #111; font-size: 11px; }
+      .page { width: 210mm; height: 297mm; }
+      .copy { height: 148.5mm; padding: 9mm 12mm; position: relative; }
+      .copy + .copy { border-top: 1px dashed #999; }
+      .frame { border: 1.2px solid #222; height: 100%; padding: 5mm 6mm; display: flex; flex-direction: column; }
+      .head { display: flex; align-items: center; gap: 10px; border-bottom: 1.2px solid #222; padding-bottom: 3mm; }
+      .head img { width: 15mm; height: 15mm; object-fit: contain; }
+      .school { flex: 1; text-align: center; }
+      .school h1 { margin: 0; font-size: 16px; letter-spacing: .3px; text-transform: uppercase; }
+      .school p { margin: 1px 0 0; font-size: 10px; color: #333; }
+      .tag { font-size: 9px; border: 1px solid #222; padding: 2px 6px; border-radius: 3px; white-space: nowrap; }
+      .title { text-align: center; font-weight: bold; font-size: 13px; margin: 3mm 0 2mm; letter-spacing: 1px; }
+      .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5mm 8mm; margin-bottom: 3mm; }
+      .meta div span { color: #555; display: inline-block; min-width: 26mm; }
+      table { width: 100%; border-collapse: collapse; }
+      th, td { border: 1px solid #444; padding: 1.6mm 2mm; text-align: left; }
+      th { background: #f0f0f0; font-size: 10px; text-transform: uppercase; }
+      td.amt, th.amt { text-align: right; width: 32mm; }
+      tr.group td { background: #fafafa; font-weight: bold; font-size: 10px; }
+      tr.total td { font-weight: bold; font-size: 12px; }
+      .words { margin-top: 2mm; font-size: 10px; }
+      .foot { margin-top: auto; display: flex; justify-content: space-between; align-items: flex-end; font-size: 9.5px; color: #333; }
+      .sign { text-align: center; border-top: 1px solid #333; padding-top: 1mm; min-width: 40mm; }
+      .cancelled { position: absolute; top: 55%; left: 50%; transform: translate(-50%, -50%) rotate(-22deg); font-size: 54px; font-weight: bold; color: rgba(200, 0, 0, .22); border: 6px solid rgba(200, 0, 0, .22); padding: 4px 20px; }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      {{#each copies}}
+      <div class="copy">
+        {{#if ../receipt.cancelled}}<div class="cancelled">CANCELLED</div>{{/if}}
+        <div class="frame">
+          <div class="head">
+            {{#if ../school.logoUrl}}<img src="{{../school.logoUrl}}" alt="" />{{/if}}
+            <div class="school">
+              <h1>{{../school.name}}</h1>
+              {{#if ../school.address}}<p>{{../school.address}}</p>{{/if}}
+              <p>
+                {{#if ../school.contact}}Ph: {{../school.contact}}{{/if}}
+                {{#if ../school.email}} &nbsp;|&nbsp; {{../school.email}}{{/if}}
+                {{#if ../school.affiliationNo}} &nbsp;|&nbsp; Affiliation No: {{../school.affiliationNo}}{{/if}}
+              </p>
+            </div>
+            <div class="tag">{{title}}</div>
+          </div>
+
+          <div class="title">FEE RECEIPT</div>
+
+          <div class="meta">
+            <div><span>Receipt No.</span><b>{{../receipt.no}}</b></div>
+            <div><span>Date</span><b>{{../receipt.date}}</b></div>
+            <div><span>Student</span><b>{{../student.name}}</b></div>
+            <div><span>Roll No.</span>{{../student.rollNumber}}</div>
+            <div><span>Class / Section</span>{{../student.class}}{{#if ../student.section}} - {{../student.section}}{{/if}}</div>
+            <div><span>Father's Name</span>{{../student.fatherName}}</div>
+            <div><span>Payment Mode</span>{{../receipt.mode}}{{#if ../receipt.reference}} ({{../receipt.reference}}){{/if}}</div>
+            <div><span>Session</span>{{../receipt.session}}</div>
+          </div>
+
+          <table>
+            <thead>
+              <tr><th>Particulars</th><th class="amt">Amount (₹)</th></tr>
+            </thead>
+            <tbody>
+              {{#each ../groups}}
+              <tr class="group"><td colspan="2">{{label}}</td></tr>
+              {{#each lines}}
+              <tr><td>{{name}}</td><td class="amt">{{amount}}</td></tr>
+              {{/each}}
+              {{/each}}
+              {{#if ../receipt.lateFee}}
+              <tr><td>Late Fee / Fine</td><td class="amt">{{../receipt.lateFee}}</td></tr>
+              {{/if}}
+              <tr class="total"><td>Total Received</td><td class="amt">{{../receipt.total}}</td></tr>
+            </tbody>
+          </table>
+          <div class="words"><b>In words:</b> {{../receipt.words}}</div>
+          {{#if ../receipt.remarks}}<div class="words"><b>Remarks:</b> {{../receipt.remarks}}</div>{{/if}}
+          {{#if ../receipt.cancelled}}<div class="words" style="color:#b00"><b>Cancelled:</b> {{../receipt.cancelReason}}</div>{{/if}}
+
+          <div class="foot">
+            <div>
+              {{#if ../settings.footer}}<div>{{../settings.footer}}</div>{{/if}}
+              {{#if ../settings.gstin}}<div>GSTIN: {{../settings.gstin}}</div>{{/if}}
+              {{#if ../receipt.collectedBy}}<div>Collected by: {{../receipt.collectedBy}}</div>{{/if}}
+            </div>
+            <div class="sign">Authorised Signatory</div>
+          </div>
+        </div>
+      </div>
+      {{/each}}
+    </div>
+  </body>
+</html>
