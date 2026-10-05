@@ -37,6 +37,7 @@ router.get('/fee-structures/:id', fees, fee.getStructure);
 router.put('/fee-structures/:id', fees, can(P.MANAGE_STRUCTURES), fee.updateStructure);
 router.post('/fee-structures/:id/duplicate', fees, can(P.MANAGE_STRUCTURES), fee.duplicateStructure);
 router.post('/fee-structures/:id/archive', fees, can(P.MANAGE_STRUCTURES), fee.archiveStructure);
+router.post('/fee-structures/:id/restore', fees, can(P.MANAGE_STRUCTURES), fee.restoreStructure);
 router.post('/fee-structures/:id/assign', fees, can(P.MANAGE_STRUCTURES), fee.assignStructureHandler);
 router.post('/fee-structures/:id/reapply', fees, can(P.MANAGE_STRUCTURES), fee.reapplyStructure);
 router.get('/fee-structures/:id/revisions', fees, fee.listRevisions);

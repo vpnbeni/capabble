@@ -1,12 +1,17 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
-import { Copy, Layers, Plus, Users } from 'lucide-react'
+import { Archive, ArchiveRestore, ChevronDown, Copy, Layers, Plus, Users } from 'lucide-react'
 import { useFeeStructures, useInvalidateCpitl } from '@/hooks/useCpitl'
 import cpitlService, { FeeStructure } from '@/services/cpitlService'
+import StructureArchiveDialog from '@/components/cpitl/StructureArchiveDialog'
 import { CpitlBadge, CpitlEmpty, CpitlPageShell, btnGhost, btnPrimary, errorMessage, fmtDate, inr } from '@/components/cpitl/CpitlUi'
 
-const StructureCard: React.FC<{ structure: FeeStructure; onDuplicate: (s: FeeStructure) => void }> = ({ structure, onDuplicate }) => (
+const StructureCard: React.FC<{
+  structure: FeeStructure
+  onDuplicate: (s: FeeStructure) => void
+  onArchiveToggle: (s: FeeStructure) => void
+}> = ({ structure, onDuplicate, onArchiveToggle }) => (
   <Link
     to={`/cpitl/fee-structures/${structure._id}`}
     className="group flex flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-indigo-300 hover:shadow-md dark:border-slate-700 dark:bg-slate-800 dark:hover:border-indigo-500"
@@ -49,7 +54,25 @@ const StructureCard: React.FC<{ structure: FeeStructure; onDuplicate: (s: FeeStr
       </div>
     </div>
 
-    <div className="mt-3 flex justify-end">
+    <div className="mt-3 flex justify-end gap-1">
+      <button
+        type="button"
+        className={btnGhost}
+        onClick={(e) => {
+          e.preventDefault()
+          onArchiveToggle(structure)
+        }}
+      >
+        {structure.status === 'archived' ? (
+          <>
+            <ArchiveRestore className="h-3.5 w-3.5" /> Restore
+          </>
+        ) : (
+          <>
+            <Archive className="h-3.5 w-3.5" /> Archive
+          </>
+        )}
+      </button>
       <button
         type="button"
         className={btnGhost}
@@ -68,6 +91,8 @@ const CpitlFeeStructures: React.FC = () => {
   const navigate = useNavigate()
   const invalidate = useInvalidateCpitl()
   const { data: structures = [], isLoading } = useFeeStructures()
+  const [target, setTarget] = useState<FeeStructure | null>(null)
+  const [showArchived, setShowArchived] = useState(false)
 
   const duplicate = async (structure: FeeStructure) => {
     try {
@@ -107,12 +132,16 @@ const CpitlFeeStructures: React.FC = () => {
       ) : active.length ? (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {active.map((s) => (
-            <StructureCard key={s._id} structure={s} onDuplicate={duplicate} />
+            <StructureCard key={s._id} structure={s} onDuplicate={duplicate} onArchiveToggle={setTarget} />
           ))}
         </div>
       ) : (
         <CpitlEmpty
-          message="No fee structures yet. Create one per class group, for example “Primary (I–V)” or “Senior Secondary Science”."
+          message={
+            archived.length
+              ? 'No active fee structures. Create a new one, or restore an archived structure below.'
+              : 'No fee structures yet. Create one per class group, for example “Primary (I–V)” or “Senior Secondary Science”.'
+          }
           action={
             <Link to="/cpitl/fee-structures/new" className={btnPrimary}>
               <Plus className="h-4 w-4" /> Create first structure
@@ -123,14 +152,30 @@ const CpitlFeeStructures: React.FC = () => {
 
       {archived.length ? (
         <div>
-          <h3 className="mb-3 text-sm font-semibold text-slate-500">Archived</h3>
-          <div className="grid gap-4 opacity-75 md:grid-cols-2 xl:grid-cols-3">
-            {archived.map((s) => (
-              <StructureCard key={s._id} structure={s} onDuplicate={duplicate} />
-            ))}
-          </div>
+          <button
+            type="button"
+            className="mb-3 inline-flex items-center gap-1.5 text-sm font-semibold text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+            aria-expanded={showArchived}
+            onClick={() => setShowArchived((v) => !v)}
+          >
+            <ChevronDown className={`h-4 w-4 transition-transform ${showArchived ? '' : '-rotate-90'}`} />
+            Archived ({archived.length})
+          </button>
+          {showArchived ? (
+            <div className="grid gap-4 opacity-75 md:grid-cols-2 xl:grid-cols-3">
+              {archived.map((s) => (
+                <StructureCard key={s._id} structure={s} onDuplicate={duplicate} onArchiveToggle={setTarget} />
+              ))}
+            </div>
+          ) : null}
         </div>
       ) : null}
+
+      <StructureArchiveDialog
+        structure={target}
+        mode={target?.status === 'archived' ? 'restore' : 'archive'}
+        onClose={() => setTarget(null)}
+      />
     </CpitlPageShell>
   )
 }

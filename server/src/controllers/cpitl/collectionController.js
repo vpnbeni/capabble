@@ -130,7 +130,14 @@ const updateStudentAccount = asyncHandler(async (req, res) => {
     if (!Number.isFinite(value) || value < 0) throw httpError('Opening balance must be zero or more.');
     account.openingBalance = value;
   }
-  if (structureId !== undefined) account.structureId = structureId || null;
+  if (structureId !== undefined && String(structureId || '') !== String(account.structureId || '')) {
+    if (structureId) {
+      const next = await FeeStructure.findById(structureId).select('status').lean();
+      if (!next) throw httpError('Fee structure not found.', 404);
+      if (next.status === 'archived') throw httpError('Archived structures cannot be assigned. Restore it first.', 400);
+    }
+    account.structureId = structureId || null;
+  }
 
   const student = await Student.findById(account.student).lean();
   if (student) account.studentSnapshot = snapshotStudent(student);

@@ -110,7 +110,6 @@ const Sidebar: React.FC<SidebarProps> = ({
   }, [location.pathname])
 
   const activeModule = selectedModule
-  const isStdntNav = activeModule === 'stdnt'
 
   const renderSchoolLogoAvatar = (
     sizeClass = 'w-10 h-10',
@@ -133,11 +132,7 @@ const Sidebar: React.FC<SidebarProps> = ({
 
     return (
       <div
-        className={`${sizeClass} flex-shrink-0 ${roundedClass} flex items-center justify-center shadow-md transition-all ${
-          isStdntNav
-            ? 'bg-gradient-to-br from-[#7b61ff] to-[#a855f7] shadow-violet-500/20'
-            : 'bg-gradient-to-br from-primary-500 to-indigo-600 shadow-primary-500/10 ring-2 ring-white dark:ring-secondary-800 group-hover:ring-primary-100 dark:group-hover:ring-primary-900/30'
-        }`}
+        className={`${sizeClass} flex-shrink-0 ${roundedClass} flex items-center justify-center shadow-md transition-all bg-gradient-to-br from-primary-500 to-indigo-600 shadow-primary-500/10 ring-2 ring-white dark:ring-secondary-800 group-hover:ring-primary-100 dark:group-hover:ring-primary-900/30`}
       >
         <span className="text-sm font-bold text-white">{footerFallbackInitial}</span>
       </div>
@@ -871,9 +866,9 @@ const Sidebar: React.FC<SidebarProps> = ({
       name: 'Income',
       module: 'cpitl',
       icon: (
-        <svg className="w-5 h-5 transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m0 0l-6-6m6 6l6-6" />
-          </svg>
+        <svg className="w-4 h-4 transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
       ),
       children: [
         {
@@ -948,9 +943,9 @@ const Sidebar: React.FC<SidebarProps> = ({
       name: 'Expenses',
       module: 'cpitl',
       icon: (
-        <svg className="w-5 h-5 transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 20V4m0 0l-6 6m6-6l6 6" />
-          </svg>
+        <svg className="w-4 h-4 transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+        </svg>
       ),
       children: [
         {
@@ -1025,9 +1020,9 @@ const Sidebar: React.FC<SidebarProps> = ({
       name: 'Payroll',
       module: 'cpitl',
       icon: (
-        <svg className="w-5 h-5 transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-          </svg>
+        <svg className="w-4 h-4 transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+        </svg>
       ),
       children: [
         {
@@ -1575,23 +1570,10 @@ const Sidebar: React.FC<SidebarProps> = ({
     openGroups,
   ])
 
-  const stdntItemClass = (isActive: boolean, collapsed: boolean) =>
-    `group relative flex items-center text-[13px] font-medium rounded-lg transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-violet-400 ${
-      collapsed ? 'justify-center w-10 h-10 p-0' : 'px-2.5 py-1.5'
-    } ${
-      isActive
-        ? 'bg-gradient-to-r from-[#7b61ff] to-[#a855f7] text-white'
-        : 'text-white/80 hover:bg-white/10 hover:text-white'
-    }`
-
   return (
     <div
       ref={rootRef}
-      className={`h-[100vh] min-h-[100vh] transition-all duration-300 flex flex-col overflow-visible relative z-50 ${
-        isStdntNav
-          ? 'border-r border-white/10 bg-gradient-to-b from-[#1e3a8a] via-[#172554] to-[#0f172a] text-white'
-          : 'bg-white dark:bg-secondary-900 border-r border-secondary-200 dark:border-secondary-700'
-      }`}
+      className="h-[100vh] min-h-[100vh] transition-all duration-300 flex flex-col overflow-visible relative z-50 bg-white dark:bg-secondary-900 border-r border-secondary-200 dark:border-secondary-700"
       style={{ width: currentSidebarWidth }}
     >
       {/* Module Switcher Header */}
@@ -1599,15 +1581,11 @@ const Sidebar: React.FC<SidebarProps> = ({
         <div className="relative">
           <div
             aria-hidden
-            className={`pointer-events-none absolute -inset-0.5 rounded-[10px] ${
-              isStdntNav
-                ? 'bg-white/10'
-                : 'bg-sky-50'
-            }`}
+            className="pointer-events-none absolute -inset-0.5 rounded-[10px] bg-sky-50"
           />
           <button
             onClick={() => hasMultipleModules && setModuleSwitcherOpen(!moduleSwitcherOpen)}
-            className={`relative w-full flex items-center gap-2 rounded-lg transition-all duration-200 group outline-none focus-visible:ring-2 ${isStdntNav ? 'bg-[#1e3a8a]/35 ring-1 ring-white/25 focus-visible:ring-violet-400' : 'bg-white ring-1 ring-secondary-200/80 focus-visible:ring-primary-500'} ${isCollapsed ? 'justify-center p-1.5' : 'px-2 py-1.5'} ${hasMultipleModules ? (isStdntNav ? 'hover:bg-white/10 cursor-pointer' : 'hover:bg-white cursor-pointer') : 'cursor-default'} ${moduleSwitcherOpen ? (isStdntNav ? 'bg-white/10' : 'bg-white/80 dark:bg-secondary-800/60') : ''}`}
+            className={`relative w-full flex items-center gap-2 rounded-lg transition-all duration-200 group outline-none focus-visible:ring-2 bg-white ring-1 ring-secondary-200/80 focus-visible:ring-primary-500 ${isCollapsed ? 'justify-center p-1.5' : 'px-2 py-1.5'} ${hasMultipleModules ? 'hover:bg-white cursor-pointer' : 'cursor-default'} ${moduleSwitcherOpen ? 'bg-white/80 dark:bg-secondary-800/60' : ''}`}
           >
             <div className="relative flex h-8 w-8 flex-shrink-0 items-center justify-center overflow-hidden rounded-md bg-white ring-1 ring-secondary-200/70">
               <img
@@ -1619,16 +1597,16 @@ const Sidebar: React.FC<SidebarProps> = ({
             {!isCollapsed && (
               <>
                 <div className="min-w-0 flex-1 flex items-baseline gap-1.5 text-left">
-                  <h2 className={`text-[13px] font-bold leading-none tracking-tight shrink-0 ${isStdntNav ? 'text-white' : 'text-slate-800 dark:text-white'}`}>
+                  <h2 className="text-[13px] font-bold leading-none tracking-tight shrink-0 text-slate-800 dark:text-white">
                     {activeModuleDef.abbreviation}
                   </h2>
-                  <p className={`text-[11px] font-medium leading-none tracking-tight truncate ${isStdntNav ? 'text-white/60' : 'text-slate-500 dark:text-slate-400'}`}>
+                  <p className="text-[11px] font-medium leading-none tracking-tight truncate text-slate-500 dark:text-slate-400">
                     {activeModuleDef.title}
                   </p>
                 </div>
                 {hasMultipleModules && (
                   <svg
-                    className={`w-3.5 h-3.5 flex-shrink-0 transition-transform duration-200 ${moduleSwitcherOpen ? 'rotate-180' : ''} ${isStdntNav ? 'text-white/50' : 'text-secondary-400 dark:text-secondary-500'}`}
+                    className={`w-3.5 h-3.5 flex-shrink-0 transition-transform duration-200 ${moduleSwitcherOpen ? 'rotate-180' : ''} text-secondary-400 dark:text-secondary-500`}
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -1707,7 +1685,7 @@ const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Navigation - scrollable */}
       <nav className={`flex-1 min-h-0 overflow-y-auto overflow-x-hidden transition-all duration-300 ${isCollapsed ? 'px-3 [&_svg]:w-4.5 [&_svg]:h-4.5' : 'px-3'} py-2`}>
-        <div className={`space-y-1 ${isCollapsed ? 'flex flex-col items-center' : ''}`}>
+        <div className={`space-y-0.5 ${isCollapsed ? 'flex flex-col items-center' : ''}`}>
           {filteredNavigation.map((entry) => {
             if (isGroup(entry)) {
               const group = entry
@@ -1734,9 +1712,9 @@ const Sidebar: React.FC<SidebarProps> = ({
                         navigate(group.href)
                       }
                     }}
-                    className={`group relative flex items-center w-full text-[12.5px] font-medium rounded-xl transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-primary-500 ${isCollapsed
-                      ? 'justify-center w-11 h-11 p-0'
-                      : 'px-2.5 py-2.5'
+                    className={`group relative flex items-center w-full text-[12px] font-medium rounded-lg transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-primary-500 ${isCollapsed
+                      ? 'justify-center w-10 h-10 p-0'
+                      : 'px-2 py-1.5'
                       } ${isAnyActive
                         ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400'
                         : 'text-secondary-600 dark:text-secondary-400 hover:bg-secondary-50 dark:hover:bg-secondary-800/50 hover:text-secondary-900 dark:hover:text-secondary-200'
@@ -1744,7 +1722,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                     title={isCollapsed ? group.name : undefined}
                   >
                     {isAnyActive && !isCollapsed && (
-                      <div className="absolute left-0 top-1/2 -translate-y-1/2 h-8 w-1 bg-primary-500 rounded-r-full" />
+                      <div className="absolute left-0 top-1/2 -translate-y-1/2 h-6 w-1 bg-primary-500 rounded-r-full" />
                     )}
 
                     <span className={`flex-shrink-0 transition-colors duration-200 ${isAnyActive
@@ -1756,11 +1734,11 @@ const Sidebar: React.FC<SidebarProps> = ({
 
                     {!isCollapsed && (
                       <>
-                        <span className="ml-3.5 truncate font-medium">
+                        <span className="ml-2.5 truncate font-medium">
                           {group.name}
                         </span>
                         <svg
-                          className={`ml-auto w-4 h-4 flex-shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-90' : ''} ${isAnyActive
+                          className={`ml-auto w-3.5 h-3.5 flex-shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-90' : ''} ${isAnyActive
                             ? 'text-primary-500 dark:text-primary-400'
                             : 'text-secondary-400 dark:text-secondary-500'
                             }`}
@@ -1776,7 +1754,7 @@ const Sidebar: React.FC<SidebarProps> = ({
 
                   {/* Group children */}
                   {isOpen && !isCollapsed && (
-                    <div className="mt-1 ml-4 pl-3.5 border-l-2 border-secondary-100 dark:border-secondary-800 space-y-0.5">
+                    <div className="mt-0.5 ml-3.5 pl-3 border-l-2 border-secondary-100 dark:border-secondary-800 space-y-px">
                       {group.children.map((child) => {
                         if (isSubGroup(child)) {
                           // Render sub-group with its own expand/collapse
@@ -1788,7 +1766,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                             <div key={subGroup.name}>
                               <button
                                 onClick={() => toggleGroup(`${group.name}/${subGroup.name}`)}
-                                className={`group relative flex items-center w-full text-[13px] font-medium rounded-lg transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-primary-500 px-3 py-2 ${isSubChildActive
+                                className={`group relative flex items-center w-full text-[12px] font-medium rounded-lg transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-primary-500 px-2.5 py-1.5 ${isSubChildActive
                                   ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400'
                                   : 'text-secondary-500 dark:text-secondary-400 hover:bg-secondary-50 dark:hover:bg-secondary-800/50 hover:text-secondary-900 dark:hover:text-secondary-200'
                                   }`}
@@ -1799,7 +1777,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                                   }`}>
                                   {subGroup.icon}
                                 </span>
-                                <span className="ml-2.5 truncate">
+                                <span className="ml-2 truncate">
                                   {subGroup.name}
                                 </span>
                                 <svg
@@ -1860,7 +1838,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                           <NavLink
                             key={child.name}
                             to={child.href}
-                            className={`group relative flex items-center text-[13px] font-medium rounded-lg transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-primary-500 px-3 py-2 ${isActive
+                            className={`group relative flex items-center text-[12px] font-medium rounded-lg transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-primary-500 px-2.5 py-1.5 ${isActive
                               ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400'
                               : 'text-secondary-500 dark:text-secondary-400 hover:bg-secondary-50 dark:hover:bg-secondary-800/50 hover:text-secondary-900 dark:hover:text-secondary-200'
                               }`}
@@ -1871,7 +1849,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                               }`}>
                               {child.icon}
                             </span>
-                            <span className="ml-2.5 truncate">
+                            <span className="ml-2 truncate">
                               {child.name}
                             </span>
                             {child.badge && (
@@ -1945,47 +1923,37 @@ const Sidebar: React.FC<SidebarProps> = ({
               <NavLink
                 key={item.name}
                 to={item.href}
-                className={
-                  isStdntNav
-                    ? stdntItemClass(isActive, isCollapsed)
-                    : `group relative flex items-center text-[12.5px] font-medium rounded-xl transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-primary-500 ${isCollapsed
-                      ? 'justify-center w-11 h-11 p-0'
-                      : 'px-2.5 py-2'
-                      } ${isActive
-                        ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400'
-                        : 'text-secondary-600 dark:text-secondary-400 hover:bg-secondary-50 dark:hover:bg-secondary-800/50 hover:text-secondary-900 dark:hover:text-secondary-200'
-                      }`
-                }
+                className={`group relative flex items-center text-[12px] font-medium rounded-lg transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-primary-500 ${isCollapsed
+                  ? 'justify-center w-10 h-10 p-0'
+                  : 'px-2 py-1.5'
+                  } ${isActive
+                    ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400'
+                    : 'text-secondary-600 dark:text-secondary-400 hover:bg-secondary-50 dark:hover:bg-secondary-800/50 hover:text-secondary-900 dark:hover:text-secondary-200'
+                  }`}
                 title={isCollapsed ? item.name : undefined}
               >
-                {isActive && !isCollapsed && !isStdntNav && (
-                  <div className="absolute left-0 top-1/2 -translate-y-1/2 h-8 w-1 bg-primary-500 rounded-r-full" />
+                {isActive && !isCollapsed && (
+                  <div className="absolute left-0 top-1/2 -translate-y-1/2 h-6 w-1 bg-primary-500 rounded-r-full" />
                 )}
 
                 <span className={`flex-shrink-0 transition-colors duration-200 ${
-                  isStdntNav
-                    ? 'text-white'
-                    : isActive
-                      ? 'text-primary-600 dark:text-primary-400'
-                      : 'text-secondary-400 group-hover:text-secondary-600 dark:text-secondary-500 dark:group-hover:text-secondary-300'
+                  isActive
+                    ? 'text-primary-600 dark:text-primary-400'
+                    : 'text-secondary-400 group-hover:text-secondary-600 dark:text-secondary-500 dark:group-hover:text-secondary-300'
                 }`}>
                   {item.icon}
                 </span>
 
                 {!isCollapsed && (
                   <>
-                    <span className="ml-3.5 truncate font-medium">
+                    <span className="ml-2.5 truncate font-medium">
                       {item.name}
                     </span>
                     {item.badge && (
                       <span className={`ml-auto inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold shadow-sm ${
-                        isStdntNav
-                          ? isActive
-                            ? 'bg-white/20 text-white'
-                            : 'bg-white/10 text-white/80'
-                          : isActive
-                            ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/50 dark:text-primary-300'
-                            : 'bg-secondary-100 text-secondary-600 dark:bg-secondary-800 dark:text-secondary-400 group-hover:bg-white group-hover:shadow-sm dark:group-hover:bg-secondary-700'
+                        isActive
+                          ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/50 dark:text-primary-300'
+                          : 'bg-secondary-100 text-secondary-600 dark:bg-secondary-800 dark:text-secondary-400 group-hover:bg-white group-hover:shadow-sm dark:group-hover:bg-secondary-700'
                       }`}>
                         {item.badge}
                       </span>
@@ -2004,28 +1972,10 @@ const Sidebar: React.FC<SidebarProps> = ({
         </div>
       </nav>
 
-      {isStdntNav && !isCollapsed && (
-        <div className="flex-shrink-0 px-3 pb-3" data-sidebar-fit>
-          <div className="flex flex-col items-center rounded-2xl bg-white/10 px-4 py-4 text-center ring-1 ring-white/10">
-            <span className="mb-2 text-4xl leading-none" aria-hidden="true">
-              🎓
-            </span>
-            <p className="text-sm font-bold text-white">Empower Education</p>
-            <p className="mt-1 text-[11px] leading-snug text-white/65">
-              Smarter data. Better decisions. Stronger tomorrow.
-            </p>
-          </div>
-        </div>
-      )}
-
       {/* Account at bottom - fixed */}
-      <div className={`flex-shrink-0 backdrop-blur-sm ${
-        isCollapsed ? 'px-2 py-3' : 'p-[0.8rem]'
-      } ${
-        isStdntNav
-          ? 'border-t border-white/10 bg-black/10'
-          : 'border-t border-secondary-100 dark:border-secondary-800 bg-white/50 dark:bg-secondary-900/50'
-      } ${isCollapsed ? 'flex justify-center' : ''}`}>
+      <div className={`flex-shrink-0 backdrop-blur-sm border-t border-secondary-100 dark:border-secondary-800 bg-white/50 dark:bg-secondary-900/50 ${
+        isCollapsed ? 'px-2 py-3 flex justify-center' : 'p-[0.8rem]'
+      }`}>
         <div className="relative w-full">
           <button
             onClick={() => setAccountDropdownOpen(!accountDropdownOpen)}
@@ -2034,9 +1984,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                 ? 'justify-center p-0'
                 : hasLogoBrandMenu
                   ? 'p-2 ring-1 hover:brightness-[1.03]'
-                  : isStdntNav
-                    ? 'p-2 hover:bg-white/10'
-                    : 'p-2 hover:bg-white dark:hover:bg-secondary-800 hover:shadow-sm ring-1 ring-transparent hover:ring-secondary-200 dark:hover:ring-secondary-700'
+                  : 'p-2 hover:bg-white dark:hover:bg-secondary-800 hover:shadow-sm ring-1 ring-transparent hover:ring-secondary-200 dark:hover:ring-secondary-700'
             }`}
             style={
               hasLogoBrandMenu && !isCollapsed && logoBrandTheme
@@ -2055,9 +2003,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                   className={`text-sm font-semibold truncate transition-colors ${
                     hasLogoBrandMenu
                       ? ''
-                      : isStdntNav
-                        ? 'text-white'
-                        : 'text-secondary-900 dark:text-white group-hover:text-primary-600 dark:group-hover:text-primary-400'
+                      : 'text-secondary-900 dark:text-white group-hover:text-primary-600 dark:group-hover:text-primary-400'
                   }`}
                   style={hasLogoBrandMenu && logoBrandTheme ? { color: logoBrandTheme.textPrimary } : undefined}
                 >
@@ -2067,9 +2013,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                   className={`text-xs truncate ${
                     hasLogoBrandMenu
                       ? ''
-                      : isStdntNav
-                        ? 'text-white/55'
-                        : 'text-secondary-500 dark:text-secondary-400'
+                      : 'text-secondary-500 dark:text-secondary-400'
                   }`}
                   style={hasLogoBrandMenu && logoBrandTheme ? { color: logoBrandTheme.textMuted } : undefined}
                 >
@@ -2082,9 +2026,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                 className={`w-4 h-4 transition-transform duration-200 ${accountDropdownOpen ? 'rotate-180' : ''} ${
                   hasLogoBrandMenu
                     ? ''
-                    : isStdntNav
-                      ? 'text-white/50'
-                      : 'text-secondary-400 group-hover:text-secondary-600 dark:text-secondary-500 dark:group-hover:text-secondary-300'
+                    : 'text-secondary-400 group-hover:text-secondary-600 dark:text-secondary-500 dark:group-hover:text-secondary-300'
                 }`}
                 style={hasLogoBrandMenu && logoBrandTheme ? { color: logoBrandTheme.textMuted } : undefined}
                 fill="none"

@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import toast from 'react-hot-toast'
-import { Archive, Check, Copy, History, RefreshCw, Save, Users } from 'lucide-react'
+import { Archive, ArchiveRestore, Check, Copy, History, RefreshCw, Save, Users } from 'lucide-react'
 import Modal from '@/components/common/Modal'
+import StructureArchiveDialog from '@/components/cpitl/StructureArchiveDialog'
 import {
   useCpitlClasses,
   useFeeHeads,
@@ -56,6 +57,25 @@ const formatChangeValue = (field: string, value: unknown) => {
 
 const RevisionItem: React.FC<{ revision: StructureRevision; isLatest: boolean; onView: () => void }> = ({ revision, isLatest, onView }) => {
   const { diff } = revision
+  if (revision.event === 'archived' || revision.event === 'restored') {
+    const archived = revision.event === 'archived'
+    const Icon = archived ? Archive : ArchiveRestore
+    return (
+      <li className="relative pb-6 pl-8 last:pb-0">
+        <span className="absolute left-[7px] top-5 h-full w-px bg-slate-200 dark:bg-slate-700" aria-hidden />
+        <span className="absolute left-0 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-white ring-4 ring-white dark:bg-slate-800 dark:ring-slate-800">
+          <Icon className={`h-3.5 w-3.5 ${archived ? 'text-slate-500' : 'text-emerald-600'}`} />
+        </span>
+        <span className="font-semibold text-slate-900 dark:text-white">{archived ? 'Archived' : 'Restored'}</span>
+        <span className="ml-2 text-xs text-slate-500">at version {revision.version}</span>
+        <p className="text-xs text-slate-500">
+          {fmtDate(revision.createdAt)} · {new Date(revision.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+          {revision.changedBy?.name ? ` · ${revision.changedBy.name}` : ''}
+        </p>
+        {revision.changeNote ? <p className="mt-1.5 text-sm text-slate-700 dark:text-slate-300">“{revision.changeNote}”</p> : null}
+      </li>
+    )
+  }
   return (
     <li className="relative pb-6 pl-8 last:pb-0">
       <span className="absolute left-[7px] top-5 h-full w-px bg-slate-200 dark:bg-slate-700" aria-hidden />
@@ -130,6 +150,7 @@ const CpitlFeeStructureDetail: React.FC = () => {
   const [assignSections, setAssignSections] = useState<Record<string, string[]>>({})
   const [busy, setBusy] = useState<string | null>(null)
   const [snapshot, setSnapshot] = useState<StructureRevision | null>(null)
+  const [archiveMode, setArchiveMode] = useState<'archive' | 'restore' | null>(null)
 
   useEffect(() => {
     if (!structure) return
@@ -149,6 +170,7 @@ const CpitlFeeStructureDetail: React.FC = () => {
   const annual = useMemo(() => components.filter((c) => !c.isOptional).reduce((s, c) => s + annualFor(c, plan), 0), [components, plan])
   const annualOptional = useMemo(() => components.filter((c) => c.isOptional).reduce((s, c) => s + annualFor(c, plan), 0), [components, plan])
   const preview = useMemo(() => schedulePreview(components, plan), [components, plan])
+  const latestContentRevisionId = revisions.find((r) => !r.event || r.event === 'content')?._id
 
   const toggleHead = (headId: string) => {
     const head = heads.find((h) => h._id === headId)
@@ -278,19 +300,22 @@ const CpitlFeeStructureDetail: React.FC = () => {
       actions={
         <>
           {!isNew && structure ? <CpitlBadge status={structure.status} /> : null}
-          {!isNew && !readOnly ? (
-            <button
-              type="button"
-              className={btnSecondary}
-              disabled={busy === 'archive'}
-              onClick={() => {
-                if (window.confirm('Archive this structure? Existing student dues stay unchanged.')) {
-                  run('archive', () => cpitlService.archiveStructure(id as string))
-                }
-              }}
-            >
-              <Archive className="h-4 w-4" /> Archive
-            </button>
+          {!isNew && structure ? (
+            readOnly ? (
+              <button type="button" className={btnSecondary} onClick={() => setArchiveMode('restore')}>
+                <ArchiveRestore className="h-4 w-4" /> Restore
+              </button>
+            ) : (
+              <button
+                type="button"
+                className={btnSecondary}
+                disabled={dirty}
+                title={dirty ? 'Save or discard your changes before archiving' : undefined}
+                onClick={() => setArchiveMode('archive')}
+              >
+                <Archive className="h-4 w-4" /> Archive
+              </button>
+            )
           ) : null}
           {!isNew ? (
             <button
@@ -325,7 +350,16 @@ const CpitlFeeStructureDetail: React.FC = () => {
     >
       {readOnly ? (
         <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
-          This structure is archived and read-only. Duplicate it to make changes.
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <span>
+              This structure is archived and read-only
+              {structure?.assignedCount ? `. Its ${structure.assignedCount} assigned students keep their dues` : ''}. Restore it to edit or
+              assign again, or duplicate it to start fresh.
+            </span>
+            <button type="button" className={btnGhost} onClick={() => setArchiveMode('restore')}>
+              <ArchiveRestore className="h-3.5 w-3.5" /> Restore
+            </button>
+          </div>
         </div>
       ) : null}
 
@@ -749,8 +783,8 @@ const CpitlFeeStructureDetail: React.FC = () => {
         <CpitlCard title="Change history">
           {revisions.length ? (
             <ol className="mt-2">
-              {revisions.map((r, i) => (
-                <RevisionItem key={r._id} revision={r} isLatest={i === 0} onView={() => viewSnapshot(r.version)} />
+              {revisions.map((r) => (
+                <RevisionItem key={r._id} revision={r} isLatest={r._id === latestContentRevisionId} onView={() => viewSnapshot(r.version)} />
               ))}
             </ol>
           ) : (
@@ -758,6 +792,12 @@ const CpitlFeeStructureDetail: React.FC = () => {
           )}
         </CpitlCard>
       )}
+
+      <StructureArchiveDialog
+        structure={archiveMode && structure ? structure : null}
+        mode={archiveMode || 'archive'}
+        onClose={() => setArchiveMode(null)}
+      />
 
       <Modal isOpen={noteOpen} onClose={() => setNoteOpen(false)} title="Save new version">
         <div className="space-y-4">

@@ -91,6 +91,8 @@ feeStructureSchema.index({ status: 1, name: 1 });
 const feeStructureRevisionSchema = new mongoose.Schema({
   structureId: { type: ObjectId, ref: 'FeeStructure', required: true, index: true },
   version: { type: Number, required: true },
+  // 'content' = a saved version; 'archived' / 'restored' = status change (no new version)
+  event: { type: String, enum: ['content', 'archived', 'restored'], default: 'content' },
   changeNote: { type: String, trim: true, default: '' },
   changedBy: auditUserSchema,
   snapshot: { type: mongoose.Schema.Types.Mixed, default: {} },

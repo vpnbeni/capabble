@@ -514,8 +514,10 @@ const CpitlSalary: React.FC = () => {
         <CpitlCard>
           <div className="mb-4 flex flex-wrap items-center gap-3">
             <div className="relative w-72">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <input className={`${inputClass} mt-0 pl-9`} placeholder="Search staff" value={q} onChange={(e) => setQ(e.target.value)} />
+              <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+                <Search className="h-4 w-4" />
+              </span>
+              <input className={`${inputClass} !mt-0 pl-9`} placeholder="Search staff" value={q} onChange={(e) => setQ(e.target.value)} />
             </div>
             <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
               <input type="checkbox" className="h-4 w-4 rounded" checked={onlyMissing} onChange={(e) => setOnlyMissing(e.target.checked)} />

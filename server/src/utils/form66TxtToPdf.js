@@ -1,4 +1,5 @@
 const puppeteer = require('puppeteer');
+const { resolveChromeExecutablePath } = require('./chromeExecutable');
 
 /**
  * Convert Form 66 TXT content to PDF preserving exact formatting
@@ -21,7 +22,7 @@ async function convertTxtToPdf(txtContent) {
     // Launch Puppeteer
     browser = await puppeteer.launch({
       headless: 'new',
-      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+      executablePath: await resolveChromeExecutablePath(),
       args: ['--no-sandbox', '--disable-setuid-sandbox']
     });
 

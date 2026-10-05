@@ -18,7 +18,8 @@
     "test": "jest --watchAll --verbose",
     "test:cloudinary": "node scripts/tests/test-cloudinary.js",
     "lint": "eslint src --ext .js",
-    "lint:fix": "eslint src --ext .js --fix"
+    "lint:fix": "eslint src --ext .js --fix",
+    "postinstall": "npx puppeteer browsers install chrome || echo \"[postinstall] puppeteer chrome install skipped\""
   },
   "keywords": [
     "express",

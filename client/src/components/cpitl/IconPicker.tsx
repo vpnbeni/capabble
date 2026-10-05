@@ -123,7 +123,7 @@ export const IconPicker: React.FC<{ value: string; color?: string; onChange: (ke
         value={q}
         onChange={(e) => setQ(e.target.value)}
       />
-      <div className="grid max-h-48 grid-cols-8 gap-1.5 overflow-y-auto pr-1 sm:grid-cols-10">
+      <div className="grid max-h-48 grid-cols-8 gap-1.5 overflow-y-auto sm:grid-cols-10">
         {entries.map(([key, def]) => {
           const Icon = def.icon
           const on = key === value
@@ -134,12 +134,12 @@ export const IconPicker: React.FC<{ value: string; color?: string; onChange: (ke
               title={def.label}
               aria-label={def.label}
               onClick={() => onChange(key)}
-              className={`flex h-9 w-9 items-center justify-center rounded-lg border transition ${
-                on ? 'border-transparent ring-2 ring-offset-1 dark:ring-offset-slate-800' : 'border-slate-200 text-slate-500 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700'
+              className={`flex aspect-square w-full items-center justify-center rounded-lg border transition ${
+                on ? 'border-transparent ring-2 ring-inset dark:ring-offset-slate-800' : 'border-slate-200 text-slate-500 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700'
               }`}
               style={on ? { backgroundColor: `${color}1f`, color, ['--tw-ring-color' as string]: color } : undefined}
             >
-              <Icon className="h-4 w-4" />
+              <Icon className="h-4 w-4 shrink-0" />
             </button>
           )
         })}

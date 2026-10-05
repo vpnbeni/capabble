@@ -34,9 +34,11 @@ const CpitlCollection: React.FC = () => {
         <div className="lg:col-span-4 xl:col-span-3">
           <CpitlCard className="lg:sticky lg:top-4">
             <div className="relative">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+                <Search className="h-4 w-4" />
+              </span>
               <input
-                className={`${inputClass} mt-0 pl-9`}
+                className={`${inputClass} !mt-0 pl-9`}
                 placeholder="Name, roll no., father, phone"
                 value={q}
                 autoFocus

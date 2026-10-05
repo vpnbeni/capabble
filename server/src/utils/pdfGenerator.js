@@ -2,6 +2,7 @@ const puppeteer = require('puppeteer');
 const handlebars = require('handlebars');
 const fs = require('fs').promises;
 const path = require('path');
+const { resolveChromeExecutablePath } = require('./chromeExecutable');
 
 class PDFGenerator {
   constructor() {
@@ -47,7 +48,7 @@ class PDFGenerator {
       // Launch browser
       browser = await puppeteer.launch({
         headless: 'new',
-        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+        executablePath: await resolveChromeExecutablePath(),
         args: launchArgs,
         pipe: true,
       });
