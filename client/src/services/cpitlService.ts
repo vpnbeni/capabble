@@ -78,6 +78,7 @@ export type ComponentDiff = {
 export type StructureRevision = {
   _id: string
   version: number
+  event?: 'content' | 'archived' | 'restored'
   changeNote: string
   changedBy?: { name?: string; email?: string }
   createdAt: string
@@ -519,7 +520,8 @@ const cpitlService = {
   updateStructure: async (id: string, payload: Partial<FeeStructure> & { changeNote?: string }) =>
     (await api.put(`/cpitl/fee-structures/${id}`, payload)).data,
   duplicateStructure: async (id: string, name?: string) => (await api.post(`/cpitl/fee-structures/${id}/duplicate`, { name })).data.data as FeeStructure,
-  archiveStructure: async (id: string) => (await api.post(`/cpitl/fee-structures/${id}/archive`)).data,
+  archiveStructure: async (id: string, reason?: string) => (await api.post(`/cpitl/fee-structures/${id}/archive`, { reason })).data,
+  restoreStructure: async (id: string) => (await api.post(`/cpitl/fee-structures/${id}/restore`)).data,
   assignStructure: async (id: string, payload: { classes?: string[]; sections?: string[]; studentIds?: string[] }) =>
     (await api.post(`/cpitl/fee-structures/${id}/assign`, payload)).data,
   reapplyStructure: async (id: string) => (await api.post(`/cpitl/fee-structures/${id}/reapply`)).data,

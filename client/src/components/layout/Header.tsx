@@ -4,8 +4,7 @@ import { useSelector } from 'react-redux'
 import { selectUser } from '@/redux/slices/authSlice'
 import { useAcademicSession } from '@/contexts/AcademicSessionContext'
 import { useTimetable } from '@/contexts/TimetableContext'
-import { getModuleForPath, isFeatureEnabledForPath } from '@/constants/featureAccess'
-import { contrastTextOnDark } from '@/constants/uiContrast'
+import { isFeatureEnabledForPath } from '@/constants/featureAccess'
 import { useCentreDetails } from '@/hooks/useCentreDetails'
 import { useOnboardingStatus } from '@/hooks/useOnboarding'
 import { AttndModeSwitch } from '@/components/attnd/AttndModeSwitch'
@@ -599,16 +598,9 @@ const Header: React.FC<HeaderProps> = ({ isSidebarCollapsed, onToggleSidebar }) 
     setEditingPeriodsPerWeek(false)
   }
 
-  const isStdntHeader =
-    location.pathname.startsWith('/stdnt') || getModuleForPath(location.pathname) === 'stdnt'
-
   return (
     <header
-      className={`h-16 flex-shrink-0 sticky top-0 z-40 transition-all duration-300 ${
-        isStdntHeader
-          ? 'border-b border-white/10 bg-[#1e3a8a] text-white'
-          : 'bg-white dark:bg-secondary-900 border-b border-secondary-200 dark:border-secondary-700'
-      }`}
+      className="h-16 flex-shrink-0 sticky top-0 z-40 transition-all duration-300 bg-white dark:bg-secondary-900 border-b border-secondary-200 dark:border-secondary-700"
     >
       <div className="h-full px-2 md:px-4 flex items-center">
         <div className="flex items-center justify-between w-full gap-6">
@@ -617,11 +609,7 @@ const Header: React.FC<HeaderProps> = ({ isSidebarCollapsed, onToggleSidebar }) 
             <button
               type="button"
               onClick={onToggleSidebar}
-              className={`p-1.5 transition-colors duration-200 flex-shrink-0 ${
-                isStdntHeader
-                  ? 'text-white/80 hover:text-white'
-                  : 'text-secondary-600 dark:text-secondary-400 hover:text-primary-600 dark:hover:text-primary-400'
-              }`}
+              className="p-1.5 transition-colors duration-200 flex-shrink-0 text-secondary-600 dark:text-secondary-400 hover:text-primary-600 dark:hover:text-primary-400"
               aria-label={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
               title={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             >
@@ -631,9 +619,7 @@ const Header: React.FC<HeaderProps> = ({ isSidebarCollapsed, onToggleSidebar }) 
               </svg>
             </button>
             <span
-              className={`h-6 w-px flex-shrink-0 mr-1 ${
-                isStdntHeader ? 'bg-white/20' : 'bg-secondary-200 dark:bg-secondary-700'
-              }`}
+              className="h-6 w-px flex-shrink-0 mr-1 bg-secondary-200 dark:bg-secondary-700"
             />
             {showBackButton && backTo && (
               <button
@@ -671,16 +657,12 @@ const Header: React.FC<HeaderProps> = ({ isSidebarCollapsed, onToggleSidebar }) 
             ) : (
               <div className="min-w-0">
                 <h1
-                  className={`text-lg md:text-xl font-bold truncate tracking-tight ${
-                    isStdntHeader ? contrastTextOnDark.title : 'text-gray-900 dark:text-white'
-                  }`}
+                  className="text-lg md:text-xl font-bold truncate tracking-tight text-gray-900 dark:text-white"
                 >
                   {pageTitle}
                 </h1>
                 <p
-                  className={`hidden sm:block text-[11px] md:text-xs truncate mt-0.5 font-medium ${
-                    isStdntHeader ? contrastTextOnDark.muted : 'text-gray-500 dark:text-gray-400'
-                  }`}
+                  className="hidden sm:block text-[11px] md:text-xs truncate mt-0.5 font-medium text-gray-500 dark:text-gray-400"
                 >
                   {pageSubtitle}
                 </p>
@@ -768,14 +750,10 @@ const Header: React.FC<HeaderProps> = ({ isSidebarCollapsed, onToggleSidebar }) 
             {/* Academic Session Badge */}
             {currentSession && (
               <div
-                className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg ${
-                  isStdntHeader
-                    ? 'border border-white/15 bg-white/10'
-                    : 'bg-primary-50 dark:bg-primary-900/20 border border-primary-200/60 dark:border-primary-800/40'
-                }`}
+                className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-primary-50 dark:bg-primary-900/20 border border-primary-200/60 dark:border-primary-800/40"
               >
                 <svg
-                  className={`w-3.5 h-3.5 ${isStdntHeader ? 'text-white/80' : 'text-primary-500 dark:text-primary-400'}`}
+                  className="w-3.5 h-3.5 text-primary-500 dark:text-primary-400"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -783,9 +761,7 @@ const Header: React.FC<HeaderProps> = ({ isSidebarCollapsed, onToggleSidebar }) 
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
                 <span
-                  className={`text-xs font-semibold ${
-                    isStdntHeader ? 'text-white' : 'text-primary-700 dark:text-primary-300'
-                  }`}
+                  className="text-xs font-semibold text-primary-700 dark:text-primary-300"
                 >
                   {currentSession}
                 </span>
@@ -802,11 +778,7 @@ const Header: React.FC<HeaderProps> = ({ isSidebarCollapsed, onToggleSidebar }) 
             <div className="hidden md:block">
               <div className="relative group">
                 <div
-                  className={`absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none transition-colors ${
-                    isStdntHeader
-                      ? 'text-white/50 group-focus-within:text-white'
-                      : 'text-secondary-400 group-focus-within:text-primary-500'
-                  }`}
+                  className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none transition-colors text-secondary-400 group-focus-within:text-primary-500"
                 >
                   <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -817,11 +789,7 @@ const Header: React.FC<HeaderProps> = ({ isSidebarCollapsed, onToggleSidebar }) 
                   value={headerSearchValue}
                   onChange={(event) => handleHeaderSearchChange(event.target.value)}
                   placeholder={headerSearchConfig.placeholder}
-                  className={`pl-9 pr-4 py-2 w-28 sm:w-32 text-sm rounded-xl focus:ring-0 transition-all duration-200 ${
-                    isStdntHeader
-                      ? 'border border-white/15 bg-white/10 text-white placeholder:text-white/45 focus:border-white/40 focus:bg-white/15'
-                      : 'bg-gray-50/80 dark:bg-gray-800/60 border border-gray-200/80 dark:border-gray-700/80 focus:border-primary-400 focus:bg-white dark:focus:bg-gray-800 focus:shadow-[0_0_0_3px_rgba(59,130,246,0.08)] placeholder:text-gray-400 dark:text-white'
-                  }`}
+                  className="pl-9 pr-4 py-2 w-28 sm:w-32 text-sm rounded-xl focus:ring-0 transition-all duration-200 bg-gray-50/80 dark:bg-gray-800/60 border border-gray-200/80 dark:border-gray-700/80 focus:border-primary-400 focus:bg-white dark:focus:bg-gray-800 focus:shadow-[0_0_0_3px_rgba(59,130,246,0.08)] placeholder:text-gray-400 dark:text-white"
                 />
               </div>
             </div>
@@ -833,13 +801,9 @@ const Header: React.FC<HeaderProps> = ({ isSidebarCollapsed, onToggleSidebar }) 
                 aria-label="Toggle notifications"
                 title="Notifications"
                 className={`relative p-2 rounded-xl transition-all duration-200 focus:outline-none focus:ring-2 ${
-                  isStdntHeader
-                    ? notificationsOpen
-                      ? 'bg-white/15 text-white focus:ring-white/20'
-                      : 'text-white/80 hover:text-white hover:bg-white/10 focus:ring-white/20'
-                    : notificationsOpen
-                      ? 'bg-primary-50 text-primary-600 dark:bg-primary-900/30 dark:text-primary-400 focus:ring-primary-500/20'
-                      : 'text-secondary-500 hover:text-secondary-700 dark:text-secondary-400 dark:hover:text-secondary-200 hover:bg-secondary-50 dark:hover:bg-secondary-800 focus:ring-primary-500/20'
+                  notificationsOpen
+                    ? 'bg-primary-50 text-primary-600 dark:bg-primary-900/30 dark:text-primary-400 focus:ring-primary-500/20'
+                    : 'text-secondary-500 hover:text-secondary-700 dark:text-secondary-400 dark:hover:text-secondary-200 hover:bg-secondary-50 dark:hover:bg-secondary-800 focus:ring-primary-500/20'
                 }`}
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">

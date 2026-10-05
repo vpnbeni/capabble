@@ -190,7 +190,8 @@ const updateStructure = asyncHandler(async (req, res) => {
   if (Array.isArray(components)) structure.components = await normalizeComponents(req.models, components);
   if (installmentPlan) structure.installmentPlan = normalizePlan(installmentPlan);
   if (lateFee) structure.lateFee = lateFee;
-  if (['draft', 'active', 'archived'].includes(status)) structure.status = status;
+  // Archiving goes through the archive endpoint so it is logged as a status event.
+  if (['draft', 'active'].includes(status)) structure.status = status;
   structure.version += 1;
   structure.updatedBy = auditUser(req);
   await structure.save();
@@ -219,23 +220,41 @@ const duplicateStructure = asyncHandler(async (req, res) => {
   return res.status(201).json({ success: true, data: withComputed(copy), message: 'Structure duplicated.' });
 });
 
+/** Archive: hidden from new assignments; assigned students keep their dues. Not a new version. */
 const archiveStructure = asyncHandler(async (req, res) => {
   const FeeStructure = getModel(req.models, 'FeeStructure');
+  const StudentFeeAccount = getModel(req.models, 'StudentFeeAccount');
   const structure = await FeeStructure.findById(req.params.id);
   if (!structure) throw httpError('Fee structure not found.', 404);
-  const previous = structure.toObject().components;
+  if (structure.status === 'archived') throw httpError('Structure is already archived.', 400);
   structure.status = 'archived';
-  structure.version += 1;
   structure.updatedBy = auditUser(req);
   await structure.save();
-  await recordRevision(req.models, structure, previous, 'Structure archived', auditUser(req));
-  return ok(res, withComputed(structure), { message: 'Structure archived.' });
+  const reason = String(req.body?.reason || '').trim();
+  await recordRevision(req.models, structure, structure.toObject().components, reason, auditUser(req), 'archived');
+  const assignedCount = await StudentFeeAccount.countDocuments({ structureId: structure._id });
+  return ok(res, withComputed(structure, assignedCount), { message: 'Structure archived.' });
+});
+
+/** Restore an archived structure: active if students are assigned, otherwise back to draft. */
+const restoreStructure = asyncHandler(async (req, res) => {
+  const FeeStructure = getModel(req.models, 'FeeStructure');
+  const StudentFeeAccount = getModel(req.models, 'StudentFeeAccount');
+  const structure = await FeeStructure.findById(req.params.id);
+  if (!structure) throw httpError('Fee structure not found.', 404);
+  if (structure.status !== 'archived') throw httpError('Only archived structures can be restored.', 400);
+  const assignedCount = await StudentFeeAccount.countDocuments({ structureId: structure._id });
+  structure.status = assignedCount ? 'active' : 'draft';
+  structure.updatedBy = auditUser(req);
+  await structure.save();
+  await recordRevision(req.models, structure, structure.toObject().components, '', auditUser(req), 'restored');
+  return ok(res, withComputed(structure, assignedCount), { message: `Structure restored as ${structure.status}.` });
 });
 
 const listRevisions = asyncHandler(async (req, res) => {
   const FeeStructureRevision = getModel(req.models, 'FeeStructureRevision');
   const revisions = await FeeStructureRevision.find({ structureId: req.params.id })
-    .sort({ version: -1 })
+    .sort({ version: -1, createdAt: -1 })
     .select(req.query.full === 'true' ? '' : '-snapshot')
     .lean();
   return ok(res, revisions);
@@ -243,7 +262,11 @@ const listRevisions = asyncHandler(async (req, res) => {
 
 const getRevision = asyncHandler(async (req, res) => {
   const FeeStructureRevision = getModel(req.models, 'FeeStructureRevision');
-  const revision = await FeeStructureRevision.findOne({ structureId: req.params.id, version: Number(req.params.version) }).lean();
+  const revision = await FeeStructureRevision.findOne({
+    structureId: req.params.id,
+    version: Number(req.params.version),
+    event: { $nin: ['archived', 'restored'] },
+  }).lean();
   if (!revision) throw httpError('Revision not found.', 404);
   return ok(res, revision);
 });
@@ -309,6 +332,7 @@ module.exports = {
   updateStructure,
   duplicateStructure,
   archiveStructure,
+  restoreStructure,
   listRevisions,
   getRevision,
   assignStructureHandler,

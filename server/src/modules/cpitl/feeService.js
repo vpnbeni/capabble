@@ -288,13 +288,14 @@ const assignStructure = async (models, structure, { classes = [], sections = [],
 };
 
 /** Record a revision snapshot for a structure. */
-const recordRevision = async (models, structure, previousComponents, changeNote, user) => {
+const recordRevision = async (models, structure, previousComponents, changeNote, user, event = 'content') => {
   const FeeStructureRevision = getModel(models, 'FeeStructureRevision');
   const plain = typeof structure.toObject === 'function' ? structure.toObject() : structure;
   const diff = diffComponents(previousComponents || [], plain.components || []);
   return FeeStructureRevision.create({
     structureId: plain._id,
     version: plain.version,
+    event,
     changeNote: changeNote || '',
     changedBy: user,
     snapshot: {
