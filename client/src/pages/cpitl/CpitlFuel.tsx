@@ -298,14 +298,18 @@ const CpitlFuel: React.FC = () => {
 
   return (
     <CpitlPageShell
-      title="Fuel"
-      subtitle={vehicleData && !vehicleData.trnstActive ? 'Transport module is off — vehicles are entered by registration number.' : 'Fuel log and cost per vehicle'}
       actions={
         <button type="button" className={btnPrimary} onClick={() => setModal({ open: true, log: null })}>
           <Plus className="h-4 w-4" /> Log fuel
         </button>
       }
     >
+      {vehicleData && !vehicleData.trnstActive ? (
+        <p className="rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-200">
+          Transport module is off — vehicles are entered by registration number.
+        </p>
+      ) : null}
+
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatCard label="Fuel cost (session)" value={inrShort(fleet?.cost)} hint={`${(fleet?.litres || 0).toLocaleString('en-IN')} litres`} icon={Wallet} tone="indigo" />
         <StatCard label="Distance" value={`${(fleet?.km || 0).toLocaleString('en-IN')} km`} hint="From odometer readings" icon={Route} tone="sky" />
@@ -335,7 +339,12 @@ const CpitlFuel: React.FC = () => {
       {tab === 'log' && (
         <CpitlCard
           actions={
-            <select className={`${inputClass} mt-0 w-56`} value={vehicleFilter} onChange={(e) => setVehicleFilter(e.target.value)} aria-label="Filter by vehicle">
+            <select
+              className={`${inputClass} !mt-0 !w-56 shrink-0`}
+              value={vehicleFilter}
+              onChange={(e) => setVehicleFilter(e.target.value)}
+              aria-label="Filter by vehicle"
+            >
               <option value="">All vehicles</option>
               {vehicles
                 .filter((v) => v._id)

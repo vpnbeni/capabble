@@ -88,12 +88,14 @@ export const CpitlPageShell: React.FC<{
   children: React.ReactNode
 }> = ({ title, subtitle, actions, children }) => (
   <div className="space-y-6 p-4 sm:p-6">
-    {(title || actions) && (
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          {title ? <h2 className="text-lg font-semibold text-slate-900 dark:text-white">{title}</h2> : null}
-          {subtitle ? <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{subtitle}</p> : null}
-        </div>
+    {(title || subtitle || actions) && (
+      <div className={`flex flex-col gap-3 sm:flex-row sm:items-end ${title || subtitle ? 'sm:justify-between' : 'sm:justify-end'}`}>
+        {(title || subtitle) && (
+          <div>
+            {title ? <h2 className="text-lg font-semibold text-slate-900 dark:text-white">{title}</h2> : null}
+            {subtitle ? <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{subtitle}</p> : null}
+          </div>
+        )}
         {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
       </div>
     )}
@@ -109,9 +111,9 @@ export const CpitlCard: React.FC<{ children: React.ReactNode; className?: string
 }) => (
   <section className={`rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800 ${className}`}>
     {(title || actions) && (
-      <div className="mb-4 flex items-center justify-between gap-3">
-        {title ? <h3 className="text-sm font-semibold text-slate-900 dark:text-white">{title}</h3> : <span />}
-        {actions}
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        {title ? <h3 className="min-w-0 text-sm font-semibold text-slate-900 dark:text-white">{title}</h3> : <span />}
+        {actions ? <div className="ml-auto flex shrink-0 items-center gap-2">{actions}</div> : null}
       </div>
     )}
     {children}
