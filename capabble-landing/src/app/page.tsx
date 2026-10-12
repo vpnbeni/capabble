@@ -1,16 +1,9 @@
-import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { Caveat, Inter } from "next/font/google";
 import { CapabbleLanding } from "@/components/landing/CapabbleLanding";
 
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700", "800"], variable: "--font-inter" });
 const caveat = Caveat({ subsets: ["latin"], weight: ["600"], variable: "--font-caveat" });
-
-export const metadata: Metadata = {
-  title: "Capabble | Software, AI and ERP for schools",
-  description:
-    "Capabble develops, licenses, implements and maintains SaaS platforms, AI applications and ERP for schools and the organisations around them.",
-};
 
 // School OS (the tenant app) lives on its own origin; stage builds point at the stage app.
 function getSchoolOsOrigin(host: string): string {

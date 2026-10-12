@@ -4,32 +4,39 @@ import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import { Toaster } from "react-hot-toast";
 import { CursorGlow } from "@/components/CursorGlow";
 
+const siteTitle = "Capabble | Software, AI and ERP for schools";
+const siteDescription =
+  "Capabble develops, licenses, implements and maintains SaaS platforms, AI applications and ERP for schools and the organisations around them.";
+
+// Favicon, Apple touch icon and the link-preview image come from the file
+// conventions in this folder (favicon.ico, icon.svg, apple-icon.png,
+// opengraph-image.jpg, twitter-image.jpg).
 export const metadata: Metadata = {
-  title: "Capabble | Cloud Platform for School and Examination Operations",
-  description:
-    "Explore Capabble's 16 connected operational modules spanning centre control, timetable, exam cell, finance, stock, transport, academics, staff, students, and communication.",
+  metadataBase: new URL("https://www.capabble.cloud"),
+  title: siteTitle,
+  description: siteDescription,
   keywords: [
     "capabble",
-    "cntr",
-    "examination operations",
-    "school administration",
+    "school os",
+    "school erp",
+    "school management software",
+    "cbse school software",
     "exam centre management",
-    "seating plans",
-    "answer sheet tracking",
+    "fee management",
     "multi-tenant education software",
   ],
-  icons: {
-    icon: "/icon.svg",
-    shortcut: "/icon.svg",
-    apple: "/icon.svg",
-  },
   openGraph: {
-    title: "Capabble | Cloud Platform for School and Examination Operations",
-    description:
-      "See how Capabble presents its 16-module platform while routing institutions into CNTR for central exam operations.",
+    title: siteTitle,
+    description: siteDescription,
+    url: "/",
     type: "website",
     locale: "en_IN",
     siteName: "Capabble",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: siteTitle,
+    description: siteDescription,
   },
 };
 
