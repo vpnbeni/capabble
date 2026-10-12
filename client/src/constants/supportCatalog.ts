@@ -1,4 +1,4 @@
-import featureCatalog from './tenantFeatureCatalog.json'
+import featureCatalog from '@capabble/shared/tenantFeatureCatalog.json'
 import { MODULE_REGISTRY, type ModuleId } from './moduleRegistry'
 import { isFeatureEnabledForPath, type TenantFeatureToggles } from './featureAccess'
 

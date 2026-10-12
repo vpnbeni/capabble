@@ -9,7 +9,8 @@
  * 1. Create a directory under modules/ with index.js, routes.js, models.js, listeners.js
  * 2. Add it to the `modules` array below
  * 3. Add its model keys to constants/moduleModelKeys.js
- * 4. Add its features to constants/tenantFeatureCatalog.json
+ * 4. Add its features to packages/shared/src/tenantFeatureCatalog.json, then run
+ *    `npm run sync:shared` from the repo root (copies it to constants/)
  */
 const coreModule = require('./core');
 const cntrModule = require('./cntr');

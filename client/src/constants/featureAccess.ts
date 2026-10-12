@@ -1,4 +1,4 @@
-import featureCatalog from './tenantFeatureCatalog.json'
+import featureCatalog from '@capabble/shared/tenantFeatureCatalog.json'
 
 export type TenantFeatureToggles = Record<string, boolean> | null | undefined
 

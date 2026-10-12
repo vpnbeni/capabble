@@ -35,6 +35,42 @@
     "prefixes": ["/time-table/subjects"]
   },
   {
+    "key": "stdnt_classes",
+    "label": "Stdnt - Classes",
+    "path": "/stdnt/classes",
+    "group": "Student Hub",
+    "module": "stdnt",
+    "prefixes": ["/stdnt/classes"],
+    "fallbackPriority": 25
+  },
+  {
+    "key": "stdnt_subjects",
+    "label": "Stdnt - Subjects",
+    "path": "/stdnt/subjects",
+    "group": "Student Hub",
+    "module": "stdnt",
+    "prefixes": ["/stdnt/subjects"],
+    "fallbackPriority": 26
+  },
+  {
+    "key": "stdnt_student_info",
+    "label": "Stdnt - Stdntboard",
+    "path": "/stdnt/stdntboard",
+    "group": "Student Hub",
+    "module": "stdnt",
+    "prefixes": ["/stdnt/stdntboard", "/stdnt/student-info"],
+    "fallbackPriority": 27
+  },
+  {
+    "key": "stdnt_students",
+    "label": "Stdnt - Students",
+    "path": "/stdnt/students",
+    "group": "Student Hub",
+    "module": "stdnt",
+    "prefixes": ["/stdnt/students"],
+    "fallbackPriority": 28
+  },
+  {
     "key": "staaf_staff_members",
     "label": "STAAF - Staff Members",
     "path": "/staaf/overview",
@@ -90,7 +126,7 @@
   {
     "key": "actvt_activities",
     "label": "ACTVT - Activities",
-    "path": "/actvt/clubs",
+    "path": "/actvt/houses",
     "group": "Activities Hub",
     "module": "actvt",
     "prefixes": ["/actvt"],
