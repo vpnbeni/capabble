@@ -3,21 +3,20 @@ import type { IconName } from "./primitives";
 export type Tone = "success" | "warning" | "danger" | "info" | "neutral" | "accent";
 
 /*
- * Optional photography. The design references photos that were not part of the
- * export; drop files into /public/landing and set the paths here. While a path
- * is null the page renders a styled placeholder instead.
+ * Photography in /public/landing. A null path renders a styled placeholder instead.
  */
-export const PHOTOS = {
-  develop: null as string | null,
-  developMobile: null as string | null,
-  license: null as string | null,
-  licenseMobile: null as string | null,
-  implement: null as string | null,
-  implementMobile: null as string | null,
-  maintain: null as string | null,
-  maintainMobile: null as string | null,
-  transport: null as string | null,
-  library: null as string | null,
+export const PHOTOS: Record<string, string | null> = {
+  develop: "/landing/how-develop.jpg",
+  developMobile: "/landing/how-develop-mobile.jpg",
+  license: "/landing/how-license.jpg",
+  licenseMobile: "/landing/how-license-mobile.jpg",
+  implement: "/landing/how-implement.jpg",
+  implementMobile: "/landing/how-implement-mobile.jpg",
+  maintain: "/landing/how-maintain.jpg",
+  maintainMobile: "/landing/how-maintain-mobile.jpg",
+  // The design reuses the hero shots for these two menu tiles
+  transport: "/landing/hero-student-mobile.jpg",
+  library: "/landing/hero-student.jpg",
 };
 
 export const solutions: {
