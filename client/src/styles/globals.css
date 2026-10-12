@@ -367,3 +367,82 @@
     page-break-before: always;
   }
 }
+
+/*
+ * Capabble design tokens (sign-in and sign-up pages).
+ * Scoped to .cb-auth so existing screens keep their Tailwind palette.
+ * Dark values follow the app's class-based dark mode (.dark on <html>) and
+ * [data-theme="dark"]; [data-theme="light"] pins an element to light values.
+ */
+.cb-auth,
+.cb-auth [data-theme="light"] {
+  --bg: #F4F5F6;
+  --surface: #FFFFFF;
+  --surface-sunken: #EDEFF0;
+  --surface-hover: #F7F8F9;
+  --border: #E3E6E8;
+  --border-control: #868E92;
+  --ink: #191B1C;
+  --ink-muted: #595F61;
+  --ink-disabled: #9BA3A8;
+  --accent-strong: #2458AA;
+  --accent-strong-hover: #1D4890;
+  --on-accent: #FFFFFF;
+  --accent-soft: #E4ECFA;
+  --accent-soft-ink: #1D4890;
+  --focus-ring: #2458AA;
+  --danger-ink: #BE123C;
+  --danger-soft: #FFF1F2;
+  --danger-border: #FECDD3;
+  --danger-solid: #E11D48;
+  --warning-solid: #D97706;
+  --success-ink: #047857;
+  --success-soft: #ECFDF5;
+  --success-border: #A7F3D0;
+  --success-solid: #059669;
+  --shadow-overlay: 0 12px 32px rgba(25, 27, 28, 0.14), 0 2px 6px rgba(25, 27, 28, 0.08);
+}
+
+.dark .cb-auth,
+.cb-auth[data-theme="dark"],
+.cb-auth [data-theme="dark"] {
+  --bg: #111314;
+  --surface: #191B1C;
+  --surface-sunken: #0C0D0E;
+  --surface-hover: #202324;
+  --border: #2E3133;
+  --border-control: #6B7275;
+  --ink: #EDEFF0;
+  --ink-muted: #9BA3A8;
+  --ink-disabled: #5C6366;
+  --accent-strong: #89B4F0;
+  --accent-strong-hover: #ABC6F1;
+  --on-accent: #051736;
+  --accent-soft: #1A2E4F;
+  --accent-soft-ink: #ABC6F1;
+  --focus-ring: #89B4F0;
+  --danger-ink: #FDA4AF;
+  --danger-soft: #331820;
+  --danger-border: #5E2433;
+  --danger-solid: #FB7185;
+  --warning-solid: #FBBF24;
+  --success-ink: #6EE7B7;
+  --success-soft: #0E2A22;
+  --success-border: #1F5140;
+  --success-solid: #34D399;
+  --shadow-overlay: 0 12px 32px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+.cb-auth {
+  --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", sans-serif;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+  --radius-sm: 6px;
+  --radius-lg: 12px;
+  --control-lg: 44px;
+}
