@@ -1,0 +1,582 @@
+/* Capabble sign-in / sign-up layout and form controls. Tokens live in styles/globals.css (.cb-auth). */
+
+.cb-auth {
+  display: flex;
+  min-height: 100vh;
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+.cb-auth *,
+.cb-auth *::before,
+.cb-auth *::after {
+  box-sizing: border-box;
+}
+.cb-auth a {
+  color: var(--accent-strong);
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+.cb-auth a:hover {
+  color: var(--accent-strong-hover);
+}
+.cb-auth a:focus-visible,
+.cb-auth button:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* ---------- Photo panel ---------- */
+
+.cb-auth-photo {
+  position: sticky;
+  top: 0;
+  flex: 1 1 52%;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--surface-sunken);
+  color: var(--ink);
+}
+.cb-auth-photo picture,
+.cb-auth-photo img {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.cb-auth-photo img {
+  object-fit: cover;
+  object-position: 55% 30%;
+  animation: cb-auth-fade 0.4s ease both;
+}
+@keyframes cb-auth-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.cb-auth-brand {
+  position: absolute;
+  top: 40px;
+  left: 56px;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.cb-auth .cb-auth-brand,
+.cb-auth .cb-auth-brand:hover {
+  color: var(--ink);
+}
+.cb-auth-brand img {
+  position: static;
+  width: 40px;
+  height: 40px;
+  animation: none;
+}
+.cb-auth-wordmark {
+  font-size: 28px;
+  line-height: 28px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+.cb-auth-wordmark span,
+.cb-auth-accent {
+  color: var(--accent-strong);
+}
+.cb-auth-intro {
+  position: absolute;
+  top: 120px;
+  left: 56px;
+  z-index: 1;
+  max-width: 380px;
+}
+.cb-auth-intro h2 {
+  margin: 0;
+  font-size: 40px;
+  line-height: 1.08;
+  font-weight: 800;
+  letter-spacing: -0.035em;
+}
+.cb-auth-intro p {
+  margin: var(--space-3) 0 0;
+  font-size: 16px;
+  line-height: 24px;
+  color: var(--ink-muted);
+}
+.cb-auth-steps {
+  position: absolute;
+  left: 56px;
+  bottom: var(--space-12);
+  z-index: 1;
+  width: 340px;
+  padding: var(--space-5);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-overlay);
+}
+.cb-auth-steps h3 {
+  margin: 0 0 var(--space-3);
+  font-size: 15px;
+  line-height: 22px;
+  font-weight: 600;
+}
+.cb-auth-steps ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.cb-auth-steps li {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+.cb-auth-step-icon {
+  flex: 0 0 auto;
+  display: inline-flex;
+  width: 32px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+.cb-auth-step-icon[data-primary] {
+  background: var(--accent-strong);
+  color: var(--on-accent);
+}
+.cb-auth-step-title {
+  display: block;
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 500;
+}
+.cb-auth-step-detail {
+  display: block;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink-muted);
+}
+
+/* ---------- Form panel ---------- */
+
+.cb-auth-main {
+  flex: 1 1 48%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-12) 64px var(--space-8);
+  background: var(--surface);
+}
+.cb-auth-column {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+}
+.cb-auth-title {
+  margin: 0;
+  font-size: 28px;
+  line-height: 34px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.cb-auth-subtitle {
+  margin: var(--space-2) 0 0;
+  font-size: 16px;
+  line-height: 24px;
+  color: var(--ink-muted);
+}
+.cb-auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  margin-top: var(--space-6);
+}
+.cb-auth-section-label {
+  margin: 0;
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 600;
+  color: var(--ink-muted);
+}
+.cb-auth-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+.cb-auth-section + .cb-auth-section {
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--border);
+}
+.cb-auth-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+.cb-auth-alt {
+  margin: var(--space-6) 0 0;
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--border);
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--ink-muted);
+}
+.cb-auth-alt a {
+  font-weight: 600;
+}
+.cb-auth-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  width: 100%;
+  max-width: 480px;
+  margin: var(--space-8) auto 0;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink-muted);
+}
+.cb-auth .cb-auth-footer a {
+  color: var(--ink-muted);
+}
+.cb-auth .cb-auth-footer a:hover {
+  color: var(--accent-strong-hover);
+}
+
+/* ---------- Text field ---------- */
+
+.cb-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.cb-field-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.cb-field-label {
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 500;
+  color: var(--ink);
+}
+.cb-field-head a {
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 500;
+}
+.cb-field-control {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.cb-field-icon {
+  position: absolute;
+  left: 12px;
+  display: inline-flex;
+  color: var(--ink-muted);
+  pointer-events: none;
+}
+.cb-auth .cb-field-input {
+  /* Beats the Tailwind forms plugin's base [type=…] rules */
+  box-shadow: none;
+  width: 100%;
+  height: var(--control-lg);
+  padding: 0 12px;
+  font: 400 16px/22px var(--font-sans);
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius-sm);
+  outline: none;
+  transition: border-color 0.12s ease;
+}
+.cb-auth .cb-field-input[data-icon] {
+  padding-left: 40px;
+}
+.cb-auth .cb-field-input::placeholder {
+  color: var(--ink-disabled);
+}
+.cb-auth .cb-field-input:hover {
+  border-color: var(--ink-muted);
+}
+.cb-auth .cb-field-input:focus,
+.cb-auth .cb-field-input:focus-visible {
+  border-color: var(--border-control);
+  box-shadow: none;
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+.cb-auth .cb-field-input[aria-invalid="true"] {
+  border-color: var(--danger-solid);
+  box-shadow: inset 0 0 0 1px var(--danger-solid);
+}
+.cb-auth .cb-field-input:-webkit-autofill,
+.cb-auth .cb-field-input:-webkit-autofill:hover,
+.cb-auth .cb-field-input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--ink);
+  -webkit-box-shadow: 0 0 0 1000px var(--surface) inset;
+  caret-color: var(--ink);
+}
+.cb-auth .cb-field-input[data-code] {
+  letter-spacing: 0.3em;
+  font-variant-numeric: tabular-nums;
+}
+.cb-field-hint {
+  margin: 0;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink-muted);
+}
+.cb-field-error {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+  margin: 0;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--danger-ink);
+}
+.cb-field-error svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+
+/* ---------- Checkbox ---------- */
+
+.cb-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  align-self: flex-start;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--ink);
+  cursor: pointer;
+}
+.cb-auth .cb-check input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  /* The forms plugin draws the box; color sets the checked fill */
+  color: var(--accent-strong);
+  background-color: var(--surface);
+  border: 1px solid var(--border-control);
+  border-radius: 4px;
+  cursor: pointer;
+}
+.cb-auth .cb-check input:focus {
+  box-shadow: none;
+  outline: none;
+}
+.cb-auth .cb-check input:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+.cb-auth-checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--space-6);
+  margin: -8px 0;
+}
+
+/* ---------- Buttons ---------- */
+
+.cb-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  width: 100%;
+  height: var(--control-lg);
+  padding: 0 18px;
+  font: 600 15px/20px var(--font-sans);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background-color 0.12s ease, border-color 0.12s ease;
+}
+.cb-btn-primary {
+  background: var(--accent-strong);
+  color: var(--on-accent);
+}
+.cb-btn-primary:hover:not(:disabled) {
+  background: var(--accent-strong-hover);
+}
+.cb-btn-secondary {
+  background: var(--surface);
+  color: var(--ink);
+  border-color: var(--border-control);
+}
+.cb-btn-secondary:hover:not(:disabled) {
+  background: var(--surface-hover);
+}
+.cb-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.8;
+}
+.cb-btn:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+.cb-btn-link {
+  align-self: center;
+  padding: 10px 4px;
+  font: 500 14px/20px var(--font-sans);
+  color: var(--accent-strong);
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+.cb-btn-link:hover {
+  color: var(--accent-strong-hover);
+}
+.cb-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 9999px;
+  animation: cb-spin 0.7s linear infinite;
+}
+@keyframes cb-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ---------- Strength meter ---------- */
+
+.cb-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+  animation: cb-auth-fade 0.15s ease-out both;
+}
+.cb-progress-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink-muted);
+}
+.cb-progress-value {
+  font-weight: 600;
+  color: var(--ink);
+}
+.cb-progress-track {
+  height: 4px;
+  border-radius: 9999px;
+  background: var(--surface-sunken);
+  overflow: hidden;
+}
+.cb-progress-fill {
+  height: 100%;
+  border-radius: 9999px;
+  transition: width 0.2s ease-out;
+}
+.cb-progress-fill[data-tone="danger"] { background: var(--danger-solid); }
+.cb-progress-fill[data-tone="warning"] { background: var(--warning-solid); }
+.cb-progress-fill[data-tone="success"] { background: var(--success-solid); }
+
+/* ---------- Callout ---------- */
+
+.cb-callout {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  font-size: 14px;
+  line-height: 20px;
+  border: 1px solid var(--danger-border);
+  border-radius: var(--radius-sm);
+  background: var(--danger-soft);
+  color: var(--danger-ink);
+}
+.cb-callout[data-tone="success"] {
+  border-color: var(--success-border);
+  background: var(--success-soft);
+  color: var(--success-ink);
+}
+.cb-callout svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+.cb-callout p {
+  margin: 0;
+}
+
+/* ---------- Responsive ---------- */
+
+@media (max-height: 700px) and (min-width: 1024px) {
+  .cb-auth-steps { display: none; }
+}
+
+@media (max-width: 1023px) {
+  .cb-auth {
+    flex-direction: column;
+  }
+  .cb-auth-photo {
+    position: relative;
+    flex: 0 0 auto;
+    height: 300px;
+  }
+  .cb-auth-photo img {
+    object-position: 68% 35%;
+  }
+  .cb-auth-brand {
+    top: 24px;
+    left: 32px;
+  }
+  .cb-auth-intro,
+  .cb-auth-steps {
+    display: none;
+  }
+  .cb-auth-main {
+    flex: 1 0 auto;
+    padding: var(--space-12) var(--space-8) var(--space-8);
+  }
+}
+
+@media (max-width: 639px) {
+  .cb-auth-photo {
+    height: 220px;
+  }
+  .cb-auth-brand {
+    top: 16px;
+    left: 20px;
+  }
+  .cb-auth-main {
+    padding: 28px 20px 24px;
+  }
+}
+
+@media (max-width: 479px) {
+  .cb-auth-pair {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-5);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cb-auth-photo img,
+  .cb-progress,
+  .cb-spinner {
+    animation: none;
+  }
+  .cb-progress-fill {
+    transition: none;
+  }
+}
