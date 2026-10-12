@@ -1,491 +1,426 @@
-import React, { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { AnimatePresence, motion } from 'framer-motion'
-import { ArrowLeft, CheckCircle2, Eye, EyeOff, KeyRound, Mail, RefreshCcw, Shield } from 'lucide-react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { ArrowLeft, ArrowRight, CheckCircle2, Clock, KeyRound, Lock, Mail, RefreshCw, ShieldCheck, UserCog } from 'lucide-react'
 import authService from '@/services/authService'
-import { getUniversalAuthCopy } from '@/utils/publicBranding'
+import AuthLayout, { CardHeading } from '@/components/auth/capabble/AuthLayout'
+import { Button, Callout, Checkbox, LinkButton, StrengthMeter, TextField } from '@/components/auth/capabble/controls'
+import { getPasswordStrength, MISMATCH_ERROR, PASSWORD_ERROR, PASSWORD_RULE } from '@/components/auth/capabble/password'
+import { marketingLinks } from '@/utils/marketingSite'
 
-const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-const strongPasswordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[!@#$%^&*]).{8,128}$/
 const RESEND_COOLDOWN_SECONDS = 45
+// Matches PASSWORD_RESET_OTP_TTL_MINUTES on the server (default 10).
+const CODE_LIFETIME = '10 minutes'
 
-type Step = 'email' | 'reset' | 'success'
-
-interface FieldErrors {
-  email?: string
-  otp?: string
-  newPassword?: string
-  confirmNewPassword?: string
-}
+/*
+ * request → sent (enter the emailed code) → new (choose a password) → done
+ * A rejected code sends the user back to "sent"; an expired or used-up code shows "expired".
+ */
+type Step = 'request' | 'sent' | 'new' | 'done' | 'expired'
 
 const syncTenantInUrl = (tenantSlug: string | null) => {
   const url = new URL(window.location.href)
-
-  if (tenantSlug) {
-    url.searchParams.set('tenant', tenantSlug)
-  } else {
-    url.searchParams.delete('tenant')
-  }
-
+  if (tenantSlug) url.searchParams.set('tenant', tenantSlug)
+  else url.searchParams.delete('tenant')
   window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`)
 }
 
+type ApiError = { response?: { data?: { message?: string; errorCode?: string } } }
+const apiError = (err: unknown) => (err && typeof err === 'object' ? (err as ApiError).response?.data : undefined)
+
+const focusSoon = (id: string) => requestAnimationFrame(() => document.getElementById(id)?.focus())
+
 const ForgotPassword: React.FC = () => {
-  const navigate = useNavigate()
-  const authCopy = getUniversalAuthCopy()
-  const [step, setStep] = useState<Step>('email')
+  const [step, setStep] = useState<Step>('request')
   const [email, setEmail] = useState('')
   const [otp, setOtp] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmNewPassword, setConfirmNewPassword] = useState('')
-  const [showNewPassword, setShowNewPassword] = useState(false)
-  const [showConfirmNewPassword, setShowConfirmNewPassword] = useState(false)
-  const [submittingEmail, setSubmittingEmail] = useState(false)
-  const [resettingPassword, setResettingPassword] = useState(false)
-  const [resendingOtp, setResendingOtp] = useState(false)
-  const [cooldownRemaining, setCooldownRemaining] = useState(0)
-  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
-  const [statusMessage, setStatusMessage] = useState('')
-  const [errorMessage, setErrorMessage] = useState('')
+  const [showPasswords, setShowPasswords] = useState(false)
+  const [sending, setSending] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [resending, setResending] = useState(false)
+  const [resent, setResent] = useState(false)
+  const [cooldown, setCooldown] = useState(0)
+  const [expiredReason, setExpiredReason] = useState<'expired' | 'attempts'>('expired')
+  const [errors, setErrors] = useState<{ email?: string; otp?: string; password?: string; confirm?: string }>({})
+  const [generalError, setGeneralError] = useState<string | null>(null)
+  const headingRef = useRef<HTMLHeadingElement>(null)
 
-  const isBusy = submittingEmail || resettingPassword || resendingOtp
-
-  const resendLabel = useMemo(() => {
-    if (cooldownRemaining <= 0) {
-      return 'Resend OTP'
-    }
-
-    return `Resend OTP in ${cooldownRemaining}s`
-  }, [cooldownRemaining])
+  const strength = useMemo(() => getPasswordStrength(newPassword), [newPassword])
+  const normalizedEmail = email.trim().toLowerCase()
 
   useEffect(() => {
-    if (cooldownRemaining <= 0) {
-      return undefined
-    }
-
-    const timer = window.setInterval(() => {
-      setCooldownRemaining((value) => (value > 0 ? value - 1 : 0))
-    }, 1000)
-
+    if (cooldown <= 0) return undefined
+    const timer = window.setInterval(() => setCooldown((v) => (v > 0 ? v - 1 : 0)), 1000)
     return () => window.clearInterval(timer)
-  }, [cooldownRemaining])
+  }, [cooldown])
 
+  // Each step swaps the whole form, so move focus to its heading for screen readers.
   useEffect(() => {
-    if (step !== 'success') return undefined
+    if (step !== 'request') headingRef.current?.focus()
+  }, [step])
 
-    const redirectTimer = window.setTimeout(() => {
-      navigate('/login', { replace: true })
-    }, 2000)
-
-    return () => window.clearTimeout(redirectTimer)
-  }, [navigate, step])
-
-  const clearFieldError = (field: keyof FieldErrors) => {
-    setFieldErrors((prev) => {
-      if (!prev[field]) return prev
-      return { ...prev, [field]: undefined }
-    })
+  const goTo = (next: Step) => {
+    setGeneralError(null)
+    setErrors({})
+    setStep(next)
   }
 
-  const resetFeedback = () => {
-    setErrorMessage('')
-    setStatusMessage('')
-  }
-
-  const handleEmailSubmit = async (event: React.FormEvent) => {
-    event.preventDefault()
-    if (isBusy) return
-
-    resetFeedback()
-    const normalizedEmail = email.trim().toLowerCase()
-
-    if (!emailRegex.test(normalizedEmail)) {
-      setFieldErrors({ email: 'Enter a valid email address.' })
+  const sendCode = async () => {
+    if (!/^\S+@\S+\.\S+$/.test(normalizedEmail)) {
+      setErrors({ email: 'Enter an email address like name@yourschool.in' })
+      focusSoon('reset-email')
       return
     }
-
-    setSubmittingEmail(true)
-    setFieldErrors({})
-
+    setGeneralError(null)
+    setSending(true)
     try {
       const tenant = await authService.resolveTenantByEmail(normalizedEmail)
       localStorage.setItem('tenantSlug', tenant.slug)
       syncTenantInUrl(tenant.slug)
-
       await authService.forgotPassword(normalizedEmail)
-
       setEmail(normalizedEmail)
-      setStep('reset')
       setOtp('')
-      setCooldownRemaining(RESEND_COOLDOWN_SECONDS)
-      setStatusMessage(`A 6-digit OTP was sent to ${normalizedEmail}.`)
-    } catch (error: any) {
-      const message = error?.response?.data?.message || 'Unable to start password reset. Please try again.'
-      setErrorMessage(message)
+      setResent(false)
+      setCooldown(RESEND_COOLDOWN_SECONDS)
+      goTo('sent')
+    } catch (err) {
+      setGeneralError(apiError(err)?.message || "We couldn't send the code. Check your connection and try again.")
     } finally {
-      setSubmittingEmail(false)
+      setSending(false)
     }
   }
 
-  const validateResetForm = (): boolean => {
-    const nextErrors: FieldErrors = {}
-    const normalizedOtp = otp.trim()
-
-    if (!/^\d{6}$/.test(normalizedOtp)) {
-      nextErrors.otp = 'OTP must be exactly 6 digits.'
+  const resendCode = async () => {
+    if (resending || cooldown > 0) return
+    setGeneralError(null)
+    setResending(true)
+    try {
+      await authService.resendForgotPasswordOtp(normalizedEmail)
+      setOtp('')
+      setResent(true)
+      setCooldown(RESEND_COOLDOWN_SECONDS)
+    } catch (err) {
+      setGeneralError(apiError(err)?.message || "We couldn't send a new code. Try again in a moment.")
+    } finally {
+      setResending(false)
     }
+  }
 
-    if (!strongPasswordRegex.test(newPassword)) {
-      nextErrors.newPassword = 'Use at least 8 chars with upper/lowercase, number, and special character.'
+  const continueWithCode = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!/^\d{6}$/.test(otp)) {
+      setErrors({ otp: 'Enter the 6-digit code from the email' })
+      focusSoon('reset-code')
+      return
     }
+    goTo('new')
+  }
 
+  const savePassword = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (saving) return
+    if (strength < 2) {
+      setErrors({ password: PASSWORD_ERROR })
+      focusSoon('new-password')
+      return
+    }
     if (confirmNewPassword !== newPassword) {
-      nextErrors.confirmNewPassword = 'Confirm password must match new password.'
-    }
-
-    setFieldErrors(nextErrors)
-    return Object.keys(nextErrors).length === 0
-  }
-
-  const handleResetSubmit = async (event: React.FormEvent) => {
-    event.preventDefault()
-    if (isBusy) return
-
-    resetFeedback()
-    if (!validateResetForm()) {
+      setErrors({ confirm: MISMATCH_ERROR })
+      focusSoon('confirm-password')
       return
     }
-
-    setResettingPassword(true)
-
+    setErrors({})
+    setGeneralError(null)
+    setSaving(true)
     try {
-      await authService.resetPassword({
-        email: email.trim().toLowerCase(),
-        otp: otp.trim(),
-        newPassword,
-        confirmNewPassword,
-      })
-
-      setStep('success')
-      setStatusMessage('Password reset successful. Redirecting to login...')
-    } catch (error: any) {
-      const message = error?.response?.data?.message || 'Unable to reset password right now. Please try again.'
-      setErrorMessage(message)
+      await authService.resetPassword({ email: normalizedEmail, otp, newPassword, confirmNewPassword })
+      goTo('done')
+    } catch (err) {
+      const data = apiError(err)
+      if (data?.errorCode === 'invalid_otp') {
+        setStep('sent')
+        setErrors({ otp: "That code isn't right. Check the latest email and try again." })
+        focusSoon('reset-code')
+      } else if (data?.errorCode === 'otp_expired' || data?.errorCode === 'otp_not_requested') {
+        setExpiredReason('expired')
+        goTo('expired')
+      } else if (data?.errorCode === 'otp_attempts_exceeded') {
+        setExpiredReason('attempts')
+        goTo('expired')
+      } else {
+        setGeneralError(data?.message || "We couldn't save the password. Check your connection and try again.")
+      }
     } finally {
-      setResettingPassword(false)
+      setSaving(false)
     }
   }
 
-  const handleResendOtp = async () => {
-    if (isBusy || cooldownRemaining > 0) {
-      return
-    }
-
-    resetFeedback()
-    setResendingOtp(true)
-
-    try {
-      await authService.resendForgotPasswordOtp(email.trim().toLowerCase())
-      setOtp('')
-      setCooldownRemaining(RESEND_COOLDOWN_SECONDS)
-      setStatusMessage('A new OTP has been sent to your email.')
-    } catch (error: any) {
-      const message = error?.response?.data?.message || 'Unable to resend OTP. Please try again.'
-      setErrorMessage(message)
-    } finally {
-      setResendingOtp(false)
-    }
+  const startOver = () => {
+    setOtp('')
+    setNewPassword('')
+    setConfirmNewPassword('')
+    setCooldown(0)
+    goTo('request')
+    focusSoon('reset-email')
   }
+
+  const passwordType = showPasswords ? 'text' : 'password'
+  const choosingPassword = step === 'new' || step === 'done'
 
   return (
-    <div className="min-h-screen w-full bg-[#050505] text-white">
-      <div className="mx-auto grid min-h-screen max-w-7xl lg:grid-cols-2">
-        <section className="relative hidden overflow-hidden border-r border-white/5 bg-gradient-to-br from-gray-900 to-black lg:block">
-          <div className="absolute inset-0">
-            <div className="absolute -left-24 top-0 h-64 w-64 rounded-full bg-primary-500/20 blur-[120px]" />
-            <div className="absolute bottom-0 right-0 h-72 w-72 rounded-full bg-secondary-500/20 blur-[120px]" />
+    <AuthLayout
+      layout="signin"
+      headline={
+        choosingPassword ? (
+          <>
+            A fresh start for your <span className="cb-auth-accent">account.</span>
+          </>
+        ) : (
+          <>
+            Locked out? You&apos;ll be back in a <span className="cb-auth-accent">minute.</span>
+          </>
+        )
+      }
+      subline={
+        choosingPassword
+          ? 'Your new password works in every module straight away.'
+          : 'One reset brings back every module on your account.'
+      }
+      card={
+        choosingPassword ? (
+          <>
+            <CardHeading icon={ShieldCheck}>A good password</CardHeading>
+            <ul>
+              <li>Is at least 8 characters, with upper and lower case letters, a number and a symbol</li>
+              <li>Is 12 characters or more to be strong</li>
+              <li>Isn&apos;t one you use on another website</li>
+            </ul>
+          </>
+        ) : (
+          <>
+            <CardHeading icon={UserCog}>No access to that email?</CardHeading>
+            <p>Your school&apos;s Capabble admin can change the email on your account. Then reset your password here.</p>
+            <a className="cb-auth-card-link" href={marketingLinks().signingInHelp}>
+              Get help signing in
+            </a>
+          </>
+        )
+      }
+    >
+      {step === 'request' ? (
+        <>
+          <div className="cb-auth-head">
+            <h1 className="cb-auth-title">Reset your password</h1>
+            <p className="cb-auth-subtitle">
+              Enter the email you sign in with. We&apos;ll send you a 6-digit code to set a new password.
+            </p>
           </div>
-          <div className="relative z-10 flex h-full flex-col justify-between p-12">
-            <div>
-              <div className="inline-flex items-center gap-2 rounded-full border border-primary-400/30 bg-primary-500/10 px-3 py-1 text-xs text-primary-200">
-                <Shield className="h-4 w-4" />
-                Secure Recovery
-              </div>
-              <h1 className="mt-8 text-4xl font-bold leading-tight">
-                {authCopy.forgotTitle}
-                <span className="block bg-gradient-to-r from-primary-300 to-secondary-300 bg-clip-text text-transparent">
-                  with email verification.
-                </span>
-              </h1>
-              <p className="mt-4 max-w-md text-gray-400">
-                {authCopy.forgotDescription}
-              </p>
-            </div>
-
-            <div className="space-y-4 text-sm text-gray-300">
-              <p className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-                Shared account recovery across modules
-              </p>
-              <p className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-                Secure OTP with expiry and retry controls
-              </p>
-              <p className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-                Password strength checks before submit
-              </p>
-            </div>
-          </div>
-        </section>
-
-        <section className="relative flex items-center justify-center px-5 py-10 sm:px-8">
-          <div className="absolute inset-0 -z-10 lg:hidden">
-            <div className="absolute left-8 top-8 h-40 w-40 rounded-full bg-primary-500/15 blur-[80px]" />
-            <div className="absolute bottom-8 right-8 h-48 w-48 rounded-full bg-secondary-500/15 blur-[80px]" />
-          </div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="w-full max-w-md rounded-3xl border border-white/10 bg-white/5 p-6 shadow-2xl backdrop-blur xl:p-8"
+          <form
+            className="cb-auth-form"
+            style={{ marginTop: 0 }}
+            noValidate
+            onSubmit={(e) => {
+              e.preventDefault()
+              if (!sending) void sendCode()
+            }}
           >
-            <Link to="/login" className="inline-flex items-center gap-2 text-sm text-gray-400 transition-colors hover:text-white">
-              <ArrowLeft className="h-4 w-4" />
-              Back to Login
-            </Link>
+            <TextField
+              id="reset-email"
+              label="Email address"
+              icon={Mail}
+              type="email"
+              placeholder="name@yourschool.in"
+              autoComplete="email"
+              error={errors.email}
+              value={email}
+              onChange={(e) => {
+                setEmail(e.target.value)
+                setErrors({})
+              }}
+            />
+            {generalError ? <Callout>{generalError}</Callout> : null}
+            <Button type="submit" iconRight={ArrowRight} loading={sending} loadingLabel="Sending code">
+              Send reset code
+            </Button>
+          </form>
+        </>
+      ) : null}
 
-            <div className="mt-5">
-              <h2 className="text-2xl font-bold">Forgot Password</h2>
-              <p className="mt-2 text-sm text-gray-400">
-                {step === 'email'
-                  ? 'Enter your account email to receive OTP.'
-                  : step === 'reset'
-                    ? 'Enter OTP and choose a secure new password.'
-                    : 'Password updated successfully.'}
+      {step === 'sent' ? (
+        <>
+          <div className="cb-auth-head" style={{ gap: 16 }}>
+            <span className="cb-auth-status-icon">
+              <Mail size={24} strokeWidth={1.75} aria-hidden="true" />
+            </span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <h1 className="cb-auth-title" ref={headingRef} tabIndex={-1}>
+                Check your email
+              </h1>
+              <p className="cb-auth-subtitle">
+                We&apos;ve sent a 6-digit code to <strong>{normalizedEmail}</strong>. The code works for {CODE_LIFETIME}.
               </p>
             </div>
+          </div>
 
-            <AnimatePresence mode="wait">
-              {step === 'email' && (
-                <motion.form
-                  key="email-step"
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -8 }}
-                  onSubmit={handleEmailSubmit}
-                  className="mt-6 space-y-4"
-                >
-                  <div>
-                    <label htmlFor="forgot-email" className="mb-2 ml-1 block text-sm text-gray-300">Email</label>
-                    <div className="group relative">
-                      <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-gray-500 group-focus-within:text-primary-400">
-                        <Mail className="h-5 w-5" />
-                      </div>
-                      <input
-                        id="forgot-email"
-                        type="email"
-                        value={email}
-                        onChange={(event) => {
-                          setEmail(event.target.value)
-                          clearFieldError('email')
-                          resetFeedback()
-                        }}
-                        className={`w-full rounded-xl border bg-white/5 py-3 pl-12 pr-4 outline-none transition-all ${
-                          fieldErrors.email
-                            ? 'border-red-400/50 focus:border-red-400'
-                            : 'border-white/10 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/40'
-                        }`}
-                        placeholder="name@institution.com"
-                        autoComplete="email"
-                        required
-                      />
-                    </div>
-                    {fieldErrors.email && <p className="mt-1 ml-1 text-xs text-red-300">{fieldErrors.email}</p>}
-                  </div>
+          <form className="cb-auth-form" style={{ marginTop: 0 }} noValidate onSubmit={continueWithCode}>
+            <TextField
+              id="reset-code"
+              label="Reset code"
+              icon={KeyRound}
+              code
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              hint="6 digits"
+              error={errors.otp}
+              value={otp}
+              onChange={(e) => {
+                setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))
+                setErrors({})
+              }}
+            />
+            <Button type="submit" iconRight={ArrowRight}>
+              Continue
+            </Button>
+          </form>
 
-                  <button
-                    type="submit"
-                    disabled={submittingEmail}
-                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary-600 py-3.5 font-semibold text-white transition-colors hover:bg-primary-500 disabled:cursor-not-allowed disabled:opacity-70"
-                  >
-                    {submittingEmail ? 'Sending OTP...' : 'Send OTP'}
-                    <KeyRound className="h-4 w-4" />
-                  </button>
-                </motion.form>
-              )}
+          <div className="cb-auth-panel" style={{ marginTop: 24 }}>
+            <strong>Didn&apos;t get it?</strong>
+            <span>Check your spam folder. It can take a minute to arrive.</span>
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px 16px' }}>
+              <Button
+                variant="secondary"
+                icon={RefreshCw}
+                onClick={resendCode}
+                disabled={cooldown > 0}
+                loading={resending}
+                loadingLabel="Sending"
+              >
+                Resend code
+              </Button>
+              <span className="cb-auth-note" aria-live="polite">
+                {resent ? 'Sent again. ' : ''}
+                {cooldown > 0 ? `You can resend in 0:${String(cooldown).padStart(2, '0')}` : ''}
+              </span>
+            </div>
+          </div>
+          {generalError ? (
+            <div style={{ marginTop: 16 }}>
+              <Callout>{generalError}</Callout>
+            </div>
+          ) : null}
+          <div style={{ marginTop: 16 }}>
+            <Button variant="tertiary" onClick={startOver}>
+              Use a different email
+            </Button>
+          </div>
+        </>
+      ) : null}
 
-              {step === 'reset' && (
-                <motion.form
-                  key="reset-step"
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -8 }}
-                  onSubmit={handleResetSubmit}
-                  className="mt-6 space-y-4"
-                >
-                  <div>
-                    <label htmlFor="forgot-otp" className="mb-2 ml-1 block text-sm text-gray-300">OTP</label>
-                    <input
-                      id="forgot-otp"
-                      type="text"
-                      value={otp}
-                      onChange={(event) => {
-                        setOtp(event.target.value.replace(/\D/g, '').slice(0, 6))
-                        clearFieldError('otp')
-                        resetFeedback()
-                      }}
-                      className={`w-full rounded-xl border bg-white/5 px-4 py-3 text-center text-lg tracking-[0.25em] outline-none transition-all ${
-                        fieldErrors.otp
-                          ? 'border-red-400/50 focus:border-red-400'
-                          : 'border-white/10 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/40'
-                      }`}
-                      inputMode="numeric"
-                      pattern="\d{6}"
-                      autoComplete="one-time-code"
-                      placeholder="123456"
-                      required
-                    />
-                    {fieldErrors.otp && <p className="mt-1 ml-1 text-xs text-red-300">{fieldErrors.otp}</p>}
-                  </div>
+      {step === 'new' ? (
+        <>
+          <div className="cb-auth-head">
+            <h1 className="cb-auth-title" ref={headingRef} tabIndex={-1}>
+              Set a new password
+            </h1>
+            <p className="cb-auth-subtitle">
+              For <strong>{normalizedEmail}</strong>
+            </p>
+          </div>
+          <form className="cb-auth-form" style={{ marginTop: 0 }} noValidate onSubmit={savePassword}>
+            <div>
+              <TextField
+                id="new-password"
+                label="New password"
+                icon={Lock}
+                type={passwordType}
+                hint={PASSWORD_RULE}
+                error={errors.password}
+                autoComplete="new-password"
+                value={newPassword}
+                onChange={(e) => {
+                  setNewPassword(e.target.value)
+                  setErrors({})
+                }}
+              />
+              {newPassword ? (
+                <div style={{ marginTop: 10 }}>
+                  <StrengthMeter level={strength} />
+                </div>
+              ) : null}
+            </div>
+            <TextField
+              id="confirm-password"
+              label="Confirm new password"
+              icon={Lock}
+              type={passwordType}
+              error={errors.confirm}
+              autoComplete="new-password"
+              value={confirmNewPassword}
+              onChange={(e) => {
+                setConfirmNewPassword(e.target.value)
+                setErrors({})
+              }}
+            />
+            <div className="cb-auth-checks">
+              <Checkbox label="Show passwords" checked={showPasswords} onChange={setShowPasswords} />
+            </div>
+            {generalError ? <Callout>{generalError}</Callout> : null}
+            <Button type="submit" loading={saving} loadingLabel="Saving password">
+              Save new password
+            </Button>
+          </form>
+        </>
+      ) : null}
 
-                  <div>
-                    <label htmlFor="forgot-new-password" className="mb-2 ml-1 block text-sm text-gray-300">New Password</label>
-                    <div className="relative">
-                      <input
-                        id="forgot-new-password"
-                        type={showNewPassword ? 'text' : 'password'}
-                        value={newPassword}
-                        onChange={(event) => {
-                          setNewPassword(event.target.value)
-                          clearFieldError('newPassword')
-                          resetFeedback()
-                        }}
-                        className={`w-full rounded-xl border bg-white/5 py-3 pl-4 pr-12 outline-none transition-all ${
-                          fieldErrors.newPassword
-                            ? 'border-red-400/50 focus:border-red-400'
-                            : 'border-white/10 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/40'
-                        }`}
-                        placeholder="New strong password"
-                        autoComplete="new-password"
-                        required
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowNewPassword((value) => !value)}
-                        className="absolute inset-y-0 right-0 pr-4 text-gray-400 transition-colors hover:text-white"
-                      >
-                        {showNewPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                      </button>
-                    </div>
-                    {fieldErrors.newPassword && <p className="mt-1 ml-1 text-xs text-red-300">{fieldErrors.newPassword}</p>}
-                  </div>
+      {step === 'done' ? (
+        <div className="cb-auth-head" style={{ gap: 16, marginBottom: 0 }}>
+          <span className="cb-auth-status-icon" data-tone="success">
+            <CheckCircle2 size={24} strokeWidth={1.75} aria-hidden="true" />
+          </span>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <h1 className="cb-auth-title" ref={headingRef} tabIndex={-1}>
+              Password changed
+            </h1>
+            <p className="cb-auth-subtitle">Sign in with your new password to get back to your modules.</p>
+          </div>
+          <LinkButton to="/login" iconRight={ArrowRight}>
+            Sign in
+          </LinkButton>
+        </div>
+      ) : null}
 
-                  <div>
-                    <label htmlFor="forgot-confirm-password" className="mb-2 ml-1 block text-sm text-gray-300">Confirm Password</label>
-                    <div className="relative">
-                      <input
-                        id="forgot-confirm-password"
-                        type={showConfirmNewPassword ? 'text' : 'password'}
-                        value={confirmNewPassword}
-                        onChange={(event) => {
-                          setConfirmNewPassword(event.target.value)
-                          clearFieldError('confirmNewPassword')
-                          resetFeedback()
-                        }}
-                        className={`w-full rounded-xl border bg-white/5 py-3 pl-4 pr-12 outline-none transition-all ${
-                          fieldErrors.confirmNewPassword
-                            ? 'border-red-400/50 focus:border-red-400'
-                            : 'border-white/10 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/40'
-                        }`}
-                        placeholder="Re-enter new password"
-                        autoComplete="new-password"
-                        required
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowConfirmNewPassword((value) => !value)}
-                        className="absolute inset-y-0 right-0 pr-4 text-gray-400 transition-colors hover:text-white"
-                      >
-                        {showConfirmNewPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                      </button>
-                    </div>
-                    {fieldErrors.confirmNewPassword && <p className="mt-1 ml-1 text-xs text-red-300">{fieldErrors.confirmNewPassword}</p>}
-                  </div>
+      {step === 'expired' ? (
+        <div className="cb-auth-head" style={{ gap: 16, marginBottom: 0 }}>
+          <span className="cb-auth-status-icon" data-tone="warning">
+            <Clock size={24} strokeWidth={1.75} aria-hidden="true" />
+          </span>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <h1 className="cb-auth-title" ref={headingRef} tabIndex={-1}>
+              {expiredReason === 'attempts' ? 'Too many tries with that code' : 'This code has expired'}
+            </h1>
+            <p className="cb-auth-subtitle">
+              {expiredReason === 'attempts'
+                ? 'For your security, that code no longer works. Ask for a new one and enter it carefully.'
+                : `Reset codes work for ${CODE_LIFETIME} and only once. Ask for a new one and use it straight away.`}
+            </p>
+          </div>
+          {generalError ? <Callout>{generalError}</Callout> : null}
+          <Button iconRight={ArrowRight} onClick={sendCode} loading={sending} loadingLabel="Sending code">
+            Send a new code
+          </Button>
+        </div>
+      ) : null}
 
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <button
-                      type="submit"
-                      disabled={resettingPassword}
-                      className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary-600 py-3 font-semibold text-white transition-colors hover:bg-primary-500 disabled:cursor-not-allowed disabled:opacity-70"
-                    >
-                      {resettingPassword ? 'Resetting...' : 'Reset Password'}
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={handleResendOtp}
-                      disabled={resendingOtp || cooldownRemaining > 0}
-                      className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-white/20 py-3 font-semibold text-gray-200 transition-colors hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      <RefreshCcw className="h-4 w-4" />
-                      {resendingOtp ? 'Sending...' : resendLabel}
-                    </button>
-                  </div>
-                </motion.form>
-              )}
-
-              {step === 'success' && (
-                <motion.div
-                  key="success-step"
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -8 }}
-                  className="mt-8 rounded-2xl border border-emerald-400/30 bg-emerald-500/10 p-6 text-center"
-                >
-                  <CheckCircle2 className="mx-auto h-12 w-12 text-emerald-300" />
-                  <h3 className="mt-3 text-xl font-semibold">Password Updated</h3>
-                  <p className="mt-2 text-sm text-emerald-100/90">Redirecting you to login.</p>
-                  <button
-                    type="button"
-                    onClick={() => navigate('/login', { replace: true })}
-                    className="mt-5 rounded-xl bg-emerald-500 px-4 py-2.5 font-semibold text-slate-900 transition-colors hover:bg-emerald-400"
-                  >
-                    Go to Login
-                  </button>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            <AnimatePresence>
-              {statusMessage && (
-                <motion.p
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="mt-4 overflow-hidden rounded-xl border border-cyan-400/30 bg-cyan-500/10 px-3 py-2 text-sm text-cyan-100"
-                >
-                  {statusMessage}
-                </motion.p>
-              )}
-            </AnimatePresence>
-
-            <AnimatePresence>
-              {errorMessage && (
-                <motion.p
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="mt-4 overflow-hidden rounded-xl border border-red-400/30 bg-red-500/10 px-3 py-2 text-sm text-red-200"
-                >
-                  {errorMessage}
-                </motion.p>
-              )}
-            </AnimatePresence>
-          </motion.div>
-        </section>
-      </div>
-    </div>
+      {step !== 'done' ? (
+        <div className="cb-auth-back">
+          <Link to="/login">
+            <ArrowLeft size={16} strokeWidth={1.75} aria-hidden="true" />
+            Back to sign in
+          </Link>
+        </div>
+      ) : null}
+    </AuthLayout>
   )
 }
 

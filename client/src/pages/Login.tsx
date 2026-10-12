@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { Link, useNavigate } from 'react-router-dom'
-import { ArrowRight, Building2, Lock, Mail, RefreshCw, KeyRound } from 'lucide-react'
+import { ArrowRight, Building2, KeyRound, LayoutGrid, Lock, Mail, RefreshCw } from 'lucide-react'
 import { clearError, login, selectAuth, setCredentials } from '../redux/slices/authSlice'
 import authService from '../services/authService'
 import { useAcademicSession } from '../contexts/AcademicSessionContext'
@@ -11,8 +11,8 @@ import { resolveTenantSlug } from '../utils/tenantRuntime'
 import type { AppDispatch } from '../redux/store'
 import type { LoginCredentials } from '../types/auth'
 import Loader from '../components/common/Loader'
-import AuthLayout from '../components/auth/capabble/AuthLayout'
-import { Button, Callout, Checkbox, TextField } from '../components/auth/capabble/controls'
+import AuthLayout, { CardHeading } from '../components/auth/capabble/AuthLayout'
+import { Badge, Button, Callout, Checkbox, TextField } from '../components/auth/capabble/controls'
 
 const syncTenantInUrl = (tenantSlug: string | null) => {
   const url = new URL(window.location.href)
@@ -33,6 +33,7 @@ const Login: React.FC = () => {
   const [tenantLookupError, setTenantLookupError] = useState<string | null>(null)
   const [schoolCode, setSchoolCode] = useState('')
   const [showSchoolCode, setShowSchoolCode] = useState(false)
+  const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({})
   const [formData, setFormData] = useState<LoginCredentials>({
     email: '',
     password: '',
@@ -66,6 +67,7 @@ const Login: React.FC = () => {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
     setTenantLookupError(null)
+    setFieldErrors({})
     dispatch(clearError())
     setFormData((prev) => ({
       ...prev,
@@ -89,10 +91,8 @@ const Login: React.FC = () => {
       return
     }
     if (!identifier || !password) {
-      setTenantLookupError(
-        !identifier ? 'Enter your email address or username.' : 'Enter your password.'
-      )
-      document.getElementById(!identifier ? 'email' : 'password')?.focus()
+      setFieldErrors(!identifier ? { email: 'Enter your email or username' } : { password: 'Enter your password' })
+      requestAnimationFrame(() => document.getElementById(!identifier ? 'email' : 'password')?.focus())
       return
     }
 
@@ -240,21 +240,36 @@ const Login: React.FC = () => {
 
   return (
     <AuthLayout
+      layout="signin"
       headline={
         <>
-          One sign-in for every <span className="cb-auth-accent">module.</span>
+          One account for every <span className="cb-auth-accent">module.</span>
         </>
       }
-      subline="Your workspace account opens every module your school uses."
+      subline="Attendance, exams, fees and the exam centre all open with the same sign-in."
+      card={
+        <>
+          <CardHeading icon={LayoutGrid}>Modules on this account</CardHeading>
+          <div className="cb-auth-badges">
+            {['Students', 'Attendance', 'Exams', 'Exam centre', 'Finance', 'Timetable'].map((m) => (
+              <Badge key={m}>{m}</Badge>
+            ))}
+            <Badge tone="info">+6 more</Badge>
+          </div>
+          <p>Your school chooses which modules are turned on.</p>
+        </>
+      }
     >
       {verifyEmailStep ? (
         <>
-          <h1 className="cb-auth-title">Confirm your email</h1>
-          <p className="cb-auth-subtitle">
-            Enter the 6-digit code we sent to <strong style={{ color: 'var(--ink)', fontWeight: 600 }}>{formData.email}</strong>.
-          </p>
+          <div className="cb-auth-head">
+            <h1 className="cb-auth-title">Confirm your email</h1>
+            <p className="cb-auth-subtitle">
+              Enter the 6-digit code we sent to <strong>{formData.email}</strong>.
+            </p>
+          </div>
 
-          <form className="cb-auth-form" noValidate onSubmit={handleVerifyEmail}>
+          <form className="cb-auth-form" style={{ marginTop: 0 }} noValidate onSubmit={handleVerifyEmail}>
             {verifySuccessMessage && !verifyError ? <Callout tone="success">{verifySuccessMessage}</Callout> : null}
             <TextField
               id="verifyOtp"
@@ -265,6 +280,7 @@ const Login: React.FC = () => {
               autoComplete="one-time-code"
               maxLength={6}
               hint="6 digits"
+              error={verifyError}
               value={verifyOtp}
               onChange={(e) => {
                 setVerifyOtp(e.target.value.replace(/\D/g, '').slice(0, 6))
@@ -272,13 +288,7 @@ const Login: React.FC = () => {
               }}
               autoFocus
             />
-            {verifyError ? <Callout>{verifyError}</Callout> : null}
-            <Button
-              type="submit"
-              iconRight={ArrowRight}
-              loading={verifyLoading}
-              loadingLabel="Verifying"
-            >
+            <Button type="submit" iconRight={ArrowRight} loading={verifyLoading} loadingLabel="Verifying">
               Verify and sign in
             </Button>
             <Button variant="secondary" icon={RefreshCw} onClick={handleResendVerification} loading={resendLoading} loadingLabel="Sending">
@@ -286,12 +296,10 @@ const Login: React.FC = () => {
             </Button>
           </form>
 
-          <p className="cb-auth-alt">
-            Wrong account?{' '}
+          <div className="cb-auth-back">
             <button
               type="button"
               className="cb-btn-link"
-              style={{ padding: 0, fontWeight: 600 }}
               onClick={() => {
                 setVerifyEmailStep(false)
                 setVerifyOtp('')
@@ -301,16 +309,18 @@ const Login: React.FC = () => {
             >
               Back to sign in
             </button>
-          </p>
+          </div>
         </>
       ) : (
         <>
-          <h1 className="cb-auth-title">Sign in to your workspace</h1>
-          <p className="cb-auth-subtitle">
-            Use the email address or username your school gave you. One account opens every module.
-          </p>
+          <div className="cb-auth-head">
+            <h1 className="cb-auth-title">Sign in to Capabble</h1>
+            <p className="cb-auth-subtitle">
+              Use your workspace account. It works across every module your school has turned on.
+            </p>
+          </div>
 
-          <form className="cb-auth-form" noValidate onSubmit={handleLogin}>
+          <form className="cb-auth-form" style={{ marginTop: 0 }} noValidate onSubmit={handleLogin}>
             <TextField
               id="email"
               name="email"
@@ -320,6 +330,7 @@ const Login: React.FC = () => {
               autoComplete="username"
               autoCapitalize="none"
               spellCheck={false}
+              error={fieldErrors.email}
               value={formData.email}
               onChange={handleInputChange}
             />
@@ -339,37 +350,40 @@ const Login: React.FC = () => {
               />
             ) : null}
 
-            <TextField
-              id="password"
-              name="password"
-              label="Password"
-              icon={Lock}
-              type={showPassword ? 'text' : 'password'}
-              autoComplete="current-password"
-              labelAside={<Link to="/forgot-password">Forgot password?</Link>}
-              value={formData.password}
-              onChange={handleInputChange}
-            />
-
-            <div className="cb-auth-checks">
-              <Checkbox label="Show password" checked={showPassword} onChange={setShowPassword} />
-              <Checkbox label="Stay signed in" checked={rememberMe} onChange={setRememberMe} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <TextField
+                id="password"
+                name="password"
+                label="Password"
+                icon={Lock}
+                type={showPassword ? 'text' : 'password'}
+                autoComplete="current-password"
+                error={fieldErrors.password}
+                value={formData.password}
+                onChange={handleInputChange}
+              />
+              <div className="cb-auth-row">
+                <Checkbox label="Show password" checked={showPassword} onChange={setShowPassword} />
+                <Link to="/forgot-password">Forgot password?</Link>
+              </div>
             </div>
+
+            <Checkbox
+              label="Keep me signed in on this device"
+              description="Don't use this on a shared computer."
+              checked={rememberMe}
+              onChange={setRememberMe}
+            />
 
             {activeError ? <Callout>{activeError}</Callout> : null}
 
-            <Button
-              type="submit"
-              iconRight={ArrowRight}
-              loading={busy}
-              loadingLabel="Signing in"
-            >
+            <Button type="submit" iconRight={ArrowRight} loading={busy} loadingLabel="Signing in">
               Sign in
             </Button>
           </form>
 
           <p className="cb-auth-alt">
-            New to Capabble? <Link to="/signup">Create a workspace account</Link>
+            New school on Capabble? <Link to="/signup">Create a workspace account</Link>
           </p>
         </>
       )}

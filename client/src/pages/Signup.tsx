@@ -3,8 +3,9 @@ import { Link, useNavigate } from 'react-router-dom'
 import { ArrowRight, Building2, LayoutGrid, Lock, Mail, School } from 'lucide-react'
 import toast from 'react-hot-toast'
 import tenantSignupService from '@/services/tenantSignupService'
-import AuthLayout from '@/components/auth/capabble/AuthLayout'
-import { Button, Callout, Checkbox, StrengthMeter, TextField, type StrengthLevel } from '@/components/auth/capabble/controls'
+import AuthLayout, { StepsCard } from '@/components/auth/capabble/AuthLayout'
+import { Button, Callout, Checkbox, StrengthMeter, TextField } from '@/components/auth/capabble/controls'
+import { getPasswordStrength, MISMATCH_ERROR, PASSWORD_ERROR, PASSWORD_RULE } from '@/components/auth/capabble/password'
 
 function toSlug(value: string): string {
   return value
@@ -15,18 +16,6 @@ function toSlug(value: string): string {
     .replace(/-+/g, '-')
     .replace(/^-+|-+$/g, '')
 }
-
-// Mirrors publicTenantSignupStartSchema on the server: 8–128 characters with a
-// lowercase letter, an uppercase letter, a digit and one of !@#$%^&*.
-const meetsPasswordPolicy = (p: string) =>
-  p.length >= 8 && p.length <= 128 && /[a-z]/.test(p) && /[A-Z]/.test(p) && /\d/.test(p) && /[!@#$%^&*]/.test(p)
-
-function getPasswordStrength(password: string): StrengthLevel {
-  if (!meetsPasswordPolicy(password)) return 1
-  return password.length >= 12 ? 3 : 2
-}
-
-const PASSWORD_RULE = 'At least 8 characters, with upper and lower case letters, a number and one of ! @ # $ % ^ & *'
 
 type Field = 'schoolCode' | 'affiliationNo' | 'name' | 'email' | 'password' | 'confirm'
 type Errors = Partial<Record<Field, string>>
@@ -76,8 +65,8 @@ const Signup: React.FC = () => {
     if (!/^\d{6}$/.test(affiliationNo)) next.affiliationNo = 'Enter the 6-digit affiliation no.'
     if (!nameOfSchool.trim() || !slug) next.name = 'Enter your institution name'
     if (!/^\S+@\S+\.\S+$/.test(adminEmail.trim())) next.email = 'Enter an email address like name@yourschool.in'
-    if (strength < 2) next.password = `Use ${PASSWORD_RULE.charAt(0).toLowerCase()}${PASSWORD_RULE.slice(1)}`
-    else if (confirmPassword !== password) next.confirm = "This doesn't match the password above"
+    if (strength < 2) next.password = PASSWORD_ERROR
+    else if (confirmPassword !== password) next.confirm = MISMATCH_ERROR
     return next
   }
 
@@ -134,27 +123,32 @@ const Signup: React.FC = () => {
 
   return (
     <AuthLayout
+      layout="signup"
       headline={
         <>
           Set up your school <span className="cb-auth-accent">once.</span>
         </>
       }
       subline="One workspace account opens every module your school uses."
-      steps={{
-        title: 'Three steps to get started',
-        items: [
-          { icon: Building2, title: 'Add your institution', detail: 'Code, affiliation no. and name' },
-          { icon: Mail, title: 'Confirm your email', detail: 'We email you a 6-digit code' },
-          { icon: LayoutGrid, title: 'Open any module', detail: 'Exams, exam centre, fees and more' },
-        ],
-      }}
+      card={
+        <StepsCard
+          title="Three steps to get started"
+          items={[
+            { icon: Building2, title: 'Add your institution', detail: 'Code, affiliation no. and name' },
+            { icon: Mail, title: 'Confirm your email', detail: 'We email you a 6-digit code' },
+            { icon: LayoutGrid, title: 'Open any module', detail: 'Exams, exam centre, fees and more' },
+          ]}
+        />
+      }
     >
-      <h1 className="cb-auth-title">Create your workspace account</h1>
-      <p className="cb-auth-subtitle">
-        Set up your institution once and use the same Capabble account in every module your school has turned on.
-      </p>
+      <div className="cb-auth-head">
+        <h1 className="cb-auth-title">Create your workspace account</h1>
+        <p className="cb-auth-subtitle">
+          Set up your institution once and use the same Capabble account in every module your school has turned on.
+        </p>
+      </div>
 
-      <form className="cb-auth-form" noValidate onSubmit={handleSubmit}>
+      <form className="cb-auth-form" style={{ marginTop: 0 }} noValidate onSubmit={handleSubmit}>
         <div className="cb-auth-section">
           <p className="cb-auth-section-label">Institution</p>
           <div className="cb-auth-pair">

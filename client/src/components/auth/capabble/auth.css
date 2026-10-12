@@ -36,9 +36,15 @@
   flex: 1 1 52%;
   height: 100vh;
   overflow: hidden;
-  background: var(--surface-sunken);
+  background: var(--surface-hover);
   color: var(--ink);
 }
+@media (min-width: 1024px) {
+  .cb-auth[data-layout="signin"] .cb-auth-photo { flex-basis: 56%; }
+  .cb-auth[data-layout="signin"] .cb-auth-main { flex-basis: 44%; }
+}
+.cb-auth[data-layout="signin"] { --photo-pos: 62% 28%; --photo-pos-wide: 72% 30%; --form-max: 420px; }
+.cb-auth[data-layout="signup"] { --photo-pos: 55% 30%; --photo-pos-wide: 68% 35%; --form-max: 480px; }
 .cb-auth-photo picture,
 .cb-auth-photo img {
   position: absolute;
@@ -49,7 +55,7 @@
 }
 .cb-auth-photo img {
   object-fit: cover;
-  object-position: 55% 30%;
+  object-position: var(--photo-pos, 55% 30%);
   animation: cb-auth-fade 0.4s ease both;
 }
 @keyframes cb-auth-fade {
@@ -100,30 +106,65 @@
   letter-spacing: -0.035em;
 }
 .cb-auth-intro p {
+  max-width: 320px;
   margin: var(--space-3) 0 0;
   font-size: 16px;
   line-height: 24px;
   color: var(--ink-muted);
 }
-.cb-auth-steps {
+.cb-auth-card {
   position: absolute;
   left: 56px;
   bottom: var(--space-12);
   z-index: 1;
   width: 340px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
   padding: var(--space-5);
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-overlay);
 }
-.cb-auth-steps h3 {
-  margin: 0 0 var(--space-3);
+.cb-auth-card p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink-muted);
+}
+.cb-auth-card ul {
+  margin: 0;
+  padding: 0 0 0 18px;
+  list-style: disc;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink-muted);
+}
+.cb-auth-card-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.cb-auth-card-title {
   font-size: 15px;
   line-height: 22px;
   font-weight: 600;
 }
-.cb-auth-steps ol {
+.cb-auth-card-link {
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 600;
+}
+.cb-auth-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.cb-auth-steps {
   margin: 0;
   padding: 0;
   list-style: none;
@@ -133,7 +174,7 @@
 }
 .cb-auth-steps li {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: var(--space-3);
 }
 .cb-auth-step-icon {
@@ -180,7 +221,7 @@
   flex-direction: column;
   justify-content: center;
   width: 100%;
-  max-width: 480px;
+  max-width: var(--form-max, 480px);
   margin: 0 auto;
 }
 .cb-auth-title {
@@ -233,13 +274,15 @@
 }
 .cb-auth-alt a {
   font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 .cb-auth-footer {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2) var(--space-4);
   width: 100%;
-  max-width: 480px;
+  max-width: var(--form-max, 480px);
   margin: var(--space-8) auto 0;
   font-size: 13px;
   line-height: 18px;
@@ -247,6 +290,8 @@
 }
 .cb-auth .cb-auth-footer a {
   color: var(--ink-muted);
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 .cb-auth .cb-auth-footer a:hover {
   color: var(--accent-strong-hover);
@@ -267,8 +312,8 @@
   gap: var(--space-3);
 }
 .cb-field-label {
-  font-size: 14px;
-  line-height: 20px;
+  font-size: 13px;
+  line-height: 18px;
   font-weight: 500;
   color: var(--ink);
 }
@@ -393,6 +438,128 @@
   margin: -8px 0;
 }
 
+.cb-check[data-described] {
+  align-items: flex-start;
+  min-height: 0;
+}
+.cb-check[data-described] input {
+  margin-top: 1px;
+}
+.cb-check-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.cb-check-desc {
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink-muted);
+}
+.cb-auth-row {
+  margin: -6px 0 -10px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0 12px;
+}
+.cb-auth-row a {
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 500;
+}
+
+/* ---------- Badges ---------- */
+
+.cb-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+  white-space: nowrap;
+  background: var(--neutral-soft);
+  color: var(--neutral-ink);
+}
+.cb-badge[data-tone="info"] {
+  background: var(--info-soft);
+  color: var(--info-ink);
+}
+
+/* ---------- Status screens (email sent, password changed, code expired) ---------- */
+
+.cb-auth-status-icon {
+  display: inline-flex;
+  width: 48px;
+  height: 48px;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-lg);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+.cb-auth-status-icon[data-tone="success"] {
+  background: var(--success-soft);
+  color: var(--success-ink);
+}
+.cb-auth-status-icon[data-tone="warning"] {
+  background: var(--warning-soft);
+  color: var(--warning-ink);
+}
+.cb-auth-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-bottom: 28px;
+}
+.cb-auth-head .cb-auth-subtitle {
+  margin: 0;
+}
+.cb-auth-head strong {
+  color: var(--ink);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.cb-auth-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-radius: 8px;
+  background: var(--surface-sunken);
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--ink-muted);
+}
+.cb-auth-panel strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+.cb-auth-panel .cb-btn {
+  width: auto;
+}
+.cb-auth-note {
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink-muted);
+}
+.cb-auth-back {
+  margin-top: var(--space-6);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+}
+.cb-auth .cb-auth-back a,
+.cb-auth .cb-auth-back button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  font: 600 14px/20px var(--font-sans);
+}
+
 /* ---------- Buttons ---------- */
 
 .cb-btn {
@@ -423,6 +590,20 @@
 }
 .cb-btn-secondary:hover:not(:disabled) {
   background: var(--surface-hover);
+}
+.cb-btn-tertiary {
+  width: auto;
+  align-self: flex-start;
+  background: transparent;
+  color: var(--accent-strong);
+}
+.cb-btn-tertiary:hover:not(:disabled) {
+  background: var(--surface-hover);
+  color: var(--accent-strong-hover);
+}
+.cb-auth a.cb-btn-primary,
+.cb-auth a.cb-btn-primary:hover {
+  color: var(--on-accent);
 }
 .cb-btn:disabled {
   cursor: not-allowed;
@@ -521,7 +702,7 @@
 /* ---------- Responsive ---------- */
 
 @media (max-height: 700px) and (min-width: 1024px) {
-  .cb-auth-steps { display: none; }
+  .cb-auth-card { display: none; }
 }
 
 @media (max-width: 1023px) {
@@ -534,14 +715,14 @@
     height: 300px;
   }
   .cb-auth-photo img {
-    object-position: 68% 35%;
+    object-position: var(--photo-pos-wide, 68% 35%);
   }
   .cb-auth-brand {
     top: 24px;
     left: 32px;
   }
   .cb-auth-intro,
-  .cb-auth-steps {
+  .cb-auth-card {
     display: none;
   }
   .cb-auth-main {
@@ -579,4 +760,9 @@
   .cb-progress-fill {
     transition: none;
   }
+}
+
+/* Headings get focus when a step changes (for screen readers); they aren't interactive, so no ring. */
+.cb-auth h1[tabindex="-1"]:focus {
+  outline: none;
 }

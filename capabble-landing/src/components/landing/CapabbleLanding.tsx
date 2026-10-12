@@ -1642,6 +1642,7 @@ export function CapabbleLanding({ loginUrl, signupUrl }: Props) {
               <a href="#platform">For schools</a>
               <a href="#how">How we work</a>
               <a href="#stories">Client stories</a>
+              <a href="/help">Help centre</a>
             </nav>
             <div data-reveal="up" style={{ transitionDelay: ".7s", display: "flex", flexDirection: "column", gap: 12, fontSize: 14, lineHeight: "20px", color: "var(--ink-muted)" }}>
               <span style={{ fontSize: 13, lineHeight: "18px", fontWeight: 600, letterSpacing: "0.08em", color: "var(--ink)" }}>CONTACT</span>
@@ -1667,6 +1668,11 @@ export function CapabbleLanding({ loginUrl, signupUrl }: Props) {
           </div>
           <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", gap: 12, paddingTop: 24, borderTop: "1px solid var(--border)", fontSize: 13, lineHeight: "18px", color: "var(--ink-subtle)" }}>
             <span>© 2026 Capabble Platforms LLP. All rights reserved.</span>
+            <span style={{ display: "flex", flexWrap: "wrap", gap: "8px 20px" }}>
+              <a href="/privacy">Privacy policy</a>
+              <a href="/terms">Terms of use</a>
+              <a href="/help">Help</a>
+            </span>
           </div>
         </div>
       </footer>
