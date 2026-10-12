@@ -4,14 +4,20 @@
     {
       "name": "server",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
       "cwd": "server",
       "port": 5000
     },
     {
       "name": "client",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
       "cwd": "client",
       "port": 5173,
       "autoPort": true
@@ -19,23 +25,46 @@
     {
       "name": "admin",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
       "cwd": "admin",
       "port": 5174
     },
     {
       "name": "schol",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
       "cwd": "schol",
       "port": 5175
     },
     {
       "name": "school-intel-api",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "school-intel:api"],
+      "runtimeArgs": [
+        "run",
+        "school-intel:api"
+      ],
       "cwd": ".",
       "port": 8001
+    },
+    {
+      "name": "landing",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--",
+        "--webpack",
+        "-p",
+        "3100"
+      ],
+      "cwd": "capabble-landing",
+      "port": 3100
     }
   ]
 }
