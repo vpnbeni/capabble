@@ -28,80 +28,83 @@ const CpitlPayments: React.FC = () => {
   return (
     <CpitlPageShell title="Receipts" subtitle="Day book of all fee receipts">
       <CpitlCard>
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="flex shrink-0 gap-1">
-            {presets.map((p) => (
-              <button
-                key={p.label}
-                type="button"
-                onClick={() => set({ from: p.from, to: isoDaysAgo(0) })}
-                className={`rounded-full border px-2.5 py-1 text-xs font-medium ${
-                  filters.from === p.from && filters.to === isoDaysAgo(0)
-                    ? 'border-indigo-500 bg-indigo-50 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-200'
-                    : 'border-slate-200 text-slate-600 dark:border-slate-600 dark:text-slate-300'
-                }`}
-              >
-                {p.label}
-              </button>
-            ))}
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+            <div className="flex gap-1">
+              {presets.map((p) => (
+                <button
+                  key={p.label}
+                  type="button"
+                  onClick={() => set({ from: p.from, to: isoDaysAgo(0) })}
+                  className={`rounded-full border px-2.5 py-1 text-xs font-medium ${
+                    filters.from === p.from && filters.to === isoDaysAgo(0)
+                      ? 'border-indigo-500 bg-indigo-50 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-200'
+                      : 'border-slate-200 text-slate-600 dark:border-slate-600 dark:text-slate-300'
+                  }`}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+            <div className="hidden h-5 w-px bg-slate-200 sm:block dark:bg-slate-600" aria-hidden />
+            <div className="flex items-center gap-1.5">
+              <input
+                type="date"
+                className={`${inputClass} !mt-0 !w-[9.5rem]`}
+                value={filters.from}
+                onChange={(e) => set({ from: e.target.value })}
+              />
+              <span className="text-xs text-slate-400">to</span>
+              <input
+                type="date"
+                className={`${inputClass} !mt-0 !w-[9.5rem]`}
+                value={filters.to}
+                onChange={(e) => set({ to: e.target.value })}
+              />
+            </div>
           </div>
 
-          <div className="flex items-center gap-1.5">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            <select
+              className={`${inputClass} !mt-0`}
+              value={filters.mode}
+              onChange={(e) => set({ mode: e.target.value })}
+            >
+              <option value="">All modes</option>
+              {Object.entries(MODE_LABELS).map(([k, v]) => (
+                <option key={k} value={k}>
+                  {v}
+                </option>
+              ))}
+            </select>
+            <select
+              className={`${inputClass} !mt-0`}
+              value={filters.class}
+              onChange={(e) => set({ class: e.target.value })}
+            >
+              <option value="">All classes</option>
+              {classes.map((c) => (
+                <option key={c.class} value={c.class}>
+                  Class {c.class}
+                </option>
+              ))}
+            </select>
+            <select
+              className={`${inputClass} !mt-0`}
+              value={filters.status}
+              onChange={(e) => set({ status: e.target.value })}
+            >
+              <option value="">Valid & cancelled</option>
+              <option value="valid">Valid</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
             <input
-              type="date"
-              className={`${inputClass} !mt-0 !w-[9.5rem] shrink-0`}
-              value={filters.from}
-              onChange={(e) => set({ from: e.target.value })}
-            />
-            <span className="text-xs text-slate-400">to</span>
-            <input
-              type="date"
-              className={`${inputClass} !mt-0 !w-[9.5rem] shrink-0`}
-              value={filters.to}
-              onChange={(e) => set({ to: e.target.value })}
+              className={`${inputClass} !mt-0`}
+              placeholder="Receipt no. / student"
+              value={filters.q}
+              onChange={(e) => set({ q: e.target.value })}
             />
           </div>
-
-          <select
-            className={`${inputClass} !mt-0 !w-auto shrink-0`}
-            value={filters.mode}
-            onChange={(e) => set({ mode: e.target.value })}
-          >
-            <option value="">All modes</option>
-            {Object.entries(MODE_LABELS).map(([k, v]) => (
-              <option key={k} value={k}>
-                {v}
-              </option>
-            ))}
-          </select>
-          <select
-            className={`${inputClass} !mt-0 !w-auto shrink-0`}
-            value={filters.class}
-            onChange={(e) => set({ class: e.target.value })}
-          >
-            <option value="">All classes</option>
-            {classes.map((c) => (
-              <option key={c.class} value={c.class}>
-                Class {c.class}
-              </option>
-            ))}
-          </select>
-          <select
-            className={`${inputClass} !mt-0 !w-auto shrink-0`}
-            value={filters.status}
-            onChange={(e) => set({ status: e.target.value })}
-          >
-            <option value="">Valid & cancelled</option>
-            <option value="valid">Valid</option>
-            <option value="cancelled">Cancelled</option>
-          </select>
-
-          <input
-            className={`${inputClass} !mt-0 min-w-[12rem] flex-1 !w-auto`}
-            placeholder="Receipt no. / student"
-            value={filters.q}
-            onChange={(e) => set({ q: e.target.value })}
-          />
         </div>
 
         <div className="mt-4 flex gap-6 rounded-xl bg-slate-50 px-4 py-3 text-sm dark:bg-slate-900/40">
