@@ -32,7 +32,7 @@ const platformContextMiddleware = async (req, res, next) => {
   try {
     const resolution = resolveTenantFromRequest(req);
     const rootApiDomain = (process.env.ROOT_API_DOMAIN || 'api.capabble.cloud').toLowerCase();
-    const rootAppDomain = (process.env.ROOT_APP_DOMAIN || 'cntr.capabble.cloud').toLowerCase();
+    const rootAppDomain = (process.env.ROOT_APP_DOMAIN || 'school.capabble.cloud').toLowerCase();
     const isRequestToRootApiHost = resolution.host === rootApiDomain;
 
     console.log('[platform-debug]', {

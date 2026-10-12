@@ -188,7 +188,7 @@ DNS cutover — remove the hosts-file entry afterward.
 ## 10. Post-cutover verification
 
 - [ ] `curl -i https://<real-api-domain>/health` and `/api` from outside.
-- [ ] Log into the actual client app (`cntr.capabble.cloud` / `sems.capabble.cloud`, whichever is
+- [ ] Log into the actual client app (`school.capabble.cloud` / `sems.capabble.cloud`, whichever is
       live — see the domain-model note below) and exercise a real flow: login, load a tenant
       dashboard, one write action.
 - [ ] Watch `pm2 logs sems-server sems-stage --lines 200` on the new box for errors during first
@@ -197,7 +197,7 @@ DNS cutover — remove the hosts-file entry afterward.
       must match whatever frontend origin is actually calling this API.
 
 > **Domain-model discrepancy found during exploration:** `PROJECT_OVERVIEW.md` describes
-> subdomain-based tenant resolution via `cntr.capabble.cloud`, while `server/.env.example` and
+> subdomain-based tenant resolution via `school.capabble.cloud`, while `server/.env.example` and
 > CLAUDE.md describe a newer single-URL model at `sems.capabble.cloud`. Confirm which is actually
 > live in production before assuming which client origin needs to keep working post-cutover.
 

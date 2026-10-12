@@ -7,8 +7,8 @@ const caveat = Caveat({ subsets: ["latin"], weight: ["600"], variable: "--font-c
 
 // School OS (the tenant app) lives on its own origin; stage builds point at the stage app.
 function getSchoolOsOrigin(host: string): string {
-  if (host.startsWith("stage.")) return "https://stagecntr.capabble.cloud";
-  return "https://cntr.capabble.cloud";
+  if (host.startsWith("stage.")) return "https://stageschool.capabble.cloud";
+  return "https://school.capabble.cloud";
 }
 
 export default async function Home() {

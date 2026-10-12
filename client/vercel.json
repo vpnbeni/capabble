@@ -3,6 +3,31 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "installCommand": "npm install",
+  "ignoreCommand": "npx turbo-ignore@2.11.7",
+  "redirects": [
+    {
+      "source": "/:path*",
+      "has": [
+        {
+          "type": "host",
+          "value": "cntr.capabble.cloud"
+        }
+      ],
+      "destination": "https://school.capabble.cloud/:path*",
+      "permanent": true
+    },
+    {
+      "source": "/:path*",
+      "has": [
+        {
+          "type": "host",
+          "value": "stagecntr.capabble.cloud"
+        }
+      ],
+      "destination": "https://stageschool.capabble.cloud/:path*",
+      "permanent": true
+    }
+  ],
   "rewrites": [
     {
       "source": "/(.*)",

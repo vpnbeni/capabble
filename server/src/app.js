@@ -58,7 +58,7 @@ const getAllowedOrigins = () => {
 };
 
 const allowedOrigins = getAllowedOrigins();
-const rootAppDomain = (process.env.ROOT_APP_DOMAIN || 'cntr.capabble.cloud').toLowerCase();
+const rootAppDomain = (process.env.ROOT_APP_DOMAIN || 'school.capabble.cloud').toLowerCase();
 
 const isAllowedOrigin = (origin) => {
   if (!origin) {
