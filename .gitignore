@@ -121,3 +121,6 @@ public/uploads/
 *.db
 .vercel
 .env*.local
+
+# Turborepo
+.turbo

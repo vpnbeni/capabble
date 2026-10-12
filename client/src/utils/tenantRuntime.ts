@@ -42,7 +42,7 @@ const decodeJwtPayload = (token: string | null): Record<string, any> | null => {
   }
 };
 
-export const getRootAppDomain = () => import.meta.env.VITE_ROOT_APP_DOMAIN || 'cntr.capabble.cloud';
+export const getRootAppDomain = () => import.meta.env.VITE_ROOT_APP_DOMAIN || 'school.capabble.cloud';
 export const getRootApiDomain = () => import.meta.env.VITE_ROOT_API_DOMAIN || 'api.capabble.cloud';
 const trimTrailingSlash = (value: string) => value.replace(/\/+$/, '');
 

@@ -643,7 +643,7 @@ Vite's dev proxy (`vite.config.ts`) forwards `/api` to `localhost:5000`.
 
 | App | Domain | Platform | Notes |
 |---|---|---|---|
-| Main client | `cntr.capabble.cloud` | Vercel | `client/vercel.json` + Vercel project |
+| Main client | `school.capabble.cloud` | Vercel | `client/vercel.json` + Vercel project |
 | Admin portal | _(separate)_ | Vercel | `admin/vercel.json` |
 | Company landing | `capabble.cloud` | Vercel | `capabble-landing/` Next.js 15 |
 | Backend API | `api.capabble.cloud` | _(Render/Railway/VPS)_ | `server/ecosystem.config.js` (PM2) + `render.yaml` |
@@ -652,7 +652,7 @@ Vite's dev proxy (`vite.config.ts`) forwards `/api` to `localhost:5000`.
 
 Each request identifies its tenant via (in priority order):
 1. `x-tenant-slug` request header (client explicitly sends this)
-2. Subdomain: `{slug}.cntr.capabble.cloud` → slug = `{slug}`
+2. Subdomain: `{slug}.school.capabble.cloud` → slug = `{slug}`
 3. Query param: `?tenant={slug}` (fallback for dev)
 
 The client stores and sends `x-tenant-slug` on every authenticated request (computed from the user's tenant slug stored in the JWT payload / Redux auth state).

@@ -82,12 +82,12 @@ CAPABBLE ERP is a multi-tenant, full-stack MERN application providing modular sc
 ## Deployment & Domains
 
 - **schol.capabble.localhost:5175** — Local SCHOL UI (`/schol` + `/school-intelligence` API on port 8001). Start with `npm run dev:schol`. Optional bare host `schol.capabble` via `schol/scripts/setup-local-host.ps1` (Windows, admin).
-- **cntr.capabble.cloud** — Production deployment of the `/client` app on Vercel. This is the main product website for "Cntr – Exam Centre Control".
+- **school.capabble.cloud** (stage: stageschool.capabble.cloud) — Production deployment of the `/client` app on Vercel (formerly cntr.capabble.cloud, which 301-redirects here via `client/vercel.json`). This is the main product website for "Cntr – Exam Centre Control".
   - `/` (root) → shows `CntrLanding` page (public marketing landing page) when not authenticated
   - `/login` → Login page
   - `/signup` → Signup / tenant onboarding
   - Authenticated users are redirected to `/dashboard` or `/select-session`
-- **capabble.cloud** — Separate repo (`capabble-landing`) deployed on Vercel. This is the parent company (CAPABBLE) main website. Cntr is one of the products under CAPABBLE.
+- **capabble.cloud** — `/capabble-landing` (Next.js) in this repo, deployed as its own Vercel project. This is the parent company (CAPABBLE) main website. Cntr is one of the products under CAPABBLE.
 
 ## Development Commands
 
@@ -151,6 +151,16 @@ npm run backfill:tenant-user-directory # Backfill tenant user directory
 - `/client` - React 18 + TypeScript + Vite frontend (port 5173)
 - `/server` - Node.js + Express backend with MongoDB (port 5000)
 - `/admin` - React 18 + TypeScript + Vite admin portal (port 5174)
+- `/schol` + `/school-intelligence` - SCHOL UI + Python API
+- `/capabble-landing` - Next.js marketing site (capabble.cloud)
+- `/billing-service` - Standalone billing service
+- `/packages/shared` - `@capabble/shared`: code/data used by more than one app (e.g. `tenantFeatureCatalog.json`)
+
+**npm workspaces + Turborepo**: `client`, `admin`, `schol`, `capabble-landing` and `packages/*` are workspaces sharing one root `package-lock.json` — run `npm install` from the root, never inside an app. `npm run build:all` / `npm run type-check` run through Turborepo.
+
+`server`, `billing-service` and `school-intelligence` are **not** workspaces (server deploys standalone to EC2 via `cd server && npm ci`). Server gets shared files as committed copies: edit `packages/shared`, then `npm run sync:shared`; `npm run lint` fails if the copy drifts.
+
+Each frontend `vercel.json` has `ignoreCommand: npx turbo-ignore`, so a Vercel project only rebuilds when its app or a workspace it depends on changed.
 
 ### Multi-Tenancy
 
