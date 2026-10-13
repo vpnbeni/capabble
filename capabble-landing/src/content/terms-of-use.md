@@ -85,7 +85,7 @@ If you send us suggestions, we may use them to improve Capabble without owing yo
 
 ## Governing law
 
-These terms are governed by the laws of India. The courts of [city] have jurisdiction over any dispute.
+These terms are governed by the laws of India. The courts of Jhajjar, Haryana have jurisdiction over any dispute.
 
 ## Changes and contact
 

@@ -1,8 +1,7 @@
 /*
  * Business facts used on the Help, Privacy and Terms pages.
  *
- * Each value is still the bracketed placeholder from the draft. Replace a value
- * here and it updates everywhere it is used. A production build fails while any
+ * Replace a value here and it updates everywhere it is used. A production build fails while any
  * "[…]" placeholder is still rendered (scripts/check-placeholders.mjs).
  *
  * Placeholders that appear only once, inside the legal text itself (retention
@@ -10,14 +9,14 @@
  * in privacy-policy.md and terms-of-use.md.
  */
 export const legalFacts = {
-  legalEntityName: '[Capabble legal entity name]',
-  registeredAddress: '[registered address]',
-  supportEmail: '[support email]',
-  supportPhone: '[support phone]',
-  supportHours: '[Support hours, e.g. Mon–Sat, 9:00 am – 6:00 pm]',
-  legalContactEmail: '[legal contact email]',
-  privacyLastUpdated: '[date]',
-  termsLastUpdated: '[date]',
+  legalEntityName: 'Capabble Platforms LLP',
+  registeredAddress: 'H. No. 41, Village Godhri, PO Achhej, Tehsil Beri, District Jhajjar, Haryana 124106, India',
+  supportEmail: 'support@capabble.cloud',
+  supportPhone: '+91 90532 32597',
+  supportHours: 'Mon–Sat, 10:00 am – 7:00 pm IST',
+  legalContactEmail: 'support@capabble.cloud',
+  privacyLastUpdated: '13 October 2026',
+  termsLastUpdated: '13 October 2026',
 }
 
 /** Placeholder text in the markdown → the fact that replaces it. */

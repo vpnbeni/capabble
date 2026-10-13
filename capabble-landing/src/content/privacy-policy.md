@@ -65,15 +65,14 @@ Schools are responsible for getting verifiable consent from a parent or guardian
 
 We share personal data only with service providers who help us run Capabble, under contracts that limit their use of it to that work:
 
-- Hosting: [provider and region]
+- Hosting: Vercel (website) and Amazon Web Services, Mumbai region (application and data)
 - Email delivery: [provider]
-- [Any other sub-processors]
 
 We disclose data to authorities only when the law requires it. We do not sell personal data.
 
 ## Where it's kept, and for how long
 
-Data is stored in [country or region].
+Data is stored in India, in the Amazon Web Services Mumbai region.
 
 - Workspace account details: while the account is open, and for [N days] after it's closed.
 - School data: deleted or handed back to the school within [N days] of its agreement ending, as the school instructs.
