@@ -1,4 +1,5 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { Icon } from '@/components/ui'
 
 const shiftDate = (dateKey: string, delta: number) => {
   const next = new Date(`${dateKey}T00:00:00`)
@@ -8,11 +9,12 @@ const shiftDate = (dateKey: string, delta: number) => {
 }
 
 const formatDateLabel = (dateKey: string) => {
-  const [yearValue, monthValue, dayValue] = dateKey.split('-')
-  if (!yearValue || !monthValue || !dayValue) return dateKey
-  return `${dayValue}.${monthValue}.${yearValue.slice(-2)}`
+  const date = new Date(`${dateKey}T00:00:00`)
+  if (Number.isNaN(date.getTime())) return dateKey
+  return date.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })
 }
 
+/** Previous / next day stepper. Renders inside a `.cb-app` page. */
 export const DateSwitcher = ({
   value,
   onChange,
@@ -20,27 +22,27 @@ export const DateSwitcher = ({
   value: string
   onChange: (date: string) => void
 }) => (
-  <div className="inline-flex h-[34px] overflow-hidden rounded-lg border border-gray-300 bg-white dark:border-gray-600 dark:bg-gray-800">
+  <div className="attnd-stepper" role="group" aria-label="Date">
     <button
       type="button"
+      className="attnd-stepper__btn"
       title="Previous day"
       aria-label="Previous day"
       onClick={() => onChange(shiftDate(value, -1))}
-      className="flex items-center px-1.5 text-slate-500 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-gray-700"
     >
-      <ChevronLeft className="h-4 w-4" />
+      <Icon icon={ChevronLeft} size={16} />
     </button>
-    <div className="flex min-w-[84px] items-center justify-center border-x border-gray-300 px-2.5 text-sm font-semibold text-indigo-800 dark:border-gray-600 dark:text-indigo-200">
+    <span className="attnd-stepper__label" aria-live="polite">
       {formatDateLabel(value)}
-    </div>
+    </span>
     <button
       type="button"
+      className="attnd-stepper__btn"
       title="Next day"
       aria-label="Next day"
       onClick={() => onChange(shiftDate(value, 1))}
-      className="flex items-center px-1.5 text-slate-500 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-gray-700"
     >
-      <ChevronRight className="h-4 w-4" />
+      <Icon icon={ChevronRight} size={16} />
     </button>
   </div>
 )

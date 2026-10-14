@@ -508,11 +508,11 @@ const Header: React.FC<HeaderProps> = ({ isSidebarCollapsed, onToggleSidebar }) 
       case 'attnd': {
         const subPage = segments[1] || ''
         const titleMap: Record<string, { title: string; subtitle: string }> = {
-          attndboard: { title: 'Attndboard', subtitle: 'Attendance snapshot for staff and students' },
-          'staff-attendance': { title: 'Staff Attendance', subtitle: 'Mark and save daily staff attendance' },
-          'student-attendance': { title: 'Student Attendance', subtitle: 'Mark and save student attendance classwise or daywise' },
+          attndboard: { title: 'Attndboard', subtitle: 'Who is in today, and where absences are adding up.' },
+          'staff-attendance': { title: 'Staff attendance', subtitle: 'Tick the days each staff member was absent, then save.' },
+          'student-attendance': { title: 'Student attendance', subtitle: 'Tick the days each student was absent, then save.' },
         }
-        const info = titleMap[subPage] || { title: 'ATTND', subtitle: 'Attendance management workspace' }
+        const info = titleMap[subPage] || { title: 'Attendance', subtitle: 'Staff and student attendance for this session.' }
         return {
           pageTitle: info.title,
           pageSubtitle: info.subtitle,
