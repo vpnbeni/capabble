@@ -1,68 +1,53 @@
 import React, { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
+import { Archive, ExternalLink, Inbox, Package, Plus, Pencil } from 'lucide-react'
 import asetsService from '@/services/asetsService'
-import { AsetsCard, AsetsEmpty, AsetsStatusBadge, btnPrimary, btnSecondary } from '@/components/asets/AsetsUi'
-import { LOCATION_TYPE_META, childTypeForParent, normalizeLocationType } from '@/constants/locationConstants'
-import { formatMoney } from '@/constants/asetsConstants'
+import { AsetsStatusBadge } from '@/components/asets/AsetsUi'
+import {
+  Badge,
+  Button,
+  DataTable,
+  DetailList,
+  Dialog,
+  EmptyState,
+  Icon,
+  Menu,
+  Sheet,
+  Tabs,
+  cx,
+  formatDate,
+  formatINR,
+  orDash,
+} from '@/components/ui'
+import { childTypeForParent, normalizeLocationType } from '@/constants/locationConstants'
+import { isLocationInactive, locationIcon, locationLabel, locationTypeTone, plural } from './LocationTree'
+import './locations.css'
 
-type Props = {
-  locationId?: string
-  onAddChild: (parent: any, type: string) => void
-  onEdit: (record: any) => void
-  onArchived: () => void
-}
+/* ---------- Archive confirmation (shared by the canvas, the sheet and the full page) ---------- */
 
-const date = (value?: string) => (value ? new Date(value).toLocaleDateString('en-GB') : '—')
+export type ArchiveTarget = { id: string; name: string; childCount?: number; assetCount?: number }
 
-const LocationDetailPanel: React.FC<Props> = ({ locationId, onAddChild, onEdit, onArchived }) => {
-  const [data, setData] = useState<any>(null)
-  const [loading, setLoading] = useState(false)
+export const ArchiveLocationDialog: React.FC<{
+  target: ArchiveTarget | null
+  onClose: () => void
+  onArchived: (target: ArchiveTarget) => void
+}> = ({ target, onClose, onArchived }) => {
   const [archiving, setArchiving] = useState(false)
-  const [tab, setTab] = useState('overview')
+  const childCount = target?.childCount || 0
+  const assetCount = target?.assetCount || 0
+  const contents = [
+    childCount ? plural(childCount, 'sub-location', 'sub-locations') : '',
+    assetCount ? plural(assetCount, 'asset', 'assets') : '',
+  ].filter(Boolean)
 
-  useEffect(() => {
-    if (!locationId) {
-      setData(null)
-      return
-    }
-    setLoading(true)
-    void asetsService.getLocationOverview(locationId)
-      .then(setData)
-      .catch((error) => toast.error(error?.response?.data?.message || 'Failed to load location.'))
-      .finally(() => setLoading(false))
-  }, [locationId])
-
-  if (!locationId) {
-    return (
-      <AsetsCard>
-        <div className="py-16 text-center text-sm text-slate-500">Select a location from the tree to view details.</div>
-      </AsetsCard>
-    )
-  }
-
-  if (loading || !data) {
-    return <AsetsCard><div className="py-16 text-center text-sm text-slate-500">Loading location details...</div></AsetsCard>
-  }
-
-  const { location, parent, pathSegments = [], children = [], assets = [], summary } = data
-  const normalized = normalizeLocationType(location.type)
-  const meta = LOCATION_TYPE_META[normalized] || LOCATION_TYPE_META.Room
-  const childType = childTypeForParent(normalized)
-  const blocks = children.filter((child: any) => normalizeLocationType(child.type) === 'Block')
-  const floors = children.filter((child: any) => normalizeLocationType(child.type) === 'Floor')
-  const rooms = children.filter((child: any) => normalizeLocationType(child.type) === 'Room')
-
-  const archive = async () => {
-    const message = summary.childCount || summary.totalAssetCount
-      ? `This location contains:\n\n${summary.childCount || 0} sub-location(s)\n${summary.totalAssetCount || 0} asset(s)\n\nArchive anyway?`
-      : `Archive ${location.name}?`
-    if (!window.confirm(message)) return
+  const confirm = async () => {
+    if (!target) return
     setArchiving(true)
     try {
-      await asetsService.removeLocation(locationId)
+      await asetsService.removeLocation(target.id)
       toast.success('Location archived.')
-      onArchived()
+      onArchived(target)
     } catch (error: any) {
       toast.error(error?.response?.data?.message || 'Could not archive location.')
     } finally {
@@ -70,194 +55,335 @@ const LocationDetailPanel: React.FC<Props> = ({ locationId, onAddChild, onEdit, 
     }
   }
 
-  const tabs = ['overview', 'blocks', 'floors', 'rooms', 'assets', 'history']
-
   return (
-    <div className="space-y-4">
-      <AsetsCard>
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <span aria-hidden className="text-xl">{meta.icon}</span>
-              <h2 className="text-xl font-semibold text-slate-900 dark:text-white">{location.name}</h2>
-              <span className={`rounded-lg px-2.5 py-1 text-xs font-semibold uppercase ${meta.badge}`}>{meta.label}</span>
-            </div>
-            <div className="mt-2 text-sm text-slate-500">
-              {pathSegments.map((segment: any, index: number) => (
-                <span key={segment._id}>
-                  {index > 0 ? ' → ' : ''}
-                  {segment.name}
-                </span>
-              ))}
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {childType ? (
-              <button type="button" className={btnPrimary} onClick={() => onAddChild(location, childType)}>+ Add {childType}</button>
-            ) : null}
-            <button type="button" className={btnSecondary} onClick={() => onEdit(location)}>Edit</button>
-            {normalized !== 'Campus' ? (
-              <button type="button" disabled={archiving} className="rounded-xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-700 disabled:opacity-60" onClick={archive}>
-                {archiving ? 'Archiving...' : 'Archive'}
-              </button>
-            ) : null}
-          </div>
-        </div>
-
-        <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <Metric label="Direct assets" value={summary.assetCount} />
-          <Metric label="Total assets" value={summary.totalAssetCount} />
-          <Metric label="Asset value" value={formatMoney(summary.totalAssetValue || summary.assetValue)} />
-          <Metric label="Sub-locations" value={summary.childCount} />
-        </div>
-      </AsetsCard>
-
-      <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-2 dark:border-slate-700">
-        {tabs.map((key) => (
-          <button
-            key={key}
-            type="button"
-            className={`rounded-lg px-3 py-1.5 text-sm font-medium capitalize ${tab === key ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300' : 'text-slate-500 hover:text-slate-700'}`}
-            onClick={() => setTab(key)}
-          >
-            {key}
-          </button>
-        ))}
-      </div>
-
-      {tab === 'overview' ? (
-        <div className="grid gap-4 xl:grid-cols-2">
-          <AsetsCard>
-            <h3 className="font-semibold dark:text-white">Location Details</h3>
-            <dl className="mt-4 space-y-3 text-sm">
-              <Row label="Name" value={location.name} />
-              <Row label="Code" value={location.code || '—'} />
-              <Row label="Type" value={normalized} />
-              <Row label="Parent" value={parent?.name || 'School / Tenant'} />
-              {location.address ? <Row label="Address" value={location.address} /> : null}
-              {location.roomNumber ? <Row label="Room number" value={location.roomNumber} /> : null}
-              {location.className && location.section ? (
-                <Row label="Class & section" value={`${location.className} - ${location.section}`} />
-              ) : null}
-              {location.roomType ? <Row label="Room type" value={location.roomType} /> : null}
-              {location.capacityHint ? <Row label="Capacity" value={location.capacityHint} /> : null}
-              <Row label="Status" value={location.locationStatus || (location.isActive === false ? 'Inactive' : 'Active')} />
-              <Row label="Description" value={location.notes || '—'} />
-              <Row label="Created on" value={date(location.createdAt)} />
-              <Row label="Updated on" value={date(location.updatedAt)} />
-            </dl>
-          </AsetsCard>
-          <AsetsCard>
-            <h3 className="font-semibold dark:text-white">Location Hierarchy</h3>
-            <div className="mt-4 space-y-3 text-sm">
-              {pathSegments.map((segment: any, index: number) => (
-                <div key={segment._id} className="flex items-center gap-3">
-                  <div className="w-24 text-xs font-semibold uppercase text-slate-400">{normalizeLocationType(segment.type)}</div>
-                  <div className="font-medium text-slate-800 dark:text-slate-100">{segment.name}</div>
-                  {index < pathSegments.length - 1 ? <div className="text-slate-300">↓</div> : null}
-                </div>
-              ))}
-              {normalized === 'Campus' ? (
-                <>
-                  <HierarchyRow label="Blocks" value={summary.blocks || blocks.length} />
-                  <HierarchyRow label="Floors" value={summary.floors || floors.length} />
-                  <HierarchyRow label="Rooms" value={summary.rooms || rooms.length} />
-                </>
-              ) : null}
-              {normalized === 'Block' ? <HierarchyRow label="Floors" value={summary.floors || floors.length} /> : null}
-              {normalized === 'Floor' ? <HierarchyRow label="Rooms" value={`${summary.rooms || rooms.length} rooms`} /> : null}
-            </div>
-            <div className="mt-6 space-y-2">
-              <h4 className="text-sm font-semibold dark:text-white">Quick Actions</h4>
-              {childType ? (
-                <button type="button" className={btnPrimary} onClick={() => onAddChild(location, childType)}>Add {childType}</button>
-              ) : (
-                <Link className={btnSecondary} to={`/asets/assets?locationId=${location._id}`}>View Assets</Link>
-              )}
-            </div>
-          </AsetsCard>
-        </div>
-      ) : null}
-
-      {tab === 'blocks' ? <ChildList title="Blocks" items={blocks} empty="No blocks yet." actionLabel="+ Add Block" onAction={() => onAddChild(location, 'Block')} /> : null}
-      {tab === 'floors' ? <ChildList title="Floors" items={floors} empty="No floors yet." actionLabel="+ Add Floor" onAction={() => onAddChild(location, 'Floor')} /> : null}
-      {tab === 'rooms' ? <ChildList title="Rooms" items={rooms} empty="No rooms yet." actionLabel="+ Add Room" onAction={() => onAddChild(location, 'Room')} /> : null}
-
-      {tab === 'assets' ? (
-        <AsetsCard>
-          <h3 className="font-semibold dark:text-white">Assets at this location</h3>
-          {!assets.length ? <div className="mt-4"><AsetsEmpty message="No assets are currently assigned here." /></div> : (
-            <div className="mt-4 overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead className="border-b text-xs text-slate-500">
-                  <tr><th className="pb-2">Asset</th><th className="pb-2">Category</th><th className="pb-2">Status</th></tr>
-                </thead>
-                <tbody>
-                  {assets.map((asset: any) => (
-                    <tr key={asset._id} className="border-b border-slate-100 last:border-0 dark:border-slate-700">
-                      <td className="py-3"><Link className="font-medium text-indigo-600" to={`/asets/assets/${asset._id}`}>{asset.name}</Link></td>
-                      <td className="py-3 text-slate-600">{asset.categoryId?.name || '—'}</td>
-                      <td className="py-3"><AsetsStatusBadge status={asset.status} /></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </AsetsCard>
-      ) : null}
-
-      {tab === 'history' ? (
-        <AsetsCard>
-          <h3 className="font-semibold dark:text-white">History</h3>
-          <p className="mt-3 text-sm text-slate-500">Created on {date(location.createdAt)}. Updates and archive events are tracked through ASETS lifecycle records.</p>
-        </AsetsCard>
-      ) : null}
-    </div>
+    <Dialog
+      open={Boolean(target)}
+      onClose={archiving ? undefined : onClose}
+      tone="danger"
+      size="sm"
+      title={target ? `Archive ${target.name}?` : 'Archive location?'}
+      description={
+        contents.length
+          ? `It still contains ${contents.join(' and ')}. Archiving removes it from the location structure.`
+          : 'Archiving removes it from the location structure.'
+      }
+      footer={
+        <>
+          <Button onClick={onClose} disabled={archiving}>
+            Keep location
+          </Button>
+          <Button variant="danger" icon={Archive} loading={archiving} onClick={() => void confirm()}>
+            Archive location
+          </Button>
+        </>
+      }
+    />
   )
 }
 
-const Metric: React.FC<{ label: string; value: string | number }> = ({ label, value }) => (
-  <div className="rounded-xl bg-slate-50 px-4 py-3 text-center dark:bg-slate-900/40">
-    <div className="text-lg font-semibold dark:text-white">{value}</div>
-    <div className="text-xs text-slate-500">{label}</div>
-  </div>
-)
+/* ---------- Shared bits ---------- */
 
-const Row: React.FC<{ label: string; value: string | number }> = ({ label, value }) => (
-  <div className="grid grid-cols-[120px_1fr] gap-3">
-    <dt className="text-slate-500">{label}</dt>
-    <dd className="font-medium text-slate-800 dark:text-slate-100">{value}</dd>
-  </div>
-)
-
-const HierarchyRow: React.FC<{ label: string; value: string | number }> = ({ label, value }) => (
-  <div className="flex items-center gap-3 border-t border-slate-100 pt-3 dark:border-slate-700">
-    <div className="w-24 text-xs font-semibold uppercase text-slate-400">{label}</div>
-    <div className="font-medium text-slate-800 dark:text-slate-100">{value}</div>
-  </div>
-)
-
-const ChildList: React.FC<{ title: string; items: any[]; empty: string; actionLabel: string; onAction: () => void }> = ({
-  title, items, empty, actionLabel, onAction,
-}) => (
-  <AsetsCard>
-    <div className="flex items-center justify-between gap-3">
-      <h3 className="font-semibold dark:text-white">{title}</h3>
-      <button type="button" className="text-sm font-semibold text-indigo-600" onClick={onAction}>{actionLabel}</button>
-    </div>
-    {!items.length ? <div className="mt-4"><AsetsEmpty message={empty} /></div> : (
-      <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        {items.map((item) => (
-          <div key={item._id} className="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
-            <div className="text-xs font-semibold uppercase text-slate-400">{normalizeLocationType(item.type)}</div>
-            <div className="mt-1 font-semibold text-slate-900 dark:text-white">{item.name}</div>
-            <div className="mt-1 text-xs text-slate-500">{item.code || 'No code'}</div>
-          </div>
-        ))}
+export const LocationMetrics: React.FC<{ items: Array<{ label: string; value: React.ReactNode }> }> = ({ items }) => (
+  <div className="al-metrics">
+    {items.map((item) => (
+      <div key={item.label} className="al-metric">
+        <span className="al-metric__value">{item.value}</span>
+        <span className="al-metric__label">{item.label}</span>
       </div>
-    )}
-  </AsetsCard>
+    ))}
+  </div>
 )
+
+export const LocationPath: React.FC<{ segments: Array<{ _id?: string; name: string }> }> = ({ segments }) =>
+  segments.length ? (
+    <ol className="al-path" aria-label="Location path">
+      {segments.map((segment, index) => (
+        <li key={segment._id || index}>{segment.name}</li>
+      ))}
+    </ol>
+  ) : null
+
+/** Every field of a location record as DetailList items. */
+export const locationDetailItems = (location: any, parent?: any) => {
+  const type = String(normalizeLocationType(location.type))
+  return [
+    { label: 'Name', value: location.name },
+    { label: 'Code', value: orDash(location.code) },
+    { label: 'Type', value: type },
+    { label: 'Parent', value: parent?.name || 'School' },
+    ...(location.address ? [{ label: 'Address', value: location.address, wide: true }] : []),
+    ...(location.floorNumber ? [{ label: 'Floor number', value: location.floorNumber }] : []),
+    ...(location.roomNumber ? [{ label: 'Room number', value: location.roomNumber }] : []),
+    ...(location.className && location.section ? [{ label: 'Class and section', value: `${location.className}-${location.section}` }] : []),
+    ...(location.roomType ? [{ label: 'Room type', value: location.roomType }] : []),
+    ...(location.capacityHint ? [{ label: 'Capacity', value: location.capacityHint }] : []),
+    {
+      label: 'Status',
+      value: isLocationInactive(location) ? <Badge tone="neutral">Inactive</Badge> : <Badge tone="success">Active</Badge>,
+    },
+    { label: 'Created', value: formatDate(location.createdAt) },
+    { label: 'Updated', value: formatDate(location.updatedAt) },
+    { label: 'Description', value: orDash(location.notes), wide: true },
+  ]
+}
+
+export const LocationAssetsTable: React.FC<{ assets: any[]; showCustodian?: boolean }> = ({ assets, showCustodian }) => (
+  <DataTable
+    rows={assets}
+    getRowKey={(asset: any) => asset._id}
+    caption="Assets at this location"
+    columns={[
+      {
+        key: 'name',
+        header: 'Asset',
+        mobile: 'title',
+        render: (asset: any) => (
+          <span className="al-asset-name">
+            <Link to={`/asets/assets/${asset._id}`}>{asset.name}</Link>
+            {asset.assetId ? <span className="al-asset-name__id">{asset.assetId}</span> : null}
+          </span>
+        ),
+      },
+      { key: 'category', header: 'Category', mobile: 'subtitle', render: (asset: any) => orDash(asset.categoryId?.name) },
+      ...(showCustodian ? [{ key: 'custodian', header: 'Custodian', render: (asset: any) => orDash(asset.custodianName) }] : []),
+      { key: 'status', header: 'Status', mobile: 'aside' as const, render: (asset: any) => <AsetsStatusBadge status={asset.status} /> },
+    ]}
+    empty={<EmptyState icon={Package} title="No assets are assigned here" body="Allocate or transfer an asset to this location to see it listed." compact />}
+  />
+)
+
+/* ---------- Detail sheet ---------- */
+
+type Props = {
+  locationId?: string
+  open: boolean
+  /** Bump to reload after an edit or a new child. */
+  reloadKey?: number
+  onClose: () => void
+  onAddChild: (parent: any, type: string) => void
+  onEdit: (record: any) => void
+  onArchived: () => void
+  /** Opens another location (a child) in the same sheet. */
+  onOpenLocation?: (id: string) => void
+}
+
+const LocationDetailPanel: React.FC<Props> = ({ locationId, open, reloadKey = 0, onClose, onAddChild, onEdit, onArchived, onOpenLocation }) => {
+  const navigate = useNavigate()
+  const [data, setData] = useState<any>(null)
+  const [loading, setLoading] = useState(false)
+  const [tab, setTab] = useState('overview')
+  const [archiveTarget, setArchiveTarget] = useState<ArchiveTarget | null>(null)
+
+  useEffect(() => {
+    setTab('overview')
+  }, [locationId])
+
+  useEffect(() => {
+    if (!locationId || !open) return
+    let cancelled = false
+    setLoading(true)
+    void asetsService
+      .getLocationOverview(locationId)
+      .then((result) => {
+        if (!cancelled) setData(result)
+      })
+      .catch((error) => toast.error(error?.response?.data?.message || 'Failed to load location.'))
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [locationId, open, reloadKey])
+
+  const current = data && data.location?._id === locationId ? data : null
+
+  if (!current) {
+    return (
+      <>
+      <Sheet open={open && Boolean(locationId)} onClose={onClose} size="lg" title="Location">
+        {loading ? (
+          <div className="cb-table-state" role="status">
+            <span className="cb-spinner" aria-hidden="true" />
+            Loading location details
+          </div>
+        ) : (
+          <EmptyState icon={Inbox} title="This location could not be loaded" body="It may have been archived. Close this panel and pick another location." compact />
+        )}
+      </Sheet>
+      <ArchiveLocationDialog target={null} onClose={() => setArchiveTarget(null)} onArchived={() => undefined} />
+      </>
+    )
+  }
+
+  const { location, parent, pathSegments = [], children = [], assets = [], summary = {} } = current
+  const type = String(normalizeLocationType(location.type))
+  const childType = childTypeForParent(type)
+  const childLabel = childType ? `${childType}s` : 'Sub-locations'
+  const blocks = children.filter((child: any) => normalizeLocationType(child.type) === 'Block')
+  const floors = children.filter((child: any) => normalizeLocationType(child.type) === 'Floor')
+  const rooms = children.filter((child: any) => normalizeLocationType(child.type) === 'Room')
+
+  const hierarchyItems = [
+    ...(type === 'Campus'
+      ? [
+          { label: 'Blocks', value: summary.blocks || blocks.length },
+          { label: 'Floors', value: summary.floors || floors.length },
+          { label: 'Rooms', value: summary.rooms || rooms.length },
+        ]
+      : []),
+    ...(type === 'Block' ? [{ label: 'Floors', value: summary.floors || floors.length }] : []),
+    ...(type === 'Floor' ? [{ label: 'Rooms', value: summary.rooms || rooms.length }] : []),
+  ]
+
+  const menuItems = [
+    { label: 'Open full page', icon: ExternalLink, onSelect: () => navigate(`/asets/locations/${location._id}`) },
+    { label: 'View assets', icon: Package, onSelect: () => navigate(`/asets/assets?locationId=${location._id}`) },
+    ...(type !== 'Campus'
+      ? [
+          { divider: true as const },
+          {
+            label: 'Archive',
+            icon: Archive,
+            tone: 'danger' as const,
+            onSelect: () =>
+              setArchiveTarget({
+                id: location._id,
+                name: location.name,
+                childCount: summary.childCount,
+                assetCount: summary.totalAssetCount,
+              }),
+          },
+        ]
+      : []),
+  ]
+
+  return (
+    <>
+      <Sheet
+        open={open}
+        onClose={archiveTarget ? undefined : onClose}
+        size="lg"
+        icon={locationIcon(location)}
+        title={locationLabel(location)}
+        description={pathSegments.length > 1 ? pathSegments.slice(0, -1).map((segment: any) => segment.name).join(' › ') : 'Top level'}
+      >
+        <div className="al-hero">
+          <div className="al-hero__main">
+            <div className="al-hero__name">
+              <Badge tone={locationTypeTone(type)} dot={false}>
+                {type}
+              </Badge>
+              {isLocationInactive(location) ? <Badge tone="neutral">Inactive</Badge> : <Badge tone="success">Active</Badge>}
+              {location.isStore ? <Badge tone="warning" dot={false}>Store</Badge> : null}
+            </div>
+          </div>
+          <div className="al-hero__actions">
+            {childType ? (
+              <Button variant="primary" size="sm" icon={Plus} onClick={() => onAddChild(location, childType)}>
+                Add {childType.toLowerCase()}
+              </Button>
+            ) : null}
+            <Button size="sm" icon={Pencil} onClick={() => onEdit(location)}>
+              Edit
+            </Button>
+            <Menu items={menuItems} label="More location actions" />
+          </div>
+        </div>
+
+        <LocationMetrics
+          items={[
+            { label: 'Direct assets', value: (summary.assetCount || 0).toLocaleString('en-IN') },
+            { label: 'Total assets', value: (summary.totalAssetCount || 0).toLocaleString('en-IN') },
+            { label: 'Asset value', value: formatINR(summary.totalAssetValue || summary.assetValue || 0, { compact: true }) },
+            { label: 'Sub-locations', value: (summary.childCount || 0).toLocaleString('en-IN') },
+          ]}
+        />
+
+        <Tabs
+          label="Location sections"
+          value={tab}
+          onChange={setTab}
+          items={[
+            { id: 'overview', label: 'Overview' },
+            ...(childType ? [{ id: 'children', label: childLabel, count: children.length }] : []),
+            { id: 'assets', label: 'Assets', count: assets.length },
+            { id: 'history', label: 'History' },
+          ]}
+        />
+
+        {tab === 'overview' ? (
+          <>
+            <DetailList items={locationDetailItems(location, parent)} />
+            {hierarchyItems.length ? (
+              <div className="al-section">
+                <p className="al-section__title">Inside this {type.toLowerCase()}</p>
+                <DetailList columns={3} items={hierarchyItems} />
+              </div>
+            ) : null}
+          </>
+        ) : null}
+
+        {tab === 'children' && childType ? (
+          <div className="al-section">
+            <div className="al-section__head">
+              <p className="al-section__title">{plural(children.length, childType.toLowerCase(), childLabel.toLowerCase())}</p>
+              <Button size="sm" variant="tertiary" icon={Plus} onClick={() => onAddChild(location, childType)}>
+                Add {childType.toLowerCase()}
+              </Button>
+            </div>
+            {children.length ? (
+              <ul className="al-children">
+                {children.map((child: any) => {
+                  const childKind = String(normalizeLocationType(child.type))
+                  return (
+                    <li key={child._id}>
+                      <button
+                        type="button"
+                        className="al-child"
+                        onClick={() => (onOpenLocation ? onOpenLocation(child._id) : navigate(`/asets/locations/${child._id}`))}
+                      >
+                        <span className={cx('al-tname__icon', `al-tone--${childKind.toLowerCase()}`)} aria-hidden="true">
+                          <Icon icon={locationIcon(child)} size={14} />
+                        </span>
+                        <span className="al-child__text">
+                          <span className="al-child__name">{locationLabel(child)}</span>
+                          <span className="al-child__meta">{child.code || 'No code'}</span>
+                        </span>
+                      </button>
+                    </li>
+                  )
+                })}
+              </ul>
+            ) : (
+              <EmptyState
+                title={`No ${childLabel.toLowerCase()} yet`}
+                body={`Add a ${childType.toLowerCase()} to keep building this ${type.toLowerCase()}.`}
+                compact
+              />
+            )}
+          </div>
+        ) : null}
+
+        {tab === 'assets' ? <LocationAssetsTable assets={assets} /> : null}
+
+        {tab === 'history' ? (
+          <p className="cb-muted">
+            Created on {formatDate(location.createdAt)}. Updates and archive events are tracked through ASETS lifecycle records.
+          </p>
+        ) : null}
+      </Sheet>
+
+      <ArchiveLocationDialog
+        target={archiveTarget}
+        onClose={() => setArchiveTarget(null)}
+        onArchived={() => {
+          setArchiveTarget(null)
+          onArchived()
+        }}
+      />
+    </>
+  )
+}
 
 export default LocationDetailPanel

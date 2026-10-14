@@ -1,0 +1,58 @@
+/* Seating plan (CNTR + EXMCL). Tokens only; everything sits inside .cb-app.
+ * The template tables are drawn on kit paper (.cb-paper), so they use the paper ink
+ * (--paper-ink / --paper-rule) the kit defines for printed documents. */
+
+/* Schedule table cells. */
+.cb-app .cx-seat-date { display: inline-flex; align-items: center; gap: var(--space-2); white-space: nowrap; }
+.cb-app .cx-seat-subject { display: inline-flex; flex-direction: column; min-width: 0; line-height: 18px; }
+.cb-app .cx-seat-subject .cb-muted { font-size: 12px; font-variant-numeric: tabular-nums; }
+
+/* ---------- Layout template on paper ---------- */
+.cb-app .cx-seat-sheet { padding: var(--space-3); font: 400 13px/18px var(--font-sans); color: var(--paper-ink); }
+.cb-app .cx-seat-sheet p { margin: 0; }
+.cb-app .cx-seat-sheet > * + *, .cb-app .cx-seat-cbse > * + * { margin-top: var(--space-4); }
+
+.cb-app .cx-seat-title { display: flex; flex-direction: column; align-items: center; gap: 2px; text-align: center; }
+.cb-app .cx-seat-title strong { font-size: 16px; line-height: 22px; }
+.cb-app .cx-seat-heading { text-align: center; font-size: 16px; line-height: 22px; font-weight: 700; }
+.cb-app .cx-seat-meta { display: flex; justify-content: space-between; gap: var(--space-4); font-weight: 700; }
+.cb-app .cx-seat-meta__end { text-align: right; }
+.cb-app .cx-seat-sign { text-align: right; font-weight: 700; padding-top: var(--space-8); }
+.cb-app .cx-seat-strong { font-weight: 700; }
+.cb-app .cx-seat-num { font-variant-numeric: tabular-nums; }
+.cb-app .cx-seat-cut { border-top: 1px dashed var(--paper-rule); }
+
+/* Printed tables: fixed column widths (set per <col>) so the column handles line up. */
+.cb-app .cx-seat-table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 13px; line-height: 18px; }
+.cb-app .cx-seat-table + .cx-seat-table { margin-top: var(--space-4); }
+.cb-app .cx-seat-table caption { padding: var(--space-2); border: 1px solid var(--paper-ink); border-bottom: 0; font-weight: 700; text-align: left; }
+.cb-app .cx-seat-table th,
+.cb-app .cx-seat-table td { border: 1px solid var(--paper-ink); padding: 4px 6px; text-align: center; vertical-align: middle; overflow-wrap: anywhere; }
+.cb-app .cx-seat-table th { font-weight: 700; }
+.cb-app .cx-seat-table tbody th[scope='row'] { text-align: left; }
+.cb-app .cx-seat-table--info th, .cb-app .cx-seat-table--info td { border-width: 2px; padding: var(--space-2); }
+.cb-app .cx-seat-table--small { font-size: 12px; line-height: 16px; }
+.cb-app .cx-seat-cell { height: var(--cx-row-h, 24px); }
+
+/* CBSE format: font sizes, padding and row height come from the saved template. */
+.cb-app .cx-seat-cbse .cx-seat-cbse__head { font-size: var(--cx-cbse-head); }
+.cb-app .cx-seat-cbse .cx-seat-cbse__subhead { font-size: var(--cx-cbse-subhead); }
+.cb-app .cx-seat-cbse .cx-seat-table td.cx-seat-cbse__cell { height: var(--cx-row-h); padding: var(--cx-cbse-pad-y) var(--cx-cbse-pad-x); font-size: var(--cx-cbse-body); }
+.cb-app .cx-seat-cbse__foot { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-6); line-height: 24px; }
+
+/* Resize handles: editor controls drawn over the paper, not part of the print. */
+.cb-app .cx-seat-resize { position: relative; }
+.cb-app .cx-seat-col-handle { position: absolute; top: 0; bottom: 0; width: 8px; margin-left: -4px; cursor: col-resize; z-index: 2; border-radius: var(--radius-sm); }
+.cb-app .cx-seat-col-handle:hover { background: var(--accent-soft); }
+.cb-app .cx-seat-row-handle { display: flex; align-items: center; gap: var(--space-3); }
+.cb-app .cx-seat-row-handle__bar { flex: 1; height: 8px; border-radius: var(--radius-sm); background: var(--accent-soft); cursor: row-resize; }
+.cb-app .cx-seat-row-handle__bar:hover { background: var(--accent); }
+.cb-app .cx-seat-row-handle__label { font: 500 12px/16px var(--font-sans); color: var(--paper-ink); opacity: 0.65; white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+@media (max-width: 640px) {
+  .cb-app .cx-seat-sheet { padding: 0; font-size: 11px; line-height: 15px; }
+  .cb-app .cx-seat-table, .cb-app .cx-seat-table--small { font-size: 10px; line-height: 13px; }
+  .cb-app .cx-seat-table th, .cb-app .cx-seat-table td, .cb-app .cx-seat-table--info th, .cb-app .cx-seat-table--info td { padding: 2px 3px; }
+  .cb-app .cx-seat-meta { flex-direction: column; gap: var(--space-1); }
+  .cb-app .cx-seat-meta__end { text-align: left; }
+}

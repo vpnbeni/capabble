@@ -1,7 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
-import { Medal, Plus, Trash2, Trophy } from 'lucide-react'
+import { ListOrdered, Trash2, Trophy } from 'lucide-react'
 import api from '@/services/api'
+import { Banner, Button, Card, Dialog, EmptyState, Page, Select, TextField, formatDate, initials } from '@/components/ui'
+import { isLikelyColor, toneStyle } from '@/components/actvt/entityTone'
+import '@/components/actvt/actvt.css'
+import '@/components/actvt/sports.css'
 
 type HouseOption = {
   _id?: string
@@ -50,8 +54,12 @@ const emptyForm = (): PointsForm => ({
   notes: '',
 })
 
-const inputClass =
-  'h-10 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100'
+const PLACE_LABELS = ['First place', 'Second place', 'Third place']
+
+const formatPoints = (value?: number) => {
+  const points = Number(value || 0)
+  return points > 0 ? `+${points}` : String(points)
+}
 
 const ActvtHouseRanking: React.FC = () => {
   const [houses, setHouses] = useState<HouseOption[]>([])
@@ -60,6 +68,8 @@ const ActvtHouseRanking: React.FC = () => {
   const [form, setForm] = useState<PointsForm>(emptyForm())
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [pendingRemove, setPendingRemove] = useState<PointsEntry | null>(null)
+  const [removing, setRemoving] = useState(false)
 
   const houseMap = useMemo(() => {
     const map = new Map<string, HouseOption>()
@@ -128,7 +138,7 @@ const ActvtHouseRanking: React.FC = () => {
   }
 
   const handleRemove = async (item: PointsEntry) => {
-    if (!item._id || !window.confirm(`Remove points entry "${item.title || 'Untitled'}"?`)) return
+    if (!item._id) return
     try {
       await api.delete(`/actvt/points/${item._id}`)
       toast.success('Entry removed.')
@@ -138,135 +148,234 @@ const ActvtHouseRanking: React.FC = () => {
     }
   }
 
+  const houseIndex = useMemo(() => {
+    const map = new Map<string, number>()
+    houses.forEach((house, index) => map.set(String(house._id), index))
+    return map
+  }, [houses])
+
+  /** The house's own colour as stored; the entry's snapshot if the house has none. */
+  const houseTone = (houseId?: string, snapshot?: string, position = 0) => {
+    const house = houseId ? houseMap.get(String(houseId)) : undefined
+    const color = isLikelyColor(house?.color || '') ? house?.color : snapshot
+    const index = houseId && houseIndex.has(String(houseId)) ? houseIndex.get(String(houseId))! : position
+    return toneStyle(color, index)
+  }
+
+  const confirmRemove = async () => {
+    if (!pendingRemove) return
+    setRemoving(true)
+    try {
+      await handleRemove(pendingRemove)
+    } finally {
+      setRemoving(false)
+      setPendingRemove(null)
+    }
+  }
+
   const maxPoints = Math.max(...standings.map((item) => item.totalPoints), 1)
+  const podium = standings.length > 1 ? standings.slice(0, 3) : []
+  const activityLabel = (count: number) => `${count} ${count === 1 ? 'activity' : 'activities'}`
 
   return (
-    <div className="p-6">
-      <div className="mx-auto max-w-[1400px] space-y-6">
-        <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="mb-4 flex items-center gap-2">
-            <Trophy className="h-5 w-5 text-amber-500" />
-            <h2 className="text-lg font-semibold text-slate-900">House standings</h2>
+    <Page>
+      <Card title="House standings" subtitle="Total points from every recorded activity">
+        {loading && standings.length === 0 ? (
+          <div className="cb-table-state" role="status">
+            <span className="cb-spinner" aria-hidden="true" />
+            Loading rankings…
           </div>
+        ) : standings.length === 0 ? (
+          <EmptyState
+            icon={Trophy}
+            title="No house points yet"
+            body="Record points for an activity below to start the leaderboard."
+          />
+        ) : (
+          <>
+            {podium.length ? (
+              <ol className="asp-podium" aria-label="Top houses">
+                {podium.map((house, index) => (
+                  <li
+                    key={house.houseId}
+                    className="asp-podium__item"
+                    style={houseTone(house.houseId, house.houseColor, index)}
+                  >
+                    <span className="asp-podium__logo" aria-hidden="true">
+                      {house.logo ? (
+                        <img src={house.logo} alt="" />
+                      ) : (
+                        <span className="asp-podium__initials">{initials(house.houseName) || '?'}</span>
+                      )}
+                    </span>
+                    <span className="asp-podium__main">
+                      <span className="asp-podium__place">{PLACE_LABELS[house.rank - 1] || `Rank ${house.rank}`}</span>
+                      <span className="asp-podium__name">{house.houseName}</span>
+                    </span>
+                    <span className="asp-podium__points">
+                      {house.totalPoints}
+                      <small>points</small>
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            ) : null}
 
-          {loading ? <p className="text-sm text-slate-500">Loading rankings...</p> : null}
-
-          {!loading && standings.length === 0 ? (
-            <p className="text-sm text-slate-500">No house points yet. Record an activity below to begin the leaderboard.</p>
-          ) : (
-            <div className="flex flex-nowrap gap-3 overflow-x-auto">
-              {standings.map((house) => (
-                <div key={house.houseId} className="min-w-[160px] flex-1 rounded-2xl border border-slate-100 p-3 shadow-sm">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex min-w-0 items-center gap-2">
-                      <span
-                        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white"
-                        style={{ backgroundColor: house.houseColor || '#4f46e5' }}
-                      >
-                        {house.rank}
-                      </span>
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-slate-900">{house.houseName}</p>
-                        <p className="text-[10px] text-slate-500">{house.entries} activit{house.entries === 1 ? 'y' : 'ies'}</p>
-                      </div>
-                    </div>
-                    <p className="shrink-0 text-lg font-bold text-slate-900">{house.totalPoints}</p>
-                  </div>
-                  <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100">
-                    <div
-                      className="h-full rounded-full"
-                      style={{
-                        width: `${Math.max((house.totalPoints / maxPoints) * 100, 4)}%`,
-                        backgroundColor: house.houseColor || '#4f46e5',
-                      }}
+            <ol className="asp-bars" aria-label="All houses by points">
+              {standings.map((house, index) => (
+                <li key={house.houseId} style={houseTone(house.houseId, house.houseColor, index)}>
+                  <span className="asp-bars__rank" aria-label={`Rank ${house.rank}`}>
+                    {house.rank}
+                  </span>
+                  <span className="asp-bars__label">
+                    <span className="asp-bars__name">{house.houseName}</span>
+                    <span className="asp-bars__meta">{activityLabel(house.entries)}</span>
+                  </span>
+                  <span className="asp-bars__track" aria-hidden="true">
+                    <span
+                      className="asp-bars__fill"
+                      style={{ width: `${Math.max((house.totalPoints / maxPoints) * 100, 4)}%` }}
                     />
-                  </div>
-                </div>
+                  </span>
+                  <span className="asp-bars__value">{house.totalPoints}</span>
+                </li>
               ))}
-            </div>
-          )}
-        </section>
+            </ol>
+          </>
+        )}
+      </Card>
 
-        <div className="grid gap-6 xl:grid-cols-[1fr_1.2fr]">
-          <form onSubmit={handleSave} className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="mb-4 flex items-center gap-2">
-              <Plus className="h-4 w-4 text-indigo-600" />
-              <h3 className="text-lg font-semibold text-slate-900">Record house points</h3>
+      <div className="asp-split">
+        <Card title="Record house points" subtitle="Award or deduct points for an activity">
+          <form className="asp-form" onSubmit={handleSave} noValidate>
+            {!loading && houses.length === 0 ? (
+              <Banner tone="warning" title="No houses yet">
+                Create houses first to record ranking points.
+              </Banner>
+            ) : null}
+            <TextField
+              label="Activity or event"
+              required
+              value={form.title}
+              onChange={(e) => setForm({ ...form, title: e.target.value })}
+              placeholder="e.g. Annual sports relay"
+            />
+            <div className="cb-form-grid">
+              <TextField
+                label="Date"
+                type="date"
+                value={form.date}
+                onChange={(e) => setForm({ ...form, date: e.target.value })}
+              />
+              <TextField
+                label="Points"
+                required
+                type="number"
+                inputMode="numeric"
+                value={form.points}
+                onChange={(e) => setForm({ ...form, points: e.target.value })}
+                placeholder="10"
+                hint="Use a minus sign to deduct."
+              />
             </div>
-
-            <div className="grid gap-3">
-              <label className="text-xs">
-                <span className="mb-1 block font-medium text-slate-500">Activity / event</span>
-                <input required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className={inputClass} placeholder="e.g. Annual Sports Relay" />
-              </label>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <label className="text-xs">
-                  <span className="mb-1 block font-medium text-slate-500">Date</span>
-                  <input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} className={inputClass} />
-                </label>
-                <label className="text-xs">
-                  <span className="mb-1 block font-medium text-slate-500">Points</span>
-                  <input required type="number" value={form.points} onChange={(e) => setForm({ ...form, points: e.target.value })} className={inputClass} placeholder="10" />
-                </label>
-              </div>
-              <label className="text-xs">
-                <span className="mb-1 block font-medium text-slate-500">House</span>
-                <select required value={form.houseId} onChange={(e) => setForm({ ...form, houseId: e.target.value })} className={inputClass}>
-                  <option value="">Select house</option>
-                  {houses.map((house) => (
-                    <option key={house._id} value={house._id}>{house.name}</option>
-                  ))}
-                </select>
-              </label>
-              <label className="text-xs">
-                <span className="mb-1 block font-medium text-slate-500">Category</span>
-                <input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className={inputClass} placeholder="Inter-house / Cultural / Sports" />
-              </label>
-              <label className="text-xs">
-                <span className="mb-1 block font-medium text-slate-500">Notes</span>
-                <input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className={inputClass} placeholder="Optional notes" />
-              </label>
-              <button type="submit" disabled={saving || houses.length === 0} className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60">
-                {saving ? 'Saving...' : 'Add points'}
-              </button>
-              {houses.length === 0 ? (
-                <p className="text-xs text-amber-600">Create houses first to record ranking points.</p>
-              ) : null}
+            <Select
+              label="House"
+              required
+              value={form.houseId}
+              onChange={(e) => setForm({ ...form, houseId: e.target.value })}
+              placeholder="Select house"
+              options={houses
+                .filter((house) => house._id)
+                .map((house) => ({ value: String(house._id), label: house.name || 'Untitled house' }))}
+            />
+            <TextField
+              label="Category"
+              value={form.category}
+              onChange={(e) => setForm({ ...form, category: e.target.value })}
+              placeholder="Inter-house, cultural or sports"
+            />
+            <TextField
+              label="Notes"
+              value={form.notes}
+              onChange={(e) => setForm({ ...form, notes: e.target.value })}
+              placeholder="Optional"
+            />
+            <div className="asp-form__actions">
+              <Button variant="primary" type="submit" loading={saving} disabled={houses.length === 0}>
+                Add points
+              </Button>
             </div>
           </form>
+        </Card>
 
-          <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="mb-4 flex items-center gap-2">
-              <Medal className="h-4 w-4 text-indigo-600" />
-              <h3 className="text-lg font-semibold text-slate-900">Activity points log</h3>
+        <Card title="Points log" subtitle={`${recent.length} recent ${recent.length === 1 ? 'entry' : 'entries'}`} className="asp-logcard">
+          {loading && recent.length === 0 ? (
+            <div className="cb-table-state" role="status">
+              <span className="cb-spinner" aria-hidden="true" />
+              Loading entries…
             </div>
-
-            {recent.length === 0 ? (
-              <p className="text-sm text-slate-500">No points entries yet.</p>
-            ) : (
-              <div className="space-y-2">
-                {recent.map((item) => (
-                  <div key={item._id} className="flex items-start justify-between gap-3 rounded-2xl border border-slate-100 px-3 py-2.5">
-                    <div className="min-w-0">
-                      <p className="font-medium text-slate-900">{item.title}</p>
-                      <p className="text-xs text-slate-500">
-                        {item.houseName || 'House'} · {item.date || 'No date'} · {item.category || 'Inter-house'}
-                      </p>
+          ) : recent.length === 0 ? (
+            <EmptyState
+              icon={ListOrdered}
+              title="No points recorded yet"
+              body="Entries appear here as you add points for each house."
+              compact
+            />
+          ) : (
+            <ul className="asp-log">
+              {recent.map((item, index) => {
+                const points = Number(item.points || 0)
+                const house = item.houseId ? houseMap.get(String(item.houseId)) : undefined
+                return (
+                  <li key={item._id || index}>
+                    <div className="asp-log__main">
+                      <span className="asp-log__title">{item.title || 'Untitled activity'}</span>
+                      <span className="asp-log__meta">
+                        <span className="asp-swatchname" style={houseTone(item.houseId, item.houseColor, index)}>
+                          <span className="actvt-tone-dot" aria-hidden="true" />
+                          <span>{house?.name || item.houseName || 'House'}</span>
+                        </span>
+                        <span aria-hidden="true">·</span>
+                        <span>{item.date ? formatDate(item.date) : 'No date'}</span>
+                        <span aria-hidden="true">·</span>
+                        <span>{item.category || 'Inter-house'}</span>
+                      </span>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <span className="text-sm font-bold text-slate-900">+{item.points || 0}</span>
-                      <button type="button" onClick={() => void handleRemove(item)} className="text-rose-600">
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
-        </div>
+                    <span className={`asp-log__points${points < 0 ? ' is-negative' : ''}`}>{formatPoints(points)}</span>
+                    <Button
+                      variant="tertiary"
+                      size="sm"
+                      icon={Trash2}
+                      aria-label={`Remove points entry ${item.title || ''}`.trim()}
+                      onClick={() => setPendingRemove(item)}
+                    />
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </Card>
       </div>
-    </div>
+
+      <Dialog
+        open={Boolean(pendingRemove)}
+        onClose={() => (removing ? undefined : setPendingRemove(null))}
+        tone="danger"
+        size="sm"
+        title={`Remove ${pendingRemove?.title || 'this'} entry?`}
+        description={`The ${formatPoints(pendingRemove?.points)} points it gave ${pendingRemove?.houseName || 'the house'} no longer count towards the standings. This can't be undone.`}
+        footer={
+          <>
+            <Button onClick={() => setPendingRemove(null)} disabled={removing}>
+              Cancel
+            </Button>
+            <Button variant="danger" loading={removing} onClick={() => void confirmRemove()}>
+              Remove entry
+            </Button>
+          </>
+        }
+      />
+    </Page>
   )
 }
 

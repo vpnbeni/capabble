@@ -1,0 +1,6 @@
+/* Roll number stickers (pages/Stickers.tsx). Tokens only; scoped inside .cb-app. */
+
+/* Date with its Today / Next badge beside it. */
+.cb-app .cx-stk-date { display: inline-flex; align-items: center; gap: var(--space-2); }
+
+/* Sticker PDF fills the sheet body. */

@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { GraduationCap, Save, SearchX, Users } from 'lucide-react'
 import { MonthSwitcher, formatMonthLabel } from '@/components/attnd/MonthSwitcher'
@@ -37,12 +38,17 @@ const getDaysInMonth = (month: string) => {
 }
 
 const AttndStudentAttendance: React.FC = () => {
-  const { mode } = useAttndMatrixMode()
+  const { mode, setMode } = useAttndMatrixMode()
   const settings = useAttndSettings()
-  const [selectedMonth, setSelectedMonth] = useState(currentMonthKey())
+  // Links from the Attndboard and School OS open a section directly: ?class=4th&section=Rose&month=2026-10
+  const [searchParams] = useSearchParams()
+  const linkedClass = searchParams.get('class') || ''
+  const linkedSection = searchParams.get('section') || ''
+  const linkedMonth = /^\d{4}-\d{2}$/.test(searchParams.get('month') || '') ? (searchParams.get('month') as string) : ''
+  const [selectedMonth, setSelectedMonth] = useState(linkedMonth || currentMonthKey())
   const [classOptions, setClassOptions] = useState<StudentClassOption[]>([])
-  const [selectedClass, setSelectedClass] = useState('')
-  const [selectedSection, setSelectedSection] = useState('')
+  const [selectedClass, setSelectedClass] = useState(linkedClass)
+  const [selectedSection, setSelectedSection] = useState(linkedSection)
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -73,7 +79,15 @@ const AttndStudentAttendance: React.FC = () => {
     void loadFilters()
   }, [])
 
+  // A linked section is shown class by class, not in the daywise view.
   useEffect(() => {
+    if (linkedClass && linkedSection) setMode('classwise')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [linkedClass, linkedSection])
+
+  useEffect(() => {
+    // Wait for the class list so a linked section isn't cleared before it can be checked.
+    if (classOptions.length === 0) return
     if (!selectedClass) {
       setSelectedSection('')
       return
@@ -85,7 +99,7 @@ const AttndStudentAttendance: React.FC = () => {
     if (!sectionOptions.includes(selectedSection)) {
       setSelectedSection(sectionOptions[0])
     }
-  }, [selectedClass, sectionOptions, selectedSection])
+  }, [classOptions.length, selectedClass, sectionOptions, selectedSection])
 
   const loadData = async () => {
     if (!selectedClass || !selectedSection || !selectedMonth) {

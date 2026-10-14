@@ -1,12 +1,35 @@
 import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import toast from 'react-hot-toast'
-import { Document, Page, pdfjs } from 'react-pdf'
+import { Document, Page as PdfPage, pdfjs } from 'react-pdf'
+import { AlertCircle, ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, ChevronLeft, ChevronRight, DoorOpen, Download, ExternalLink, FileText, Save, Users } from 'lucide-react'
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 import { useTeachers } from '../hooks/useTeachers'
 import type { Teacher } from '../services/teacherService'
 import { seatingPlanService, type Room } from '../services/seatingPlanService'
 import dutiesService from '../services/dutiesService'
-import Dialog from '../components/common/Dialog/Dialog'
+import {
+  Badge,
+  Banner,
+  Button,
+  Card,
+  CardToolbar,
+  Checkbox,
+  DataTable,
+  Dialog,
+  EmptyState,
+  FilterBar,
+  Icon,
+  Page,
+  Select,
+  Sheet,
+  Switch,
+  Tabs,
+  cx,
+  type DataTableColumn,
+  type SelectOption,
+} from '@/components/ui'
+import { PAPER_PAGES_CLASS, Paper, PaperStage } from '@/components/ui'
+import '@/components/exmcl/centre-duties.css'
 import {
   useDutiesSupport,
   useDutySelections,
@@ -19,6 +42,10 @@ import { useDailyDuties } from '../hooks/useDashboard'
 import { useSeatingPlanTemplateSettings } from '../hooks/useSeatingPlan'
 
 pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl
+
+/** PDF page width that fits the preview sheet (xl) and phones. */
+const dutyPdfPageWidth = () =>
+  typeof window !== 'undefined' ? Math.max(260, Math.min(680, window.innerWidth - 72)) : 680
 
 /* ────────── constants ────────── */
 
@@ -191,16 +218,16 @@ const computeMaxDuties = (
 /* ── Header label for the "maximum" row per tab ── */
 const getMaxRowLabel = (tabKey: string): string => {
   switch (tabKey) {
-    case 'CS': return 'Max CS per Day'
-    case 'DCS': return 'Max DCS per Day'
-    case 'OBR': return 'Max Observers'
-    case 'ASI': return 'Max Invigilators'
+    case 'CS': return 'Max CS per day'
+    case 'DCS': return 'Max DCS per day'
+    case 'OBR': return 'Max observers'
+    case 'ASI': return 'Max invigilators'
     case 'ASC': return 'Max ASI (CCTV)'
-    case 'ASFM': return 'Max ASI (Frisking; Male)'
-    case 'ASFF': return 'Max ASI (Frisking; Female)'
-    case 'CLR': return 'Max Clerks'
+    case 'ASFM': return 'Max ASI (frisking, male)'
+    case 'ASFF': return 'Max ASI (frisking, female)'
+    case 'CLR': return 'Max clerks'
     case 'CL4': return 'Max Class IV'
-    default: return 'Maximum Duties'
+    default: return 'Maximum duties'
   }
 }
 
@@ -1320,575 +1347,494 @@ const Duties: React.FC = () => {
 
   /* ────────── render ────────── */
 
+  const countClass = (assigned: number, max: number) =>
+    cx('cx-duty-count', max > 0 && (assigned > max ? 'is-over' : assigned === max ? 'is-met' : 'is-short'))
+
+  const totalAssignedForTab = examDates.reduce((sum, dk) => sum + (checkedCountByDate[dk] || 0), 0)
+  const totalMaxForTab = examDates.reduce((sum, dk) => {
+    const roomsCount = Number(requiredRoomsByDate[dk] || 0)
+    const candidates = Number(candidatesByDate[dk] || 0)
+    return sum + computeMaxDuties(activeTab, roomsCount, candidates)
+  }, 0)
+
+  type RoomRow = {
+    room: Room
+    firstId: string
+    secondId: string
+    first?: Teacher
+    second?: Teacher
+    firstAllowed: boolean
+    secondAllowed: boolean
+    firstOptions: Teacher[]
+    secondOptions: Teacher[]
+  }
+
+  const roomRows: RoomRow[] =
+    activeTab === 'ASI'
+      ? allocatedRoomsForSelectedDate.map((room) => {
+          const selectedFunctionaryId = roomAssignmentsByDate[selectedRoomDate]?.[room._id] || ''
+          const selectedFunctionarySecondId = roomAssignmentsByDateSecond[selectedRoomDate]?.[room._id] || ''
+          const selectedFunctionary = functionaryById[selectedFunctionaryId]
+          const selectedFunctionarySecond = functionaryById[selectedFunctionarySecondId]
+          const selectedFunctionaryAllowed =
+            isCurrentInvigilator(selectedFunctionary) &&
+            (allocationMode === 'manual' || isInvigilatorAllowedForRoom(room._id, selectedFunctionaryId, selectedRoomDate))
+          const selectedFunctionarySecondAllowed =
+            isCurrentInvigilator(selectedFunctionarySecond) &&
+            (allocationMode === 'manual' || isInvigilatorAllowedForRoom(room._id, selectedFunctionarySecondId, selectedRoomDate))
+          const remainingForFirst = getRemainingInvigilatorIdsForSlot(selectedRoomDate, room._id, 'first')
+          const remainingForSecond = getRemainingInvigilatorIdsForSlot(selectedRoomDate, room._id, 'second')
+
+          const options = [...roomDropdownInvigilators].filter((func) => {
+            const candidateId = String(func._id || '').trim()
+            if (!candidateId) return false
+            if (!remainingForFirst.has(candidateId)) return false
+            if (candidateId === String(selectedFunctionarySecondId || '').trim()) return false
+            if (allocationMode !== 'manual' && !isInvigilatorAllowedForRoom(room._id, candidateId, selectedRoomDate)) return false
+            if (isFunctionaryAssignedElsewhere(selectedRoomDate, candidateId, room._id, 'first')) return false
+            return true
+          })
+
+          const secondOptions = [...roomDropdownInvigilators].filter((func) => {
+            const candidateId = String(func._id || '').trim()
+            if (!candidateId) return false
+            if (!remainingForSecond.has(candidateId)) return false
+            if (candidateId === String(selectedFunctionaryId || '').trim()) return false
+            if (allocationMode !== 'manual' && !isInvigilatorAllowedForRoom(room._id, candidateId, selectedRoomDate)) return false
+            if (isFunctionaryAssignedElsewhere(selectedRoomDate, candidateId, room._id, 'second')) return false
+            return true
+          })
+          if (
+            selectedFunctionaryId &&
+            selectedFunctionary &&
+            selectedFunctionaryAllowed &&
+            !isFunctionaryAssignedElsewhere(selectedRoomDate, selectedFunctionaryId, room._id, 'first') &&
+            !options.some((func) => func._id === selectedFunctionaryId)
+          ) {
+            options.push(selectedFunctionary)
+          }
+          if (
+            selectedFunctionarySecondId &&
+            selectedFunctionarySecond &&
+            String(selectedFunctionarySecondId) !== String(selectedFunctionaryId) &&
+            selectedFunctionarySecondAllowed &&
+            !isFunctionaryAssignedElsewhere(selectedRoomDate, selectedFunctionarySecondId, room._id, 'second') &&
+            !secondOptions.some((func) => func._id === selectedFunctionarySecondId)
+          ) {
+            secondOptions.push(selectedFunctionarySecond)
+          }
+
+          return {
+            room,
+            firstId: selectedFunctionaryId,
+            secondId: selectedFunctionarySecondId,
+            first: selectedFunctionary,
+            second: selectedFunctionarySecond,
+            firstAllowed: selectedFunctionaryAllowed,
+            secondAllowed: selectedFunctionarySecondAllowed,
+            firstOptions: options,
+            secondOptions,
+          }
+        })
+      : []
+
+  const invigilatorOptions = (
+    selectedId: string,
+    selected: Teacher | undefined,
+    allowed: boolean,
+    list: Teacher[]
+  ): SelectOption[] => [
+    ...(selectedId && selected && !allowed
+      ? [{ value: selectedId, label: `${selected.name || ''} (stored assignment no longer valid)`, disabled: true }]
+      : []),
+    ...list.map((func) => ({ value: String(func._id), label: String(func.name || '') })),
+  ]
+
+  const roomColumns: DataTableColumn<RoomRow>[] = [
+    {
+      key: 'room',
+      header: 'Room',
+      mobile: 'title',
+      render: ({ room }) => (
+        <span className="cb-strong">
+          {room.roomNo}
+          {room.roomName ? ` · ${room.roomName}` : ''}
+        </span>
+      ),
+    },
+    {
+      key: 'first',
+      header: 'Invigilator 1',
+      interactive: true,
+      render: (row) => (
+        <Select
+          size="sm"
+          aria-label={`Invigilator 1 for room ${row.room.roomNo}`}
+          value={row.firstId}
+          onChange={(e) => handleRoomAssignmentChange(row.room._id, e.target.value)}
+          disabled={loadingRoomAssignments || allocationMode === 'auto'}
+          title={
+            allocationMode === 'auto'
+              ? `Auto mode: invigilator is assigned by system for room ${row.room.roomNo}`
+              : `Assign invigilator for room ${row.room.roomNo}`
+          }
+          placeholder="Select invigilator"
+          options={invigilatorOptions(row.firstId, row.first, row.firstAllowed, row.firstOptions)}
+        />
+      ),
+    },
+    {
+      key: 'firstId',
+      header: 'OASIS ID',
+      mobile: 'hidden',
+      render: ({ first }) => <span className="cb-muted">{first?.oasisId || first?.employeeId || '—'}</span>,
+    },
+    {
+      key: 'second',
+      header: 'Invigilator 2',
+      interactive: true,
+      render: (row) => (
+        <Select
+          size="sm"
+          aria-label={`Invigilator 2 for room ${row.room.roomNo}`}
+          value={row.secondId}
+          onChange={(e) => handleRoomAssignmentSecondChange(row.room._id, e.target.value)}
+          disabled={loadingRoomAssignments || allocationMode === 'auto'}
+          title={`Invigilator 2 for room ${row.room.roomNo}`}
+          placeholder="Select invigilator"
+          options={invigilatorOptions(row.secondId, row.second, row.secondAllowed, row.secondOptions)}
+        />
+      ),
+    },
+    {
+      key: 'secondId',
+      header: 'OASIS ID',
+      mobile: 'hidden',
+      render: ({ second }) => <span className="cb-muted">{second?.oasisId || second?.employeeId || '—'}</span>,
+    },
+  ]
+
+  const previewRooms = (
+    allocatedRoomsForSelectedDate.length > 0
+      ? allocatedRoomsForSelectedDate
+      : Array.from({ length: 10 }).map(
+          (_, i) =>
+            ({
+              _id: `preview-${i}`,
+              roomNo: `${i + 1}`,
+              roomName: '',
+              floor: '',
+            }) as Room
+        )
+  ).slice(0, 14)
+
+  const orientationLabel = functionaryDutyListFormat.orientation === 'landscape' ? 'Landscape' : 'Portrait'
+
+  const resizableHeader = (label: string, boundaryIndex: number, extra?: { rowSpan?: number }) => (
+    <th rowSpan={extra?.rowSpan}>
+      {label}
+      <div
+        className="cx-duty-sheet__grip"
+        onMouseDown={(event) => startDutyListColumnResize(boundaryIndex, event)}
+        title="Drag to resize column"
+      />
+    </th>
+  )
+
+  const closeConflictDialog = () => {
+    setShowConflictDialog(false)
+    setConflictDialogData(null)
+    setExpandedConflictIdx(null)
+    setReplacementTarget(null)
+  }
+
   return (
-    <div className="p-6 space-y-6">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-        {/* Header */}
-        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between gap-3">
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Duty Assignment by Date</h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Select functionaries date-wise and save.</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-              </div>
-              <input
-                type="text"
-                placeholder="Search functionaries..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-9 pr-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white w-56"
-              />
-            </div>
-            <button
-              className="btn btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={filteredFunctionaries.length === 0 || examDates.length === 0 || isSaving}
-              onClick={handleSaveFunctionaries}
-            >
-              {isSaving ? 'Saving...' : 'Save Functionaries'}
-            </button>
-          </div>
-        </div>
-
-        {/* Duty Type Tabs */}
-        <div className="px-6 border-b border-gray-200 dark:border-gray-700">
-          <nav className="flex gap-0 -mb-px overflow-x-auto" aria-label="Duty type tabs">
-            {DUTY_TABS.map((tab) => {
-              const isActive = activeTab === tab.key
-              const isAsiTab = tab.key === 'ASI'
+    <Page width="full">
+      <Card flush title="Duties by date" subtitle="Tick who is on duty for each exam date, then save the selection.">
+        <div className="cx-duty-tabs">
+          <Tabs
+            label="Duty type"
+            value={activeTab}
+            onChange={(id) => {
+              setActiveTab(id)
+              setSearch('')
+            }}
+            items={DUTY_TABS.map((tab) => {
               const count = tabCounts[tab.key] || 0
-              return (
-                <button
-                  key={tab.key}
-                  onClick={() => {
-                    setActiveTab(tab.key)
-                    setSearch('')
-                  }}
-                  className={`
-                    relative px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors
-                    ${isAsiTab ? 'bg-blue-50/60 dark:bg-blue-900/20 rounded-t-md' : ''}
-                    ${isActive
-                      ? `${isAsiTab
-                        ? 'border-blue-600 text-blue-700 dark:border-blue-400 dark:text-blue-300 shadow-[inset_0_-2px_0_0_rgba(37,99,235,1)]'
-                        : 'border-primary-600 text-primary-600 dark:border-primary-400 dark:text-primary-400'
-                      }`
-                      : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
-                    }
-                  `}
-                  title={tab.dutyType}
-                >
-                  {isAsiTab ? (
-                    <span className="inline-flex flex-col items-center leading-tight">
-                      <span className="mb-0.5 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-blue-600 text-white shadow-sm">
-                        Invigilators
-                      </span>
-                      <span className="inline-flex items-center">
-                        {tab.label}
-                        {count > 0 && (
-                          <span
-                            className={`ml-1.5 inline-flex items-center justify-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold leading-none
-                              ${isActive
-                                ? 'bg-primary-100 text-primary-700 dark:bg-primary-900 dark:text-primary-300'
-                                : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400'
-                              }
-                            `}
-                          >
-                            {count}
-                          </span>
-                        )}
-                      </span>
-                    </span>
-                  ) : (
-                    <>
-                      {tab.label}
-                      {count > 0 && (
-                        <span
-                          className={`ml-1.5 inline-flex items-center justify-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold leading-none
-                            ${isActive
-                              ? 'bg-primary-100 text-primary-700 dark:bg-primary-900 dark:text-primary-300'
-                              : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400'
-                            }
-                          `}
-                        >
-                          {count}
-                        </span>
-                      )}
-                    </>
-                  )}
-                </button>
-              )
+              return {
+                id: tab.key,
+                label: <span title={tab.dutyType}>{tab.key === 'ASI' ? 'ASI · Invigilators' : tab.label}</span>,
+                count: count > 0 ? count : undefined,
+              }
             })}
-          </nav>
+          />
         </div>
+        <CardToolbar>
+          <FilterBar
+            search={{ placeholder: 'Search functionaries', value: search, onChange: setSearch, label: 'Search functionaries' }}
+            filters={<span className="cb-muted">{activeDutyType}</span>}
+            actions={
+              <Button
+                variant="primary"
+                icon={Save}
+                loading={isSaving}
+                disabled={filteredFunctionaries.length === 0 || examDates.length === 0}
+                onClick={handleSaveFunctionaries}
+              >
+                Save selection
+              </Button>
+            }
+          />
+        </CardToolbar>
 
-        {/* Table */}
         {loadingTeachers ? (
-          <div className="px-6 py-12 text-center text-sm text-gray-500 dark:text-gray-400">
-            Loading functionaries...
+          <div className="cb-table-state" role="status">
+            <span className="cb-spinner" aria-hidden="true" />
+            Loading functionaries…
           </div>
         ) : (
-          <div className="overflow-x-auto duties-table-scroll" ref={dutiesTableRef}>
-            <table className="min-w-full border-separate border-spacing-0 border-2 border-gray-400 dark:border-gray-500">
-              <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10">
-                <tr>
-                  <th className="sticky left-0 z-20 w-[4.5rem] min-w-[4.5rem] border border-gray-400 dark:border-gray-500 px-6 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-200 uppercase tracking-wider bg-gray-50 dark:bg-gray-700 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] dark:shadow-[2px_0_4px_-2px_rgba(0,0,0,0.3)]">
-                    Sr No
-                  </th>
-                  <th className="sticky left-[4.5rem] z-20 w-52 min-w-52 border border-gray-400 dark:border-gray-500 px-6 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-200 uppercase tracking-wider bg-gray-50 dark:bg-gray-700 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] dark:shadow-[2px_0_4px_-2px_rgba(0,0,0,0.3)]">
-                    Functionary Name
-                  </th>
-                  <th
-                    className="sticky left-[17.5rem] z-20 w-20 min-w-20 border border-gray-400 dark:border-gray-500 px-4 py-3 text-center text-xs font-medium text-gray-600 dark:text-gray-200 uppercase tracking-wider whitespace-nowrap cursor-pointer select-none bg-gray-50 dark:bg-gray-700 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] dark:shadow-[2px_0_4px_-2px_rgba(0,0,0,0.3)]"
-                    onClick={() =>
-                      setInvigilatorDutySort((prev) =>
-                        prev === 'none' ? 'desc' : prev === 'desc' ? 'asc' : 'none'
-                      )
-                    }
-                  >
-                    Duties
-                    {invigilatorDutySort !== 'none' && (
-                      <span className="ml-1 text-[10px]">
-                        {invigilatorDutySort === 'asc' ? '↑' : '↓'}
-                      </span>
-                    )}
-                  </th>
-                  <th
-                    className="sticky left-[22.5rem] z-20 w-28 min-w-28 border border-gray-400 dark:border-gray-500 px-6 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-200 uppercase tracking-wider bg-gray-50 dark:bg-gray-700 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] dark:shadow-[2px_0_4px_-2px_rgba(0,0,0,0.3)]"
-                  >
-                    OASIS ID
-                  </th>
-                  {examDates.map((dateKey) => (
-                    <th
-                      key={dateKey}
-                      data-date={dateKey}
-                      className="border border-gray-400 dark:border-gray-500 px-4 py-3 text-center text-xs font-medium text-gray-600 dark:text-gray-200 uppercase tracking-wider whitespace-nowrap"
-                    >
-                      {formatDateLabel(dateKey)}
+          <>
+            <div className="cx-duty-matrix" ref={dutiesTableRef}>
+              <table>
+                <thead>
+                  <tr>
+                    <th scope="col" className="is-pin is-pin-1">
+                      #
                     </th>
-                  ))}
-                </tr>
-                {/* Dynamic Maximum Duties row */}
-                <tr>
-                  {/* Label cell spanning Sr No + Functionary Name */}
-                  <th
-                    colSpan={2}
-                    className="sticky left-0 z-20 border border-gray-400 dark:border-gray-500 px-4 py-2 text-center text-[11px] font-semibold text-gray-700 dark:text-gray-100 uppercase tracking-wide whitespace-nowrap bg-gray-50 dark:bg-gray-700 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] dark:shadow-[2px_0_4px_-2px_rgba(0,0,0,0.3)]"
-                  >
-                    {getMaxRowLabel(activeTab)}
-                  </th>
-                  {/* Total assigned / total max spanning Duties + OASIS ID */}
-                  <th
-                    colSpan={2}
-                    className="sticky left-[17.5rem] z-20 border border-gray-400 dark:border-gray-500 px-4 py-2 text-center text-[11px] font-semibold whitespace-nowrap bg-gray-50 dark:bg-gray-700 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] dark:shadow-[2px_0_4px_-2px_rgba(0,0,0,0.3)]"
-                  >
-                    {(() => {
-                      const totalAssigned = examDates.reduce((sum, dk) => sum + (checkedCountByDate[dk] || 0), 0)
-                      const totalMax = examDates.reduce((sum, dk) => {
-                        const rooms = Number(requiredRoomsByDate[dk] || 0)
-                        const candidates = Number(candidatesByDate[dk] || 0)
-                        return sum + computeMaxDuties(activeTab, rooms, candidates)
-                      }, 0)
-                      return (
-                        <span
-                          className={
-                            totalMax <= 0
-                              ? 'text-gray-700 dark:text-gray-100'
-                              : totalAssigned > totalMax
-                                ? 'text-amber-600 dark:text-amber-400'
-                                : totalAssigned === totalMax
-                                  ? 'text-green-600 dark:text-green-400'
-                                  : 'text-red-600 dark:text-red-400'
-                          }
-                        >
-                          {totalAssigned}/{totalMax}
-                        </span>
-                      )
-                    })()}
-                  </th>
-                  {examDates.map((dateKey) => {
-                    const roomsForDate = Number(requiredRoomsByDate[dateKey] || 0)
-                    const candidatesForDate = Number(candidatesByDate[dateKey] || 0)
-                    const maxDuties = computeMaxDuties(activeTab, roomsForDate, candidatesForDate)
-                    const checked = checkedCountByDate[dateKey] || 0
-                    return (
-                      <th
-                        key={`max-${dateKey}`}
-                        className="border border-gray-400 dark:border-gray-500 px-4 py-2 text-center text-[11px] font-semibold whitespace-nowrap"
-                      >
-                        <span
-                          className={
-                            maxDuties <= 0
-                              ? 'text-gray-700 dark:text-gray-100'
-                              : checked > maxDuties
-                                ? 'text-amber-600 dark:text-amber-400'
-                                : checked === maxDuties
-                                  ? 'text-green-600 dark:text-green-400'
-                                  : 'text-red-600 dark:text-red-400'
-                          }
-                        >
-                          {checked}/{maxDuties}
-                        </span>
-                      </th>
-                    )
-                  })}
-                </tr>
-              </thead>
-              <tbody className="bg-white dark:bg-gray-800">
-                {filteredFunctionaries.map((func, index) => (
-                  <tr key={func._id} className="group hover:bg-gray-50 dark:hover:bg-gray-700">
-                    <td className="sticky left-0 z-[5] w-[4.5rem] min-w-[4.5rem] border border-gray-400 dark:border-gray-500 px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white bg-white dark:bg-gray-800 group-hover:bg-gray-50 dark:group-hover:bg-gray-700 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.06)] dark:shadow-[2px_0_4px_-2px_rgba(0,0,0,0.2)]">
-                      {index + 1}
-                    </td>
-                    <td className="sticky left-[4.5rem] z-[5] w-52 min-w-52 border border-gray-400 dark:border-gray-500 px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white bg-white dark:bg-gray-800 group-hover:bg-gray-50 dark:group-hover:bg-gray-700 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.06)] dark:shadow-[2px_0_4px_-2px_rgba(0,0,0,0.2)]">
-                      <span>{String(func.name || '').toUpperCase()}</span>
-                    </td>
-                    <td className="sticky left-[17.5rem] z-[5] w-20 min-w-20 border border-gray-400 dark:border-gray-500 px-4 py-4 text-center text-sm text-gray-900 dark:text-white bg-white dark:bg-gray-800 group-hover:bg-gray-50 dark:group-hover:bg-gray-700 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.06)] dark:shadow-[2px_0_4px_-2px_rgba(0,0,0,0.2)]">
-                      {checkedCountByFunctionary[func._id] || 0}
-                    </td>
-                    <td
-                      className="sticky left-[22.5rem] z-[5] w-28 min-w-28 border border-gray-400 dark:border-gray-500 px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white bg-white dark:bg-gray-800 group-hover:bg-gray-50 dark:group-hover:bg-gray-700 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.06)] dark:shadow-[2px_0_4px_-2px_rgba(0,0,0,0.2)]"
+                    <th scope="col" className="is-pin is-pin-2">
+                      Functionary
+                    </th>
+                    <th
+                      scope="col"
+                      className="is-pin is-pin-3"
+                      aria-sort={
+                        invigilatorDutySort === 'asc' ? 'ascending' : invigilatorDutySort === 'desc' ? 'descending' : 'none'
+                      }
                     >
-                      {activeTab === 'CL4' ? 'N/A' : (func.oasisId || func.employeeId || '-')}
-                    </td>
+                      <button
+                        type="button"
+                        className="cx-duty-matrix__sort"
+                        onClick={() =>
+                          setInvigilatorDutySort((prev) => (prev === 'none' ? 'desc' : prev === 'desc' ? 'asc' : 'none'))
+                        }
+                      >
+                        Duties
+                        <Icon
+                          icon={invigilatorDutySort === 'asc' ? ArrowUp : invigilatorDutySort === 'desc' ? ArrowDown : ArrowUpDown}
+                          size={12}
+                        />
+                      </button>
+                    </th>
+                    <th scope="col" className="is-pin is-pin-4">
+                      OASIS ID
+                    </th>
+                    {examDates.map((dateKey) => (
+                      <th key={dateKey} scope="col" data-date={dateKey}>
+                        {formatDateLabel(dateKey)}
+                      </th>
+                    ))}
+                  </tr>
+                  <tr>
+                    <th colSpan={2} className="is-pin is-pin-12">
+                      {getMaxRowLabel(activeTab)}
+                    </th>
+                    <th colSpan={2} className="is-pin is-pin-34">
+                      <span className={countClass(totalAssignedForTab, totalMaxForTab)}>
+                        {totalAssignedForTab}/{totalMaxForTab}
+                      </span>
+                    </th>
                     {examDates.map((dateKey) => {
-                      const key = `${func._id}::${dateKey}`
-                      const isChecked = !!checkedDuties[key]
                       const roomsForDate = Number(requiredRoomsByDate[dateKey] || 0)
                       const candidatesForDate = Number(candidatesByDate[dateKey] || 0)
                       const maxDuties = computeMaxDuties(activeTab, roomsForDate, candidatesForDate)
-                      const dateCheckedCount = checkedCountByDate[dateKey] || 0
-                      const maxReached = dateCheckedCount >= maxDuties && maxDuties > 0
-                      const isDisabled = maxReached && !isChecked
+                      const checked = checkedCountByDate[dateKey] || 0
                       return (
-                        <td key={key} className="border border-gray-400 dark:border-gray-500 px-4 py-4 text-center">
-                          <input
-                            type="checkbox"
-                            checked={isChecked}
-                            disabled={isDisabled}
-                            onChange={() => toggleDuty(func._id, dateKey)}
-                            className={`rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500 ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-                            title={isDisabled && maxReached && !isChecked ? `Maximum ${maxDuties} reached for ${formatDateLabel(dateKey)}` : `${func.name} - ${formatDateLabel(dateKey)}`}
-                          />
-                        </td>
+                        <th key={`max-${dateKey}`}>
+                          <span className={countClass(checked, maxDuties)}>
+                            {checked}/{maxDuties}
+                          </span>
+                        </th>
                       )
                     })}
                   </tr>
-                ))}
-                {filteredFunctionaries.length === 0 && (
-                  <tr>
-                    <td
-                      colSpan={4 + examDates.length}
-                      className="px-6 py-12 text-center text-sm text-gray-500 dark:text-gray-400"
-                    >
-                      {allFunctionaries.length === 0
-                        ? 'No exam functionaries found.'
-                        : `No functionaries assigned as "${activeDutyType}". Assign duty types on the Exam Functionaries page.`
-                      }
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {activeTab === 'ASI' && (
-          <div className="px-6 py-5 border-t border-gray-200 dark:border-gray-700 space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Room-wise Invigilator Assignment</h4>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  Assign selected invigilators to specific rooms for the chosen date (Auto/Manual applies here).
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="inline-flex items-center gap-2">
-                  <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">Manual</span>
-                  <button
-                    type="button"
-                    onClick={() => handleModeChange(allocationMode === 'auto' ? 'manual' : 'auto')}
-                    disabled={loadingAllocationMode}
-                    className={`relative inline-flex h-7 w-14 items-center rounded-full border transition-colors ${
-                      allocationMode === 'auto'
-                        ? 'bg-blue-600 border-blue-600'
-                        : 'bg-gray-200 dark:bg-gray-700 border-gray-300 dark:border-gray-600'
-                    } ${loadingAllocationMode ? 'opacity-60 cursor-not-allowed' : ''}`}
-                    title={
-                      allocationMode === 'auto'
-                        ? 'Switch to manual mode'
-                        : canEnableAutoModeForDate
-                          ? 'Switch to auto mode'
-                          : 'Switch to auto mode (requires selected functionaries for date)'
-                    }
-                  >
-                    <span
-                      className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
-                        allocationMode === 'auto' ? 'translate-x-8' : 'translate-x-1'
-                      }`}
-                    />
-                  </button>
-                  <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">Auto</span>
-                </div>
-                <div className="inline-flex items-center rounded-md border border-gray-300 dark:border-gray-600 overflow-hidden">
-                  <button
-                    type="button"
-                    onClick={goToPreviousRoomDate}
-                    disabled={!canGoToPreviousRoomDate}
-                    className="px-2.5 py-2 text-sm text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
-                    title="Previous exam date"
-                  >
-                    &larr;
-                  </button>
-                  <div className="px-3 py-2 text-sm font-medium text-gray-900 dark:text-white bg-white dark:bg-gray-800 border-l border-r border-gray-300 dark:border-gray-600 min-w-[90px] text-center">
-                    {selectedRoomDate ? formatDateLabel(selectedRoomDate) : '-'}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={goToNextRoomDate}
-                    disabled={!canGoToNextRoomDate}
-                    className="px-2.5 py-2 text-sm text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
-                    title="Next exam date"
-                  >
-                    &rarr;
-                  </button>
-                </div>
-                {allocationMode !== 'auto' && (
-                  <button
-                    className="btn btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
-                    onClick={handleSaveRoomAssignments}
-                    disabled={!selectedRoomDate || savingRoomAssignments || loadingRoomAssignments}
-                  >
-                    {savingRoomAssignments ? 'Saving...' : 'Save'}
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={handleDownloadRoomAssignments}
-                  disabled={!selectedRoomDate || loadingRoomAssignments || loadingDutyPdfPreview}
-                  className="inline-flex items-center justify-center h-9 w-9 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
-                  title="Preview Exam Functionary Duty Record"
-                  aria-label="Preview Exam Functionary Duty Record"
-                >
-                  {loadingDutyPdfPreview ? (
-                    <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                  ) : (
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v12m0 0l4-4m-4 4l-4-4M4 17v1a3 3 0 003 3h10a3 3 0 003-3v-1" />
-                    </svg>
-                  )}
-                </button>
-              </div>
-            </div>
-
-          <div className="overflow-x-auto duties-table-scroll">
-              <table className="min-w-full border-collapse border border-gray-300 dark:border-gray-600">
-                <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10">
-                  <tr>
-                    <th className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-200 uppercase tracking-wide">
-                      Room
-                    </th>
-                    <th className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-200 uppercase tracking-wide">
-                      Invigilator 1
-                    </th>
-                    <th className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-200 uppercase tracking-wide">
-                      OASIS ID
-                    </th>
-                    <th className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-200 uppercase tracking-wide">
-                      Invigilator 2
-                    </th>
-                    <th className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-200 uppercase tracking-wide">
-                      OASIS ID
-                    </th>
-                  </tr>
                 </thead>
-                <tbody className="bg-white dark:bg-gray-800">
-                  {allocatedRoomsForSelectedDate.map((room) => {
-                    const selectedFunctionaryId = roomAssignmentsByDate[selectedRoomDate]?.[room._id] || ''
-                    const selectedFunctionarySecondId = roomAssignmentsByDateSecond[selectedRoomDate]?.[room._id] || ''
-                    const selectedFunctionary = functionaryById[selectedFunctionaryId]
-                    const selectedFunctionarySecond = functionaryById[selectedFunctionarySecondId]
-                    const selectedFunctionaryAllowed =
-                      isCurrentInvigilator(selectedFunctionary) &&
-                      (allocationMode === 'manual' || isInvigilatorAllowedForRoom(room._id, selectedFunctionaryId, selectedRoomDate))
-                    const selectedFunctionarySecondAllowed =
-                      isCurrentInvigilator(selectedFunctionarySecond) &&
-                      (allocationMode === 'manual' || isInvigilatorAllowedForRoom(room._id, selectedFunctionarySecondId, selectedRoomDate))
-                    const remainingForFirst = getRemainingInvigilatorIdsForSlot(selectedRoomDate, room._id, 'first')
-                    const remainingForSecond = getRemainingInvigilatorIdsForSlot(selectedRoomDate, room._id, 'second')
-
-                    const options = [...roomDropdownInvigilators].filter((func) => {
-                      const candidateId = String(func._id || '').trim()
-                      if (!candidateId) return false
-                      if (!remainingForFirst.has(candidateId)) return false
-                      if (candidateId === String(selectedFunctionarySecondId || '').trim()) return false
-                      if (allocationMode !== 'manual' && !isInvigilatorAllowedForRoom(room._id, candidateId, selectedRoomDate)) return false
-                      if (isFunctionaryAssignedElsewhere(selectedRoomDate, candidateId, room._id, 'first')) return false
-                      return true
-                    })
-
-                    const secondOptions = [...roomDropdownInvigilators].filter((func) => {
-                      const candidateId = String(func._id || '').trim()
-                      if (!candidateId) return false
-                      if (!remainingForSecond.has(candidateId)) return false
-                      if (candidateId === String(selectedFunctionaryId || '').trim()) return false
-                      if (allocationMode !== 'manual' && !isInvigilatorAllowedForRoom(room._id, candidateId, selectedRoomDate)) return false
-                      if (isFunctionaryAssignedElsewhere(selectedRoomDate, candidateId, room._id, 'second')) return false
-                      return true
-                    })
-                    if (
-                      selectedFunctionaryId &&
-                      selectedFunctionary &&
-                      selectedFunctionaryAllowed &&
-                      !isFunctionaryAssignedElsewhere(selectedRoomDate, selectedFunctionaryId, room._id, 'first') &&
-                      !options.some((func) => func._id === selectedFunctionaryId)
-                    ) {
-                      options.push(selectedFunctionary)
-                    }
-                    if (
-                      selectedFunctionarySecondId &&
-                      selectedFunctionarySecond &&
-                      String(selectedFunctionarySecondId) !== String(selectedFunctionaryId) &&
-                      selectedFunctionarySecondAllowed &&
-                      !isFunctionaryAssignedElsewhere(selectedRoomDate, selectedFunctionarySecondId, room._id, 'second') &&
-                      !secondOptions.some((func) => func._id === selectedFunctionarySecondId)
-                    ) {
-                      secondOptions.push(selectedFunctionarySecond)
-                    }
-
-                    return (
-                      <tr key={room._id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                        <td className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-sm text-gray-900 dark:text-white whitespace-nowrap">
-                          {room.roomNo}{room.roomName ? ` - ${room.roomName}` : ''}
-                        </td>
-                        <td className="border border-gray-300 dark:border-gray-600 px-4 py-2">
-                          <select
-                            value={selectedFunctionaryId}
-                            onChange={(e) => handleRoomAssignmentChange(room._id, e.target.value)}
-                            className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white px-2 py-1.5"
-                            disabled={loadingRoomAssignments || allocationMode === 'auto'}
+                <tbody>
+                  {filteredFunctionaries.map((func, index) => (
+                    <tr key={func._id}>
+                      <td className="is-pin is-pin-1">{index + 1}</td>
+                      <td className="is-pin is-pin-2" title={func.name}>
+                        {func.name}
+                      </td>
+                      <td className="is-pin is-pin-3">{checkedCountByFunctionary[func._id] || 0}</td>
+                      <td className="is-pin is-pin-4">
+                        {activeTab === 'CL4' ? 'N/A' : func.oasisId || func.employeeId || '—'}
+                      </td>
+                      {examDates.map((dateKey) => {
+                        const key = `${func._id}::${dateKey}`
+                        const isChecked = !!checkedDuties[key]
+                        const roomsForDate = Number(requiredRoomsByDate[dateKey] || 0)
+                        const candidatesForDate = Number(candidatesByDate[dateKey] || 0)
+                        const maxDuties = computeMaxDuties(activeTab, roomsForDate, candidatesForDate)
+                        const dateCheckedCount = checkedCountByDate[dateKey] || 0
+                        const maxReached = dateCheckedCount >= maxDuties && maxDuties > 0
+                        const isDisabled = maxReached && !isChecked
+                        return (
+                          <td
+                            key={key}
                             title={
-                              allocationMode === 'auto'
-                                ? `Auto mode: invigilator is assigned by system for room ${room.roomNo}`
-                                : `Assign invigilator for room ${room.roomNo}`
+                              isDisabled
+                                ? `Maximum ${maxDuties} reached for ${formatDateLabel(dateKey)}`
+                                : `${func.name} - ${formatDateLabel(dateKey)}`
                             }
                           >
-                            <option value="">Select invigilator</option>
-                            {selectedFunctionaryId && selectedFunctionary && !selectedFunctionaryAllowed && (
-                              <option value={selectedFunctionaryId} disabled>
-                                {`${String(selectedFunctionary.name || '').toUpperCase()} (stored invalid assignment)`}
-                              </option>
-                            )}
-                            {options.map((func) => (
-                              <option key={func._id} value={func._id}>
-                                {String(func.name || '').toUpperCase()}
-                              </option>
-                            ))}
-                          </select>
-                        </td>
-                        <td className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-sm text-gray-900 dark:text-white whitespace-nowrap">
-                          {selectedFunctionary?.oasisId || selectedFunctionary?.employeeId || '-'}
-                        </td>
-                        <td className="border border-gray-300 dark:border-gray-600 px-4 py-2">
-                          <select
-                            value={selectedFunctionarySecondId}
-                            onChange={(e) => handleRoomAssignmentSecondChange(room._id, e.target.value)}
-                            disabled={loadingRoomAssignments || allocationMode === 'auto'}
-                            className={`w-full rounded-md border border-gray-300 dark:border-gray-600 text-sm text-gray-900 dark:text-white px-2 py-1.5 ${
-                              allocationMode === 'auto'
-                                ? 'bg-gray-100 dark:bg-gray-700 cursor-not-allowed'
-                                : 'bg-white dark:bg-gray-800'
-                            }`}
-                            title={`Invigilator 2 for room ${room.roomNo}`}
-                          >
-                            <option value="">Select invigilator</option>
-                            {selectedFunctionarySecondId && selectedFunctionarySecond && !selectedFunctionarySecondAllowed && (
-                              <option value={selectedFunctionarySecondId} disabled>
-                                {`${String(selectedFunctionarySecond.name || '').toUpperCase()} (stored invalid assignment)`}
-                              </option>
-                            )}
-                            {secondOptions.map((func) => (
-                              <option key={func._id} value={func._id}>
-                                {String(func.name || '').toUpperCase()}
-                              </option>
-                            ))}
-                          </select>
-                        </td>
-                        <td className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-sm text-gray-900 dark:text-white whitespace-nowrap">
-                          {selectedFunctionarySecond?.oasisId || selectedFunctionarySecond?.employeeId || '-'}
-                        </td>
-                      </tr>
-                    )
-                  })}
-                  {allocatedRoomsForSelectedDate.length === 0 && (
-                    <tr>
-                      <td colSpan={5} className="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
-                        No rooms are allotted for this date.
-                      </td>
+                            <Checkbox
+                              checked={isChecked}
+                              disabled={isDisabled}
+                              onChange={() => toggleDuty(func._id, dateKey)}
+                              aria-label={`${func.name} on ${formatDateLabel(dateKey)}`}
+                            />
+                          </td>
+                        )
+                      })}
                     </tr>
-                  )}
-                  {allocatedRoomsForSelectedDate.length > 0 && allocationMode === 'manual' && roomDropdownInvigilators.length === 0 && (
-                    <tr>
-                      <td colSpan={5} className="px-4 py-4 text-center text-xs text-amber-700 dark:text-amber-300">
-                        No invigilators selected for this date. Select invigilators in the upper table first.
-                      </td>
-                    </tr>
-                  )}
-                  {allocatedRoomsForSelectedDate.length > 0 && allocationMode === 'auto' && (
-                    <tr>
-                      <td colSpan={5} className="px-4 py-3 text-center text-xs text-blue-700 dark:text-blue-300">
-                        Auto mode is active. Invigilators shown here are assigned by backend on Save.
-                      </td>
-                    </tr>
-                  )}
+                  ))}
                 </tbody>
               </table>
             </div>
+            {filteredFunctionaries.length === 0 ? (
+              <EmptyState
+                compact
+                icon={Users}
+                title={allFunctionaries.length === 0 ? 'No exam functionaries yet' : `No one is set up as ${activeDutyType}`}
+                body={
+                  allFunctionaries.length === 0
+                    ? 'Add exam functionaries first, then pick their duties here.'
+                    : 'Assign duty types on the Exam functionaries page.'
+                }
+              />
+            ) : null}
+          </>
+        )}
+      </Card>
 
-            <div className="mt-4 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4">
-              <div className="flex items-center justify-between gap-3 mb-3">
-                <div>
-                  <h5 className="text-sm font-semibold text-gray-900 dark:text-white">Functionary Duty List Preview</h5>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    Stored format metadata for print/export.
-                  </p>
-                </div>
-                <div className="flex items-center gap-2 text-xs">
-                  <span className="px-2 py-1 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
-                    Page Size: {functionaryDutyListFormat.pageSize}
-                  </span>
-                  <span className="px-2 py-1 rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">
-                    Orientation: {functionaryDutyListFormat.orientation === 'landscape' ? 'Landscape' : 'Portrait'}
-                  </span>
-                </div>
+      {activeTab === 'ASI' && (
+        <>
+          <Card
+            flush
+            title="Invigilators by room"
+            subtitle="Place the selected invigilators in rooms for one exam date. Auto assignment applies here."
+          >
+            <CardToolbar>
+              <FilterBar
+                filters={
+                  <>
+                    <div className="cx-duty-date">
+                      <Button
+                        variant="tertiary"
+                        size="sm"
+                        icon={ChevronLeft}
+                        aria-label="Previous exam date"
+                        title="Previous exam date"
+                        onClick={goToPreviousRoomDate}
+                        disabled={!canGoToPreviousRoomDate}
+                      />
+                      <span className="cx-duty-date__label">
+                        {selectedRoomDate ? formatDateLabel(selectedRoomDate) : '—'}
+                      </span>
+                      <Button
+                        variant="tertiary"
+                        size="sm"
+                        icon={ChevronRight}
+                        aria-label="Next exam date"
+                        title="Next exam date"
+                        onClick={goToNextRoomDate}
+                        disabled={!canGoToNextRoomDate}
+                      />
+                    </div>
+                    <Switch
+                      label="Auto assign"
+                      checked={allocationMode === 'auto'}
+                      onChange={(on) => handleModeChange(on ? 'auto' : 'manual')}
+                      disabled={loadingAllocationMode}
+                    />
+                  </>
+                }
+                actions={
+                  <>
+                    <Button
+                      icon={FileText}
+                      onClick={handleDownloadRoomAssignments}
+                      loading={loadingDutyPdfPreview}
+                      disabled={!selectedRoomDate || loadingRoomAssignments}
+                    >
+                      Preview duty record
+                    </Button>
+                    {allocationMode !== 'auto' && (
+                      <Button
+                        variant="primary"
+                        icon={Save}
+                        onClick={handleSaveRoomAssignments}
+                        loading={savingRoomAssignments}
+                        disabled={!selectedRoomDate || loadingRoomAssignments}
+                      >
+                        Save rooms
+                      </Button>
+                    )}
+                  </>
+                }
+              />
+            </CardToolbar>
+            {allocatedRoomsForSelectedDate.length > 0 && allocationMode === 'auto' ? (
+              <div className="cx-duty-banner">
+                <Banner tone="info">Auto assignment is on. The system places invigilators in rooms when the selection is saved.</Banner>
               </div>
+            ) : null}
+            {allocatedRoomsForSelectedDate.length > 0 &&
+            allocationMode === 'manual' &&
+            roomDropdownInvigilators.length === 0 ? (
+              <div className="cx-duty-banner">
+                <Banner tone="warning">
+                  No invigilators are selected for this date. Tick them in the ASI tab above first.
+                </Banner>
+              </div>
+            ) : null}
+            <DataTable
+              caption="Invigilators by room"
+              columns={roomColumns}
+              rows={roomRows}
+              getRowKey={(row) => row.room._id}
+              loading={loadingRoomAssignments && roomRows.length === 0}
+              loadingLabel="Loading room assignments…"
+              empty={<EmptyState compact icon={DoorOpen} title="No rooms are allotted for this date" />}
+            />
+          </Card>
 
-              <div className="overflow-x-auto">
-                <div className="min-w-[1180px] rounded-md border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 p-3">
-                  <div className="text-[11px] font-medium text-gray-700 dark:text-gray-200 mb-2">
-                    A4 / {functionaryDutyListFormat.orientation === 'landscape' ? 'Landscape' : 'Portrait'} preview
-                  </div>
-                  <div className="rounded border border-gray-600 dark:border-gray-400 bg-white dark:bg-gray-900 p-3 overflow-hidden text-[11px]">
-                    <div className="flex items-center justify-between font-semibold text-gray-800 dark:text-gray-100 mb-1">
+          <Card
+            flush
+            title="Duty record layout"
+            subtitle="Drag a column edge to set its width on the printed record. Widths save on their own."
+            action={
+              <Badge tone="neutral">
+                {functionaryDutyListFormat.pageSize} · {orientationLabel}
+              </Badge>
+            }
+          >
+            <PaperStage flush>
+              <div className="cx-duty-record">
+                <Paper pageSize="A4" orientation={functionaryDutyListFormat.orientation} caption>
+                  <div className="cx-duty-sheet">
+                    <div className="cx-duty-sheet__row">
                       <span>Centre No:&nbsp; ________</span>
                       <span>Centre Name:&nbsp; ______________________________</span>
                       <span>Date:&nbsp; __.__.__</span>
                     </div>
-                    <div className="text-center text-[12px] font-semibold text-gray-800 dark:text-gray-100 mb-2">
-                      Exam Functionaries Duties Record (2025-26)
-                    </div>
-                    <div className="grid grid-cols-2 gap-4 text-[11px] font-semibold text-gray-800 dark:text-gray-100 mb-1">
-                      <div>Centre Superintendent: _______________________</div>
-                      <div className="text-right">Deputy Centre Superintendent: _______________________</div>
+                    <div className="cx-duty-sheet__title">Exam Functionaries Duties Record (2025-26)</div>
+                    <div className="cx-duty-sheet__row">
+                      <span>Centre Superintendent: _______________________</span>
+                      <span>Deputy Centre Superintendent: _______________________</span>
                     </div>
 
-                    <div className="relative inline-block align-top">
-                    <table className="w-full table-fixed border-collapse border border-gray-600 dark:border-gray-400 text-[10px]">
+                    <table>
                       <colgroup>
                         <col width={`${dutyListPreviewColumnPercentages.srNo}%`} />
                         <col width={`${dutyListPreviewColumnPercentages.roomNo}%`} />
@@ -1904,429 +1850,334 @@ const Duties: React.FC = () => {
                         <col width={`${dutyListPreviewColumnPercentages.inv2Signature}%`} />
                       </colgroup>
                       <thead>
-                        <tr className="text-[10px] font-semibold text-gray-800 dark:text-gray-100">
-                          <th rowSpan={2} className="relative border border-gray-600 dark:border-gray-400 px-1 py-1">
-                            Sr No
-                            <div
-                              className="absolute top-0 right-0 h-full w-3 cursor-col-resize z-30 bg-blue-500/10 hover:bg-blue-500/25"
-                              onMouseDown={(event) => startDutyListColumnResize(0, event)}
-                              title="Drag to resize column"
-                            />
-                          </th>
-                          <th rowSpan={2} className="relative border border-gray-600 dark:border-gray-400 px-1 py-1">
-                            Room No
-                            <div
-                              className="absolute top-0 right-0 h-full w-3 cursor-col-resize z-30 bg-blue-500/10 hover:bg-blue-500/25"
-                              onMouseDown={(event) => startDutyListColumnResize(1, event)}
-                              title="Drag to resize column"
-                            />
-                          </th>
-                          <th rowSpan={2} className="relative border border-gray-600 dark:border-gray-400 px-1 py-1">
-                            Room Name
-                            <div
-                              className="absolute top-0 right-0 h-full w-3 cursor-col-resize z-30 bg-blue-500/10 hover:bg-blue-500/25"
-                              onMouseDown={(event) => startDutyListColumnResize(2, event)}
-                              title="Drag to resize column"
-                            />
-                          </th>
-                          <th rowSpan={2} className="relative border border-gray-600 dark:border-gray-400 px-1 py-1">
-                            Floor
-                            <div
-                              className="absolute top-0 right-0 h-full w-3 cursor-col-resize z-30 bg-blue-500/10 hover:bg-blue-500/25"
-                              onMouseDown={(event) => startDutyListColumnResize(3, event)}
-                              title="Drag to resize column"
-                            />
-                          </th>
-                          <th colSpan={4} className="border border-gray-600 dark:border-gray-400 px-1 py-1">Invigilator 1</th>
-                          <th colSpan={4} className="border border-gray-600 dark:border-gray-400 px-1 py-1">Invigilator 2</th>
+                        <tr>
+                          {resizableHeader('Sr No', 0, { rowSpan: 2 })}
+                          {resizableHeader('Room No', 1, { rowSpan: 2 })}
+                          {resizableHeader('Room Name', 2, { rowSpan: 2 })}
+                          {resizableHeader('Floor', 3, { rowSpan: 2 })}
+                          <th colSpan={4}>Invigilator 1</th>
+                          <th colSpan={4}>Invigilator 2</th>
                         </tr>
-                        <tr className="text-[10px] font-semibold text-gray-800 dark:text-gray-100">
-                          <th className="relative border border-gray-600 dark:border-gray-400 px-1 py-1">
-                            School
-                            <div
-                              className="absolute top-0 right-0 h-full w-3 cursor-col-resize z-30 bg-blue-500/10 hover:bg-blue-500/25"
-                              onMouseDown={(event) => startDutyListColumnResize(4, event)}
-                              title="Drag to resize column"
-                            />
-                          </th>
-                          <th className="relative border border-gray-600 dark:border-gray-400 px-1 py-1">
-                            Invigilator Name
-                            <div
-                              className="absolute top-0 right-0 h-full w-3 cursor-col-resize z-30 bg-blue-500/10 hover:bg-blue-500/25"
-                              onMouseDown={(event) => startDutyListColumnResize(5, event)}
-                              title="Drag to resize column"
-                            />
-                          </th>
-                          <th className="relative border border-gray-600 dark:border-gray-400 px-1 py-1">
-                            OASIS ID
-                            <div
-                              className="absolute top-0 right-0 h-full w-3 cursor-col-resize z-30 bg-blue-500/10 hover:bg-blue-500/25"
-                              onMouseDown={(event) => startDutyListColumnResize(6, event)}
-                              title="Drag to resize column"
-                            />
-                          </th>
-                          <th className="relative border border-gray-600 dark:border-gray-400 px-1 py-1">
-                            Signature
-                            <div
-                              className="absolute top-0 right-0 h-full w-3 cursor-col-resize z-30 bg-blue-500/10 hover:bg-blue-500/25"
-                              onMouseDown={(event) => startDutyListColumnResize(7, event)}
-                              title="Drag to resize column"
-                            />
-                          </th>
-                          <th className="relative border border-gray-600 dark:border-gray-400 px-1 py-1">
-                            School
-                            <div
-                              className="absolute top-0 right-0 h-full w-3 cursor-col-resize z-30 bg-blue-500/10 hover:bg-blue-500/25"
-                              onMouseDown={(event) => startDutyListColumnResize(8, event)}
-                              title="Drag to resize column"
-                            />
-                          </th>
-                          <th className="relative border border-gray-600 dark:border-gray-400 px-1 py-1">
-                            Invigilator Name
-                            <div
-                              className="absolute top-0 right-0 h-full w-3 cursor-col-resize z-30 bg-blue-500/10 hover:bg-blue-500/25"
-                              onMouseDown={(event) => startDutyListColumnResize(9, event)}
-                              title="Drag to resize column"
-                            />
-                          </th>
-                          <th className="relative border border-gray-600 dark:border-gray-400 px-1 py-1">
-                            OASIS ID
-                            <div
-                              className="absolute top-0 right-0 h-full w-3 cursor-col-resize z-30 bg-blue-500/10 hover:bg-blue-500/25"
-                              onMouseDown={(event) => startDutyListColumnResize(10, event)}
-                              title="Drag to resize column"
-                            />
-                          </th>
-                          <th className="border border-gray-600 dark:border-gray-400 px-1 py-1">Signature</th>
+                        <tr>
+                          {resizableHeader('School', 4)}
+                          {resizableHeader('Invigilator Name', 5)}
+                          {resizableHeader('OASIS ID', 6)}
+                          {resizableHeader('Signature', 7)}
+                          {resizableHeader('School', 8)}
+                          {resizableHeader('Invigilator Name', 9)}
+                          {resizableHeader('OASIS ID', 10)}
+                          <th>Signature</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {(allocatedRoomsForSelectedDate.length > 0 ? allocatedRoomsForSelectedDate : Array.from({ length: 10 }).map((_, i) => ({
-                          _id: `preview-${i}`,
-                          roomNo: `${i + 1}`,
-                          roomName: '',
-                          floor: '',
-                        } as Room))).slice(0, 14).map((room, idx) => {
+                        {previewRooms.map((room, idx) => {
                           const assignedFunctionaryId = String(roomAssignmentsByDate[selectedRoomDate]?.[room._id] || '')
                           const invigilator = functionaryById[assignedFunctionaryId]
                           return (
-                          <tr key={room._id || `row-${idx}`}>
-                            <td className="border border-gray-600 dark:border-gray-400 px-1 py-1 text-center">{idx + 1}</td>
-                            <td className="border border-gray-600 dark:border-gray-400 px-1 py-1 text-center">{room.roomNo || ''}</td>
-                            <td className="border border-gray-600 dark:border-gray-400 px-1 py-1">{room.roomName || ''}</td>
-                            <td className="border border-gray-600 dark:border-gray-400 px-1 py-1">{room.floor || ''}</td>
-                            <td className="border border-gray-600 dark:border-gray-400 px-1 py-1">{getSchoolInitials(invigilator)}</td>
-                            <td className="border border-gray-600 dark:border-gray-400 px-1 py-1">{String(invigilator?.name || '').toUpperCase()}</td>
-                            <td className="border border-gray-600 dark:border-gray-400 px-1 py-1">{invigilator?.oasisId || invigilator?.employeeId || ''}</td>
-                            <td className="border border-gray-600 dark:border-gray-400 px-1 py-1" />
-                            <td className="border border-gray-600 dark:border-gray-400 px-1 py-1">{getSchoolInitials(invigilator)}</td>
-                            <td className="border border-gray-600 dark:border-gray-400 px-1 py-1">{String(invigilator?.name || '').toUpperCase()}</td>
-                            <td className="border border-gray-600 dark:border-gray-400 px-1 py-1">{invigilator?.oasisId || invigilator?.employeeId || ''}</td>
-                            <td className="border border-gray-600 dark:border-gray-400 px-1 py-1" />
-                          </tr>
-                        )})}
+                            <tr key={room._id || `row-${idx}`}>
+                              <td className="is-center">{idx + 1}</td>
+                              <td className="is-center">{room.roomNo || ''}</td>
+                              <td>{room.roomName || ''}</td>
+                              <td>{room.floor || ''}</td>
+                              <td>{getSchoolInitials(invigilator)}</td>
+                              <td>{String(invigilator?.name || '').toUpperCase()}</td>
+                              <td>{invigilator?.oasisId || invigilator?.employeeId || ''}</td>
+                              <td />
+                              <td>{getSchoolInitials(invigilator)}</td>
+                              <td>{String(invigilator?.name || '').toUpperCase()}</td>
+                              <td>{invigilator?.oasisId || invigilator?.employeeId || ''}</td>
+                              <td />
+                            </tr>
+                          )
+                        })}
                       </tbody>
                     </table>
-                    </div>
 
-                    <div className="grid grid-cols-3 gap-6 mt-4 text-[10px] text-gray-800 dark:text-gray-100">
+                    <div className="cx-duty-sheet__foot">
                       <div>
-                        <div className="font-semibold mb-2">Frisking Duty</div>
-                        <div>1 ___________________________</div>
-                        <div className="mt-2">2 ___________________________</div>
+                        <strong>Frisking Duty</strong>
+                        <p>1 ___________________________</p>
+                        <p>2 ___________________________</p>
                       </div>
                       <div>
-                        <div className="font-semibold mb-2">CCTV Invigilation</div>
-                        <div>1 ___________________________</div>
-                        <div className="mt-2">2 ___________________________</div>
+                        <strong>CCTV Invigilation</strong>
+                        <p>1 ___________________________</p>
+                        <p>2 ___________________________</p>
                       </div>
                       <div>
-                        <div className="font-semibold mb-2">Class IV Duty</div>
-                        <div className="flex gap-4">
-                          <span>1 ___________________</span>
-                          <span>2 ___________________</span>
-                        </div>
-                        <div className="mt-2">3 ___________________</div>
+                        <strong>Class IV Duty</strong>
+                        <p>1 ___________________&nbsp;&nbsp;&nbsp; 2 ___________________</p>
+                        <p>3 ___________________</p>
                       </div>
                     </div>
 
-                    <div className="mt-5 text-right text-[11px] font-semibold text-gray-800 dark:text-gray-100">
-                      Centre Superintendent
-                    </div>
+                    <div className="cx-duty-sheet__sign">Centre Superintendent</div>
                   </div>
-                </div>
+                </Paper>
               </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {showDutyPdfPreview && dutyPdfPreviewUrl && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4">
-          <div className="w-full max-w-6xl h-[88vh] bg-white dark:bg-gray-900 rounded-xl shadow-xl overflow-hidden flex flex-col">
-            <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-              <h4 className="text-sm font-semibold text-gray-900 dark:text-white">
-                Exam Functionary Duty Record Preview
-              </h4>
-              <div className="flex items-center gap-2">
-                <a
-                  href={dutyPdfPreviewUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center px-3 py-1.5 rounded-md text-xs font-semibold border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
-                >
-                  Open in New Tab
-                </a>
-                <a
-                  href={dutyPdfPreviewUrl}
-                  download={`exam-functionary-duty-record-${selectedRoomDate}.pdf`}
-                  className="inline-flex items-center px-3 py-1.5 rounded-md text-xs font-semibold bg-blue-600 text-white hover:bg-blue-700"
-                >
-                  Download PDF
-                </a>
-                <button
-                  type="button"
-                  onClick={closeDutyPdfPreview}
-                  className="inline-flex items-center px-3 py-1.5 rounded-md text-xs font-semibold border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-            <div className="w-full flex-1 overflow-auto bg-gray-100 dark:bg-gray-800 p-4">
-              {dutyPdfRenderError ? (
-                <div className="h-full w-full flex items-center justify-center p-6 text-center text-sm text-gray-600 dark:text-gray-300">
-                  {dutyPdfRenderError}
-                </div>
-              ) : (
-                <Document
-                  file={dutyPdfPreviewUrl}
-                  loading={
-                    <div className="h-full w-full flex items-center justify-center text-sm text-gray-600 dark:text-gray-300">
-                      Loading PDF preview...
-                    </div>
-                  }
-                  onLoadSuccess={({ numPages }) => {
-                    setDutyPdfPageCount(numPages)
-                    setDutyPdfRenderError(null)
-                  }}
-                  onLoadError={(error) => {
-                    console.error('Failed to render duty PDF preview:', error)
-                    const message = (error as Error)?.message || 'Unknown PDF render error'
-                    setDutyPdfRenderError(`Failed to render preview in dialog (${message}). Use "Open in New Tab" or "Download PDF".`)
-                  }}
-                  className="flex flex-col items-center gap-4"
-                >
-                  {Array.from({ length: dutyPdfPageCount }).map((_, index) => (
-                    <Page
-                      key={`duty-preview-page-${index + 1}`}
-                      pageNumber={index + 1}
-                      width={980}
-                      renderTextLayer={false}
-                      renderAnnotationLayer={false}
-                    />
-                  ))}
-                </Document>
-              )}
-            </div>
-          </div>
-        </div>
+            </PaperStage>
+          </Card>
+        </>
       )}
+
+      <Sheet
+        open={showDutyPdfPreview && !!dutyPdfPreviewUrl}
+        onClose={closeDutyPdfPreview}
+        size="xl"
+        icon={FileText}
+        title="Duty record preview"
+        description={selectedRoomDate ? `Exam functionary duty record for ${formatDateLabel(selectedRoomDate)}` : undefined}
+        footer={
+          dutyPdfPreviewUrl ? (
+            <>
+              <Button onClick={closeDutyPdfPreview}>Close</Button>
+              <Button icon={ExternalLink} onClick={() => window.open(dutyPdfPreviewUrl, '_blank', 'noopener,noreferrer')}>
+                Open in new tab
+              </Button>
+              <Button
+                variant="primary"
+                icon={Download}
+                onClick={() => {
+                  const link = document.createElement('a')
+                  link.href = dutyPdfPreviewUrl
+                  link.download = `exam-functionary-duty-record-${selectedRoomDate}.pdf`
+                  link.click()
+                }}
+              >
+                Download PDF
+              </Button>
+            </>
+          ) : null
+        }
+      >
+        {dutyPdfPreviewUrl ? (
+          <PaperStage
+            className="cx-duty-pdf"
+            state={
+              dutyPdfRenderError ? (
+                <EmptyState
+                  icon={AlertCircle}
+                  title="The preview couldn’t be shown"
+                  body={dutyPdfRenderError}
+                />
+              ) : undefined
+            }
+          >
+            <Document
+              file={dutyPdfPreviewUrl}
+              className={PAPER_PAGES_CLASS}
+              loading={
+                <div className="cb-table-state" role="status">
+                  <span className="cb-spinner" aria-hidden="true" />
+                  Loading PDF preview…
+                </div>
+              }
+              onLoadSuccess={({ numPages }) => {
+                setDutyPdfPageCount(numPages)
+                setDutyPdfRenderError(null)
+              }}
+              onLoadError={(error) => {
+                console.error('Failed to render duty PDF preview:', error)
+                const message = (error as Error)?.message || 'Unknown PDF render error'
+                setDutyPdfRenderError(`Failed to render preview in dialog (${message}). Use "Open in new tab" or "Download PDF".`)
+              }}
+            >
+              {Array.from({ length: dutyPdfPageCount }).map((_, index) => (
+                <PdfPage
+                  key={`duty-preview-page-${index + 1}`}
+                  pageNumber={index + 1}
+                  width={dutyPdfPageWidth()}
+                  renderTextLayer={false}
+                  renderAnnotationLayer={false}
+                />
+              ))}
+            </Document>
+          </PaperStage>
+        ) : null}
+      </Sheet>
+
       {/* ── Conflict diagnostics dialog ── */}
       <Dialog
-        isOpen={showConflictDialog && !!conflictDialogData}
-        onClose={() => { setShowConflictDialog(false); setConflictDialogData(null); setExpandedConflictIdx(null); setReplacementTarget(null) }}
-        variant="error"
-        size="xl"
-        title="Auto Assignment Failed"
-        description="No valid assignment exists. See conflict details below."
-        maxHeight="80vh"
-        actions={[
-          {
-            label: 'Close',
-            variant: 'outline',
-            onClick: () => { setShowConflictDialog(false); setConflictDialogData(null); setExpandedConflictIdx(null); setReplacementTarget(null) },
-          },
-        ]}
-        footerClassName="justify-between"
+        open={showConflictDialog && !!conflictDialogData}
+        onClose={closeConflictDialog}
+        tone="danger"
+        size="lg"
+        title="Auto assignment failed"
+        description="No valid assignment exists for this date. Open a functionary to see which rooms conflict."
+        footer={<Button onClick={closeConflictDialog}>Close</Button>}
       >
         {conflictDialogData && (
           <>
-            <table className="w-full text-xs border-collapse">
-              <thead>
-                <tr className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-700">
-                  <th className="text-left py-2 pr-2">Functionary</th>
-                  <th className="text-left py-2 pr-2">OASIS ID</th>
-                  <th className="text-left py-2 pr-2">School</th>
-                  <th className="text-center py-2 pr-2">Eligible</th>
-                  <th className="text-center py-2 pr-2">Replace</th>
-                  <th className="text-center py-2">Details</th>
-                </tr>
-              </thead>
-              <tbody>
-                {conflictDialogData.map((entry, idx) => {
-                  const isExpanded = expandedConflictIdx === idx
-                  const hasConflicts = (entry.ineligibleRooms?.length ?? 0) > 0
-                  return (
-                    <React.Fragment key={idx}>
-                      <tr
-                        className={`border-b border-gray-100 dark:border-gray-800 ${hasConflicts ? 'cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50' : ''} ${isExpanded ? 'bg-amber-50/60 dark:bg-amber-900/10' : ''}`}
-                        onClick={() => hasConflicts && setExpandedConflictIdx(isExpanded ? null : idx)}
-                      >
-                        <td className="py-2 pr-2 font-medium text-gray-800 dark:text-gray-200">{entry.name || '—'}</td>
-                        <td className="py-2 pr-2 text-gray-500 dark:text-gray-400 font-mono">{entry.employeeId || '—'}</td>
-                        <td className="py-2 pr-2 text-gray-500 dark:text-gray-400">{entry.schoolCode || '—'}</td>
-                        <td className="py-2 pr-2 text-center">
-                          <span className={`inline-flex items-center justify-center min-w-[40px] px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
-                            entry.eligibleRoomCount === entry.totalRooms
-                              ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                              : entry.eligibleRoomCount === 0
-                                ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-                                : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
-                          }`}>
-                            {entry.eligibleRoomCount}/{entry.totalRooms}
-                          </span>
-                        </td>
-                        <td className="py-2 pr-2 text-center">
-                          {entry._id && hasConflicts ? (
-                            <button
-                              type="button"
-                              onClick={(event) => {
-                                event.stopPropagation()
-                                setReplacementTarget(entry)
-                              }}
-                              className="inline-flex items-center px-2 py-1 rounded border border-gray-300 dark:border-gray-600 text-[10px] font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
-                            >
-                              Replace
-                            </button>
-                          ) : (
-                            <span className="text-gray-300 dark:text-gray-600">-</span>
-                          )}
-                        </td>
-                        <td className="py-2 text-center">
-                          {hasConflicts ? (
-                            <span className="text-gray-400 dark:text-gray-500 text-sm">
-                              {isExpanded ? '▾' : '▸'}
-                            </span>
-                          ) : (
-                            <span className="text-green-500 text-sm">✓</span>
-                          )}
-                        </td>
-                      </tr>
-                      {isExpanded && hasConflicts && (
-                        <tr>
-                          <td colSpan={6} className="px-3 py-2 bg-gray-50 dark:bg-gray-800/40">
-                            <div className="space-y-1.5">
-                              {(entry.ineligibleRooms || []).map((room: ConflictRoom, rIdx: number) => (
-                                <div key={rIdx} className="flex items-start gap-2 text-[11px]">
-                                  <span className="font-mono font-semibold text-gray-600 dark:text-gray-300 min-w-[52px] shrink-0">
-                                    Room {room.roomNo}
-                                  </span>
-                                  <div className="flex flex-wrap gap-1.5">
-                                    {room.reasons.map((reason: ConflictReason, reasonIdx: number) => {
-                                      if (reason.type === 'subject') {
-                                        return (
-                                          <span key={reasonIdx} className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300">
-                                            <span className="font-semibold">Subject:</span> {(reason.codes || []).join(', ')}
-                                          </span>
-                                        )
-                                      }
-                                      if (reason.type === 'school') {
-                                        return (
-                                          <span key={reasonIdx} className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">
-                                            <span className="font-semibold">School:</span> {reason.schoolCode}
-                                          </span>
-                                        )
-                                      }
-                                      if (reason.type === 'candidateOverlap') {
-                                        return (
-                                          <span key={reasonIdx} className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300">
-                                            <span className="font-semibold">Overlap:</span>
-                                            {' '}{(reason.rollNumbers || []).join(', ')}
-                                            {(reason.totalOverlaps || 0) > 5 ? ` (+${(reason.totalOverlaps || 0) - 5} more)` : ''}
-                                          </span>
-                                        )
-                                      }
-                                      return null
-                                    })}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </td>
-                        </tr>
-                      )}
-                    </React.Fragment>
-                  )
-                })}
-              </tbody>
-            </table>
-            <p className="mt-3 text-[10px] text-gray-500 dark:text-gray-400">
-              Mode reverted to manual. Add more functionaries or resolve conflicts above.
-            </p>
-          </>
-        )}
-      </Dialog>
-      <Dialog
-        isOpen={!!replacementTarget}
-        onClose={() => setReplacementTarget(null)}
-        size="lg"
-        title={replacementTarget?.name ? `Replace ${replacementTarget.name}` : 'Replace Functionary'}
-        description="Only current ASI invigilators who are not already selected or assigned for this date are shown."
-        actions={[
-          {
-            label: 'Close',
-            variant: 'outline',
-            onClick: () => setReplacementTarget(null),
-          },
-        ]}
-      >
-        <div className="space-y-3">
-          {replacementCandidates.length === 0 ? (
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              No eligible ASI invigilators are available for replacement on this date.
-            </p>
-          ) : (
-            <div className="max-h-[50vh] overflow-auto rounded-lg border border-gray-200 dark:border-gray-700">
-              <table className="w-full text-sm border-collapse">
-                <thead className="bg-gray-50 dark:bg-gray-800">
-                  <tr className="text-left text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                    <th className="px-3 py-2">Functionary</th>
-                    <th className="px-3 py-2">OASIS ID</th>
-                    <th className="px-3 py-2">Eligible Rooms</th>
-                    <th className="px-3 py-2 text-right">Action</th>
+            <div className="cx-duty-scroll">
+              <table className="cx-duty-conflicts">
+                <thead>
+                  <tr>
+                    <th scope="col">Functionary</th>
+                    <th scope="col">OASIS ID</th>
+                    <th scope="col">School</th>
+                    <th scope="col">Eligible rooms</th>
+                    <th scope="col" className="is-end">
+                      <span className="cb-visually-hidden">Actions</span>
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {replacementCandidates.map(({ functionary, eligibleRoomCount }) => (
-                    <tr key={functionary._id} className="border-t border-gray-100 dark:border-gray-800">
-                      <td className="px-3 py-2 font-medium text-gray-900 dark:text-white">
-                        {String(functionary.name || '').toUpperCase()}
-                      </td>
-                      <td className="px-3 py-2 text-gray-500 dark:text-gray-400 font-mono">
-                        {functionary.employeeId || '-'}
-                      </td>
-                      <td className="px-3 py-2 text-gray-500 dark:text-gray-400">
-                        {eligibleRoomCount}/{allocatedRoomsForSelectedDate.length}
-                      </td>
-                      <td className="px-3 py-2 text-right">
-                        <button
-                          type="button"
-                          onClick={() => handleReplaceConflictFunctionary(String(replacementTarget?._id || ''), String(functionary._id || ''))}
-                          className="inline-flex items-center px-2.5 py-1.5 rounded bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700"
+                  {conflictDialogData.map((entry, idx) => {
+                    const isExpanded = expandedConflictIdx === idx
+                    const hasConflicts = (entry.ineligibleRooms?.length ?? 0) > 0
+                    const eligibleTone =
+                      entry.eligibleRoomCount === entry.totalRooms
+                        ? 'success'
+                        : entry.eligibleRoomCount === 0
+                          ? 'danger'
+                          : 'warning'
+                    return (
+                      <React.Fragment key={idx}>
+                        <tr
+                          className={cx(hasConflicts && 'is-expandable', isExpanded && 'is-open')}
+                          onClick={() => hasConflicts && setExpandedConflictIdx(isExpanded ? null : idx)}
                         >
-                          Replace
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                          <td className="cb-strong">{entry.name || '—'}</td>
+                          <td className="is-num cb-muted">{entry.employeeId || '—'}</td>
+                          <td className="cb-muted">{entry.schoolCode || '—'}</td>
+                          <td>
+                            <Badge tone={eligibleTone}>
+                              {entry.eligibleRoomCount}/{entry.totalRooms} eligible
+                            </Badge>
+                          </td>
+                          <td className="is-end">
+                            {entry._id && hasConflicts ? (
+                              <Button
+                                size="sm"
+                                onClick={(event) => {
+                                  event.stopPropagation()
+                                  setReplacementTarget(entry)
+                                }}
+                              >
+                                Replace
+                              </Button>
+                            ) : null}
+                            {hasConflicts ? (
+                              <Button
+                                variant="tertiary"
+                                size="sm"
+                                icon={isExpanded ? ChevronDown : ChevronRight}
+                                aria-label={isExpanded ? 'Hide conflicting rooms' : 'Show conflicting rooms'}
+                                aria-expanded={isExpanded}
+                                onClick={(event) => {
+                                  event.stopPropagation()
+                                  setExpandedConflictIdx(isExpanded ? null : idx)
+                                }}
+                              />
+                            ) : null}
+                          </td>
+                        </tr>
+                        {isExpanded && hasConflicts && (
+                          <tr>
+                            <td colSpan={5} className="cx-duty-conflicts__detail">
+                              <div className="cx-duty-reasons">
+                                {(entry.ineligibleRooms || []).map((room: ConflictRoom, rIdx: number) => (
+                                  <div key={rIdx} className="cx-duty-reasons__room">
+                                    <span>Room {room.roomNo}</span>
+                                    <div className="cx-duty-reasons__list">
+                                      {room.reasons.map((reason: ConflictReason, reasonIdx: number) => {
+                                        if (reason.type === 'subject') {
+                                          return (
+                                            <Badge key={reasonIdx} tone="neutral">
+                                              Subject: {(reason.codes || []).join(', ')}
+                                            </Badge>
+                                          )
+                                        }
+                                        if (reason.type === 'school') {
+                                          return (
+                                            <Badge key={reasonIdx} tone="neutral">
+                                              Own school: {reason.schoolCode}
+                                            </Badge>
+                                          )
+                                        }
+                                        if (reason.type === 'candidateOverlap') {
+                                          return (
+                                            <Badge key={reasonIdx} tone="neutral">
+                                              Candidate overlap: {(reason.rollNumbers || []).join(', ')}
+                                              {(reason.totalOverlaps || 0) > 5 ? ` (+${(reason.totalOverlaps || 0) - 5} more)` : ''}
+                                            </Badge>
+                                          )
+                                        }
+                                        return null
+                                      })}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
-          )}
-        </div>
+            <p className="cb-subtle">Mode switched back to manual. Add more functionaries or resolve the conflicts above.</p>
+          </>
+        )}
       </Dialog>
-    </div>
+
+      <Dialog
+        open={!!replacementTarget}
+        onClose={() => setReplacementTarget(null)}
+        size="lg"
+        title={replacementTarget?.name ? `Replace ${replacementTarget.name}` : 'Replace functionary'}
+        description="Only current ASI invigilators who aren’t already selected or placed for this date are listed."
+        footer={<Button onClick={() => setReplacementTarget(null)}>Close</Button>}
+      >
+        {replacementCandidates.length === 0 ? (
+          <EmptyState
+            compact
+            icon={Users}
+            title="No one is free to take this duty"
+            body="No eligible ASI invigilators are available for replacement on this date."
+          />
+        ) : (
+          <div className="cx-duty-scroll">
+            <table className="cx-duty-conflicts">
+              <thead>
+                <tr>
+                  <th scope="col">Functionary</th>
+                  <th scope="col">OASIS ID</th>
+                  <th scope="col">Eligible rooms</th>
+                  <th scope="col" className="is-end">
+                    <span className="cb-visually-hidden">Actions</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {replacementCandidates.map(({ functionary, eligibleRoomCount }) => (
+                  <tr key={functionary._id}>
+                    <td className="cb-strong">{functionary.name || '—'}</td>
+                    <td className="is-num cb-muted">{functionary.employeeId || '—'}</td>
+                    <td className="is-num cb-muted">
+                      {eligibleRoomCount}/{allocatedRoomsForSelectedDate.length}
+                    </td>
+                    <td className="is-end">
+                      <Button
+                        size="sm"
+                        variant="primary"
+                        onClick={() =>
+                          handleReplaceConflictFunctionary(String(replacementTarget?._id || ''), String(functionary._id || ''))
+                        }
+                      >
+                        Replace
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Dialog>
+    </Page>
   )
 }
 

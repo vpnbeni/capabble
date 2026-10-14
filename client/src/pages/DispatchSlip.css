@@ -1,126 +1,24 @@
-/* Dispatch Slip - A4 print layout: 2 slips per page (half page each) */
+/* Dispatch slip template preview.
+ * The slips are drawn on kit paper (.cb-paper), so they use the paper ink
+ * (--paper-ink / --paper-rule) the kit defines for printed documents.
+ * Two slips per A4 sheet, top and bottom, with a dashed cut line between them. */
 
-.dispatch-slip-print-area {
-  /* Screen: show as preview */
-  display: block;
-  max-width: 210mm;
-  margin: 0 auto;
-  background: white;
-  color: black;
-}
+.cb-app .cx-dslip-sheet { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-3); color: var(--paper-ink); }
+.cb-app .cx-dslip-sheet__cut { width: 100%; border-top: 1px dashed var(--paper-ink); opacity: 0.6; }
 
-.dispatch-slip-half {
-  /* Each slip = half A4 height */
-  width: 210mm;
-  min-height: 148.5mm; /* A4 height / 2 */
-  padding: 10mm 15mm;
-  box-sizing: border-box;
-  page-break-after: avoid;
-}
+.cb-app .cx-dslip { border: 1px solid var(--paper-ink); padding: var(--space-6) var(--space-8); font: 400 12px/18px var(--font-sans); }
+.cb-app .cx-dslip__head { text-align: center; margin-bottom: var(--space-6); font: 800 14px/20px var(--font-sans); letter-spacing: 0.025em; }
+.cb-app .cx-dslip__blank { display: inline-block; border-bottom: 1px solid var(--paper-ink); padding-bottom: 2px; vertical-align: bottom; }
+.cb-app .cx-dslip__blank--centre { min-width: 90px; }
+.cb-app .cx-dslip__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-8); margin-bottom: var(--space-6); }
+.cb-app .cx-dslip__grid--address { gap: calc(var(--space-8) + var(--space-2)); margin-bottom: 0; }
+.cb-app .cx-dslip__col { display: flex; flex-direction: column; gap: var(--space-3); }
+.cb-app .cx-dslip__label { font-weight: 600; }
+.cb-app .cx-dslip__grid--address .cx-dslip__label { margin-bottom: var(--space-1); }
+.cb-app .cx-dslip__address { font-weight: 600; line-height: 1.375; white-space: pre-wrap; }
 
-/* Every third slip (indices 2, 4, 6...) starts a new page when printed */
-.dispatch-slip-new-page {
-  page-break-before: always;
-}
-
-.dispatch-slip-content {
-  border: 1px solid #333;
-  padding: 8mm;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-}
-
-.dispatch-slip-header {
-  border-bottom: 1px solid #333;
-  padding-bottom: 4mm;
-  margin-bottom: 6mm;
-}
-
-.dispatch-slip-title {
-  font-size: 14pt;
-  font-weight: 700;
-  margin: 0 0 2mm 0;
-  letter-spacing: 0.05em;
-}
-
-.dispatch-slip-meta {
-  font-size: 10pt;
-  display: flex;
-  flex-direction: column;
-  gap: 1mm;
-}
-
-.dispatch-slip-body {
-  flex: 1;
-  font-size: 11pt;
-}
-
-.dispatch-slip-row {
-  display: flex;
-  gap: 4mm;
-  margin-bottom: 3mm;
-}
-
-.dispatch-slip-label {
-  font-weight: 600;
-  min-width: 100px;
-}
-
-.dispatch-slip-value {
-  flex: 1;
-}
-
-.dispatch-slip-destination {
-  margin-top: 4mm;
-  padding-top: 4mm;
-  border-top: 1px dashed #666;
-}
-
-.dispatch-slip-footer {
-  margin-top: auto;
-  padding-top: 6mm;
-}
-
-.dispatch-slip-cut-line {
-  border-top: 1px dashed #999;
-  margin-top: 4mm;
-  font-size: 8pt;
-  color: #666;
-}
-
-/* Hide screen preview when printing */
-@media print {
-  .dispatch-slip-preview {
-    display: none !important;
-  }
-
-  .dispatch-slip-print-area {
-    display: block !important;
-    max-width: none;
-    margin: 0;
-    padding: 0;
-  }
-
-  .dispatch-slip-half {
-    width: 210mm;
-    min-height: 148.5mm;
-    padding: 10mm 15mm;
-    border: none;
-    background: white;
-  }
-
-  .dispatch-slip-new-page {
-    page-break-before: always;
-  }
-
-  /* Ensure odd number of slips: last slip doesn't force blank half */
-  .dispatch-slip-half:last-child {
-    min-height: 148.5mm;
-  }
-
-  /* Hide non-print UI */
-  .print\\:hidden {
-    display: none !important;
-  }
+@media (max-width: 640px) {
+  .cb-app .cx-dslip-sheet { padding: 0; }
+  .cb-app .cx-dslip { padding: var(--space-3); font-size: 10px; line-height: 15px; }
+  .cb-app .cx-dslip__grid { gap: var(--space-3); }
 }

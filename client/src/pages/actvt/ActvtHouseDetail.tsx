@@ -2,15 +2,13 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import {
-  ArrowDown,
-  ArrowLeft,
-  ArrowUp,
-  ArrowUpDown,
+  ChevronLeft,
   Crown,
   Flag,
-  Medal,
+  GraduationCap,
   Pencil,
   Plus,
+  Shield,
   Trash2,
   Trophy,
   UserRound,
@@ -18,13 +16,28 @@ import {
 } from 'lucide-react'
 import api from '@/services/api'
 import { ImageCropModal } from '@/components/common/ImageCropModal'
-import { HouseEditModal } from '@/components/actvt/HouseEditModal'
-import { HouseFlagFly } from '@/components/actvt/HouseFlagFly'
 import {
-  getHouseHeadingTextColor,
-  usesDarkHouseHeading,
-} from '@/constants/houseColorMetadata'
+  Avatar,
+  Badge,
+  Button,
+  Card,
+  DataTable,
+  EmptyState,
+  FilterBar,
+  Icon,
+  Page,
+  Select,
+  StatCard,
+  TextField,
+  orDash,
+  type DataTableColumn,
+} from '@/components/ui'
+import { HouseEditModal, houseInitials } from '@/components/actvt/HouseEditModal'
+import { HouseFlagFly } from '@/components/actvt/HouseFlagFly'
+import { toneStyle } from '@/components/actvt/entityTone'
 import { HOUSE_COUNCIL_MEMBER_ROLES } from '@/constants/councilMetadata'
+import '@/components/actvt/actvt.css'
+import '@/components/actvt/houses.css'
 
 type HouseTeacher = {
   _id?: string
@@ -110,14 +123,32 @@ type HouseDetailsPayload = {
 const COUNCIL_ROLES: string[] = [...HOUSE_COUNCIL_MEMBER_ROLES]
 const TEACHER_ROLES = ['House Master', 'House Mistress', 'Assistant House Teacher', 'Mentor', 'House Teacher']
 
-const isLikelyColor = (value = '') => /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(value.trim())
+const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? '' : 's'}`
 
-const initialsOf = (name = '') => {
-  const parts = String(name).trim().split(/\s+/).filter(Boolean)
-  if (parts.length === 0) return 'H'
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
-  return `${parts[0][0] || ''}${parts[1][0] || ''}`.toUpperCase()
-}
+const STUDENT_COLUMNS: DataTableColumn<HouseStudent>[] = [
+  { key: 'rollNumber', header: 'Adm no', sortable: true, mobile: 'aside', render: (row) => orDash(row.rollNumber) },
+  { key: 'classRollNo', header: 'Roll no', sortable: true, numeric: true, render: (row) => orDash(row.classRollNo) },
+  {
+    key: 'name',
+    header: 'Student',
+    sortable: true,
+    mobile: 'title',
+    render: (row) => <span className="cb-strong">{row.name}</span>,
+  },
+  { key: 'fatherName', header: 'Father', sortable: true, render: (row) => orDash(row.fatherName) },
+  { key: 'motherName', header: 'Mother', sortable: true, render: (row) => orDash(row.motherName) },
+  { key: 'class', header: 'Class', sortable: true, mobile: 'subtitle', render: (row) => orDash(row.class) },
+  { key: 'section', header: 'Section', sortable: true, render: (row) => orDash(row.section) },
+  { key: 'gender', header: 'Gender', sortable: true, render: (row) => orDash(row.gender) },
+  {
+    key: 'participationCount',
+    header: 'Participation',
+    sortable: true,
+    numeric: true,
+    align: 'right',
+    render: (row) => row.participationCount ?? 0,
+  },
+]
 
 const ActvtHouseDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>()
@@ -182,9 +213,6 @@ const ActvtHouseDetail: React.FC = () => {
   }, [])
 
   const house = data?.house
-  const tone = isLikelyColor(house?.color || '') ? house!.color! : '#4f46e5'
-  const headingText = getHouseHeadingTextColor(tone)
-  const darkHeading = usesDarkHouseHeading(tone)
 
   const classOptions = useMemo(() => {
     const values = new Set<string>()
@@ -265,40 +293,6 @@ const ActvtHouseDetail: React.FC = () => {
       }
       return { key, direction: 'asc' }
     })
-  }
-
-  const SortHeader = ({
-    label,
-    sortKey,
-    className = '',
-  }: {
-    label: string
-    sortKey: StudentSortKey
-    className?: string
-  }) => {
-    const active = studentSort.key === sortKey
-    return (
-      <th className={`px-2 py-3 sm:px-3 ${className}`}>
-        <button
-          type="button"
-          onClick={() => toggleStudentSort(sortKey)}
-          className={`inline-flex max-w-full items-center gap-1 font-semibold uppercase tracking-wide ${
-            active ? 'text-indigo-700' : 'text-slate-500 hover:text-slate-700'
-          }`}
-        >
-          <span className="truncate">{label}</span>
-          {active ? (
-            studentSort.direction === 'asc' ? (
-              <ArrowUp className="h-3.5 w-3.5 shrink-0" />
-            ) : (
-              <ArrowDown className="h-3.5 w-3.5 shrink-0" />
-            )
-          ) : (
-            <ArrowUpDown className="h-3.5 w-3.5 shrink-0 opacity-50" />
-          )}
-        </button>
-      </th>
-    )
   }
 
   const persistMembers = async (
@@ -430,495 +424,422 @@ const ActvtHouseDetail: React.FC = () => {
     await persistMembers(house?.teachers || [], next, 'Council member removed.')
   }
 
-  if (loading) {
-    return <div className="p-6 text-sm text-slate-500">Loading house details...</div>
+  // ---- Early returns: every hook is above this line. ----
+
+  if (loading && !data) {
+    return (
+      <Page>
+        <div className="cb-table-state" role="status">
+          <span className="cb-spinner" aria-hidden="true" />
+          Loading house…
+        </div>
+      </Page>
+    )
   }
 
   if (!house) {
     return (
-      <div className="p-6">
-        <p className="text-sm text-slate-600">House not found.</p>
-        <button
-          type="button"
-          onClick={() => navigate('/actvt/houses')}
-          className="mt-3 text-sm font-semibold text-indigo-600"
-        >
-          Back to Houses
-        </button>
-      </div>
+      <Page>
+        <Card>
+          <EmptyState
+            icon={Shield}
+            title="House not found"
+            body="It may have been removed. Go back to the house list to pick another."
+            action={
+              <Button icon={ChevronLeft} onClick={() => navigate('/actvt/houses')}>
+                Back to houses
+              </Button>
+            }
+          />
+        </Card>
+      </Page>
     )
   }
 
+  const teachers = house.teachers || []
+  const councilMembers = house.councilMembers || []
+  const wallOfFame = data?.wallOfFame || []
+  const totalStudents = data?.students.length || 0
+  const hasStudentFilters = Boolean(classFilter || sectionFilter || studentQuery)
+  const tone = toneStyle(house.color)
+
   return (
-    <div className="p-6">
-      <div className="mx-auto max-w-[1400px] space-y-6">
-        <div className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm">
-          <div
-            className="relative min-h-[220px] overflow-hidden px-6 py-4"
-            style={{ background: `linear-gradient(135deg, ${tone}, ${tone}b8)` }}
-          >
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.28),transparent_55%)]" />
+    <Page>
+      <div className="cb-stack">
+        <div className="ah-detail-head">
 
-            <input
-              ref={flagInputRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={handleFlagSelected}
-            />
+        <section className="actvt-hero ah-hero" style={tone} aria-label={`${house.name || 'House'} profile`}>
+          <input ref={flagInputRef} type="file" accept="image/*" hidden onChange={handleFlagSelected} />
 
-            <div className="relative z-[1] grid items-stretch gap-6 lg:grid-cols-[180px_1fr_auto]">
-              <div className="flex min-h-[168px] flex-col justify-self-start">
-                <Link
-                  to="/actvt/houses"
-                  className={`inline-flex shrink-0 items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold backdrop-blur ${
-                    darkHeading
-                      ? 'bg-black/10 text-black hover:bg-black/15'
-                      : 'bg-white/20 text-white hover:bg-white/30'
-                  }`}
-                >
-                  <ArrowLeft className="h-3.5 w-3.5" />
-                  All Houses
-                </Link>
+          <div className="actvt-hero__logo ah-hero__logo">
+            {house.logo ? (
+              <img src={house.logo} alt={`${house.name || 'House'} logo`} />
+            ) : (
+              <span className="ah-hero__initials actvt-tone-fill" aria-hidden="true">
+                {houseInitials(house.name)}
+              </span>
+            )}
+          </div>
 
-                <div className="mt-auto mb-auto flex h-36 w-36 items-center justify-center rounded-[28px] border-4 border-white bg-white p-2 shadow-xl">
-                  {house.logo ? (
-                    <img src={house.logo} alt={house.name} className="h-full w-full rounded-2xl object-contain" />
-                  ) : (
-                    <div
-                      className="flex h-full w-full items-center justify-center rounded-2xl text-3xl font-bold"
-                      style={{
-                        backgroundColor: tone,
-                        color: headingText,
-                      }}
-                    >
-                      {initialsOf(house.name)}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="flex flex-col items-center justify-center self-center text-center" style={{ color: headingText }}>
-                <h1 className="text-3xl font-bold">{house.name}</h1>
-                <p className="mt-2 text-sm font-semibold opacity-90">{house.tagline || 'No tagline yet'}</p>
-                <p className="mt-1 text-sm italic opacity-80">{house.motto ? `“${house.motto}”` : 'No motto yet'}</p>
-
-                <div className="mt-4 inline-flex overflow-hidden rounded-2xl bg-white/95 shadow-sm">
-                  <button
-                    type="button"
-                    onClick={() => setEditOpen(true)}
-                    className="inline-flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-                  >
-                    <Pencil className="h-3.5 w-3.5" />
-                    Edit house
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => flagInputRef.current?.click()}
-                    disabled={uploadingFlag}
-                    className="inline-flex items-center justify-center gap-1.5 border-l border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-60"
-                    title="Upload house flag"
-                  >
-                    <Flag className="h-3.5 w-3.5" />
-                    {uploadingFlag
-                      ? house.flag
-                        ? 'Changing...'
-                        : 'Uploading...'
-                      : house.flag
-                        ? 'Change flag'
-                        : 'Upload flag'}
-                  </button>
-                </div>
-              </div>
-
-              <div className="flex items-start justify-self-end pr-2 mr-6 sm:mr-10">
-                {house.flag ? (
-                  <HouseFlagFly
-                    key={house.flag}
-                    src={house.flag}
-                    alt={`${house.name} flag`}
-                    height={72}
-                    poleHeight={188}
-                    hoist
-                  />
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => flagInputRef.current?.click()}
-                    disabled={uploadingFlag}
-                    className="flex h-[188px] w-[130px] flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-white/70 bg-white/20 text-white/90 disabled:opacity-60"
-                    title="Upload house flag"
-                  >
-                    <Flag className="h-5 w-5" />
-                    <span className="text-[10px] font-semibold uppercase tracking-wide">
-                      {uploadingFlag ? 'Uploading...' : 'Add house flag'}
-                    </span>
-                  </button>
-                )}
-              </div>
+          <div className="actvt-hero__main">
+            <h2 className="actvt-hero__name">{house.name || 'Untitled house'}</h2>
+            <p className="actvt-hero__tagline">{house.tagline || 'No tagline yet'}</p>
+            <p className="ah-hero__motto">{house.motto ? `“${house.motto}”` : 'No motto yet'}</p>
+            <div className="ah-hero__swatch">
+              <span className="actvt-tone-dot" aria-hidden="true" />
+              {house.color || 'No colour set'}
+            </div>
+            <div className="actvt-hero__actions">
+              <Button variant="primary" size="sm" icon={Pencil} onClick={() => setEditOpen(true)}>
+                Edit house
+              </Button>
+              <Button
+                size="sm"
+                icon={Flag}
+                loading={uploadingFlag}
+                onClick={() => flagInputRef.current?.click()}
+              >
+                {uploadingFlag
+                  ? house.flag
+                    ? 'Changing flag…'
+                    : 'Uploading flag…'
+                  : house.flag
+                    ? 'Change flag'
+                    : 'Upload flag'}
+              </Button>
             </div>
           </div>
+
+          <div className="ah-hero__flag">
+            {house.flag ? (
+              <HouseFlagFly
+                key={house.flag}
+                src={house.flag}
+                alt={`${house.name} flag`}
+                height={72}
+                poleHeight={160}
+                hoist
+              />
+            ) : (
+              <button
+                type="button"
+                className="ah-flag-empty"
+                onClick={() => flagInputRef.current?.click()}
+                disabled={uploadingFlag}
+              >
+                <Icon icon={Flag} size={20} />
+                <span>{uploadingFlag ? 'Uploading…' : 'Add house flag'}</span>
+              </button>
+            )}
+          </div>
+        </section>
         </div>
 
-        <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <StatCard label="Students" value={data?.stats.totalStudents || 0} />
-          <StatCard label="Teachers" value={data?.stats.teachersCount || 0} />
-          <StatCard label="Council" value={data?.stats.councilCount || 0} />
+        <div className="cb-stats">
+          <StatCard label="Students" value={data?.stats.totalStudents || 0} icon={Users} />
+          <StatCard label="Teachers" value={data?.stats.teachersCount || 0} icon={UserRound} />
+          <StatCard label="Council members" value={data?.stats.councilCount || 0} icon={Crown} />
           <StatCard
-            label="Boys / Girls"
+            label="Boys / girls"
             value={`${data?.stats.genderCounts?.Boy || 0} / ${data?.stats.genderCounts?.Girl || 0}`}
+            icon={GraduationCap}
           />
-        </section>
+        </div>
 
-        <div className="grid gap-6 xl:grid-cols-2">
-          <section className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="mb-4 flex items-center gap-2">
-              <UserRound className="h-4 w-4 text-indigo-600" />
-              <h2 className="text-lg font-semibold text-slate-900">Teachers in the house</h2>
-            </div>
-
-            <form onSubmit={handleAddTeacher} className="mb-4 grid gap-2 sm:grid-cols-2">
-              <input
-                value={teacherForm.name}
-                onChange={(event) => setTeacherForm({ ...teacherForm, name: event.target.value })}
-                placeholder="Teacher name"
-                className={inputClass}
-              />
-              <select
-                value={teacherForm.role}
-                onChange={(event) => setTeacherForm({ ...teacherForm, role: event.target.value })}
-                className={inputClass}
-              >
-                {TEACHER_ROLES.map((role) => (
-                  <option key={role} value={role}>{role}</option>
-                ))}
-              </select>
-              <input
-                value={teacherForm.phone}
-                onChange={(event) => setTeacherForm({ ...teacherForm, phone: event.target.value })}
-                placeholder="Phone"
-                className={inputClass}
-              />
-              <div className="flex gap-2">
-                <input
+        <div className="cb-grid-6-6">
+          <Card title="Teachers" subtitle="House master, mistress and mentors">
+            <form onSubmit={handleAddTeacher} className="ah-member-form">
+              <div className="cb-form-grid">
+                <TextField
+                  label="Name"
+                  size="sm"
+                  value={teacherForm.name}
+                  onChange={(event) => setTeacherForm({ ...teacherForm, name: event.target.value })}
+                  placeholder="Teacher name"
+                />
+                <Select
+                  label="Role"
+                  size="sm"
+                  value={teacherForm.role}
+                  onChange={(event) => setTeacherForm({ ...teacherForm, role: event.target.value })}
+                  options={TEACHER_ROLES}
+                />
+                <TextField
+                  label="Phone"
+                  size="sm"
+                  type="tel"
+                  value={teacherForm.phone}
+                  onChange={(event) => setTeacherForm({ ...teacherForm, phone: event.target.value })}
+                />
+                <TextField
+                  label="Email"
+                  size="sm"
+                  type="email"
                   value={teacherForm.email}
                   onChange={(event) => setTeacherForm({ ...teacherForm, email: event.target.value })}
-                  placeholder="Email"
-                  className={inputClass}
                 />
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="shrink-0 rounded-xl bg-indigo-600 px-3 text-sm font-semibold text-white disabled:opacity-60"
-                >
-                  <Plus className="h-4 w-4" />
-                </button>
+              </div>
+              <div className="ah-member-form__foot">
+                <Button type="submit" size="sm" icon={Plus} loading={saving}>
+                  Add teacher
+                </Button>
               </div>
             </form>
 
-            <div className="space-y-2">
-              {(house.teachers || []).length === 0 ? (
-                <p className="text-sm text-slate-500">No teachers assigned yet.</p>
-              ) : (
-                (house.teachers || []).map((teacher, index) => (
-                  <div key={`${teacher.name}-${index}`} className="flex items-start justify-between rounded-2xl border border-slate-100 px-3 py-2">
-                    <div>
-                      <p className="font-medium text-slate-900">{teacher.name}</p>
-                      <p className="text-xs text-indigo-600">{teacher.role || 'House Teacher'}</p>
-                      <p className="text-xs text-slate-500">
-                        {[teacher.phone, teacher.email].filter(Boolean).join(' · ') || 'No contact'}
-                      </p>
+            {teachers.length === 0 ? (
+              <EmptyState
+                compact
+                icon={UserRound}
+                title="No teachers in this house yet"
+                body="Add the house master or mistress above."
+              />
+            ) : (
+              <ul className="ah-members" aria-label="House teachers">
+                {teachers.map((teacher, index) => (
+                  <li key={`${teacher.name}-${index}`} className="ah-member">
+                    <Avatar name={teacher.name} size="md" />
+                    <div className="ah-member__text">
+                      <span className="ah-member__name">{teacher.name}</span>
+                      <span className="ah-member__meta">
+                        {[teacher.phone, teacher.email].filter(Boolean).join(' · ') || 'No contact details'}
+                      </span>
                     </div>
-                    <button
-                      type="button"
+                    <Badge tone="info" dot={false}>{teacher.role || 'House Teacher'}</Badge>
+                    <Button
+                      variant="tertiary"
+                      size="sm"
+                      icon={Trash2}
+                      disabled={saving}
+                      aria-label={`Remove ${teacher.name}`}
                       onClick={() => void handleRemoveTeacher(index)}
-                      className="text-xs font-semibold text-rose-600"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                ))
-              )}
-            </div>
-          </section>
-
-          <section className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <Crown className="h-4 w-4 text-amber-600" />
-                <h2 className="text-lg font-semibold text-slate-900">House Council Members</h2>
-              </div>
-              <Link
-                to="/actvt/student-council"
-                className="text-xs font-semibold text-indigo-600 hover:text-indigo-800"
-              >
-                Manage via Student Council →
-              </Link>
-            </div>
-            <p className="mb-4 text-xs text-slate-500">
-              Members selected from a house council on Student Council appear here automatically.
-            </p>
-
-            <form onSubmit={handleAddCouncil} className="mb-4 grid gap-2 sm:grid-cols-2">
-              <input
-                value={councilForm.name}
-                onChange={(event) => setCouncilForm({ ...councilForm, name: event.target.value })}
-                placeholder="Member name"
-                className={inputClass}
-              />
-              <select
-                value={councilForm.role}
-                onChange={(event) => setCouncilForm({ ...councilForm, role: event.target.value })}
-                className={inputClass}
-              >
-                {COUNCIL_ROLES.map((role) => (
-                  <option key={role} value={role}>{role}</option>
+                    />
+                  </li>
                 ))}
-              </select>
-              <input
-                value={councilForm.className}
-                onChange={(event) => setCouncilForm({ ...councilForm, className: event.target.value })}
-                placeholder="Class"
-                className={inputClass}
-              />
-              <input
-                value={councilForm.section}
-                onChange={(event) => setCouncilForm({ ...councilForm, section: event.target.value })}
-                placeholder="Section"
-                className={inputClass}
-              />
-              <input
-                value={councilForm.phone}
-                onChange={(event) => setCouncilForm({ ...councilForm, phone: event.target.value })}
-                placeholder="Phone"
-                className={inputClass}
-              />
-              <button
-                type="submit"
-                disabled={saving}
-                className="rounded-xl bg-indigo-600 px-3 text-sm font-semibold text-white disabled:opacity-60"
-              >
-                Add member
-              </button>
+              </ul>
+            )}
+          </Card>
+
+          <Card
+            title="House council"
+            subtitle="Members picked on Student Council appear here automatically"
+            action={
+              <Link to="/actvt/student-council" className="cb-link ah-small-link">
+                Manage in Student Council
+              </Link>
+            }
+          >
+            <form onSubmit={handleAddCouncil} className="ah-member-form">
+              <div className="cb-form-grid">
+                <TextField
+                  label="Name"
+                  size="sm"
+                  value={councilForm.name}
+                  onChange={(event) => setCouncilForm({ ...councilForm, name: event.target.value })}
+                  placeholder="Member name"
+                />
+                <Select
+                  label="Role"
+                  size="sm"
+                  value={councilForm.role}
+                  onChange={(event) => setCouncilForm({ ...councilForm, role: event.target.value })}
+                  options={COUNCIL_ROLES}
+                />
+                <TextField
+                  label="Class"
+                  size="sm"
+                  value={councilForm.className}
+                  onChange={(event) => setCouncilForm({ ...councilForm, className: event.target.value })}
+                />
+                <TextField
+                  label="Section"
+                  size="sm"
+                  value={councilForm.section}
+                  onChange={(event) => setCouncilForm({ ...councilForm, section: event.target.value })}
+                />
+                <TextField
+                  label="Phone"
+                  size="sm"
+                  type="tel"
+                  value={councilForm.phone}
+                  onChange={(event) => setCouncilForm({ ...councilForm, phone: event.target.value })}
+                />
+              </div>
+              <div className="ah-member-form__foot">
+                <Button type="submit" size="sm" icon={Plus} loading={saving}>
+                  Add member
+                </Button>
+              </div>
             </form>
 
-            <div className="space-y-2">
-              {(house.councilMembers || []).length === 0 ? (
-                <p className="text-sm text-slate-500">No council members added yet.</p>
-              ) : (
-                (house.councilMembers || []).map((member, index) => (
-                  <div key={`${member.name}-${index}`} className="flex items-start justify-between rounded-2xl border border-slate-100 px-3 py-2">
-                    <div>
-                      <p className="font-medium text-slate-900">{member.name}</p>
-                      <p className="text-xs text-amber-700">{member.role || 'Member'}</p>
-                      <p className="text-xs text-slate-500">
-                        {[member.className, member.section].filter(Boolean).join(' · ') || 'Class/section not set'}
+            {councilMembers.length === 0 ? (
+              <EmptyState
+                compact
+                icon={Crown}
+                title="No council members yet"
+                body="Add a captain or prefect above, or select them on Student Council."
+              />
+            ) : (
+              <ul className="ah-members" aria-label="House council members">
+                {councilMembers.map((member, index) => (
+                  <li key={`${member.name}-${index}`} className="ah-member">
+                    <Avatar name={member.name} size="md" />
+                    <div className="ah-member__text">
+                      <span className="ah-member__name">{member.name}</span>
+                      <span className="ah-member__meta">
+                        {[member.className, member.section].filter(Boolean).join(' · ') || 'Class and section not set'}
                         {member.phone ? ` · ${member.phone}` : ''}
-                      </p>
+                      </span>
                     </div>
-                    <button
-                      type="button"
+                    <Badge tone="warning" dot={false}>{member.role || 'Member'}</Badge>
+                    <Button
+                      variant="tertiary"
+                      size="sm"
+                      icon={Trash2}
+                      disabled={saving}
+                      aria-label={`Remove ${member.name}`}
                       onClick={() => void handleRemoveCouncil(index)}
-                      className="text-xs font-semibold text-rose-600"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                ))
-              )}
-            </div>
-          </section>
+                    />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
         </div>
 
-        <section className="rounded-[24px] border border-amber-100 bg-gradient-to-br from-amber-50/80 via-white to-white p-5 shadow-sm">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <Trophy className="h-5 w-5 text-amber-500" />
-              <div>
-                <h2 className="text-lg font-semibold text-slate-900">House wall of fame</h2>
-                <p className="text-xs text-slate-500">
-                  Top achievers from medals and activity participation
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {(data?.wallOfFame || []).length === 0 ? (
-            <p className="rounded-2xl border border-dashed border-amber-200 bg-white/70 px-4 py-8 text-center text-sm text-slate-500">
-              No wall of fame entries yet. Issue house participation or medal certificates after activities to rank students here.
-            </p>
+        <Card title="Wall of fame" subtitle="Top achievers by medals and activity participation">
+          {wallOfFame.length === 0 ? (
+            <EmptyState
+              compact
+              icon={Trophy}
+              title="No achievers ranked yet"
+              body="Issue house participation or medal certificates after activities to rank students here."
+            />
           ) : (
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              {(data?.wallOfFame || []).map((entry, index) => (
-                <button
-                  key={entry._id}
-                  type="button"
-                  onClick={() => navigate(`/actvt/students/${entry._id}`)}
-                  className="rounded-2xl border border-amber-100 bg-white p-4 text-left shadow-sm transition hover:border-amber-300 hover:shadow-md"
-                >
-                  <div className="mb-3 flex items-start justify-between gap-2">
-                    <div
-                      className="flex h-10 w-10 items-center justify-center rounded-xl text-sm font-bold text-white"
-                      style={{ backgroundColor: tone }}
-                    >
-                      {initialsOf(entry.name || '')}
-                    </div>
-                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800">
-                      #{index + 1}
+            <ol className="ah-fame" aria-label="Wall of fame">
+              {wallOfFame.map((entry, index) => (
+                <li key={entry._id}>
+                  <button
+                    type="button"
+                    className="ah-fame__card"
+                    style={tone}
+                    onClick={() => navigate(`/actvt/students/${entry._id}`)}
+                  >
+                    <span className="ah-fame__top">
+                      <span className="ah-fame__mark actvt-tone-fill" aria-hidden="true">
+                        {houseInitials(entry.name || '')}
+                      </span>
+                      <span className="ah-fame__rank">#{index + 1}</span>
                     </span>
-                  </div>
-                  <p className="font-semibold text-slate-900">{entry.name || 'Student'}</p>
-                  <p className="mt-1 text-xs text-slate-500">
-                    {[entry.class, entry.section].filter(Boolean).join('-') || 'Class not set'}
-                  </p>
-                  <div className="mt-3 flex flex-wrap gap-1.5">
-                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-800">
-                      <Medal className="h-3 w-3" />
-                      {entry.medalCount || 0} medal{(entry.medalCount || 0) === 1 ? '' : 's'}
+                    <span className="ah-fame__name">{entry.name || 'Student'}</span>
+                    <span className="ah-fame__class">
+                      {[entry.class, entry.section].filter(Boolean).join('-') || 'Class not set'}
                     </span>
-                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
-                      {entry.participationCount || 0} cert{(entry.participationCount || 0) === 1 ? '' : 's'}
+                    <span className="ah-fame__badges">
+                      <Badge tone="warning" dot={false}>{plural(entry.medalCount || 0, 'medal')}</Badge>
+                      <Badge tone="neutral" dot={false}>
+                        {plural(entry.participationCount || 0, 'certificate')}
+                      </Badge>
                     </span>
-                  </div>
-                  {entry.highlight ? (
-                    <p className="mt-3 line-clamp-2 text-xs text-slate-600">
-                      <span className="font-semibold text-amber-700">{entry.highlight.role || 'Winner'}</span>
-                      {' · '}
-                      {entry.highlight.eventTitle || entry.highlight.title || 'Activity'}
-                    </p>
-                  ) : null}
-                </button>
+                    {entry.highlight ? (
+                      <span className="ah-fame__highlight">
+                        <strong>{entry.highlight.role || 'Winner'}</strong>
+                        {' · '}
+                        {entry.highlight.eventTitle || entry.highlight.title || 'Activity'}
+                      </span>
+                    ) : null}
+                  </button>
+                </li>
               ))}
-            </div>
+            </ol>
           )}
-        </section>
+        </Card>
 
-        <section className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <Users className="h-4 w-4 text-indigo-600" />
-              <h2 className="text-lg font-semibold text-slate-900">
-                Students ({filteredStudents.length})
-              </h2>
-              <select
-                value={classFilter}
-                onChange={(event) => {
-                  setClassFilter(event.target.value)
-                  setSectionFilter('')
-                }}
-                className="h-9 min-w-[110px] rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-indigo-400"
-              >
-                <option value="">All classes</option>
-                {classOptions.map((className) => (
-                  <option key={className} value={className}>{className}</option>
-                ))}
-              </select>
-              <select
-                value={sectionFilter}
-                onChange={(event) => setSectionFilter(event.target.value)}
-                className="h-9 min-w-[110px] rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-indigo-400"
-              >
-                <option value="">All sections</option>
-                {sectionOptions.map((section) => (
-                  <option key={section} value={section}>{section}</option>
-                ))}
-              </select>
-              {(classFilter || sectionFilter || studentQuery) ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setClassFilter('')
-                    setSectionFilter('')
-                    setStudentQuery('')
-                  }}
-                  className="h-9 rounded-xl border border-slate-200 px-3 text-sm font-semibold text-slate-600 hover:bg-slate-50"
-                >
-                  Clear filters
-                </button>
-              ) : null}
-            </div>
-            <input
-              value={studentQuery}
-              onChange={(event) => setStudentQuery(event.target.value)}
-              placeholder="Search students"
-              className="h-9 w-[180px] rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-indigo-400"
+        <Card
+          flush
+          title="Students"
+          subtitle={
+            hasStudentFilters
+              ? `${filteredStudents.length} of ${plural(totalStudents, 'student')}`
+              : plural(totalStudents, 'student')
+          }
+        >
+          <div className="ah-toolbar">
+            <FilterBar
+              search={{
+                placeholder: 'Search name, admission no or parent',
+                value: studentQuery,
+                onChange: setStudentQuery,
+                label: 'Search students',
+              }}
+              filters={
+                <>
+                  <Select
+                    aria-label="Class"
+                    size="sm"
+                    value={classFilter}
+                    onChange={(event) => {
+                      setClassFilter(event.target.value)
+                      setSectionFilter('')
+                    }}
+                    placeholder="All classes"
+                    options={classOptions}
+                    className="ah-filter"
+                  />
+                  <Select
+                    aria-label="Section"
+                    size="sm"
+                    value={sectionFilter}
+                    onChange={(event) => setSectionFilter(event.target.value)}
+                    placeholder="All sections"
+                    options={sectionOptions}
+                    className="ah-filter"
+                  />
+                  {hasStudentFilters ? (
+                    <Button
+                      variant="tertiary"
+                      size="sm"
+                      onClick={() => {
+                        setClassFilter('')
+                        setSectionFilter('')
+                        setStudentQuery('')
+                      }}
+                    >
+                      Clear filters
+                    </Button>
+                  ) : null}
+                </>
+              }
             />
           </div>
-
-          <div className="w-full overflow-hidden rounded-2xl border border-slate-100">
-            <div className="max-h-[calc(2.5rem+20*2.75rem)] overflow-y-auto">
-              <table className="w-full table-fixed text-sm">
-                <colgroup>
-                  <col className="w-[9%]" />
-                  <col className="w-[7%]" />
-                  <col className="w-[16%]" />
-                  <col className="w-[14%]" />
-                  <col className="w-[14%]" />
-                  <col className="w-[8%]" />
-                  <col className="w-[9%]" />
-                  <col className="w-[9%]" />
-                  <col className="w-[14%]" />
-                </colgroup>
-                <thead className="sticky top-0 z-[1] bg-slate-50 text-left text-xs shadow-sm">
-                  <tr>
-                    <SortHeader label="Adm No" sortKey="rollNumber" />
-                    <SortHeader label="Roll No" sortKey="classRollNo" />
-                    <SortHeader label="Student Name" sortKey="name" />
-                    <SortHeader label="Father Name" sortKey="fatherName" />
-                    <SortHeader label="Mother Name" sortKey="motherName" />
-                    <SortHeader label="Class" sortKey="class" />
-                    <SortHeader label="Section" sortKey="section" />
-                    <SortHeader label="Gender" sortKey="gender" />
-                    <SortHeader label="Participation" sortKey="participationCount" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredStudents.length === 0 ? (
-                    <tr>
-                      <td colSpan={9} className="px-3 py-8 text-center text-slate-500">
-                        No students assigned to this house yet. Assign houses from STDNT student records.
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredStudents.map((student) => (
-                      <tr
-                        key={student._id}
-                        role="button"
-                        tabIndex={0}
-                        onClick={() => navigate(`/actvt/students/${student._id}`)}
-                        onKeyDown={(event) => {
-                          if (event.key === 'Enter' || event.key === ' ') {
-                            event.preventDefault()
-                            navigate(`/actvt/students/${student._id}`)
-                          }
-                        }}
-                        className="cursor-pointer border-t border-slate-100 transition hover:bg-indigo-50/60"
-                      >
-                        <td className="truncate px-2 py-3 text-slate-700 sm:px-3">{student.rollNumber || '—'}</td>
-                        <td className="truncate px-2 py-3 text-slate-700 sm:px-3">{student.classRollNo ?? '—'}</td>
-                        <td className="truncate px-2 py-3 font-medium text-indigo-700 sm:px-3" title={student.name}>
-                          {student.name}
-                        </td>
-                        <td className="truncate px-2 py-3 text-slate-700 sm:px-3" title={student.fatherName || ''}>
-                          {student.fatherName || '—'}
-                        </td>
-                        <td className="truncate px-2 py-3 text-slate-700 sm:px-3" title={student.motherName || ''}>
-                          {student.motherName || '—'}
-                        </td>
-                        <td className="truncate px-2 py-3 text-slate-700 sm:px-3">{student.class || '—'}</td>
-                        <td className="truncate px-2 py-3 text-slate-700 sm:px-3">{student.section || '—'}</td>
-                        <td className="truncate px-2 py-3 text-slate-700 sm:px-3">{student.gender || '—'}</td>
-                        <td className="truncate px-2 py-3 font-semibold text-slate-900 sm:px-3">
-                          {student.participationCount ?? 0}
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </section>
+          <DataTable
+            columns={STUDENT_COLUMNS}
+            rows={filteredStudents}
+            getRowKey={(row) => row._id}
+            onRowClick={(row) => navigate(`/actvt/students/${row._id}`)}
+            sort={studentSort}
+            onSort={(key) => toggleStudentSort(key as StudentSortKey)}
+            caption={`Students in ${house.name || 'this house'}`}
+            maxHeight="min(70vh, 920px)"
+            loading={loading}
+            loadingLabel="Loading students…"
+            empty={
+              hasStudentFilters ? (
+                <EmptyState
+                  compact
+                  title="No students match these filters"
+                  body="Change the class, section or search, or clear the filters."
+                />
+              ) : (
+                <EmptyState
+                  compact
+                  icon={Users}
+                  title="No students in this house yet"
+                  body="Assign houses from student records in Student Management."
+                />
+              )
+            }
+          />
+        </Card>
       </div>
 
       <HouseEditModal
@@ -942,18 +863,8 @@ const ActvtHouseDetail: React.FC = () => {
           void handleFlagCropped(file, previewUrl)
         }}
       />
-    </div>
+    </Page>
   )
 }
-
-const StatCard = ({ label, value }: { label: string; value: string | number }) => (
-  <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-    <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{label}</p>
-    <p className="mt-1 text-2xl font-semibold text-slate-900">{value}</p>
-  </div>
-)
-
-const inputClass =
-  'w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none focus:border-indigo-400'
 
 export default ActvtHouseDetail

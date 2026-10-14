@@ -1,0 +1,23 @@
+/* Exams → Datesheets page. Tokens only; everything sits inside .cb-app (a <Page> or a kit overlay portal). */
+
+/* Editable subject schedule: inline controls sit inside 40px rows. */
+.cb-app .ex-ds-schedule .cb-table td { padding-top: var(--space-1); padding-bottom: var(--space-1); vertical-align: top; }
+.cb-app .ex-ds-schedule .cb-table td .cb-field { gap: 2px; }
+.cb-app .ex-ds-schedule .ex-ds-subject { min-width: 200px; }
+.cb-app .ex-ds-schedule .ex-ds-date { min-width: 148px; }
+.cb-app .ex-ds-schedule .ex-ds-time { min-width: 116px; }
+.cb-app .ex-ds-schedule .ex-ds-minutes { min-width: 100px; max-width: 120px; }
+@media (max-width: 640px) {
+  .cb-app .ex-ds-schedule .ex-ds-subject,
+  .cb-app .ex-ds-schedule .ex-ds-date,
+  .cb-app .ex-ds-schedule .ex-ds-time,
+  .cb-app .ex-ds-schedule .ex-ds-minutes { min-width: 0; max-width: none; }
+}
+
+/* Card footer holding the save action, right-aligned. */
+.cb-app .ex-ds-foot { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-3); flex-wrap: wrap; }
+.cb-app .ex-ds-foot__note { margin-right: auto; color: var(--ink-muted); font-size: 13px; line-height: 18px; }
+
+/* Datesheet preview sheet: details, then the subject list. */
+.cb-app .ex-ds-preview { display: flex; flex-direction: column; gap: var(--space-5); }
+.cb-app .ex-ds-preview .cb-table-wrap { border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; }

@@ -7,6 +7,27 @@ import { useAcademicSession } from '@/contexts/AcademicSessionContext'
 import { useTimetable } from '@/contexts/TimetableContext'
 import { isSeniorSecondaryClass, sortClassNames, sortSectionNames } from '@/constants/studentClasses'
 import api from '@/services/api'
+import { CalendarDays, Plus, RefreshCw, Trash2 } from 'lucide-react'
+import {
+  Badge,
+  Button,
+  Card,
+  CardToolbar,
+  DataTable,
+  DetailList,
+  EmptyState,
+  FilterBar,
+  Page,
+  Select,
+  Sheet,
+  TextField,
+  formatDate,
+  formatTime,
+  type DataTableColumn,
+} from '@/components/ui'
+import { errorMessage } from '@/components/exmcl/ExmclUi'
+import '@/components/exmcl/exmcl.css'
+import '@/components/exmcl/datesheets.css'
 
 type SubjectOption = {
   _id: string
@@ -54,6 +75,16 @@ const toAcademicYear = (session?: string | null) => {
   return `${year}-${year + 1}`
 }
 
+const getExamLabel = (sheet: SavedDatesheet) => {
+  if (sheet.examId && typeof sheet.examId === 'object') {
+    return `${sheet.examId.code || ''} — ${sheet.examId.name || ''}`.trim()
+  }
+  return '—'
+}
+
+const getExamCode = (sheet: SavedDatesheet) =>
+  sheet.examId && typeof sheet.examId === 'object' ? sheet.examId.code || '' : ''
+
 const generateRowId = () => `row-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
 
 const normalizeSubjectKey = (value: string) =>
@@ -93,6 +124,9 @@ const ExmclDatesheets: React.FC = () => {
   const [selectedSection, setSelectedSection] = useState('')
   const [title, setTitle] = useState('')
   const [rows, setRows] = useState<ScheduleRow[]>([createEmptyRow()])
+  const [tried, setTried] = useState(false)
+  const [search, setSearch] = useState('')
+  const [previewing, setPreviewing] = useState<SavedDatesheet | null>(null)
 
   const selectedExam = exams.find((exam) => exam._id === selectedExamId)
   const requiresSection = isSeniorSecondaryClass(selectedClass)
@@ -112,7 +146,7 @@ const ExmclDatesheets: React.FC = () => {
       setExams(examResult.value)
     } else {
       setExams([])
-      toast.error('Failed to load exams. Check that ExmCl Exams is enabled for your account.')
+      toast.error('Exams didn’t load. Check that Exams is turned on for your school, then refresh.')
     }
     setExamsLoading(false)
 
@@ -147,7 +181,7 @@ const ExmclDatesheets: React.FC = () => {
       subjectResult.status === 'rejected' &&
       datesheetResult.status === 'rejected'
     ) {
-      toast.error('Failed to load datesheet data.')
+      toast.error('Datesheets didn’t load. Check your connection and refresh.')
     }
 
     setLoading(false)
@@ -337,6 +371,7 @@ const ExmclDatesheets: React.FC = () => {
     setSelectedSection('')
     setTitle('')
     setRows([createEmptyRow()])
+    setTried(false)
   }
 
   const addRow = () => {
@@ -352,26 +387,27 @@ const ExmclDatesheets: React.FC = () => {
   }
 
   const handleCreateDatesheet = async () => {
+    setTried(true)
     if (!selectedExamId) {
-      toast.error('Select an exam first.')
+      toast.error('Choose the exam this datesheet is for.')
       return
     }
     if (!selectedClass) {
-      toast.error('Select a class.')
+      toast.error('Choose a class.')
       return
     }
     if (requiresSection && !selectedSection) {
-      toast.error('Select a section for this class.')
+      toast.error('Choose a section — Class 11 and 12 need one.')
       return
     }
     if (!title.trim()) {
-      toast.error('Datesheet title is required.')
+      toast.error('Enter a title for the datesheet.')
       return
     }
 
     const invalidRow = rows.find((row) => !row.subjectId || !row.examDate || !row.start || !row.end || !row.duration)
     if (invalidRow) {
-      toast.error('Please fill all subject schedule fields.')
+      toast.error('Every subject needs a date, start time, end time and duration.')
       return
     }
 
@@ -407,290 +443,406 @@ const ExmclDatesheets: React.FC = () => {
         })),
       })
 
-      toast.success('Datesheet created successfully.')
+      toast.success(`${title.trim()} saved.`)
       resetBuilder()
       await loadData()
-    } catch (error: any) {
-      const msg = error?.response?.data?.message || error?.message || 'Unable to create datesheet.'
-      toast.error(msg)
+    } catch (error) {
+      toast.error(errorMessage(error, 'The datesheet wasn’t saved. Try again.'))
     } finally {
       setSaving(false)
     }
   }
 
-  const getExamLabel = (sheet: SavedDatesheet) => {
-    if (sheet.examId && typeof sheet.examId === 'object') {
-      return `${sheet.examId.code || ''} — ${sheet.examId.name || ''}`.trim()
-    }
-    return '—'
-  }
+  const subjectOptions = filteredSubjects.map((subject) => ({
+    value: subject._id,
+    label: subject.name || subject.code,
+  }))
+
+  const subjectName = (row: ScheduleRow) => filteredSubjects.find((s) => s._id === row.subjectId)?.name || 'this row'
+
+  const visibleDatesheets = useMemo(() => {
+    const needle = search.trim().toLowerCase()
+    if (!needle) return savedDatesheets
+    return savedDatesheets.filter((sheet) =>
+      [sheet.title, sheet.class, sheet.section, getExamLabel(sheet)].some((v) =>
+        String(v || '').toLowerCase().includes(needle)
+      )
+    )
+  }, [savedDatesheets, search])
+
+  const scheduleColumns: DataTableColumn<ScheduleRow>[] = [
+    {
+      key: 'subject',
+      header: 'Subject',
+      mobile: 'title',
+      interactive: true,
+      render: (row) => (
+        <Select
+          className="ex-ds-subject"
+          size="sm"
+          aria-label="Subject"
+          placeholder="Choose subject"
+          value={row.subjectId}
+          onChange={(event) => updateRow(row.id, { subjectId: event.target.value })}
+          options={subjectOptions}
+          error={tried && !row.subjectId ? 'Choose a subject' : undefined}
+        />
+      ),
+    },
+    {
+      key: 'date',
+      header: 'Date',
+      interactive: true,
+      render: (row) => (
+        <TextField
+          className="ex-ds-date"
+          size="sm"
+          type="date"
+          aria-label={`Exam date for ${subjectName(row)}`}
+          value={row.examDate}
+          onChange={(event) => updateRow(row.id, { examDate: event.target.value })}
+          error={tried && !row.examDate ? 'Pick a date' : undefined}
+        />
+      ),
+    },
+    {
+      key: 'start',
+      header: 'Starts',
+      interactive: true,
+      render: (row) => (
+        <TextField
+          className="ex-ds-time"
+          size="sm"
+          type="time"
+          aria-label={`Start time for ${subjectName(row)}`}
+          value={row.start}
+          onChange={(event) => updateRow(row.id, { start: event.target.value })}
+          error={tried && !row.start ? 'Set a time' : undefined}
+        />
+      ),
+    },
+    {
+      key: 'end',
+      header: 'Ends',
+      interactive: true,
+      render: (row) => (
+        <TextField
+          className="ex-ds-time"
+          size="sm"
+          type="time"
+          aria-label={`End time for ${subjectName(row)}`}
+          value={row.end}
+          onChange={(event) => updateRow(row.id, { end: event.target.value })}
+          error={tried && !row.end ? 'Set a time' : undefined}
+        />
+      ),
+    },
+    {
+      key: 'duration',
+      header: 'Duration',
+      interactive: true,
+      render: (row) => (
+        <TextField
+          className="ex-ds-minutes"
+          size="sm"
+          type="number"
+          inputMode="numeric"
+          min={30}
+          suffix="min"
+          aria-label={`Duration in minutes for ${subjectName(row)}`}
+          value={row.duration}
+          onChange={(event) => updateRow(row.id, { duration: Number(event.target.value || 0) })}
+          error={tried && !row.duration ? 'Enter minutes' : undefined}
+        />
+      ),
+    },
+    {
+      key: 'remove',
+      header: '',
+      headerLabel: 'Remove',
+      align: 'right',
+      width: 48,
+      mobile: 'aside',
+      interactive: true,
+      render: (row) => (
+        <Button
+          variant="tertiary"
+          size="sm"
+          icon={Trash2}
+          aria-label={`Remove ${subjectName(row)} from the schedule`}
+          disabled={rows.length === 1}
+          onClick={() => removeRow(row.id)}
+        />
+      ),
+    },
+  ]
+
+  const savedColumns: DataTableColumn<SavedDatesheet>[] = [
+    { key: 'title', header: 'Title', mobile: 'title', render: (sheet) => <span className="cb-strong">{sheet.title}</span> },
+    {
+      key: 'exam',
+      header: 'Exam',
+      mobile: 'subtitle',
+      render: (sheet) => (getExamCode(sheet) ? <span className="ex-code">{getExamCode(sheet)}</span> : '—'),
+    },
+    {
+      key: 'class',
+      header: 'Class',
+      mobile: 'aside',
+      render: (sheet) => (
+        <Badge tone="neutral" dot={false}>
+          {sheet.class}
+        </Badge>
+      ),
+    },
+    {
+      key: 'section',
+      header: 'Section',
+      render: (sheet) => (sheet.section?.trim() ? sheet.section : 'All sections'),
+    },
+    {
+      key: 'subjects',
+      header: 'Subjects',
+      numeric: true,
+      align: 'right',
+      render: (sheet) => sheet.subjects?.length || 0,
+    },
+    { key: 'created', header: 'Created', render: (sheet) => formatDate(sheet.createdAt) },
+  ]
+
+  const previewSubjects = useMemo(
+    () =>
+      [...(previewing?.subjects || [])].sort(
+        (a, b) => new Date(a.examDate || 0).getTime() - new Date(b.examDate || 0).getTime()
+      ),
+    [previewing]
+  )
+
+  const previewColumns: DataTableColumn<SavedDatesheet['subjects'][number]>[] = [
+    {
+      key: 'subject',
+      header: 'Subject',
+      mobile: 'title',
+      render: (item) => <span className="cb-strong">{item.subject?.name || '—'}</span>,
+    },
+    { key: 'date', header: 'Date', mobile: 'aside', render: (item) => formatDate(item.examDate) },
+    {
+      key: 'time',
+      header: 'Time',
+      render: (item) =>
+        item.timeSlot?.start && item.timeSlot?.end
+          ? `${formatTime(item.timeSlot.start)} – ${formatTime(item.timeSlot.end)}`
+          : '—',
+    },
+    {
+      key: 'duration',
+      header: 'Duration',
+      numeric: true,
+      align: 'right',
+      render: (item) => (item.duration ? `${item.duration} min` : '—'),
+    },
+  ]
+
+  const builderEmpty = !selectedExamId
+    ? {
+        title: 'Choose an exam to start',
+        body: 'Pick the exam and class above. The subjects set for that exam load here so you can give each one a date and time.',
+      }
+    : !selectedClass
+      ? { title: 'Choose a class', body: 'Subjects for this exam and class load once you pick the class.' }
+      : requiresSection && !selectedSection
+        ? { title: 'Choose a section', body: 'Class 11 and 12 get a datesheet per section.' }
+        : {
+            title: 'No subjects for this exam and class',
+            body: 'Add the class’s subjects for this exam on the Subjects or Marks distribution page, then come back.',
+          }
 
   return (
-    <div className="space-y-6 p-6">
-      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800">
-        <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Create Datesheet</h2>
-        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-          Choose the exam, class, and subjects. For classes up to 10th, one datesheet applies to all sections.
-        </p>
-
-        <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Exam</label>
-            <select
-              title="Select exam"
+    <Page>
+      <div className="cb-stack">
+        <Card
+          title="New datesheet"
+          subtitle="Up to Class 10, one datesheet covers every section. Class 11 and 12 get one per section."
+        >
+          <div className="cb-form-grid">
+            <Select
+              label="Exam"
+              required
+              placeholder={examsLoading ? 'Loading exams…' : exams.length === 0 ? 'No exams yet' : 'Choose exam'}
               value={selectedExamId}
               onChange={(event) => setSelectedExamId(event.target.value)}
               disabled={examsLoading}
-              className="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:bg-slate-700 dark:text-white"
-            >
-              <option value="">
-                {examsLoading ? 'Loading exams...' : exams.length === 0 ? 'No exams found' : 'Select exam'}
-              </option>
-              {exams.map((exam) => (
-                <option key={exam._id} value={exam._id}>
-                  {exam.code} — {exam.name}
-                </option>
-              ))}
-            </select>
-            {!examsLoading && exams.length === 0 ? (
-              <p className="mt-1 text-[11px] text-amber-600 dark:text-amber-400">
-                Create exams first under ExmCl → Exams, then return here to build the datesheet.
-              </p>
-            ) : null}
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Class</label>
-            <select
-              title="Select class"
+              options={exams.map((exam) => ({ value: exam._id, label: `${exam.code} · ${exam.name}` }))}
+              hint={!examsLoading && exams.length === 0 ? 'Add exams on the Exams page first, then come back.' : undefined}
+              error={tried && !selectedExamId && exams.length > 0 ? 'Choose the exam.' : undefined}
+            />
+            <Select
+              label="Class"
+              required
+              placeholder={
+                !selectedExamId ? 'Choose exam first' : classOptions.length === 0 ? 'No classes found' : 'Choose class'
+              }
               value={selectedClass}
               onChange={(event) => setSelectedClass(event.target.value)}
               disabled={!selectedExamId}
-              className="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:bg-slate-700 dark:text-white"
-            >
-              <option value="">
-                {!selectedExamId
-                  ? 'Select exam first'
-                  : classOptions.length === 0
-                    ? 'No classes found'
-                    : 'Select class'}
-              </option>
-              {classOptions.map((className) => (
-                <option key={className} value={className}>
-                  {className}
-                </option>
-              ))}
-            </select>
-            {selectedExamId && classOptions.length === 0 ? (
-              <p className="mt-1 text-[11px] text-amber-600 dark:text-amber-400">
-                Configure classes under Time Table → Classes, then return here.
-              </p>
-            ) : null}
-          </div>
-
-          {requiresSection ? (
-            <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Section</label>
-              <select
-                title="Select section"
+              options={classOptions}
+              hint={
+                selectedExamId && classOptions.length === 0
+                  ? 'Set up classes in Timetable → Classes, then come back.'
+                  : selectedClass && !requiresSection
+                    ? 'Shared by every section of this class.'
+                    : undefined
+              }
+              error={tried && selectedExamId && !selectedClass ? 'Choose a class.' : undefined}
+            />
+            {requiresSection ? (
+              <Select
+                label="Section"
+                required
+                placeholder={selectedClass ? 'Choose section' : 'Choose class first'}
                 value={selectedSection}
                 onChange={(event) => setSelectedSection(event.target.value)}
                 disabled={!selectedClass}
-                className="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:bg-slate-700 dark:text-white"
-              >
-                <option value="">{selectedClass ? 'Select section' : 'Select class first'}</option>
-                {sectionOptions.map((section) => (
-                  <option key={section} value={section}>
-                    {section}
-                  </option>
-                ))}
-              </select>
-            </div>
-          ) : (
-            <div className="flex items-end">
-              <div className="w-full rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-300">
-                {selectedClass
-                  ? 'Shared across all sections for this class.'
-                  : 'Section not required up to Class 10.'}
-              </div>
-            </div>
-          )}
-
-          <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Datesheet Title</label>
-            <input
+                options={sectionOptions}
+                error={tried && !selectedSection ? 'Choose a section.' : undefined}
+              />
+            ) : null}
+            <TextField
+              label="Datesheet title"
+              required
+              className={requiresSection ? undefined : 'is-wide'}
               value={title}
               onChange={(event) => setTitle(event.target.value)}
-              placeholder="Auto-filled from exam and class"
-              className="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-slate-600 dark:bg-slate-700 dark:text-white"
+              placeholder="Filled in from the exam and class"
+              error={tried && !title.trim() ? 'Enter a title.' : undefined}
             />
           </div>
-        </div>
+        </Card>
 
-        {!canEditSubjects ? (
-          <div className="mt-5 rounded-xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
-            {!selectedExamId
-              ? 'Start by selecting the exam you are preparing this datesheet for.'
-              : !selectedClass
-                ? 'Select a class to load subjects for this exam.'
-                : requiresSection && !selectedSection
-                  ? 'Select a section for Class 11 or 12.'
-                  : 'No subjects found for this exam and class. Configure subjects in ExmCl Subjects or Marks Distribution.'}
-          </div>
-        ) : (
-          <div className="mt-5 overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
-            <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-700">
-              <thead className="bg-slate-50 dark:bg-slate-900/40">
-                <tr>
-                  <th className="px-3 py-2 text-left text-xs font-semibold text-slate-500">Subject</th>
-                  <th className="px-3 py-2 text-left text-xs font-semibold text-slate-500">Date</th>
-                  <th className="px-3 py-2 text-left text-xs font-semibold text-slate-500">Start</th>
-                  <th className="px-3 py-2 text-left text-xs font-semibold text-slate-500">End</th>
-                  <th className="px-3 py-2 text-left text-xs font-semibold text-slate-500">Duration (min)</th>
-                  <th className="px-3 py-2 text-left text-xs font-semibold text-slate-500">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {rows.map((row) => (
-                  <tr key={row.id}>
-                    <td className="px-3 py-2">
-                      <select
-                        title="Select subject"
-                        value={row.subjectId}
-                        onChange={(event) => updateRow(row.id, { subjectId: event.target.value })}
-                        className="w-full rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-700 dark:text-white"
-                      >
-                        <option value="">Select subject</option>
-                        {filteredSubjects.map((subject) => (
-                          <option key={subject._id} value={subject._id}>
-                            {subject.code} - {subject.name}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
-                    <td className="px-3 py-2">
-                      <input
-                        type="date"
-                        title="Exam date"
-                        value={row.examDate}
-                        onChange={(event) => updateRow(row.id, { examDate: event.target.value })}
-                        className="w-full rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-700 dark:text-white"
-                      />
-                    </td>
-                    <td className="px-3 py-2">
-                      <input
-                        type="time"
-                        title="Start time"
-                        value={row.start}
-                        onChange={(event) => updateRow(row.id, { start: event.target.value })}
-                        className="w-full rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-700 dark:text-white"
-                      />
-                    </td>
-                    <td className="px-3 py-2">
-                      <input
-                        type="time"
-                        title="End time"
-                        value={row.end}
-                        onChange={(event) => updateRow(row.id, { end: event.target.value })}
-                        className="w-full rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-700 dark:text-white"
-                      />
-                    </td>
-                    <td className="px-3 py-2">
-                      <input
-                        type="number"
-                        title="Duration in minutes"
-                        min={30}
-                        value={row.duration}
-                        onChange={(event) => updateRow(row.id, { duration: Number(event.target.value || 0) })}
-                        className="w-full rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-700 dark:text-white"
-                      />
-                    </td>
-                    <td className="px-3 py-2">
-                      <button
-                        type="button"
-                        onClick={() => removeRow(row.id)}
-                        className="rounded-md bg-rose-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-rose-700"
-                      >
-                        Remove
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <Card
+          flush
+          title="Subject schedule"
+          subtitle={
+            canEditSubjects
+              ? `${rows.length} ${rows.length === 1 ? 'subject' : 'subjects'} · give each one a date and time`
+              : undefined
+          }
+          action={
+            <Button size="sm" icon={Plus} onClick={addRow} disabled={!canEditSubjects}>
+              Add subject
+            </Button>
+          }
+          footer={
+            <div className="ex-ds-foot">
+              {selectedExam && selectedClass ? (
+                <span className="ex-ds-foot__note">
+                  {selectedExam.code} · Class {selectedClass}
+                  {requiresSection && selectedSection ? `-${selectedSection}` : ''}
+                </span>
+              ) : null}
+              <Button
+                variant="primary"
+                icon={CalendarDays}
+                loading={saving}
+                disabled={!canEditSubjects}
+                onClick={() => void handleCreateDatesheet()}
+              >
+                Save datesheet
+              </Button>
+            </div>
+          }
+        >
+          {canEditSubjects ? (
+            <DataTable
+              className="ex-ds-schedule"
+              caption="Subject schedule"
+              columns={scheduleColumns}
+              rows={rows}
+              getRowKey={(row) => row.id}
+            />
+          ) : (
+            <EmptyState compact icon={CalendarDays} title={builderEmpty.title} body={builderEmpty.body} />
+          )}
+        </Card>
 
-        <div className="mt-4 flex items-center gap-3">
-          <button
-            type="button"
-            onClick={addRow}
-            disabled={!canEditSubjects}
-            className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200"
-          >
-            Add Row
-          </button>
-          <button
-            type="button"
-            onClick={handleCreateDatesheet}
-            disabled={saving || !canEditSubjects}
-            className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {saving ? 'Saving...' : 'Create Datesheet'}
-          </button>
-        </div>
-      </section>
+        <Card flush title="Saved datesheets" subtitle="Internal exam datesheets for this session">
+          <CardToolbar>
+            <FilterBar
+              search={{
+                placeholder: 'Search title, exam or class',
+                value: search,
+                onChange: setSearch,
+                label: 'Search datesheets',
+              }}
+              actions={
+                <Button icon={RefreshCw} onClick={() => void loadData()} loading={loading && savedDatesheets.length > 0}>
+                  Refresh
+                </Button>
+              }
+            />
+          </CardToolbar>
+          <DataTable
+            caption="Saved datesheets"
+            columns={savedColumns}
+            rows={visibleDatesheets}
+            getRowKey={(sheet) => sheet._id}
+            onRowClick={setPreviewing}
+            loading={loading}
+            loadingLabel="Loading datesheets…"
+            empty={
+              savedDatesheets.length === 0 ? (
+                <EmptyState
+                  icon={CalendarDays}
+                  title="No datesheets yet"
+                  body="Choose an exam and class above, set each subject’s date and time, then save."
+                />
+              ) : (
+                <EmptyState
+                  compact
+                  icon={CalendarDays}
+                  title="No datesheets match this search"
+                  action={
+                    <Button size="sm" onClick={() => setSearch('')}>
+                      Clear search
+                    </Button>
+                  }
+                />
+              )
+            }
+          />
+        </Card>
+      </div>
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Saved Datesheets</h2>
-          <button
-            type="button"
-            onClick={() => void loadData()}
-            className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200"
-          >
-            Refresh
-          </button>
-        </div>
-
-        {loading ? (
-          <div className="py-10 text-center text-sm text-slate-500 dark:text-slate-400">Loading datesheets...</div>
-        ) : savedDatesheets.length === 0 ? (
-          <div className="py-10 text-center text-sm text-slate-500 dark:text-slate-400">
-            No datesheets yet. Create your first datesheet above.
+      <Sheet
+        open={Boolean(previewing)}
+        onClose={() => setPreviewing(null)}
+        title={previewing?.title || 'Datesheet'}
+        description={previewing ? getExamLabel(previewing) : undefined}
+        icon={CalendarDays}
+        size="lg"
+        footer={<Button onClick={() => setPreviewing(null)}>Close</Button>}
+      >
+        {previewing ? (
+          <div className="ex-ds-preview">
+            <DetailList
+              items={[
+                { label: 'Class', value: previewing.class },
+                { label: 'Section', value: previewing.section?.trim() ? previewing.section : 'All sections' },
+                { label: 'Subjects', value: previewing.subjects?.length || 0 },
+                { label: 'Created', value: formatDate(previewing.createdAt) },
+              ]}
+            />
+            <DataTable
+              caption="Subjects on this datesheet"
+              columns={previewColumns}
+              rows={previewSubjects}
+              getRowKey={(item) => item._id || `${item.subject?._id}-${item.examDate}`}
+              empty={<EmptyState compact icon={CalendarDays} title="No subjects on this datesheet" />}
+            />
           </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-700">
-              <thead>
-                <tr className="text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                  <th className="px-3 py-2">Title</th>
-                  <th className="px-3 py-2">Exam</th>
-                  <th className="px-3 py-2">Class</th>
-                  <th className="px-3 py-2">Section</th>
-                  <th className="px-3 py-2">Subjects</th>
-                  <th className="px-3 py-2">Created</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {savedDatesheets.map((sheet) => (
-                  <tr key={sheet._id}>
-                    <td className="px-3 py-2 font-medium text-slate-900 dark:text-white">{sheet.title}</td>
-                    <td className="px-3 py-2">{getExamLabel(sheet)}</td>
-                    <td className="px-3 py-2">{sheet.class}</td>
-                    <td className="px-3 py-2">{sheet.section?.trim() ? sheet.section : 'All sections'}</td>
-                    <td className="px-3 py-2">{sheet.subjects?.length || 0}</td>
-                    <td className="px-3 py-2 text-slate-500 dark:text-slate-400">
-                      {new Date(sheet.createdAt).toLocaleDateString('en-GB')}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
-    </div>
+        ) : null}
+      </Sheet>
+    </Page>
   )
 }
 

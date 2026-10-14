@@ -182,6 +182,20 @@ const Header: React.FC<HeaderProps> = ({ isSidebarCollapsed, onToggleSidebar }) 
           showBackButton: isDetailRoute,
           backTo: backToPath,
         }
+      case 'form66':
+        return {
+          pageTitle: 'Form 66',
+          pageSubtitle: 'Roll-number lists for each paper, arranged by exam date',
+          showBackButton: false,
+          backTo: null,
+        }
+      case 'attendance':
+        return {
+          pageTitle: 'Attendance',
+          pageSubtitle: 'Absentees for each paper, with the absentee list PDF',
+          showBackButton: false,
+          backTo: null,
+        }
       case 'remuneration':
         return {
           pageTitle: 'Remuneration',
@@ -210,10 +224,11 @@ const Header: React.FC<HeaderProps> = ({ isSidebarCollapsed, onToggleSidebar }) 
           showBackButton: isDetailRoute,
           backTo: backToPath,
         }
+      case 'home':
       case 'school-hub':
         return {
-          pageTitle: 'School Hub',
-          pageSubtitle: 'All school management modules at a glance',
+          pageTitle: 'School OS',
+          pageSubtitle: 'Your school today, and the modules you use.',
           showBackButton: isDetailRoute,
           backTo: backToPath,
         }
@@ -308,57 +323,51 @@ const Header: React.FC<HeaderProps> = ({ isSidebarCollapsed, onToggleSidebar }) 
       }
       case 'exmcl': {
         const subPage = segments[1] || ''
-        if (subPage === 'performas' && segments[2] === 'award-list') {
-          return {
-            pageTitle: 'Award List Format',
-            pageSubtitle: 'Design the award list layout used when generating PDFs',
-            showBackButton: true,
-            backTo: '/exmcl/performas',
-          }
+        const formatPages: Record<string, { title: string; subtitle: string }> = {
+          'award-list': { title: 'Award list format', subtitle: 'The award list layout used when you download PDFs.' },
+          'admit-card': { title: 'Admit card format', subtitle: 'The admit card layout used when you download PDFs.' },
+          'report-card': { title: 'Report card format', subtitle: 'The report card layout used when you download PDFs.' },
         }
-        if (subPage === 'performas' && segments[2] === 'admit-card') {
+        if (subPage === 'performas' && formatPages[segments[2]]) {
           return {
-            pageTitle: 'Admit Card Format',
-            pageSubtitle: 'Design the admit card layout used when generating PDFs',
-            showBackButton: true,
-            backTo: '/exmcl/performas',
-          }
-        }
-        if (subPage === 'performas' && segments[2] === 'report-card') {
-          return {
-            pageTitle: 'Report Card Format',
-            pageSubtitle: 'Design the report card layout used when generating PDFs',
+            pageTitle: formatPages[segments[2]].title,
+            pageSubtitle: formatPages[segments[2]].subtitle,
             showBackButton: true,
             backTo: '/exmcl/performas',
           }
         }
         const titleMap: Record<string, { title: string; subtitle: string }> = {
-          'centre-details': { title: 'Centre Details', subtitle: 'Manage centre profile, candidate summary, and exam days' },
-          'exam-functionaries': { title: 'Exam Functionaries', subtitle: 'Manage examination functionaries and assignments' },
-          'duties': { title: 'Duties', subtitle: 'Assign exam functionaries to rooms for each exam day' },
-          'candidate-details': { title: 'Candidate Details', subtitle: 'Manage examination candidates and PDF imports' },
-          'cbse-registration': { title: 'CBSE Registration', subtitle: 'Class subjects plus per-student additional subject (double-click)' },
-          'subjects': { title: 'Subjects', subtitle: 'Manage subjects taught in the classes.' },
-          'examrooms': { title: 'Exam Room/Hall', subtitle: 'Assign rooms and halls for examinations' },
-          'answersheets': { title: 'Answer Sheets', subtitle: 'Track and manage answer sheet dispatches' },
-          'centre-guidelines': { title: 'Circulars', subtitle: 'Draft, publish, edit, update, and delete exam circulars' },
-          'admit-cards': { title: 'Admit Cards', subtitle: 'Download admit card PDFs using the saved format' },
-          'result': { title: 'Result', subtitle: 'Prepare, upload, and publish internal exam results for student viewing' },
-          'report-card': { title: 'Report Card', subtitle: 'Generate final report card PDFs for printing and distribution' },
-          'award-list': { title: 'Award List', subtitle: 'Download award list PDFs using the saved format' },
-          'question-papers': { title: 'Question Papers', subtitle: 'Store and manage internal exam question paper records' },
-          'syllabus': { title: 'Syllabus', subtitle: 'Maintain subject-wise and exam-wise syllabus records' },
-          'marks-distribution': { title: 'Marks Distribution', subtitle: 'Distribute 100 marks across theory, practical, and internal components' },
-          'seatingplan': { title: 'Seating Plan', subtitle: 'Generate and manage seating plan PDFs' },
-          'performas': { title: 'Formats', subtitle: 'Design exam formats for award lists, datesheets, seating plans, and related records.' },
-          'datesheets': { title: 'Date Sheets', subtitle: 'Create and manage examination date sheets' },
+          'centre-details': { title: 'Centre details', subtitle: 'Centre profile, candidate summary and exam days.' },
+          'exam-functionaries': { title: 'Exam functionaries', subtitle: 'Examination staff and their assignments.' },
+          'duties': { title: 'Duties', subtitle: 'Exam functionaries assigned to rooms for each exam day.' },
+          'candidate-details': { title: 'Candidates', subtitle: 'Examination candidates and their PDF imports.' },
+          'cbse-registration': { title: 'CBSE registration', subtitle: 'Subjects for each class and each student’s additional subject.' },
+          'exams': { title: 'Exams', subtitle: 'The tests this session, with duration and maximum marks.' },
+          'subjects': { title: 'Subjects', subtitle: 'The subjects each exam covers.' },
+          'examrooms': { title: 'Exam rooms', subtitle: 'Rooms and halls used for examinations.' },
+          'answersheets': { title: 'Answer sheets', subtitle: 'Answer sheet stock and dispatches.' },
+          'attendance': { title: 'Exam attendance', subtitle: 'Candidate attendance for each exam day.' },
+          'centre-guidelines': { title: 'Circulars', subtitle: 'Exam notices, drafted and published in series.' },
+          'admit-cards': { title: 'Admit cards', subtitle: 'Admit card PDFs in the saved format.' },
+          'result': { title: 'Marks entry', subtitle: 'Marks for each class and section, exam by exam.' },
+          'report-card': { title: 'Report cards', subtitle: 'Report card PDFs for printing and sending home.' },
+          'award-list': { title: 'Award lists', subtitle: 'Award list PDFs in the saved format.' },
+          'question-papers': { title: 'Question papers', subtitle: 'Question papers for internal exams.' },
+          'syllabus': { title: 'Syllabus', subtitle: 'Syllabus for each subject and exam.' },
+          'marks-distribution': { title: 'Marks distribution', subtitle: 'How 100 marks split across theory, practical and internal work.' },
+          'seatingplan': { title: 'Seating plan', subtitle: 'Seating plans and their PDFs.' },
+          'performas': { title: 'Formats', subtitle: 'Layouts for award lists, admit cards, report cards and other exam documents.' },
+          'datesheets': { title: 'Datesheets', subtitle: 'Exam dates and timings for each class.' },
         }
-        const info = titleMap[subPage] || { title: 'EXMCL', subtitle: 'Internal exams workspace' }
+        const info = titleMap[subPage] || { title: 'Exams', subtitle: 'Internal exams for this session.' }
+        // /exmcl/<list>/:id detail pages get the same back button as their top-level twins.
+        const isExmclDetail =
+          segments.length >= 3 && listPathsWithDetail.includes(subPage) && segments[2] !== 'new'
         return {
           pageTitle: info.title,
           pageSubtitle: info.subtitle,
-          showBackButton: false,
-          backTo: null,
+          showBackButton: isExmclDetail,
+          backTo: isExmclDetail ? `/exmcl/${subPage}` : null,
         }
       }
       case 'acdmc': {
@@ -379,7 +388,7 @@ const Header: React.FC<HeaderProps> = ({ isSidebarCollapsed, onToggleSidebar }) 
         if (subPage === 'houses' && houseId) {
           return {
             pageTitle: 'House details',
-            pageSubtitle: 'Students, teachers, council, and house statistics',
+            pageSubtitle: 'Members, teachers, council and points for this house.',
             showBackButton: true,
             backTo: '/actvt/houses',
           }
@@ -387,35 +396,33 @@ const Header: React.FC<HeaderProps> = ({ isSidebarCollapsed, onToggleSidebar }) 
         if (subPage === 'students' && houseId) {
           return {
             pageTitle: 'Student activity profile',
-            pageSubtitle: 'Participation, certificates, wall of fame, and engagement scores',
+            pageSubtitle: 'Participation, certificates and achievements.',
             showBackButton: true,
-            backTo: '/actvt/houses',
+            // Opened from a house or the student council: go back to wherever it came from.
+            backTo: 'history',
           }
         }
         if (subPage === 'clubs' && houseId) {
           return {
             pageTitle: 'Club details',
-            pageSubtitle: 'Incharge, members, meeting day, and club activities',
-            showBackButton: false,
-            backTo: null,
+            pageSubtitle: 'Incharge, members, meeting day and activities.',
+            showBackButton: true,
+            backTo: '/actvt/clubs',
           }
         }
         const titleMap: Record<string, { title: string; subtitle: string }> = {
-          board: { title: 'Activity Board', subtitle: 'Plan, record, score, and judge house and school activities' },
-          calendar: { title: 'Activity Board', subtitle: 'Plan, record, score, and judge house and school activities' },
-          clubs: { title: 'Clubs', subtitle: 'Club name, logo, tagline, motto, and colour — then edit the full profile' },
-          houses: { title: 'Houses', subtitle: 'House name, logo, tagline, motto, and colour for inter-house competitions' },
-          'student-council': {
-            title: 'Student Council',
-            subtitle: 'Create school and house councils, open posts, and select members',
-          },
-          ranking: { title: 'House Ranking', subtitle: 'Track house activity points and live standings' },
-          certificates: { title: 'Certificates', subtitle: 'Generate and print certificates for house activity participants' },
-          tours: { title: 'Tours & Trips', subtitle: 'Educational tours, trips, and student feedback' },
-          sports: { title: 'Sports', subtitle: 'School sports facilities and sports activities' },
-          functions: { title: 'Functions', subtitle: 'Plan and record school functions' },
+          board: { title: 'Activity board', subtitle: 'Plan, run and score house and school activities.' },
+          calendar: { title: 'Activity board', subtitle: 'Plan, run and score house and school activities.' },
+          clubs: { title: 'Clubs', subtitle: 'Each club’s logo, colour, members and meeting day.' },
+          houses: { title: 'Houses', subtitle: 'Houses, their colours and the students in each.' },
+          'student-council': { title: 'Student council', subtitle: 'School and house councils, posts and members.' },
+          ranking: { title: 'House ranking', subtitle: 'Points and live standings for every house.' },
+          certificates: { title: 'Certificates', subtitle: 'Print certificates for activity participants.' },
+          tours: { title: 'Tours & trips', subtitle: 'Educational tours, trips and student feedback.' },
+          sports: { title: 'Sports', subtitle: 'Sports facilities, teams and events.' },
+          functions: { title: 'Functions', subtitle: 'Plan and record school functions.' },
         }
-        const info = titleMap[subPage] || { title: 'ACTVT', subtitle: 'Co-curricular and cultural activities' }
+        const info = titleMap[subPage] || { title: 'Activities', subtitle: 'Co-curricular and cultural activities.' }
         return { pageTitle: info.title, pageSubtitle: info.subtitle, showBackButton: false, backTo: null }
       }
       case 'mdcl': {
@@ -436,23 +443,23 @@ const Header: React.FC<HeaderProps> = ({ isSidebarCollapsed, onToggleSidebar }) 
       case 'cpitl': {
         const subPage = segments[1] || ''
         const titleMap: Record<string, { title: string; subtitle: string }> = {
-          dashboard: { title: 'Fee Dashboard', subtitle: 'Class-wise collection and pending dues' },
-          'fee-structures': { title: 'Fee Structures', subtitle: 'Fee heads, installments and version history' },
-          collection: { title: 'Fee Collection', subtitle: 'Student dues, payments and receipts' },
-          students: { title: 'Student Fee Ledger', subtitle: 'Installments, concessions and payments' },
-          'fee-slips': { title: 'Fee Slips', subtitle: 'Print fee slips for pending dues' },
-          payments: { title: 'Receipts', subtitle: 'Day book of fee receipts' },
-          settings: { title: 'Fee Settings', subtitle: 'Fee heads, receipts and concession presets' },
-          expenses: { title: 'Expense Overview', subtitle: 'Spend by type, income vs expense' },
-          operating: { title: 'Operating Costs', subtitle: 'Day-to-day spending by category' },
-          fuel: { title: 'Fuel', subtitle: 'Fuel log, cost per vehicle and next-year budget' },
-          electricity: { title: 'Electricity', subtitle: 'Bills, units and cost per connection' },
-          infra: { title: 'Infrastructure', subtitle: 'Development projects, budgets and payments' },
-          budgets: { title: 'Budgets', subtitle: 'Budget vs actual and next-year planning' },
-          salary: { title: 'Staff Salaries', subtitle: 'Salary structures and statutory settings' },
-          payroll: { title: 'Payroll', subtitle: 'Monthly salary runs and payslips' },
+          dashboard: { title: 'Fee dashboard', subtitle: 'What has been collected, what is due and who is behind.' },
+          'fee-structures': { title: 'Fee structures', subtitle: 'Fee heads, instalments and version history.' },
+          collection: { title: 'Fee collection', subtitle: 'Find a student, see their dues and collect fees.' },
+          students: { title: 'Student fee ledger', subtitle: 'Instalments, concessions and payments.' },
+          'fee-slips': { title: 'Fee slips', subtitle: 'Print fee slips for pending dues.' },
+          payments: { title: 'Receipts', subtitle: 'Every fee receipt, day by day.' },
+          settings: { title: 'Fee settings', subtitle: 'Fee heads, receipts and concession presets.' },
+          expenses: { title: 'Expense overview', subtitle: 'Spending by type, and income against expense.' },
+          operating: { title: 'Operating costs', subtitle: 'Day-to-day spending by category.' },
+          fuel: { title: 'Fuel', subtitle: 'Fuel log and cost per vehicle.' },
+          electricity: { title: 'Electricity', subtitle: 'Bills, units and cost per connection.' },
+          infra: { title: 'Infrastructure', subtitle: 'Development projects, budgets and payments.' },
+          budgets: { title: 'Budgets', subtitle: 'Budget against actual, and next year’s plan.' },
+          salary: { title: 'Staff salaries', subtitle: 'Salary structures and statutory deductions.' },
+          payroll: { title: 'Payroll', subtitle: 'Monthly salary runs and payslips.' },
         }
-        const info = titleMap[subPage] || { title: 'CPITL', subtitle: 'Capital & finance' }
+        const info = titleMap[subPage] || { title: 'Finance', subtitle: 'Fees, expenses and payroll.' }
         const detailBack: Record<string, string> = {
           'fee-structures': '/cpitl/fee-structures',
           students: '/cpitl/collection',
@@ -470,38 +477,39 @@ const Header: React.FC<HeaderProps> = ({ isSidebarCollapsed, onToggleSidebar }) 
       case 'asets': {
         const subPage = segments[1] || ''
         const titleMap: Record<string, { title: string; subtitle: string }> = {
-          dashboard: { title: 'Asset Overview', subtitle: 'Lifecycle KPIs, alerts, and distribution' },
-          assets: { title: 'All Assets', subtitle: 'Asset register, batch create, and profiles' },
-          categories: { title: 'Categories', subtitle: 'Hierarchical asset categories' },
-          locations: { title: 'Campus', subtitle: 'Campus, blocks, floors, and locations hierarchy' },
-          allocations: { title: 'Allocations', subtitle: 'Assign assets to locations and custodians' },
-          transfers: { title: 'Transfers', subtitle: 'Move assets with immutable history' },
-          maintenance: { title: 'Maintenance', subtitle: 'Issues, repairs, and preventive schedules' },
-          stock: { title: 'Stock / Store', subtitle: 'Consumables and quantity-based inventory' },
-          audits: { title: 'Audits', subtitle: 'Physical verification and scan workflow' },
-          vendors: { title: 'Vendors', subtitle: 'Suppliers and service providers' },
-          procurement: { title: 'Procurement', subtitle: 'Acquisition and asset generation on receipt' },
-          disposals: { title: 'Disposal', subtitle: 'Formal retirement and disposal workflow' },
-          reports: { title: 'Reports', subtitle: 'Registers, valuation, and operational reports' },
-          settings: { title: 'ASETS Settings', subtitle: 'Alerts, approvals, and module defaults' },
+          dashboard: { title: 'Asset overview', subtitle: 'What the school owns, where it is and what needs attention.' },
+          assets: { title: 'All assets', subtitle: 'The asset register, with a profile for every item.' },
+          categories: { title: 'Categories', subtitle: 'How assets are grouped.' },
+          locations: { title: 'Locations', subtitle: 'Campus, blocks, floors and rooms, and what is in each.' },
+          allocations: { title: 'Allocations', subtitle: 'Who and where each asset is assigned to.' },
+          transfers: { title: 'Transfers', subtitle: 'Asset moves between locations, with full history.' },
+          maintenance: { title: 'Maintenance', subtitle: 'Repairs, issues and preventive schedules.' },
+          stock: { title: 'Stock / store', subtitle: 'Consumables and quantity-based items.' },
+          audits: { title: 'Audits', subtitle: 'Physical checks against the register.' },
+          vendors: { title: 'Vendors', subtitle: 'Suppliers and service providers.' },
+          procurement: { title: 'Procurement', subtitle: 'Purchase requests through to received assets.' },
+          disposals: { title: 'Disposal', subtitle: 'Retiring and disposing of assets formally.' },
+          reports: { title: 'Reports', subtitle: 'Registers, valuation and operational reports.' },
+          settings: { title: 'Asset settings', subtitle: 'Alerts, approvals and module defaults.' },
         }
-        const info = titleMap[subPage] || { title: 'ASETS', subtitle: 'School asset management' }
+        const info = titleMap[subPage] || { title: 'Assets', subtitle: 'School asset management.' }
+        const detailBack = segments[2] && (subPage === 'assets' || subPage === 'locations') ? `/asets/${subPage}` : null
         return {
           pageTitle: info.title,
           pageSubtitle: info.subtitle,
-          showBackButton: subPage === 'assets' && Boolean(segments[2]),
-          backTo: subPage === 'assets' && segments[2] ? '/asets/assets' : null,
+          showBackButton: Boolean(detailBack),
+          backTo: detailBack,
         }
       }
       case 'trnst': {
         const subPage = segments[1] || ''
         const titleMap: Record<string, { title: string; subtitle: string }> = {
-          '': { title: 'Transport', subtitle: 'School routes, vehicles, and stop timings' },
-          vehicles: { title: 'Vehicles', subtitle: 'Bus and van records, capacity, and assigned staff' },
-          routes: { title: 'Routes', subtitle: 'Pickup routes, stops, and vehicle assignment' },
-          'self-students': { title: 'Self Students', subtitle: 'Students who come to school on their own' },
+          '': { title: 'Transport', subtitle: 'Vehicles, routes and who comes on their own.' },
+          vehicles: { title: 'Vehicles', subtitle: 'Buses and vans, their crew and paper renewals.' },
+          routes: { title: 'Routes', subtitle: 'Pickup routes, stops and the vehicle on each.' },
+          'self-students': { title: 'Self students', subtitle: 'Students who come to school without school transport.' },
         }
-        const info = titleMap[subPage] || { title: 'TRNST', subtitle: 'School transport workspace' }
+        const info = titleMap[subPage] || { title: 'Transport', subtitle: 'School transport.' }
         return {
           pageTitle: info.title,
           pageSubtitle: info.subtitle,
@@ -636,7 +644,15 @@ const Header: React.FC<HeaderProps> = ({ isSidebarCollapsed, onToggleSidebar }) 
             {showBackButton && backTo && (
               <button
                 type="button"
-                onClick={() => navigate(backTo)}
+                onClick={() => {
+                  if (backTo === 'history') {
+                    // React Router keeps the in-app history position in history.state.idx.
+                    if ((window.history.state?.idx ?? 0) > 0) navigate(-1)
+                    else navigate('/actvt/houses')
+                    return
+                  }
+                  navigate(backTo)
+                }}
                 className="p-2 bg-white/50 dark:bg-secondary-800/50 hover:bg-white dark:hover:bg-secondary-700 text-secondary-600 dark:text-secondary-400 hover:text-primary-600 dark:hover:text-primary-400 rounded-xl shadow-sm hover:shadow-md border border-secondary-200 dark:border-secondary-700 transition-all duration-200 flex-shrink-0 group"
                 aria-label="Go back"
               >

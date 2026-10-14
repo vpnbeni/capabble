@@ -1,0 +1,26 @@
+/* Exams · CBSE registration page. Tokens only; builds on .ex-matrix from exmcl.css. */
+
+/* ---------- Subjects by class ---------- */
+.cb-app .ex-reg-classes { margin: 0; padding: 0; list-style: none; }
+.cb-app .ex-reg-class { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-4) var(--space-5); border-top: 1px solid var(--border); }
+.cb-app .ex-reg-class__head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
+.cb-app .ex-reg-class__titles { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; min-width: 0; font-size: 14px; line-height: 20px; }
+.cb-app .ex-reg-class__titles .cb-muted { font-size: 13px; }
+.cb-app .ex-reg-slots { display: grid; gap: var(--space-3) var(--space-4); grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr)); }
+.cb-app .ex-reg-slot { display: flex; align-items: center; gap: var(--space-1); min-width: 0; }
+.cb-app .ex-reg-slot > .ex-reg-combo { flex: 1; min-width: 0; }
+@media (max-width: 640px) { .cb-app .ex-reg-class { padding: var(--space-4); } }
+
+
+/* ---------- Subjects for each student ---------- */
+.cb-app .ex-reg-matrix { max-height: 60vh; }
+.cb-app .ex-reg-matrix thead th { height: auto; padding: var(--space-2); vertical-align: bottom; }
+.cb-app .ex-reg-matrix thead th.ex-matrix__subject { padding: var(--space-2) var(--space-4); }
+.cb-app .ex-reg-matrix td { height: 48px; min-width: 96px; user-select: none; }
+.cb-app .ex-reg-matrix tbody th.ex-matrix__subject { height: 48px; min-width: 200px; max-width: 240px; }
+.cb-app .ex-reg-head { display: inline-flex; flex-direction: column; align-items: center; gap: 4px; min-width: 80px; max-width: 140px; }
+.cb-app .ex-reg-head__name { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); font-weight: 600; }
+.cb-app .ex-reg-head__code { color: var(--ink-muted); font-variant-numeric: tabular-nums; }
+.cb-app .ex-reg-cell { display: inline-flex; flex-direction: column; align-items: center; gap: 2px; }
+.cb-app .ex-reg-matrix .cb-badge { height: 18px; padding: 0 6px; }
+.cb-app .ex-reg-matrix + .cb-table-foot { border-top: 0; }

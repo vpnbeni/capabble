@@ -1,8 +1,26 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
+import { ClipboardList, Pencil, Plus, Trash2 } from 'lucide-react'
 import exmclExamService, { type ExmclExamDefinition } from '@/services/exmclExamService'
+import {
+  Button,
+  Card,
+  CardToolbar,
+  DataTable,
+  Dialog,
+  EmptyState,
+  FilterBar,
+  Menu,
+  Page,
+  Select,
+  Sheet,
+  TextField,
+  type DataTableColumn,
+} from '@/components/ui'
+import { errorMessage } from '@/components/exmcl/ExmclUi'
+import '@/components/exmcl/exmcl.css'
 
-const DEFAULT_EXAM_TEMPLATES = [
+const STANDARD_EXAMS = [
   { name: 'Unit Test 1', code: 'UT1' },
   { name: 'Unit Test 2', code: 'UT2' },
   { name: 'Periodic Test 1', code: 'PT1' },
@@ -11,31 +29,26 @@ const DEFAULT_EXAM_TEMPLATES = [
   { name: 'Semester Assessment 2 / Annual', code: 'SA2/ANNUAL' },
 ]
 
+type ExamForm = { name: string; code: string; duration: string; maximumMarks: string }
+const emptyForm = (): ExamForm => ({ name: '', code: '', duration: '', maximumMarks: '' })
+
 const ExmclExams: React.FC = () => {
   const [items, setItems] = useState<ExmclExamDefinition[]>([])
   const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
+  const [sheetOpen, setSheetOpen] = useState(false)
+  const [editing, setEditing] = useState<ExmclExamDefinition | null>(null)
+  const [form, setForm] = useState<ExamForm>(emptyForm)
+  const [tried, setTried] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [name, setName] = useState('')
-  const [code, setCode] = useState('')
-  const [duration, setDuration] = useState('')
-  const [maximumMarks, setMaximumMarks] = useState('')
-
-  const resetForm = () => {
-    setEditingId(null)
-    setName('')
-    setCode('')
-    setDuration('')
-    setMaximumMarks('')
-  }
+  const [removing, setRemoving] = useState<ExmclExamDefinition | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
   const loadExams = async () => {
-    setLoading(true)
     try {
-      const data = await exmclExamService.getAll()
-      setItems(data)
-    } catch {
-      toast.error('Failed to load exams.')
+      setItems(await exmclExamService.getAll())
+    } catch (error) {
+      toast.error(errorMessage(error, 'Exams didn’t load. Check your connection and try again.'))
     } finally {
       setLoading(false)
     }
@@ -45,231 +58,260 @@ const ExmclExams: React.FC = () => {
     void loadExams()
   }, [])
 
-  const codeSet = useMemo(() => {
-    return new Set(items.map((item) => item.code.trim().toUpperCase()))
-  }, [items])
+  const usedCodes = useMemo(() => new Set(items.map((item) => item.code.trim().toUpperCase())), [items])
+  const freeStandard = STANDARD_EXAMS.filter((t) => !usedCodes.has(t.code))
 
-  const hasTemplate = (templateCode: string) => codeSet.has(templateCode.trim().toUpperCase())
+  const rows = useMemo(() => {
+    const needle = search.trim().toLowerCase()
+    if (!needle) return items
+    return items.filter((item) => [item.name, item.code].some((v) => String(v || '').toLowerCase().includes(needle)))
+  }, [items, search])
 
-  const handleSave = async () => {
-    if (!name.trim() || !code.trim()) {
-      toast.error('Exam name and code are required.')
-      return
-    }
-    const parsedMaximumMarks = Number(maximumMarks)
-    if (!Number.isFinite(parsedMaximumMarks) || parsedMaximumMarks < 0) {
-      toast.error('Maximum Marks (M.M.) must be a non-negative number.')
-      return
-    }
+  const set = (patch: Partial<ExamForm>) => setForm((prev) => ({ ...prev, ...patch }))
 
+  const openAdd = () => {
+    setEditing(null)
+    setForm(emptyForm())
+    setTried(false)
+    setSheetOpen(true)
+  }
+
+  const openEdit = (item: ExmclExamDefinition) => {
+    setEditing(item)
+    setForm({
+      name: item.name,
+      code: item.code,
+      duration: String(item.duration || ''),
+      maximumMarks: String(item.maximumMarks ?? ''),
+    })
+    setTried(false)
+    setSheetOpen(true)
+  }
+
+  const marks = Number(form.maximumMarks)
+  const marksInvalid = form.maximumMarks.trim() !== '' && (!Number.isFinite(marks) || marks < 0)
+  const codeTaken =
+    form.code.trim() !== '' &&
+    usedCodes.has(form.code.trim().toUpperCase()) &&
+    form.code.trim().toUpperCase() !== editing?.code.trim().toUpperCase()
+
+  const save = async () => {
+    setTried(true)
+    if (!form.name.trim() || !form.code.trim() || marksInvalid || codeTaken) return
     setSaving(true)
     try {
       const payload = {
-        name: name.trim(),
-        code: code.trim().toUpperCase(),
-        duration: duration.trim(),
-        maximumMarks: parsedMaximumMarks,
-        displayOrder: editingId
-          ? items.find((item) => item._id === editingId)?.displayOrder ?? items.length
-          : items.length,
+        name: form.name.trim(),
+        code: form.code.trim().toUpperCase(),
+        duration: form.duration.trim(),
+        maximumMarks: form.maximumMarks.trim() ? marks : 0,
+        displayOrder: editing ? editing.displayOrder ?? items.length : items.length,
       }
-
-      if (editingId) {
-        await exmclExamService.update(editingId, payload)
-        toast.success('Exam updated.')
-      } else {
-        await exmclExamService.create(payload)
-        toast.success('Exam created.')
-      }
-      resetForm()
+      if (editing) await exmclExamService.update(editing._id, payload)
+      else await exmclExamService.create(payload)
+      toast.success(editing ? `${payload.code} updated.` : `${payload.code} added.`)
+      setSheetOpen(false)
       await loadExams()
-    } catch {
-      toast.error('Unable to save exam.')
+    } catch (error) {
+      toast.error(errorMessage(error, 'The exam wasn’t saved. Try again.'))
     } finally {
       setSaving(false)
     }
   }
 
-  const handleUseTemplate = (template: { name: string; code: string }) => {
-    setEditingId(null)
-    setName(template.name)
-    setCode(template.code)
-  }
-
-  const handleEdit = (item: ExmclExamDefinition) => {
-    setEditingId(item._id)
-    setName(item.name)
-    setCode(item.code)
-    setDuration(String(item.duration || ''))
-    setMaximumMarks(String(item.maximumMarks ?? 0))
-  }
-
-  const handleDelete = async (id: string) => {
-    if (!window.confirm('Delete this exam?')) return
+  const remove = async () => {
+    if (!removing) return
+    setDeleting(true)
     try {
-      await exmclExamService.remove(id)
-      toast.success('Exam deleted.')
-      if (editingId === id) resetForm()
+      await exmclExamService.remove(removing._id)
+      toast.success(`${removing.code} removed.`)
+      setRemoving(null)
       await loadExams()
-    } catch {
-      toast.error('Failed to delete exam.')
+    } catch (error) {
+      toast.error(errorMessage(error, 'The exam wasn’t removed. Try again.'))
+    } finally {
+      setDeleting(false)
     }
   }
 
-  const fieldClassName =
-    'rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white'
+  const columns: DataTableColumn<ExmclExamDefinition>[] = [
+    { key: 'order', header: '#', width: 48, numeric: true, mobile: 'hidden', render: (item) => items.indexOf(item) + 1 },
+    { key: 'name', header: 'Exam', mobile: 'title', render: (item) => <span className="cb-strong">{item.name}</span> },
+    { key: 'code', header: 'Code', mobile: 'aside', render: (item) => <span className="ex-code">{item.code}</span> },
+    { key: 'duration', header: 'Duration', render: (item) => item.duration || '—' },
+    {
+      key: 'marks',
+      header: 'Maximum marks',
+      numeric: true,
+      align: 'right',
+      render: (item) => (item.maximumMarks ? item.maximumMarks : '—'),
+    },
+    {
+      key: 'actions',
+      header: '',
+      headerLabel: 'Actions',
+      align: 'right',
+      width: 48,
+      interactive: true,
+      render: (item) => (
+        <Menu
+          label={`Actions for ${item.code}`}
+          items={[
+            { label: 'Edit exam', icon: Pencil, onSelect: () => openEdit(item) },
+            { divider: true },
+            { label: 'Remove exam', icon: Trash2, tone: 'danger', onSelect: () => setRemoving(item) },
+          ]}
+        />
+      ),
+    },
+  ]
 
   return (
-    <div className="p-6">
-      <div className="mx-auto max-w-[1400px] space-y-4">
-      <section className="flex flex-col gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-        <div className="flex flex-1 flex-wrap items-center gap-2">
-          {DEFAULT_EXAM_TEMPLATES.map((template) => (
-            <button
-              key={template.code}
-              type="button"
-              onClick={() => handleUseTemplate(template)}
-              disabled={hasTemplate(template.code) && !editingId}
-              className="rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-xs font-medium text-indigo-700 hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-indigo-900/40 dark:bg-indigo-900/20 dark:text-indigo-300"
-              title={hasTemplate(template.code) ? 'Already added in this session' : `Use ${template.code}`}
-            >
-              {template.code}
-            </button>
-          ))}
-          <input
-            id="exam-name"
-            type="text"
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            placeholder="Exam name"
-            title="Exam name"
-            aria-label="Exam name"
-            className={`${fieldClassName} min-w-[180px] flex-1`}
+    <Page>
+      <Card flush title="Exams this session" subtitle="The tests every class sits, with their duration and maximum marks">
+        <CardToolbar>
+          <FilterBar
+            search={{ placeholder: 'Search exam or code', value: search, onChange: setSearch, label: 'Search exams' }}
+            actions={
+              <Button variant="primary" icon={Plus} onClick={openAdd}>
+                Add exam
+              </Button>
+            }
           />
-          <input
-            id="exam-code"
-            type="text"
-            value={code}
-            onChange={(event) => setCode(event.target.value.toUpperCase())}
-            placeholder="Code"
-            title="Exam code"
-            aria-label="Exam code"
-            className={`${fieldClassName} w-[110px]`}
+        </CardToolbar>
+        <DataTable
+          caption="Exams this session"
+          columns={columns}
+          rows={rows}
+          getRowKey={(item) => item._id}
+          onRowClick={openEdit}
+          loading={loading}
+          loadingLabel="Loading exams…"
+          empty={
+            items.length === 0 ? (
+              <EmptyState
+                icon={ClipboardList}
+                title="No exams set up for this session"
+                body="Add the tests your school holds — UT1, PT1, SA1 and so on. Subjects, datesheets and results are built from this list."
+                action={
+                  <Button size="sm" icon={Plus} onClick={openAdd}>
+                    Add exam
+                  </Button>
+                }
+              />
+            ) : (
+              <EmptyState
+                compact
+                icon={ClipboardList}
+                title="No exams match this search"
+                action={
+                  <Button size="sm" onClick={() => setSearch('')}>
+                    Clear search
+                  </Button>
+                }
+              />
+            )
+          }
+        />
+      </Card>
+
+      <Sheet
+        open={sheetOpen}
+        onClose={() => setSheetOpen(false)}
+        title={editing ? `Edit ${editing.code}` : 'Add exam'}
+        description="Name, short code, duration and maximum marks."
+        icon={ClipboardList}
+        onSubmit={(event) => {
+          event.preventDefault()
+          if (!saving) void save()
+        }}
+        footer={
+          <>
+            <Button onClick={() => setSheetOpen(false)} disabled={saving}>
+              Cancel
+            </Button>
+            <Button type="submit" variant="primary" loading={saving}>
+              {editing ? 'Save exam' : 'Add exam'}
+            </Button>
+          </>
+        }
+      >
+        <div className="cb-form-grid">
+          {!editing && freeStandard.length ? (
+            <Select
+              className="is-wide"
+              label="Start from a standard exam"
+              placeholder="Custom exam"
+              value={STANDARD_EXAMS.find((t) => t.code === form.code && t.name === form.name)?.code || ''}
+              onChange={(e) => {
+                const t = STANDARD_EXAMS.find((x) => x.code === e.target.value)
+                set(t ? { name: t.name, code: t.code } : { name: '', code: '' })
+              }}
+              options={freeStandard.map((t) => ({ value: t.code, label: `${t.code} · ${t.name}` }))}
+            />
+          ) : null}
+          <TextField
+            className="is-wide"
+            label="Exam name"
+            required
+            autoFocus
+            placeholder="e.g. Periodic Test 1"
+            value={form.name}
+            onChange={(e) => set({ name: e.target.value })}
+            error={tried && !form.name.trim() ? 'Enter the exam name.' : undefined}
           />
-          <input
-            id="exam-duration"
-            type="text"
-            value={duration}
-            onChange={(event) => setDuration(event.target.value)}
-            placeholder="Duration"
-            title="Duration"
-            aria-label="Duration"
-            className={`${fieldClassName} w-[120px]`}
+          <TextField
+            label="Code"
+            required
+            placeholder="e.g. PT1"
+            value={form.code}
+            onChange={(e) => set({ code: e.target.value.toUpperCase() })}
+            error={
+              tried && !form.code.trim()
+                ? 'Enter a short code.'
+                : tried && codeTaken
+                  ? `${form.code.trim().toUpperCase()} is already in this session.`
+                  : undefined
+            }
           />
-          <input
-            id="exam-mm"
+          <TextField
+            label="Maximum marks"
             type="number"
+            inputMode="numeric"
             min={0}
-            value={maximumMarks}
-            onChange={(event) => setMaximumMarks(event.target.value)}
-            placeholder="M.M."
-            title="Maximum marks"
-            aria-label="Maximum marks"
-            className={`${fieldClassName} w-[88px]`}
+            placeholder="e.g. 80"
+            value={form.maximumMarks}
+            onChange={(e) => set({ maximumMarks: e.target.value })}
+            error={tried && marksInvalid ? 'Marks can’t be negative.' : undefined}
           />
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={saving}
-            className="inline-flex items-center rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {saving ? 'Saving...' : editingId ? 'Update' : 'Create Exam'}
-          </button>
-          {(editingId || name || code || duration || maximumMarks) && (
-            <button
-              type="button"
-              onClick={resetForm}
-              className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
-            >
-              Clear
-            </button>
-          )}
+          <TextField
+            label="Duration"
+            placeholder="e.g. 3 hours"
+            value={form.duration}
+            onChange={(e) => set({ duration: e.target.value })}
+          />
         </div>
-      </section>
+      </Sheet>
 
-      <section className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-        <div className="mb-3 flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Session Exams</h2>
-            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Total exams: {items.length}</p>
-          </div>
-          <button
-            type="button"
-            onClick={() => void loadExams()}
-            className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200"
-          >
-            Refresh
-          </button>
-        </div>
-
-        {loading ? (
-          <div className="py-10 text-center text-sm text-slate-500 dark:text-slate-400">Loading exams...</div>
-        ) : items.length === 0 ? (
-          <div className="py-10 text-center text-sm text-slate-500 dark:text-slate-400">
-            No exams created yet. Add exams like UT1, UT2, PT1, PT2, SA1, SA2/ANNUAL.
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-700">
-              <thead>
-                <tr className="text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                  <th className="px-3 py-2">#</th>
-                  <th className="px-3 py-2">Exam Name</th>
-                  <th className="px-3 py-2">Code</th>
-                  <th className="px-3 py-2">Duration</th>
-                  <th className="px-3 py-2">M.M.</th>
-                  <th className="px-3 py-2">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {items.map((item, index) => (
-                  <tr key={item._id}>
-                    <td className="px-3 py-2 text-slate-500 dark:text-slate-400">{index + 1}</td>
-                    <td className="px-3 py-2 font-medium text-slate-900 dark:text-white">{item.name}</td>
-                    <td className="px-3 py-2">
-                      <span className="rounded-full bg-indigo-100 px-2.5 py-1 text-xs font-semibold text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300">
-                        {item.code}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2 text-slate-700 dark:text-slate-300">{item.duration || '-'}</td>
-                    <td className="px-3 py-2 text-slate-700 dark:text-slate-300">{item.maximumMarks ?? 0}</td>
-                    <td className="px-3 py-2">
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => handleEdit(item)}
-                          className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => void handleDelete(item._id)}
-                          className="rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-rose-700"
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
-      </div>
-    </div>
+      <Dialog
+        open={Boolean(removing)}
+        onClose={() => setRemoving(null)}
+        tone="danger"
+        size="sm"
+        title={`Remove ${removing?.code || 'this exam'}?`}
+        description="The exam leaves this session’s list and can’t be picked for subjects, datesheets or results."
+        footer={
+          <>
+            <Button onClick={() => setRemoving(null)} disabled={deleting}>
+              Keep exam
+            </Button>
+            <Button variant="danger" loading={deleting} onClick={() => void remove()}>
+              Remove exam
+            </Button>
+          </>
+        }
+      />
+    </Page>
   )
 }
 

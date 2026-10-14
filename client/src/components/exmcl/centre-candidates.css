@@ -1,0 +1,62 @@
+/* Candidate list, detail and import overlays (pages/Candidates.tsx, pages/CandidateDetail.tsx,
+   components/candidates/*). Tokens only; scoped inside .cb-app (a <Page> or a kit overlay portal). */
+
+/* Toolbar: the FilterBar, then the extra filters panel when it is open. */
+.cb-app .cx-cand-toolbar { display: flex; flex-direction: column; gap: var(--space-3); }
+.cb-app .cx-cand-filters { display: grid; gap: var(--space-3); grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); padding-top: var(--space-3); border-top: 1px solid var(--border); }
+
+/* Name cell: photo beside the kit Entity (name + date of birth). */
+.cb-app .cx-cand-name { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
+
+/* Subject code chips (and the school line above them). */
+.cb-app .cx-cand-codes { display: flex; flex-wrap: wrap; gap: var(--space-1); }
+.cb-app .cx-cand-school { display: block; max-width: 280px; margin-bottom: var(--space-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; line-height: 16px; color: var(--ink-muted); }
+.cb-app .cx-cand-kv { display: inline-flex; flex-wrap: wrap; gap: 0 var(--space-3); font-size: 12px; line-height: 16px; color: var(--ink); }
+
+/* Table footer: range + rows per page on the left, previous / next on the right. */
+
+/* Candidates without subjects, listed inside the warning Banner. */
+.cb-app .cx-cand-missing { list-style: none; margin: var(--space-2) 0 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-1); }
+.cb-app .cx-cand-missing.is-scroll { max-height: 256px; overflow-y: auto; padding-right: var(--space-2); }
+.cb-app .cx-cand-missing li { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); font-variant-numeric: tabular-nums; }
+.cb-app .cx-cand-banner-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-3); }
+
+/* PDF drop zone used by Import and Re-import. */
+.cb-app .cx-drop { display: flex; flex-direction: column; align-items: center; gap: var(--space-2); padding: var(--space-8) var(--space-4); border: 1px dashed var(--border-strong); border-radius: var(--radius-md); background: var(--surface-sunken); text-align: center; color: var(--ink-muted); font-size: 13px; line-height: 18px; cursor: pointer; }
+.cb-app .cx-drop:hover { border-color: var(--accent); }
+.cb-app .cx-drop.is-active { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-soft-ink); }
+.cb-app .cx-drop.is-disabled { opacity: 0.6; cursor: not-allowed; }
+.cb-app .cx-drop__title { font: 500 14px/20px var(--font-sans); color: var(--ink); }
+
+/* Chosen file row under the drop zone. */
+.cb-app .cx-file { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2) var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); font-size: 13px; line-height: 18px; }
+.cb-app .cx-file__name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); font-weight: 500; }
+.cb-app .cx-file__size { color: var(--ink-muted); font-variant-numeric: tabular-nums; }
+
+/* Import help: requirement list and a sample of the PDF text. */
+.cb-app .cx-cand-help { margin: 0; padding-left: var(--space-5); font-size: 13px; line-height: 20px; color: var(--ink-muted); }
+.cb-app .cx-cand-sample { margin: 0; padding: var(--space-3); border-radius: var(--radius-md); background: var(--surface-sunken); font: 12px/18px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--ink-muted); white-space: pre-wrap; }
+
+/* Assign-subject picker: searchable list of subject rows inside a Dialog. */
+.cb-app .cx-cand-picklist { list-style: none; margin: var(--space-3) 0 0; padding: 0; max-height: 50vh; overflow-y: auto; display: flex; flex-direction: column; }
+.cb-app .cx-cand-pick { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-2) var(--space-3); border: 0; border-radius: var(--radius-sm); background: none; text-align: left; cursor: pointer; font: inherit; color: inherit; }
+.cb-app .cx-cand-pick:hover { background: var(--surface-hover); }
+.cb-app .cx-cand-pick:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* Detail page: photo in the side card, header avatar row. */
+.cb-app .cx-cand-photo { display: block; width: 128px; max-width: 100%; height: auto; margin: 0 auto; border: 1px solid var(--border); border-radius: var(--radius-md); object-fit: contain; }
+.cb-app .cx-cand-title { display: inline-flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
+
+@media (max-width: 640px) {
+  .cb-app .cx-cand-school { max-width: 100%; }
+}
+
+/* Candidate detail: one details card split into labelled sections, and the source-file link. */
+.cb-app .cx-cand-sections { display: flex; flex-direction: column; }
+.cb-app .cx-cand-section { display: flex; flex-direction: column; gap: var(--space-3); }
+.cb-app .cx-cand-section + .cx-cand-section { border-top: 1px solid var(--border); margin-top: var(--space-4); padding-top: var(--space-4); }
+.cb-app .cx-cand-section .cb-subhead { margin: 0; }
+.cb-app .cx-cand-file { display: inline-flex; align-items: center; gap: var(--space-1); overflow-wrap: anywhere; }
+.cb-app .cx-cand-invigilators { display: flex; flex-direction: column; gap: var(--space-1); }
+/* School line + subject-code chips: two lines, so give the cell breathing room above and below. */
+.cb-app .cx-cand-schoolcell { padding: var(--space-2) 0; }

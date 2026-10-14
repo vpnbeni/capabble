@@ -30,11 +30,14 @@ import {
   Avatar,
   Badge,
   Banner,
+  BulkBar,
   Button,
   Card,
+  CardToolbar,
   DataTable,
   Dialog,
   EmptyState,
+  Entity,
   FilterBar,
   Menu,
   Page,
@@ -44,7 +47,7 @@ import {
   type DataTableColumn,
   type MenuItem,
 } from "@/components/ui";
-import "../components/staaf/staff-list.css";
+import "../components/exmcl/centre-teachers.css";
 
 const DUTY_TYPE_OPTIONS = [
   'Centre Superintendent',
@@ -846,7 +849,7 @@ const Teachers: React.FC<TeachersProps> = ({
     return (
       <Select
         size="sm"
-        className="stafflist-type-select"
+        className="cx-teachers-duty"
         aria-label={`${dutyLabel} for ${teacher.name}`}
         value={normalizedCurrentDuty}
         onChange={(e) => {
@@ -897,12 +900,12 @@ const Teachers: React.FC<TeachersProps> = ({
             ? `OASIS ID ${teacher.oasisId}`
             : null;
         return (
-          <span className="stafflist-name">
+          <span className="cx-teachers-name">
             <Avatar name={teacher.name || entityLabelSingular} src={teacher.profileImage || null} size="md" />
-            <span className="stafflist-name__text">
-              <span className="stafflist-name__primary">{orDash(teacher.name)}</span>
-              {oasisLine ? <span className="stafflist-name__secondary is-num">{oasisLine}</span> : null}
-            </span>
+            <Entity
+              primary={orDash(teacher.name)}
+              secondary={oasisLine ? <span className="is-num">{oasisLine}</span> : undefined}
+            />
           </span>
         );
       },
@@ -962,7 +965,7 @@ const Teachers: React.FC<TeachersProps> = ({
         mobile: "hidden",
         render: (teacher: Teacher) => {
           const value = teacher.schoolName === "N/A" ? "" : String(teacher.schoolName || "");
-          return value ? <span className="stafflist-school" title={value}>{value}</span> : "—";
+          return value ? <span className="cx-teachers-school" title={value}>{value}</span> : "—";
         },
       } as DataTableColumn<Teacher>]
       : []),
@@ -1013,7 +1016,7 @@ const Teachers: React.FC<TeachersProps> = ({
         <Banner tone={pageMessage.tone} title={pageMessage.title} onDismiss={() => setPageMessage(null)}>
           {pageMessage.text}
           {pageMessage.details ? (
-            <ul className="stafflist-banner-list">
+            <ul className="cx-teachers-banner-list">
               {pageMessage.details.map((line) => (
                 <li key={line}>{line}</li>
               ))}
@@ -1052,8 +1055,8 @@ const Teachers: React.FC<TeachersProps> = ({
         </section>
       ) : null}
 
-      <Card flush className="stafflist-card">
-        <div className="stafflist-toolbar">
+      <Card flush title={entityLabelPluralTitle}>
+        <CardToolbar className="cx-teachers-toolbar">
           <FilterBar
             search={{
               placeholder: `Search name, ID, phone, subject or school`,
@@ -1072,7 +1075,7 @@ const Teachers: React.FC<TeachersProps> = ({
                       onChange={(e) => setFilterSchoolCode(e.target.value)}
                       placeholder="All schools"
                       options={schoolFilterOptions}
-                      className="stafflist-filter"
+                     
                     />
                   ) : null}
                   {showDutyFilter ? (
@@ -1083,7 +1086,7 @@ const Teachers: React.FC<TeachersProps> = ({
                       onChange={(e) => setFilterDutyType(e.target.value)}
                       placeholder={`Any ${dutyLabelLower}`}
                       options={dutyTypeFilterOptions}
-                      className="stafflist-filter"
+                     
                     />
                   ) : null}
                   {showSubjectFilter ? (
@@ -1094,7 +1097,7 @@ const Teachers: React.FC<TeachersProps> = ({
                       onChange={(e) => setFilterSubject(e.target.value)}
                       placeholder="All subjects"
                       options={subjectFilterOptions}
-                      className="stafflist-filter"
+                     
                     />
                   ) : null}
                   {hasFilters ? (
@@ -1158,27 +1161,25 @@ const Teachers: React.FC<TeachersProps> = ({
               ) : undefined
             }
           />
-          {selectedCount > 0 ? (
-            <div className="stafflist-bulkbar" role="region" aria-label="Bulk actions">
-              <span className="is-num">
-                {selectedCount} {nounFor(selectedCount)} selected
-              </span>
-              <span className="stafflist-bulkbar__spacer" />
-              <Button variant="tertiary" size="sm" onClick={clearSelection} disabled={isBulkDeleting}>
-                Clear selection
-              </Button>
-              <Button
-                size="sm"
-                icon={Trash2}
-                loading={isBulkDeleting}
-                disabled={loading}
-                onClick={() => setDeleteTargetIds([...selectedTeacherList])}
-              >
-                {isBulkDeleting ? "Deleting" : `Delete ${selectedCount} ${nounFor(selectedCount)}`}
-              </Button>
-            </div>
-          ) : null}
-        </div>
+          <BulkBar
+            count={selectedCount}
+            noun={entityLabelSingular}
+            nounPlural={entityLabelPlural}
+            onClear={clearSelection}
+            busy={isBulkDeleting}
+          >
+            <Button
+              variant="danger"
+              size="sm"
+              icon={Trash2}
+              loading={isBulkDeleting}
+              disabled={loading}
+              onClick={() => setDeleteTargetIds([...selectedTeacherList])}
+            >
+              {isBulkDeleting ? "Deleting" : `Delete ${selectedCount} ${nounFor(selectedCount)}`}
+            </Button>
+          </BulkBar>
+        </CardToolbar>
 
         <DataTable
           caption={entityLabelPluralTitle}
@@ -1243,7 +1244,7 @@ const Teachers: React.FC<TeachersProps> = ({
                     {formatCount((currentPage - 1) * 50 + 1)}–{formatCount(Math.min(currentPage * 50, pagination.totalItems))} of{" "}
                     {formatCount(pagination.totalItems)} {entityLabelPlural} · page {currentPage} of {pagination.totalPages}
                   </span>
-                  <span className="stafflist-pager">
+                  <span className="cx-teachers-pager">
                     <Button
                       size="sm"
                       onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}

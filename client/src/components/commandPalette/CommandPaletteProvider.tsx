@@ -6,6 +6,8 @@ import { getTenantHeader } from '@/utils/tenantRuntime'
 import { findPageForPath } from './pageIndex'
 import { memoryKey, recordVisit } from './storage'
 
+export { isMacPlatform } from './platform'
+
 // The palette UI is split into its own chunk; only this provider and the shortcut ship in the main bundle.
 const loadPalette = () => import('./CommandPalette')
 const CommandPalette = lazy(loadPalette)
@@ -25,9 +27,6 @@ const CommandPaletteContext = createContext<CommandPaletteContextValue>({
 })
 
 export const useCommandPalette = () => useContext(CommandPaletteContext)
-
-export const isMacPlatform = () =>
-  typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/i.test(navigator.platform || navigator.userAgent)
 
 const isTypingTarget = (target: EventTarget | null) => {
   const element = target as HTMLElement | null

@@ -1,23 +1,82 @@
 import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts'
 import toast from 'react-hot-toast'
+import {
+  AlertTriangle,
+  ArrowRightLeft,
+  Boxes,
+  CheckCircle2,
+  ClipboardCheck,
+  FileBarChart,
+  IndianRupee,
+  MapPin,
+  Package,
+  RefreshCw,
+  SearchX,
+  ShieldAlert,
+  ShoppingCart,
+  Wrench,
+  type LucideIcon,
+} from 'lucide-react'
 import asetsService from '@/services/asetsService'
-import { formatMoney } from '@/constants/asetsConstants'
-import { AsetsCard, AsetsEmpty, AsetsPageShell, AsetsStatusBadge } from '@/components/asets/AsetsUi'
+import { AsetsStatusBadge } from '@/components/asets/AsetsUi'
+import { Button, Card, EmptyState, Icon, Page, StatCard, cx, formatDate, formatINR } from '@/components/ui'
+import '@/components/asets/overview.css'
 
-const COLORS = ['#4f46e5', '#0ea5e9', '#10b981', '#f59e0b', '#f43f5e', '#8b5cf6', '#64748b']
+const count = (value: unknown) => Number(value || 0).toLocaleString('en-IN')
+
+const sentence = (value: string) => {
+  const words = String(value || '').replace(/_/g, ' ').toLowerCase().trim()
+  return words ? words.charAt(0).toUpperCase() + words.slice(1) : ''
+}
+
+/** Where each server alert type is handled. */
+const ALERT_TARGETS: Record<string, { to: string; label: string; danger?: boolean }> = {
+  low_stock: { to: '/asets/stock', label: 'View stock' },
+  warranty: { to: '/asets/assets', label: 'View assets' },
+  maintenance: { to: '/asets/maintenance', label: 'View maintenance' },
+  audit: { to: '/asets/audits', label: 'Start an audit' },
+  missing: { to: '/asets/assets', label: 'View assets', danger: true },
+  damaged: { to: '/asets/assets', label: 'View assets' },
+}
+
+const SHORTCUTS: Array<{ to: string; label: string; icon: LucideIcon }> = [
+  { to: '/asets/assets', label: 'Assets', icon: Package },
+  { to: '/asets/locations', label: 'Locations', icon: MapPin },
+  { to: '/asets/allocations', label: 'Allocations', icon: ArrowRightLeft },
+  { to: '/asets/maintenance', label: 'Maintenance', icon: Wrench },
+  { to: '/asets/stock', label: 'Stock', icon: Boxes },
+  { to: '/asets/audits', label: 'Audits', icon: ClipboardCheck },
+  { to: '/asets/procurement', label: 'Procurement', icon: ShoppingCart },
+  { to: '/asets/reports', label: 'Reports', icon: FileBarChart },
+]
+
+type BarRow = { key: string; label: string; value: number }
+
+const Bars: React.FC<{ rows: BarRow[]; variant?: 'alt' | 'cond'; label: string }> = ({ rows, variant, label }) => {
+  const max = Math.max(0, ...rows.map((r) => r.value))
+  return (
+    <ul className={cx('ao-bars', variant && `ao-bars--${variant}`)} aria-label={label}>
+      {rows.map((row) => (
+        <li key={row.key} className={row.value === 0 ? 'is-zero' : undefined}>
+          <span className="ao-bars__label" title={row.label}>
+            {row.label}
+          </span>
+          <span className="ao-bars__track" aria-hidden="true">
+            <span className="ao-bars__fill" style={{ width: `${max > 0 ? (row.value / max) * 100 : 0}%` }} />
+          </span>
+          <span className="ao-bars__value">{count(row.value)}</span>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+const ViewAll: React.FC<{ to: string; children?: React.ReactNode }> = ({ to, children = 'View all' }) => (
+  <Link to={to} className="cb-link">
+    {children}
+  </Link>
+)
 
 const AsetsDashboard: React.FC = () => {
   const [data, setData] = useState<any>(null)
@@ -38,194 +97,311 @@ const AsetsDashboard: React.FC = () => {
     void load()
   }, [])
 
-  if (loading) {
-    return <div className="p-6 text-sm text-slate-500">Loading asset dashboard...</div>
+  if (loading && !data) {
+    return (
+      <Page>
+        <div className="cb-table-state" role="status">
+          <span className="cb-spinner" aria-hidden="true" />
+          Loading asset overview…
+        </div>
+      </Page>
+    )
   }
 
   if (!data) {
     return (
-      <AsetsPageShell title="ASETS Overview">
-        <AsetsEmpty message="Unable to load dashboard data." />
-      </AsetsPageShell>
+      <Page>
+        <Card>
+          <EmptyState
+            icon={AlertTriangle}
+            title="Asset overview couldn’t load"
+            body="Check your connection, then try again."
+            action={
+              <Button icon={RefreshCw} onClick={() => void load()}>
+                Try again
+              </Button>
+            }
+          />
+        </Card>
+      </Page>
     )
   }
 
-  const kpis = [
-    { label: 'Total Assets', value: data.kpis.totalAssets },
-    { label: 'In Use', value: data.kpis.inUse },
-    { label: 'In Stock', value: data.kpis.inStock },
-    { label: 'Under Maintenance', value: data.kpis.underMaintenance },
-    { label: 'Damaged', value: data.kpis.damaged },
-    { label: 'Lost', value: data.kpis.lost },
-    { label: 'Asset Value', value: formatMoney(data.kpis.assetValue) },
-    { label: 'Due for Audit', value: data.kpis.assetsDueForAudit },
-  ]
+  const kpis = data.kpis || {}
+  const total = Number(kpis.totalAssets || 0)
+  const share = (value: number) => (total > 0 ? Math.round((Number(value || 0) / total) * 100) : 0)
 
-  const statusChart = Object.entries(data.byStatus || {}).map(([name, value]) => ({
-    name: String(name).replace(/_/g, ' '),
-    value,
+  const statusRows: BarRow[] = Object.entries(data.byStatus || {}).map(([name, value]) => ({
+    key: name,
+    label: sentence(name),
+    value: Number(value || 0),
   }))
+  const categories: any[] = data.byCategory || []
+  const categoryMax = Math.max(0, ...categories.map((c) => Number(c.count || 0)))
+  const locationRows: BarRow[] = (data.byLocation || []).slice(0, 8).map((row: any) => ({
+    key: String(row._id),
+    label: row.name || row.path || 'Unassigned',
+    value: Number(row.count || 0),
+  }))
+  const conditionRows: BarRow[] = (data.byCondition || []).map((row: any) => ({
+    key: String(row._id),
+    label: row._id ? String(row._id) : 'Not recorded',
+    value: Number(row.count || 0),
+  }))
+  const alerts: any[] = data.alerts || []
 
   return (
-    <AsetsPageShell
-      title="Asset Overview"
-      subtitle="Know what the school owns, where it is, who has it, and what needs attention."
-      actions={
-        <>
-          <Link to="/asets/assets" className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700">
-            All Assets
-          </Link>
-          <button type="button" onClick={() => void load()} className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200">
+    <Page>
+      <div className="ao-toolbar">
+        <p className="ao-toolbar__lede">Know what the school owns, where it is, who has it, and what needs attention.</p>
+        <div className="ao-toolbar__actions">
+          <Button icon={RefreshCw} loading={loading} onClick={() => void load()}>
             Refresh
-          </button>
-        </>
-      }
-    >
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8">
-        {kpis.map((kpi) => (
-          <AsetsCard key={kpi.label} className="!p-4">
-            <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{kpi.label}</div>
-            <div className="mt-2 text-xl font-bold text-slate-900 dark:text-white">{kpi.value}</div>
-          </AsetsCard>
-        ))}
+          </Button>
+          <Link to="/asets/assets" className="cb-btn cb-btn--primary cb-btn--md">
+            <Icon icon={Package} size={16} />
+            <span className="cb-btn__label">View all assets</span>
+          </Link>
+        </div>
       </div>
 
-      {data.alerts?.length ? (
-        <AsetsCard>
-          <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Alerts</h3>
-          <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-            {data.alerts.map((alert: any) => (
-              <div key={alert.type} className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200">
-                {alert.message}
-              </div>
-            ))}
-          </div>
-        </AsetsCard>
+      <section className="cb-stats" aria-label="Asset totals">
+        <StatCard label="Total assets" value={count(kpis.totalAssets)} icon={Package} hint="Active, not archived" />
+        <StatCard
+          label="Asset value"
+          value={formatINR(Number(kpis.assetValue || 0), { compact: true })}
+          icon={IndianRupee}
+          hint={`Purchase cost ${formatINR(Number(kpis.purchaseValue || 0), { compact: true })}`}
+        />
+        <StatCard
+          label="In use"
+          value={count(kpis.inUse)}
+          icon={CheckCircle2}
+          hint={`${share(kpis.inUse)}% of assets`}
+          progress={share(kpis.inUse)}
+          progressTone="success"
+        />
+        <StatCard label="In stock" value={count(kpis.inStock)} icon={Boxes} hint={`${share(kpis.inStock)}% of assets`} />
+        <StatCard
+          label="Under maintenance"
+          value={count(kpis.underMaintenance)}
+          icon={Wrench}
+          hint={kpis.underMaintenance ? 'Out of service for repair' : 'Nothing in repair'}
+        />
+        <StatCard label="Damaged" value={count(kpis.damaged)} icon={AlertTriangle} hint={kpis.damaged ? 'Needs repair or disposal' : 'None reported'} />
+        <StatCard label="Lost" value={count(kpis.lost)} icon={SearchX} hint={kpis.lost ? 'Marked lost' : 'None missing'} />
+        <StatCard
+          label="Due for audit"
+          value={count(kpis.assetsDueForAudit)}
+          icon={ClipboardCheck}
+          hint={kpis.assetsDueForAudit ? 'Not verified recently' : 'All verified'}
+        />
+      </section>
+
+      {alerts.length ? (
+        <Card title="Needs attention" subtitle={`${alerts.length} ${alerts.length === 1 ? 'item' : 'items'} to follow up`}>
+          <ul className="ao-alerts">
+            {alerts.map((alert) => {
+              const target = ALERT_TARGETS[alert.type]
+              return (
+                <li key={alert.type} className={cx('ao-alert', target?.danger && 'is-danger')}>
+                  <Icon icon={target?.danger ? ShieldAlert : AlertTriangle} size={16} />
+                  <span className="ao-alert__text">{sentence(alert.message)}</span>
+                  {target ? (
+                    <Link to={target.to} className="cb-link ao-alert__link">
+                      {target.label}
+                    </Link>
+                  ) : null}
+                </li>
+              )
+            })}
+          </ul>
+        </Card>
       ) : null}
 
-      <div className="grid gap-6 xl:grid-cols-2">
-        <AsetsCard>
-          <h3 className="mb-4 text-sm font-semibold text-slate-900 dark:text-white">Lifecycle status</h3>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={statusChart}>
-                <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.3} />
-                <XAxis dataKey="name" tick={{ fontSize: 10 }} interval={0} angle={-25} textAnchor="end" height={60} />
-                <YAxis allowDecimals={false} />
-                <Tooltip />
-                <Bar dataKey="value" fill="#4f46e5" radius={[6, 6, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </AsetsCard>
-
-        <AsetsCard>
-          <h3 className="mb-4 text-sm font-semibold text-slate-900 dark:text-white">By category</h3>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie data={data.byCategory || []} dataKey="count" nameKey="name" outerRadius={90} label>
-                  {(data.byCategory || []).map((_: any, index: number) => (
-                    <Cell key={index} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-        </AsetsCard>
-      </div>
-
-      <div className="grid gap-6 xl:grid-cols-2">
-        <AsetsCard>
-          <h3 className="mb-3 text-sm font-semibold text-slate-900 dark:text-white">By location</h3>
-          <div className="space-y-2">
-            {(data.byLocation || []).slice(0, 8).map((row: any) => (
-              <div key={String(row._id)} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm dark:bg-slate-900/40">
-                <span className="truncate text-slate-700 dark:text-slate-200">{row.name || row.path || 'Unassigned'}</span>
-                <span className="font-semibold text-slate-900 dark:text-white">{row.count}</span>
-              </div>
-            ))}
-            {!data.byLocation?.length ? <AsetsEmpty message="No location distribution yet." /> : null}
-          </div>
-        </AsetsCard>
-
-        <AsetsCard>
-          <h3 className="mb-3 text-sm font-semibold text-slate-900 dark:text-white">Condition overview</h3>
-          <div className="space-y-2">
-            {(data.byCondition || []).map((row: any) => (
-              <div key={row._id} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm dark:bg-slate-900/40">
-                <span>{row._id}</span>
-                <span className="font-semibold">{row.count}</span>
-              </div>
-            ))}
-          </div>
-        </AsetsCard>
-      </div>
-
-      <div className="grid gap-6 xl:grid-cols-2">
-        <AsetsCard>
-          <div className="mb-3 flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Recently added</h3>
-            <Link to="/asets/assets" className="text-xs font-semibold text-indigo-600">View all</Link>
-          </div>
-          <div className="space-y-2">
-            {(data.recentlyAdded || []).map((asset: any) => (
-              <Link key={asset._id} to={`/asets/assets/${asset._id}`} className="flex items-center justify-between rounded-lg border border-slate-100 px-3 py-2 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-900/40">
-                <div>
-                  <div className="text-sm font-medium text-slate-900 dark:text-white">{asset.name}</div>
-                  <div className="text-xs text-slate-500">{asset.assetId}</div>
-                </div>
-                <AsetsStatusBadge status={asset.status} />
+      <nav aria-label="Asset sections">
+        <ul className="ao-links">
+          {SHORTCUTS.map((item) => (
+            <li key={item.to}>
+              <Link to={item.to} className="ao-link">
+                <Icon icon={item.icon} size={16} />
+                <span className="ao-link__label">{item.label}</span>
               </Link>
-            ))}
-          </div>
-        </AsetsCard>
+            </li>
+          ))}
+        </ul>
+      </nav>
 
-        <AsetsCard>
-          <h3 className="mb-3 text-sm font-semibold text-slate-900 dark:text-white">Maintenance due</h3>
-          <div className="space-y-2">
-            {(data.maintenanceDue || []).map((row: any) => (
-              <div key={row._id} className="rounded-lg border border-slate-100 px-3 py-2 text-sm dark:border-slate-700">
-                <div className="font-medium text-slate-900 dark:text-white">{row.assetId?.name || 'Asset'}</div>
-                <div className="text-xs text-slate-500">{row.issue} · {row.status}</div>
-              </div>
-            ))}
-            {!data.maintenanceDue?.length ? <AsetsEmpty message="No maintenance items need attention." /> : null}
-          </div>
-        </AsetsCard>
+      <div className="cb-grid-6-6">
+        <Card title="Lifecycle status" subtitle={`${count(total)} assets by current status`} action={<ViewAll to="/asets/assets" />}>
+          {statusRows.length ? (
+            <Bars rows={statusRows} label="Assets by lifecycle status" />
+          ) : (
+            <EmptyState title="No assets yet" body="Register assets to see where they are in their lifecycle." compact />
+          )}
+        </Card>
+
+        <Card
+          title="By category"
+          subtitle={categories.length ? `Top ${categories.length} categories by count` : undefined}
+          action={<ViewAll to="/asets/categories">Manage categories</ViewAll>}
+        >
+          {categories.length ? (
+            <ul className="ao-tiles" aria-label="Assets by category">
+              {categories.map((row, index) => (
+                <li key={String(row._id)} className={`ao-tile ao-tile--c${(index % 6) + 1}`}>
+                  <span className="ao-tile__name" title={row.name || 'Uncategorised'}>
+                    {row.name || 'Uncategorised'}
+                  </span>
+                  <span className="ao-tile__count">{count(row.count)}</span>
+                  <span className="ao-tile__bar" aria-hidden="true">
+                    <span style={{ width: `${categoryMax > 0 ? (Number(row.count || 0) / categoryMax) * 100 : 0}%` }} />
+                  </span>
+                  <span className="ao-tile__meta">
+                    {row.code ? `${row.code} · ` : ''}
+                    {formatINR(Number(row.value || 0), { compact: true })} value
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <EmptyState title="No categorised assets" body="Add categories, then assign them when registering assets." compact />
+          )}
+        </Card>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-3">
-        <AsetsCard>
-          <h3 className="mb-3 text-sm font-semibold">Recent allocations</h3>
-          {(data.recentAllocations || []).slice(0, 5).map((row: any) => (
-            <div key={row._id} className="mb-2 text-sm text-slate-600 dark:text-slate-300">
-              {row.assetId?.assetId} → {row.toLocationId?.name || 'Location'}
-            </div>
-          ))}
-          {!data.recentAllocations?.length ? <AsetsEmpty message="No allocations yet." /> : null}
-        </AsetsCard>
-        <AsetsCard>
-          <h3 className="mb-3 text-sm font-semibold">Warranty alerts</h3>
-          {(data.warrantySoon || []).map((row: any) => (
-            <div key={row._id} className="mb-2 text-sm text-slate-600 dark:text-slate-300">
-              {row.assetId} · ends {new Date(row.warranty?.endDate).toLocaleDateString('en-GB')}
-            </div>
-          ))}
-          {!data.warrantySoon?.length ? <AsetsEmpty message="No warranties expiring soon." /> : null}
-        </AsetsCard>
-        <AsetsCard>
-          <h3 className="mb-3 text-sm font-semibold">Low stock</h3>
-          {(data.lowStock || []).map((row: any) => (
-            <div key={row._id} className="mb-2 text-sm text-slate-600 dark:text-slate-300">
-              {row.name}: {row.quantityOnHand}/{row.reorderLevel}
-            </div>
-          ))}
-          {!data.lowStock?.length ? <AsetsEmpty message="Stock levels look healthy." /> : null}
-        </AsetsCard>
+      <div className="cb-grid-6-6">
+        <Card title="By location" subtitle="Top locations by asset count" action={<ViewAll to="/asets/locations" />}>
+          {locationRows.length ? (
+            <Bars rows={locationRows} variant="alt" label="Assets by location" />
+          ) : (
+            <EmptyState title="No location distribution yet" body="Assign assets to rooms and stores to see where they sit." compact />
+          )}
+        </Card>
+
+        <Card title="Condition overview" subtitle="Assets by recorded condition">
+          {conditionRows.length ? (
+            <Bars rows={conditionRows} variant="cond" label="Assets by condition" />
+          ) : (
+            <EmptyState title="No conditions recorded" body="Condition is captured when assets are registered or audited." compact />
+          )}
+        </Card>
       </div>
-    </AsetsPageShell>
+
+      <div className="cb-grid-6-6">
+        <Card title="Recently added" action={<ViewAll to="/asets/assets" />}>
+          {data.recentlyAdded?.length ? (
+            <ul className="ao-list">
+              {data.recentlyAdded.map((asset: any) => (
+                <li key={asset._id}>
+                  <Link to={`/asets/assets/${asset._id}`} className="ao-row">
+                    <span className="ao-row__text">
+                      <span className="ao-row__title">{asset.name}</span>
+                      <span className="ao-row__meta">
+                        {[asset.assetId, asset.categoryId?.name, asset.locationId?.name].filter(Boolean).join(' · ')}
+                      </span>
+                    </span>
+                    <AsetsStatusBadge status={asset.status} />
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <EmptyState title="No assets added yet" body="New assets appear here as soon as they’re registered." compact />
+          )}
+        </Card>
+
+        <Card title="Maintenance due" action={<ViewAll to="/asets/maintenance" />}>
+          {data.maintenanceDue?.length ? (
+            <ul className="ao-list">
+              {data.maintenanceDue.map((row: any) => (
+                <li key={row._id}>
+                  <div className="ao-row">
+                    <span className="ao-row__text">
+                      <span className="ao-row__title">{row.assetId?.name || 'Asset'}</span>
+                      <span className="ao-row__meta">
+                        {[row.assetId?.assetId, row.issue, row.nextDueDate ? `due ${formatDate(row.nextDueDate)}` : '']
+                          .filter(Boolean)
+                          .join(' · ')}
+                      </span>
+                    </span>
+                    <AsetsStatusBadge status={row.status} />
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <EmptyState icon={CheckCircle2} title="No maintenance items need attention" body="Open repairs and services due in 30 days show here." compact />
+          )}
+        </Card>
+      </div>
+
+      <div className="cb-grid-3">
+        <Card title="Recent allocations" action={<ViewAll to="/asets/allocations" />}>
+          {data.recentAllocations?.length ? (
+            <ul className="ao-list">
+              {data.recentAllocations.slice(0, 5).map((row: any) => (
+                <li key={row._id}>
+                  <div className="ao-row">
+                    <span className="ao-row__text">
+                      <span className="ao-row__title">{row.assetId?.name || row.assetId?.assetId || 'Asset'}</span>
+                      <span className="ao-row__meta">
+                        {row.assetId?.assetId ? `${row.assetId.assetId} → ` : '→ '}
+                        {row.toLocationId?.name || 'Location'}
+                      </span>
+                    </span>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <EmptyState title="No allocations yet" body="Allocate an asset to a room or person to track it here." compact />
+          )}
+        </Card>
+
+        <Card title="Warranty alerts" action={<ViewAll to="/asets/assets" />}>
+          {data.warrantySoon?.length ? (
+            <ul className="ao-list">
+              {data.warrantySoon.map((row: any) => (
+                <li key={row._id}>
+                  <Link to={`/asets/assets/${row._id}`} className="ao-row">
+                    <span className="ao-row__text">
+                      <span className="ao-row__title">{row.name || row.assetId}</span>
+                      <span className="ao-row__meta">{row.assetId}</span>
+                    </span>
+                    <span className="ao-row__aside is-warning">Ends {formatDate(row.warranty?.endDate)}</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <EmptyState icon={CheckCircle2} title="No warranties expiring soon" compact />
+          )}
+        </Card>
+
+        <Card title="Low stock" action={<ViewAll to="/asets/stock" />}>
+          {data.lowStock?.length ? (
+            <ul className="ao-list">
+              {data.lowStock.map((row: any) => (
+                <li key={row._id}>
+                  <div className="ao-row">
+                    <span className="ao-row__text">
+                      <span className="ao-row__title">{row.name}</span>
+                      <span className="ao-row__meta">Reorder at {count(row.reorderLevel)}</span>
+                    </span>
+                    <span className="ao-row__aside is-warning">
+                      {count(row.quantityOnHand)} left
+                    </span>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <EmptyState icon={CheckCircle2} title="Stock levels look healthy" compact />
+          )}
+        </Card>
+      </div>
+    </Page>
   )
 }
 

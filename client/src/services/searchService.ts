@@ -11,6 +11,7 @@ export interface SearchHit {
   badge?: string
   image?: string
   score: number
+  fuzzy?: boolean
 }
 
 export interface SearchGroup {
@@ -22,6 +23,8 @@ export interface SearchGroup {
 export interface GlobalSearchResult {
   q: string
   groups: SearchGroup[]
+  /** True when nothing matched exactly and these are the closest spellings. */
+  fuzzy?: boolean
   tookMs: number
 }
 

@@ -1,0 +1,76 @@
+/* Exams — marks entry page. Tokens only; everything sits inside .cb-app (a <Page> or a kit overlay portal). */
+
+/* ---------- Marks sheet card ---------- */
+.cb-app .ex-marks-anchor { scroll-margin-top: calc(var(--header-height) + var(--space-4)); }
+.cb-app .ex-marks__toolbar { padding: var(--space-4) var(--space-5); }
+.cb-app .ex-marks__toolbar .cb-filterbar__filters .cb-field.ex-marks__exam { width: 240px; }
+.cb-app .ex-marks__notice { padding: var(--space-4) var(--space-5); }
+.cb-app .ex-marks__foot { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2) var(--space-4); flex-wrap: wrap; }
+@media (max-width: 640px) {
+  .cb-app .ex-marks__toolbar, .cb-app .ex-marks__notice { padding: var(--space-3) var(--space-4); }
+  .cb-app .ex-marks__toolbar .cb-filterbar__filters .cb-field.ex-marks__exam { width: auto; grid-column: 1 / -1; }
+}
+
+/* ---------- Marks grid: scrolls sideways with sticky identity columns, like the attendance register ---------- */
+.cb-app .ex-marks-scroll { overflow: auto; max-height: calc(100dvh - 280px); min-height: 240px; border-top: 1px solid var(--border); overscroll-behavior: contain; }
+.cb-app .ex-marks { border-collapse: separate; border-spacing: 0; width: max-content; min-width: 100%; font-size: 13px; line-height: 18px; color: var(--ink); }
+.cb-app .ex-marks th, .cb-app .ex-marks td { border-bottom: 1px solid var(--border); background: var(--surface); white-space: nowrap; vertical-align: middle; }
+.cb-app .ex-marks thead th { position: sticky; top: 0; z-index: 2; height: 44px; padding: 0 var(--space-3); background: var(--surface-sunken); color: var(--ink-subtle); font: 500 12px/16px var(--font-sans); text-align: left; }
+.cb-app .ex-marks td { height: var(--row-compact); padding: 0 var(--space-3); }
+.cb-app .ex-marks .is-right { text-align: right; }
+.cb-app .ex-marks tbody tr:hover > td { background: var(--surface-hover); }
+
+/* Pinned columns: roll no., student, absent. */
+.cb-app .ex-marks .is-pin { position: sticky; z-index: 1; }
+.cb-app .ex-marks thead th.is-pin { z-index: 3; }
+.cb-app .ex-marks .is-roll { left: 0; width: 64px; min-width: 64px; max-width: 64px; padding-left: var(--space-5); color: var(--ink-muted); font-variant-numeric: tabular-nums; }
+.cb-app .ex-marks .is-student { left: 64px; width: 232px; min-width: 232px; max-width: 232px; overflow: hidden; }
+.cb-app .ex-marks .is-abs { left: 296px; width: 64px; min-width: 64px; text-align: center; box-shadow: inset -1px 0 0 var(--border); }
+.cb-app .ex-marks .is-abs .cb-check { justify-content: center; }
+.cb-app .ex-marks__who { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
+.cb-app .ex-marks__who .cb-avatar { flex: none; }
+.cb-app .ex-marks__who .cb-entity { min-width: 0; }
+.cb-app .ex-marks__who .cb-entity__primary, .cb-app .ex-marks__who .cb-entity__secondary { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 640px) {
+  .cb-app .ex-marks .is-roll { width: 48px; min-width: 48px; max-width: 48px; padding-left: var(--space-3); }
+  .cb-app .ex-marks .is-student { left: 48px; width: 156px; min-width: 156px; max-width: 156px; }
+  .cb-app .ex-marks .is-student .cb-avatar { display: none; }
+  .cb-app .ex-marks .is-abs { left: 204px; width: 56px; min-width: 56px; }
+}
+
+/* Subject columns. */
+.cb-app .ex-marks thead th.ex-marks__subject { padding: 0 var(--space-1) 0 var(--space-3); min-width: 96px; }
+.cb-app .ex-marks__subhead { display: flex; align-items: center; justify-content: space-between; gap: var(--space-1); }
+.cb-app .ex-marks__subname { max-width: 120px; white-space: normal; overflow-wrap: anywhere; }
+.cb-app .ex-marks__max { color: var(--ink-subtle); font-weight: 400; font-variant-numeric: tabular-nums; }
+.cb-app .ex-marks td.ex-marks__cell { padding: 0 var(--space-2) 0 var(--space-3); }
+.cb-app .ex-marks .ex-marks__sum { border-left: 1px solid var(--border); }
+.cb-app .ex-marks__num { font-variant-numeric: tabular-nums; font-weight: 600; }
+
+/* Mark input: a compact control with the control outline; "Ab" uses the absent (danger) set with the word. */
+.cb-app .ex-mark { width: 64px; height: 28px; padding: 0 var(--space-2); border: 1px solid var(--border-control); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink); font: 400 13px/18px var(--font-sans); font-variant-numeric: tabular-nums; text-align: right; }
+.cb-app .ex-mark::placeholder { color: var(--ink-subtle); }
+.cb-app .ex-mark:focus-visible, .cb-app .ex-mark:focus { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+.cb-app .ex-mark.is-absent { background: var(--danger-soft); border-color: var(--danger-border); color: var(--danger-ink); font-weight: 600; text-align: center; }
+@media (max-width: 640px) { .cb-app .ex-mark { height: 32px; font-size: 16px; } }
+
+/* Absent in every subject: the whole row takes the absent fill. */
+.cb-app .ex-marks tbody tr.is-absent > td { background: color-mix(in srgb, var(--danger-soft) 70%, var(--surface)); }
+.cb-app .ex-marks tbody tr.is-absent:hover > td { background: var(--danger-soft); }
+
+/* Subject averages stay in view at the bottom. */
+.cb-app .ex-marks tfoot th, .cb-app .ex-marks tfoot td { position: sticky; bottom: 0; z-index: 2; height: var(--row-compact); padding: 0 var(--space-3); background: var(--surface-sunken); border-top: 1px solid var(--border-strong); border-bottom: 0; }
+.cb-app .ex-marks tfoot th.is-pin { z-index: 3; }
+.cb-app .ex-marks tfoot th.is-footlabel { left: 0; padding-left: var(--space-5); text-align: left; font: 600 13px/18px var(--font-sans); color: var(--ink); box-shadow: inset -1px 0 0 var(--border); }
+@media (max-width: 640px) { .cb-app .ex-marks tfoot th.is-footlabel { padding-left: var(--space-3); } }
+
+/* ---------- Entry status card ---------- */
+.cb-app .ex-status__summary { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-4) var(--space-5); border-bottom: 1px solid var(--border); }
+.cb-app .ex-status__counts { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; font-size: 13px; line-height: 18px; }
+.cb-app .ex-status__counts .cb-badge { font-variant-numeric: tabular-nums; }
+.cb-app .ex-status__bar { min-width: 160px; }
+.cb-app .ex-status__pending { display: inline-block; max-width: 280px; overflow: hidden; text-overflow: ellipsis; vertical-align: middle; color: var(--ink-muted); }
+.cb-app .ex-status__subject { display: flex; align-items: flex-end; gap: var(--space-3); }
+.cb-app .ex-status__subject .cb-progress { flex: 1; min-width: 0; }
+.cb-app .ex-status__subject .cb-badge { flex: none; }
+@media (max-width: 640px) { .cb-app .ex-status__summary { padding: var(--space-3) var(--space-4); } }

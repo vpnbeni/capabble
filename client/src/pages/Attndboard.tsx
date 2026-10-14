@@ -107,6 +107,10 @@ const Attndboard: React.FC = () => {
   }, [classRows])
   const sectionCount = classRows.reduce((sum, row) => sum + row.sections.length, 0)
   const absentTodayStudents = students.todayAbsent
+  const openSection = (className: string, section: string) =>
+    navigate(
+      `/attnd/student-attendance?${new URLSearchParams({ class: className, section, month: selectedMonth }).toString()}`
+    )
   const maxStaffAbsent = useMemo(() => Math.max(0, ...staffMatrix.map((row) => row.monthAbsent)), [staffMatrix])
   const maxTrend = useMemo(
     () => Math.max(1, ...dailyTrend.map((item) => item.studentAbsent + item.staffAbsent)),
@@ -232,9 +236,12 @@ const Attndboard: React.FC = () => {
                   <span className="attnd-classes__name">{row.className}</span>
                   <ul className="attnd-classes__sections">
                     {row.sections.map((cell) => (
-                      <li
-                        key={cell.section}
+                      <li key={cell.section}>
+                        <button
+                        type="button"
                         className={cx('attnd-sec', `is-${cell.band}`)}
+                        onClick={() => openSection(row.className, cell.section)}
+                        aria-label={`Open attendance for ${row.className} ${cell.section}: ${cell.rate == null ? 'no students' : `${cell.rate}%`}, ${BAND_LABEL[cell.band]}`}
                         title={`${row.className} ${cell.section}: ${cell.rate == null ? 'no students' : `${cell.rate}% attendance`} · ${cell.monthAbsent} absences and ${cell.monthHalfDay} half days this month · ${cell.todayAbsent} absent today · ${cell.strength} students`}
                       >
                         <span className="attnd-sec__name">{cell.section}</span>
@@ -247,7 +254,7 @@ const Attndboard: React.FC = () => {
                         {cell.todayAbsent > 0 ? (
                           <span className="attnd-sec__today">{formatCount(cell.todayAbsent)} absent today</span>
                         ) : null}
-                        <span className="cb-visually-hidden">{BAND_LABEL[cell.band]}</span>
+                        </button>
                       </li>
                     ))}
                   </ul>

@@ -26,13 +26,13 @@ const group = (module: PageModule, rows: Row[]): PageEntry[] =>
 
 export const PAGE_INDEX: PageEntry[] = [
   ...group('core', [
+    ['School OS', '/home', undefined, 'home main dashboard overview start school hub'],
     ['Dashboard', '/dashboard', undefined, 'home overview'],
     ['Billing', '/billing', 'Account', 'plan subscription invoice payment'],
     ['Account settings', '/account-settings', 'Account', 'profile password preferences'],
     ['Help & support', '/help-support', 'Account', 'ticket contact faq'],
   ]),
   ...group('timetable', [
-    ['School Hub', '/school-hub', undefined, 'timetable home'],
     ['Teachers', '/time-table/teachers', 'Time Table', 'faculty load'],
     ['Classes', '/time-table/classes', 'Time Table', 'sections'],
     ['Subjects', '/time-table/subjects', 'Time Table'],

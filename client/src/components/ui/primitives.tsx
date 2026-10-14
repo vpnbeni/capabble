@@ -66,12 +66,13 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
 export const Badge: React.FC<{
   tone?: Tone | 'accent'
   dot?: boolean
-  size?: 'lg'
+  /** `sm` is for dense chip lists inside table cells (subject codes); `lg` for headers. */
+  size?: 'sm' | 'lg'
   className?: string
   title?: string
   children: React.ReactNode
 }> = ({ tone = 'neutral', dot = true, size, className, title, children }) => (
-  <span className={cx('cb-badge', `cb-badge--${tone}`, size === 'lg' && 'cb-badge--lg', className)} title={title}>
+  <span className={cx('cb-badge', `cb-badge--${tone}`, size && `cb-badge--${size}`, className)} title={title}>
     {dot ? <span className="cb-badge__dot" aria-hidden="true" /> : null}
     {children}
   </span>

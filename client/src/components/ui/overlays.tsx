@@ -1,19 +1,32 @@
-import React, { useEffect, useId, useRef, useState } from 'react'
+import React, { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { MoreHorizontal, X, type LucideIcon } from 'lucide-react'
 import { useBodyScrollLock, useFocusTrap } from '@/components/common/Dialog/useDialog'
 import { cx } from './format'
 import { Button, Icon } from './primitives'
 
+// Open overlays, oldest first. Escape closes only the topmost one, so a Dialog
+// opened over a Sheet doesn't close the Sheet too.
+const escapeStack: Array<{ current: (() => void) | undefined }> = []
+
 const useEscape = (open: boolean, onClose?: () => void) => {
+  const handlerRef = useRef(onClose)
+  handlerRef.current = onClose
   useEffect(() => {
-    if (!open || !onClose) return
+    if (!open) return
+    const entry = handlerRef
+    escapeStack.push(entry)
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose()
+      if (event.key !== 'Escape' || escapeStack[escapeStack.length - 1] !== entry) return
+      entry.current?.()
     }
     document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [open, onClose])
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      const index = escapeStack.lastIndexOf(entry)
+      if (index >= 0) escapeStack.splice(index, 1)
+    }
+  }, [open])
 }
 
 /**
@@ -159,23 +172,59 @@ export const Menu: React.FC<{
   trigger?: (props: { onClick: () => void; 'aria-haspopup': 'menu'; 'aria-expanded': boolean }) => React.ReactNode
 }> = ({ items, label = 'More actions', align = 'end', trigger }) => {
   const [open, setOpen] = useState(false)
+  const [pos, setPos] = useState<{ top: number; left?: number; right?: number; up: boolean } | null>(null)
   const ref = useRef<HTMLDivElement>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
+
+  // The panel renders in a portal with fixed positioning, so tables, cards and canvases
+  // that clip their overflow (e.g. a horizontally scrolling DataTable) can't cut it off.
+  const place = () => {
+    const trigger = ref.current?.getBoundingClientRect()
+    if (!trigger) return
+    const panelHeight = panelRef.current?.offsetHeight || 240
+    const up = trigger.bottom + 4 + panelHeight > window.innerHeight - 8 && trigger.top - 4 - panelHeight > 8
+    setPos({
+      top: up ? trigger.top - 4 - panelHeight : trigger.bottom + 4,
+      ...(align === 'end' ? { right: Math.max(8, window.innerWidth - trigger.right) } : { left: Math.max(8, trigger.left) }),
+      up,
+    })
+  }
+
+  useLayoutEffect(() => {
+    if (open) place()
+    else setPos(null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open])
 
   useEffect(() => {
     if (!open) return
     const onDown = (event: MouseEvent) => {
-      if (ref.current && !ref.current.contains(event.target as Node)) setOpen(false)
+      const target = event.target as Node
+      if (ref.current?.contains(target) || panelRef.current?.contains(target)) return
+      setOpen(false)
     }
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setOpen(false)
+    // Page scroll or resize would leave the fixed panel behind; scrolling inside the panel is fine.
+    const onMove = (event: Event) => {
+      if (event.target instanceof Node && panelRef.current?.contains(event.target)) return
+      setOpen(false)
     }
     document.addEventListener('mousedown', onDown)
-    document.addEventListener('keydown', onKey)
+    window.addEventListener('resize', onMove)
+    window.addEventListener('scroll', onMove, true)
     return () => {
       document.removeEventListener('mousedown', onDown)
-      document.removeEventListener('keydown', onKey)
+      window.removeEventListener('resize', onMove)
+      window.removeEventListener('scroll', onMove, true)
     }
   }, [open])
+
+  // Escape closes only the menu, not a Sheet or Dialog it sits in.
+  useEscape(open, () => setOpen(false))
+
+  // Move focus into the menu when it opens, so arrow keys work straight away.
+  useEffect(() => {
+    if (open && pos) panelRef.current?.querySelector<HTMLButtonElement>('[role="menuitem"]:not([disabled])')?.focus()
+  }, [open, pos])
 
   const onListKey = (event: React.KeyboardEvent<HTMLDivElement>) => {
     const buttons = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="menuitem"]:not([disabled])'))
@@ -203,8 +252,17 @@ export const Menu: React.FC<{
       ) : (
         <Button variant="tertiary" size="sm" icon={MoreHorizontal} aria-label={label} {...triggerProps} />
       )}
-      {open ? (
-        <div className={cx('cb-menu__panel', `cb-menu__panel--${align}`)} role="menu" onKeyDown={onListKey}>
+      {open && typeof document !== 'undefined'
+        ? createPortal(
+        <div className="cb-app cb-portal">
+        <div
+          ref={panelRef}
+          className={cx('cb-menu__panel', 'cb-menu__panel--floating')}
+          style={{ top: pos?.top ?? -9999, left: pos?.left, right: pos?.right, visibility: pos ? 'visible' : 'hidden' }}
+          role="menu"
+          aria-label={label}
+          onKeyDown={onListKey}
+        >
           {items.map((item, index) => {
             if ('divider' in item) return <div key={`d${index}`} className="cb-menu__divider" role="separator" />
             return (
@@ -226,7 +284,10 @@ export const Menu: React.FC<{
             )
           })}
         </div>
-      ) : null}
+        </div>,
+            document.body
+          )
+        : null}
     </div>
   )
 }

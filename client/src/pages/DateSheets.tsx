@@ -1,6 +1,28 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react'
 import toast from 'react-hot-toast'
-import { Tabs } from '../components/common/Tabs'
+import { CalendarDays, Download, ExternalLink, FileText, FileWarning } from 'lucide-react'
+import {
+  Badge,
+  Banner,
+  Button,
+  Card,
+  CardToolbar,
+  DataTable,
+  EmptyState,
+  Entity,
+  FilterBar,
+  Page,
+  Sheet,
+  StatCard,
+  Tabs,
+  formatDate,
+  formatTime,
+  orDash,
+  type DataTableColumn,
+  Pagination,
+  PdfFrame,
+} from '@/components/ui'
+import { CardLoading } from '@/components/exmcl/ExmclUi'
 import DatesheetImportModal from '../components/datesheets/ImportModal'
 import CreateDatesheetModal, { DatesheetFormData } from '../components/datesheets/CreateModal'
 import ScheduleModal, { ScheduleRow } from '../components/datesheets/ScheduleModal'
@@ -128,7 +150,7 @@ const DateSheets: React.FC = () => {
       onSuccess: (response) => {
         if (response?.data?.success) {
           const count = response.data?.data?.count || 0
-          toast.success(`Datesheet imported successfully! Found ${count} entries.`)
+          toast.success(`Datesheet imported with ${count} entries`)
           setShowImportModal(false)
           setImportErrorMsg(undefined)
           setImportErrorSample(undefined)
@@ -164,10 +186,10 @@ const DateSheets: React.FC = () => {
             generalInstructions: data.generalInstructions,
           },
         })
-        toast.success('Date sheet updated successfully!')
+        toast.success('Datesheet updated')
       } else {
         await createMutation.mutateAsync(data)
-        toast.success('Date sheet created successfully!')
+        toast.success('Datesheet created')
       }
       setShowCreateModal(false)
       setEditing(false)
@@ -639,18 +661,14 @@ const DateSheets: React.FC = () => {
   // Helper function to format duration
   const formatDuration = (duration: number) => {
     // Duration is always stored in hours in the Subject model (2 or 3)
-    // Display as "X Hours" format
     if (!duration || duration === 0) return '—'
-    return `${duration} ${duration === 1 ? 'Hour' : 'Hours'}`
+    return `${duration} ${duration === 1 ? 'hour' : 'hours'}`
   }
 
   // Helper function to format time from 24-hour to 12-hour format
   const formatTimeTo12Hour = (time: string) => {
     if (!time) return ''
-    const [hours, minutes] = time.split(':').map(Number)
-    const period = hours >= 12 ? 'PM' : 'AM'
-    const hours12 = hours % 12 || 12
-    return `${hours12}:${minutes.toString().padStart(2, '0')} ${period}`
+    return formatTime(time)
   }
 
   // Helper function to calculate end time based on start time and duration
@@ -675,631 +693,323 @@ const DateSheets: React.FC = () => {
       const endTime = `${endHours.toString().padStart(2, '0')}:${endMinutes.toString().padStart(2, '0')}`
 
       // Return formatted times in 12-hour format
-      return `${formatTimeTo12Hour(startTime)} - ${formatTimeTo12Hour(endTime)}`
+      return `${formatTimeTo12Hour(startTime)} – ${formatTimeTo12Hour(endTime)}`
     }
 
     return null
   }
 
-  // Helper function to format answer sheet with colored dot
-  const formatAnswerSheet = (answerSheet: string) => {
-    const answerSheetConfig: Record<string, { colorClass: string; label: string }> = {
-      '32_pages': { colorClass: 'answer-sheet-dot--32-pages', label: '32 Pages' },
-      '20_pages': { colorClass: 'answer-sheet-dot--20-pages', label: '20 Pages' },
-      '40_graph': { colorClass: 'answer-sheet-dot--40-graph', label: '40 Pages (Graph)' },
-      'none': { colorClass: 'answer-sheet-dot--none', label: 'Not specified' }
-    }
-
-    const config = answerSheetConfig[answerSheet] || answerSheetConfig['none']
-
-    return (
-      <div className="flex items-center gap-2">
-        <div className={`w-2 h-2 rounded-full flex-shrink-0 answer-sheet-dot ${config.colorClass}`} />
-        <span>{config.label}</span>
-      </div>
-    )
+  const answerSheetLabels: Record<string, string> = {
+    '32_pages': '32 pages',
+    '20_pages': '20 pages',
+    '40_graph': '40 pages (graph)',
   }
 
-  const tabConfigs = useMemo(
+  const formatAnswerSheet = (answerSheet: string) => {
+    const label = answerSheetLabels[answerSheet]
+    return label ? label : <span className="cb-muted">Not specified</span>
+  }
+
+  const tabItems = useMemo(
     () => [
-      {
-        id: 'all' as DateSheetTabId,
-        label: 'Full Datesheet',
-        color: 'blue' as const,
-      },
-      {
-        id: 'centre' as DateSheetTabId,
-        label: 'Centre Datesheet',
-        color: 'emerald' as const,
-      },
-      {
-        id: 'centre10th' as DateSheetTabId,
-        label: 'Class 10th',
-        color: 'indigo' as const,
-      },
-      {
-        id: 'centre12th' as DateSheetTabId,
-        label: 'Class 12th',
-        color: 'purple' as const,
-      },
+      { id: 'all', label: 'Full datesheet' },
+      { id: 'centre', label: 'Centre datesheet' },
+      { id: 'centre10th', label: 'Class 10' },
+      { id: 'centre12th', label: 'Class 12' },
     ],
     []
   )
 
-  return (
-    <div className="p-8 max-w-[1600px] mx-auto min-h-screen bg-gray-50/50 dark:bg-gray-900">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <div className="p-5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm">
-          <div className="flex items-center space-x-4">
-            <div className="p-3 rounded-lg flex-shrink-0 bg-blue-50 text-blue-500 dark:bg-blue-900/20 dark:text-blue-400">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Full Datesheet</p>
-              <div className="flex items-baseline gap-3">
-                <span className="text-xl font-bold text-gray-900 dark:text-white">{stats.fullDatesheetDays}</span>
-                <span className="text-xs text-gray-400 font-medium">days</span>
-                <span className="text-xl font-bold text-gray-900 dark:text-white">{stats.fullDatesheet}</span>
-                <span className="text-xs text-gray-400 font-medium">sub</span>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div className="p-5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm">
-          <div className="flex items-center space-x-4">
-            <div className="p-3 rounded-lg flex-shrink-0 bg-emerald-50 text-emerald-500 dark:bg-emerald-900/20 dark:text-emerald-400">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-              </svg>
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Centre Datesheet</p>
-              <div className="flex items-baseline gap-3">
-                <span className="text-xl font-bold text-gray-900 dark:text-white">{stats.centreDays}</span>
-                <span className="text-xs text-gray-400 font-medium">days</span>
-                <span className="text-xl font-bold text-gray-900 dark:text-white">{stats.centre}</span>
-                <span className="text-xs text-gray-400 font-medium">sub</span>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div className="p-5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm">
-          <div className="flex items-center space-x-4">
-            <div className="p-3 rounded-lg flex-shrink-0 bg-indigo-50 text-indigo-500 dark:bg-indigo-900/20 dark:text-indigo-400">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-              </svg>
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Class 10th</p>
-              <div className="flex items-baseline gap-3">
-                <span className="text-xl font-bold text-gray-900 dark:text-white">{stats.centre10thDays}</span>
-                <span className="text-xs text-gray-400 font-medium">days</span>
-                <span className="text-xl font-bold text-gray-900 dark:text-white">{stats.centre10thCandidates}</span>
-                <span className="text-xs text-gray-400 font-medium">std</span>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div className="p-5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm">
-          <div className="flex items-center space-x-4">
-            <div className="p-3 rounded-lg flex-shrink-0 bg-violet-50 text-violet-500 dark:bg-violet-900/20 dark:text-violet-400">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-              </svg>
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Class 12th</p>
-              <div className="flex items-baseline gap-3">
-                <span className="text-xl font-bold text-gray-900 dark:text-white">{stats.centre12thDays}</span>
-                <span className="text-xs text-gray-400 font-medium">days</span>
-                <span className="text-xl font-bold text-gray-900 dark:text-white">{stats.centre12thCandidates}</span>
-                <span className="text-xs text-gray-400 font-medium">std</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+  const cardCopy: Record<DateSheetTabId, { title: string; subtitle: string }> = {
+    all: { title: 'Full datesheet', subtitle: 'Every subject in the CBSE datesheet' },
+    centre: { title: 'Centre datesheet', subtitle: 'Subjects your candidates appear for, with rooms needed' },
+    centre10th: { title: 'Class 10', subtitle: 'Centre datesheet for Class 10 candidates' },
+    centre12th: { title: 'Class 12', subtitle: 'Centre datesheet for Class 12 candidates' },
+  }
 
-      {/* Info Banner for Full Datesheet without CBSE data */}
-      {activeTab === 'all' && cbseDatesheet.length === 0 && subjects.length > 0 && (
-        <div className="mb-6 bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800 rounded-xl p-5 shadow-sm">
-          <div className="flex items-start">
-            <div className="flex-shrink-0">
-              <svg className="h-6 w-6 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-              </svg>
-            </div>
-            <div className="ml-4">
-              <h3 className="text-base font-semibold text-blue-800 dark:text-blue-200">
-                Displaying Subjects (No Exam Dates Found)
-              </h3>
-              <div className="mt-2 text-sm text-blue-700 dark:text-blue-300">
-                <p>
-                  You are currently viewing all subjects. To generate a complete schedule with exam dates and days, please import a CBSE Full Datesheet PDF.
-                  The system will automatically parse and organize the dates for you.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
+  const isCentreTab = activeTab === 'centre' || activeTab === 'centre10th' || activeTab === 'centre12th'
+  const isTableLoading =
+    loading || (activeTab === 'all' && cbseLoading) || (isCentreTab && centreLoading)
+
+  // Today's date and the next exam date are flagged on the centre tabs.
+  const todayStr = new Date().toDateString()
+  let centreNextExamDateStr: string | null = null
+  if (isCentreTab) {
+    const futureDates = visibleTableRows
+      .map((r: any) => (r.examDate ? new Date(r.examDate) : null))
+      .filter(
+        (d: Date | null): d is Date =>
+          d !== null && d.toDateString() !== todayStr && d >= new Date(new Date().toDateString())
       )
+    if (futureDates.length > 0) {
+      const minDate = futureDates.reduce((a: Date, b: Date) => (a < b ? a : b))
+      centreNextExamDateStr = minDate.toDateString()
+    }
+  }
+
+  // Sr no counts exam days: rows on the same date share a number.
+  const displayRows: any[] = []
+  {
+    const seenDates = new Set<string>()
+    const srNoByDate = new Map<string, number>()
+    visibleTableRows.forEach((row: any, index: number) => {
+      const dateStr: string | null = row.examDate ? new Date(row.examDate).toDateString() : null
+      let srNo: number
+      if (dateStr && srNoByDate.has(dateStr)) {
+        srNo = srNoByDate.get(dateStr) as number
+      } else {
+        srNo = seenDates.size + 1
+        if (dateStr) {
+          srNoByDate.set(dateStr, srNo)
+          seenDates.add(dateStr)
+        }
       }
+      displayRows.push({ ...row, _key: `${row.datesheetId}-${index}`, _srNo: srNo, _dateStr: dateStr })
+    })
+  }
 
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-        {/* Ribbon: Tabs + actions */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-4 py-3 bg-gray-50/50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700">
-          <Tabs<DateSheetTabId>
-            tabs={tabConfigs}
-            activeTab={activeTab}
-            onChange={handleTabChange}
-            variant="pill"
-            size="sm"
-            ariaLabel="Date sheet views"
+  const columns: DataTableColumn<any>[] = [
+    {
+      key: 'srNo',
+      header: 'Sr no',
+      numeric: true,
+      width: 64,
+      mobile: 'hidden',
+      render: (row) => <span className="cb-muted">{String(row._srNo).padStart(2, '0')}</span>,
+    },
+    {
+      key: 'date',
+      header: 'Date',
+      headerLabel: 'Date',
+      sortable: activeTab === 'all',
+      mobile: 'subtitle',
+      render: (row) => (
+        <span className="cx-ds-date">
+          {formatDate(row.examDate)}
+          {isCentreTab && row._dateStr === todayStr ? <Badge tone="success">Today</Badge> : null}
+          {isCentreTab && centreNextExamDateStr && row._dateStr === centreNextExamDateStr ? (
+            <Badge tone="warning">Next</Badge>
+          ) : null}
+        </span>
+      ),
+    },
+    {
+      key: 'day',
+      header: 'Day',
+      mobile: 'hidden',
+      render: (row) =>
+        row.examDate ? (row.dayName && row.dayName !== 'Unknown' ? row.dayName : getDayName(row.examDate)) : '—',
+    },
+    {
+      key: 'class',
+      header: 'Class',
+      headerLabel: 'Class',
+      sortable: activeTab === 'all',
+      mobile: 'aside',
+      render: (row) => (
+        <Badge tone="neutral" dot={false}>
+          {row.class}
+        </Badge>
+      ),
+    },
+    {
+      key: 'subjectCode',
+      header: 'Code',
+      headerLabel: 'Code',
+      sortable: activeTab === 'all',
+      render: (row) => orDash(row.subjectCode),
+    },
+    {
+      key: 'subjectName',
+      header: 'Subject',
+      headerLabel: 'Subject',
+      sortable: activeTab === 'all',
+      mobile: 'title',
+      wrap: true,
+      render: (row) => (
+        <Entity primary={row.subjectName} secondary={calculateTimeRange(row.timeSlot, row.duration) || undefined} />
+      ),
+    },
+    {
+      key: 'answerSheet',
+      header: 'Answer sheet',
+      mobile: 'hidden',
+      render: (row) => formatAnswerSheet(row.answerSheet || 'none'),
+    },
+    {
+      key: 'duration',
+      header: 'Duration',
+      headerLabel: 'Duration',
+      sortable: activeTab === 'all',
+      render: (row) => formatDuration(row.duration),
+    },
+    ...(isCentreTab
+      ? ([
+          {
+            key: 'candidateCount',
+            header: 'Candidates',
+            numeric: true,
+            align: 'right',
+            render: (row: any) => row.candidateCount || 0,
+          },
+          {
+            key: 'roomsNeeded',
+            header: 'Rooms',
+            numeric: true,
+            align: 'right',
+            render: (row: any) => (row.roomsNeeded === 0 ? <span className="cb-muted">Shared</span> : row.roomsNeeded),
+          },
+        ] as DataTableColumn<any>[])
+      : []),
+  ]
+
+  const showPagination =
+    !loading && !cbseLoading && !centreLoading && !normalizedSearchTerm && pagination.pages > 1
+
+  const paginationFooter = showPagination ? (
+    <Pagination
+      page={pagination.page}
+      pages={pagination.pages}
+      total={pagination.total}
+      limit={pagination.limit}
+      onPageChange={handlePageChange}
+    />
+  ) : undefined
+
+  const emptyTitle = normalizedSearchTerm ? 'No matching datesheet entries' : 'No exam schedule yet'
+  const emptyBody = normalizedSearchTerm
+    ? `No subject name or code matches "${searchTerm.trim()}".`
+    : activeTab === 'all'
+      ? 'No exam dates are available. Import the CBSE full datesheet PDF to see exam dates, or add subjects.'
+      : activeTab === 'centre'
+        ? 'The centre datesheet is built from candidates’ subject choices. Import candidates to generate it.'
+        : `No exam schedule found for Class ${activeTab === 'centre10th' ? '10' : '12'} at this centre.`
+
+  const downloadCentrePdfLink = () => {
+    if (!centrePdfPreviewUrl) return
+    const link = document.createElement('a')
+    link.href = centrePdfPreviewUrl
+    link.download = getCentreDatesheetPdfFilename()
+    link.click()
+  }
+
+  return (
+    <Page>
+      <section className="cb-stats" aria-label="Datesheet totals">
+        <StatCard
+          label="Full datesheet"
+          value={stats.fullDatesheetDays}
+          unit="days"
+          hint={`${stats.fullDatesheet} subjects`}
+        />
+        <StatCard label="Centre datesheet" value={stats.centreDays} unit="days" hint={`${stats.centre} subjects`} />
+        <StatCard
+          label="Class 10 at centre"
+          value={stats.centre10thDays}
+          unit="days"
+          hint={`${stats.centre10thCandidates} candidates`}
+        />
+        <StatCard
+          label="Class 12 at centre"
+          value={stats.centre12thDays}
+          unit="days"
+          hint={`${stats.centre12thCandidates} candidates`}
+        />
+      </section>
+
+      {activeTab === 'all' && cbseDatesheet.length === 0 && subjects.length > 0 && (
+        <Banner tone="info" title="Showing subjects without exam dates">
+          Import the CBSE full datesheet PDF to add exam dates and days. Dates are read from the PDF and filled in for
+          each subject.
+        </Banner>
+      )}
+
+      <Tabs
+        label="Datesheet views"
+        items={tabItems}
+        value={activeTab}
+        onChange={(id) => handleTabChange(id as DateSheetTabId)}
+      />
+
+      <Card flush title={cardCopy[activeTab].title} subtitle={cardCopy[activeTab].subtitle}>
+        <CardToolbar>
+          <FilterBar
+            search={{
+              placeholder: 'Search subject name or code',
+              label: 'Search datesheet',
+              value: searchTerm,
+              onChange: (value) => {
+                setSearchTerm(value)
+                setPage(1)
+              },
+            }}
+            actions={
+              activeTab === 'centre' ? (
+                <Button
+                  size="sm"
+                  variant="primary"
+                  icon={Download}
+                  onClick={downloadCentreDatesheetPDF}
+                  loading={isDownloadingCentrePDF}
+                >
+                  Download PDF
+                </Button>
+              ) : undefined
+            }
           />
-          <div className="flex flex-col sm:flex-row gap-3 shrink-0 sm:items-center">
-            <div className="relative w-full sm:w-72">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
-                </svg>
-              </div>
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => {
-                  setSearchTerm(e.target.value)
-                  setPage(1)
-                }}
-                placeholder="Search subject name or code..."
-                className="block w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 pl-9 pr-9 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-              />
-              {searchTerm && (
-                <button
-                  type="button"
-                  onClick={() => setSearchTerm('')}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
-                  aria-label="Clear datesheet search"
+        </CardToolbar>
+        <DataTable
+          caption={cardCopy[activeTab].title}
+          columns={columns}
+          rows={isTableLoading ? [] : displayRows}
+          getRowKey={(row) => row._key}
+          loading={isTableLoading}
+          loadingLabel="Loading datesheet…"
+          sort={activeTab === 'all' && sortField ? { key: sortField, direction: sortOrder } : null}
+          onSort={
+            activeTab === 'all'
+              ? (key) => handleSort(key as 'date' | 'class' | 'subjectName' | 'subjectCode' | 'duration')
+              : undefined
+          }
+          footer={paginationFooter}
+          empty={<EmptyState icon={CalendarDays} title={emptyTitle} body={emptyBody} />}
+        />
+      </Card>
+
+      <Sheet
+        open={centrePdfPreviewOpen && Boolean(centrePdfPreviewUrl || isDownloadingCentrePDF || centrePdfPreviewError)}
+        onClose={closeCentrePdfPreview}
+        size="xl"
+        icon={FileText}
+        title="Centre datesheet PDF"
+        description="Date-wise schedule with candidates, rooms and invigilators"
+        footer={
+          <>
+            <Button onClick={closeCentrePdfPreview}>Close</Button>
+            {centrePdfPreviewUrl ? (
+              <>
+                <Button
+                  icon={ExternalLink}
+                  onClick={() => window.open(centrePdfPreviewUrl, '_blank', 'noopener,noreferrer')}
                 >
-                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              )}
-            </div>
-            {activeTab === 'centre' && (
-              <button
-                onClick={downloadCentreDatesheetPDF}
-                disabled={isDownloadingCentrePDF}
-                className="inline-flex items-center px-4 py-2 border border-emerald-600 shadow-sm text-sm font-medium rounded-lg text-emerald-600 bg-white dark:bg-gray-800 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-              >
-                <svg className="w-5 h-5 mr-2 -ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v12m0 0l4-4m-4 4l-4-4m-5 8h18" />
-                </svg>
-                {isDownloadingCentrePDF ? 'Downloading...' : 'Download PDF'}
-              </button>
-            )}
-          </div>
-        </div>
-        {/* Datesheet Table */}
-        {(loading || (activeTab === 'all' && cbseLoading) || (['centre', 'centre10th', 'centre12th'].includes(activeTab) && centreLoading)) ? (
-          <div className="p-12 flex flex-col items-center justify-center text-gray-500 dark:text-gray-400">
-            <svg className="animate-spin h-8 w-8 text-blue-500 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            <span className="text-sm font-medium">Loading datesheet data...</span>
-          </div>
-        ) : visibleTableRows.length === 0 ? (
-          <div className="p-16 text-center">
-            <div className="mx-auto h-24 w-24 bg-gray-50 dark:bg-gray-800 rounded-full flex items-center justify-center mb-6">
-              <svg className="h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-            </div>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-              {normalizedSearchTerm ? 'No Matching Datesheet Entries' : 'No Exam Schedule Found'}
-            </h3>
-            <p className="text-gray-500 dark:text-gray-400 max-w-md mx-auto mb-8 leading-relaxed">
-              {normalizedSearchTerm
-                ? `No subject name or code matches "${searchTerm.trim()}".`
-                : activeTab === 'all'
-                  ? 'No exam dates available. Import a CBSE Full Datesheet PDF to see exam dates, or add subjects manually.'
-                  : activeTab === 'centre'
-                    ? 'No centre datesheet available. The centre datesheet is automatically generated based on candidate subject choices.'
-                    : `No exam schedule found for ${activeTab === 'centre10th' ? 'Centre 10th Datesheet' : 'Centre 12th Datesheet'}.`
-              }
-            </p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-              <thead className="bg-gray-50/50 dark:bg-gray-900/50">
-                <tr>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider w-16">
-                    Sr No
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider w-32 cursor-pointer group" onClick={() => (activeTab === 'centre' || activeTab === 'centre10th' || activeTab === 'centre12th') ? null : handleSort('date')}>
-                    <div className="flex items-center gap-2">
-                      <span>Date</span>
-                      {activeTab === 'all' && (
-                        <div className="inline-flex flex-col -space-y-1.5">
-                          <svg className={`w-3 h-3 shrink-0 ${sortField === 'date' && sortOrder === 'asc' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-300 dark:text-gray-600'}`} fill="currentColor" viewBox="0 0 20 20" aria-hidden><path fillRule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clipRule="evenodd" /></svg>
-                          <svg className={`w-3 h-3 shrink-0 ${sortField === 'date' && sortOrder === 'desc' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-300 dark:text-gray-600'}`} fill="currentColor" viewBox="0 0 20 20" aria-hidden><path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 011.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
-                        </div>
-                      )}
-                    </div>
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider w-24">
-                    Day
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider w-24 cursor-pointer group" onClick={() => (activeTab === 'centre' || activeTab === 'centre10th' || activeTab === 'centre12th') ? null : handleSort('class')}>
-                    <div className="flex items-center gap-2">
-                      <span>Class</span>
-                      {activeTab === 'all' && (
-                        <div className="inline-flex flex-col -space-y-1.5">
-                          <svg className={`w-3 h-3 shrink-0 ${sortField === 'class' && sortOrder === 'asc' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-300 dark:text-gray-600'}`} fill="currentColor" viewBox="0 0 20 20" aria-hidden><path fillRule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clipRule="evenodd" /></svg>
-                          <svg className={`w-3 h-3 shrink-0 ${sortField === 'class' && sortOrder === 'desc' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-300 dark:text-gray-600'}`} fill="currentColor" viewBox="0 0 20 20" aria-hidden><path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 011.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
-                        </div>
-                      )}
-                    </div>
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider w-32 cursor-pointer group" onClick={() => (activeTab === 'centre' || activeTab === 'centre10th' || activeTab === 'centre12th') ? null : handleSort('subjectCode')}>
-                    <div className="flex items-center gap-2">
-                      <span>Code</span>
-                      {activeTab === 'all' && (
-                        <div className="inline-flex flex-col -space-y-1.5">
-                          <svg className={`w-3 h-3 shrink-0 ${sortField === 'subjectCode' && sortOrder === 'asc' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-300 dark:text-gray-600'}`} fill="currentColor" viewBox="0 0 20 20" aria-hidden><path fillRule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clipRule="evenodd" /></svg>
-                          <svg className={`w-3 h-3 shrink-0 ${sortField === 'subjectCode' && sortOrder === 'desc' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-300 dark:text-gray-600'}`} fill="currentColor" viewBox="0 0 20 20" aria-hidden><path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 011.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
-                        </div>
-                      )}
-                    </div>
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer group" onClick={() => (activeTab === 'centre' || activeTab === 'centre10th' || activeTab === 'centre12th') ? null : handleSort('subjectName')}>
-                    <div className="flex items-center gap-2">
-                      <span>Subject</span>
-                      {activeTab === 'all' && (
-                        <div className="inline-flex flex-col -space-y-1.5">
-                          <svg className={`w-3 h-3 shrink-0 ${sortField === 'subjectName' && sortOrder === 'asc' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-300 dark:text-gray-600'}`} fill="currentColor" viewBox="0 0 20 20" aria-hidden><path fillRule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clipRule="evenodd" /></svg>
-                          <svg className={`w-3 h-3 shrink-0 ${sortField === 'subjectName' && sortOrder === 'desc' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-300 dark:text-gray-600'}`} fill="currentColor" viewBox="0 0 20 20" aria-hidden><path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 011.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
-                        </div>
-                      )}
-                    </div>
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider w-40">
-                    Answer Sheet
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider w-32 cursor-pointer group" onClick={() => (activeTab === 'centre' || activeTab === 'centre10th' || activeTab === 'centre12th') ? null : handleSort('duration')}>
-                    <div className="flex items-center gap-2">
-                      <span>Time</span>
-                      {activeTab === 'all' && (
-                        <div className="inline-flex flex-col -space-y-1.5">
-                          <svg className={`w-3 h-3 shrink-0 ${sortField === 'duration' && sortOrder === 'asc' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-300 dark:text-gray-600'}`} fill="currentColor" viewBox="0 0 20 20" aria-hidden><path fillRule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clipRule="evenodd" /></svg>
-                          <svg className={`w-3 h-3 shrink-0 ${sortField === 'duration' && sortOrder === 'desc' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-300 dark:text-gray-600'}`} fill="currentColor" viewBox="0 0 20 20" aria-hidden><path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 011.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
-                        </div>
-                      )}
-                    </div>
-                  </th>
-                  {(activeTab === 'centre' || activeTab === 'centre10th' || activeTab === 'centre12th') && (
-                    <>
-                      <th className="px-6 py-4 text-right text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider w-24">
-                        Candidates
-                      </th>
-                      <th className="px-6 py-4 text-right text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider w-24">
-                        Rooms
-                      </th>
-                    </>
-                  )}
-                </tr>
-              </thead>
-              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                {(() => {
-                  const isCentreTab = activeTab === 'centre' || activeTab === 'centre10th' || activeTab === 'centre12th'
-                  const todayStr = new Date().toDateString()
-                  let centreNextExamDateStr: string | null = null
-                  if (isCentreTab) {
-                    const futureDates = visibleTableRows
-                      .map((r: any) => r.examDate ? new Date(r.examDate) : null)
-                      .filter((d: Date | null): d is Date => d !== null && d.toDateString() !== todayStr && d >= new Date(new Date().toDateString()))
-                    if (futureDates.length > 0) {
-                      const minDate = futureDates.reduce((a: Date, b: Date) => a < b ? a : b)
-                      centreNextExamDateStr = minDate.toDateString()
-                    }
-                  }
-                  return visibleTableRows.map((row: any, index: number) => {
-                  let rowClassName = "hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
-                  let textClassName = "text-gray-900 dark:text-white"
-                  let classBadgeColor = "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300";
-
-                  const rowDateStr = row.examDate ? new Date(row.examDate).toDateString() : null
-
-                  if (isCentreTab && rowDateStr === todayStr) {
-                    rowClassName = "bg-green-50 dark:bg-green-900/20 hover:bg-green-100/60 dark:hover:bg-green-900/30 transition-colors"
-                    classBadgeColor = row.class === '10th'
-                      ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300 ring-1 ring-emerald-500/20"
-                      : "bg-violet-100 text-violet-800 dark:bg-violet-900/40 dark:text-violet-300 ring-1 ring-violet-500/20";
-                  } else if (isCentreTab && centreNextExamDateStr && rowDateStr === centreNextExamDateStr) {
-                    rowClassName = "bg-yellow-50 dark:bg-yellow-900/20 hover:bg-yellow-100/60 dark:hover:bg-yellow-900/30 transition-colors"
-                    classBadgeColor = row.class === '10th'
-                      ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300 ring-1 ring-emerald-500/20"
-                      : "bg-violet-100 text-violet-800 dark:bg-violet-900/40 dark:text-violet-300 ring-1 ring-violet-500/20";
-                  } else if (row.class === '10th') {
-                    rowClassName = "bg-emerald-50/30 dark:bg-emerald-900/10 hover:bg-emerald-50/50 dark:hover:bg-emerald-900/20 transition-colors"
-                    classBadgeColor = "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300 ring-1 ring-emerald-500/20";
-                  } else if (row.class === '12th') {
-                    rowClassName = "bg-violet-50/30 dark:bg-violet-900/10 hover:bg-violet-50/50 dark:hover:bg-violet-900/20 transition-colors"
-                    classBadgeColor = "bg-violet-100 text-violet-800 dark:bg-violet-900/40 dark:text-violet-300 ring-1 ring-violet-500/20";
-                  }
-
-                  let srNo = 1
-                  const currentDate = row.examDate ? new Date(row.examDate).toDateString() : null
-                  const uniqueDatesBefore = new Set<string>()
-                  for (let i = 0; i < index; i++) {
-                    const checkDate = visibleTableRows[i].examDate ? new Date(visibleTableRows[i].examDate).toDateString() : null
-                    if (checkDate) uniqueDatesBefore.add(checkDate)
-                  }
-                  if (currentDate && uniqueDatesBefore.has(currentDate)) {
-                    for (let i = 0; i < index; i++) {
-                      const checkDate = visibleTableRows[i].examDate ? new Date(visibleTableRows[i].examDate).toDateString() : null
-                      if (checkDate === currentDate) {
-                        const uniqueDatesBeforeFirst = new Set<string>()
-                        for (let j = 0; j < i; j++) {
-                          const prevDate = visibleTableRows[j].examDate ? new Date(visibleTableRows[j].examDate).toDateString() : null
-                          if (prevDate) uniqueDatesBeforeFirst.add(prevDate)
-                        }
-                        srNo = uniqueDatesBeforeFirst.size + 1
-                        break
-                      }
-                    }
-                  } else {
-                    srNo = uniqueDatesBefore.size + 1
-                  }
-
-                  return (
-                    <tr key={`${row.datesheetId}-${index}`} className={rowClassName}>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400 font-mono">
-                        {String(srNo).padStart(2, '0')}
-                      </td>
-                      <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium ${textClassName}`}>
-                        <div className="inline-flex items-center gap-2">
-                          <span>{row.examDate ? new Date(row.examDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : <span className="text-gray-400">—</span>}</span>
-                          {isCentreTab && rowDateStr === todayStr && (
-                            <span className="inline-flex items-center rounded-full bg-green-200 dark:bg-green-800 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-green-900 dark:text-green-100">Today</span>
-                          )}
-                          {isCentreTab && centreNextExamDateStr && rowDateStr === centreNextExamDateStr && (
-                            <span className="inline-flex items-center rounded-full bg-yellow-200 dark:bg-yellow-800 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-yellow-900 dark:text-yellow-100">Next</span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                        {row.examDate ? (row.dayName && row.dayName !== 'Unknown' ? row.dayName : getDayName(row.examDate)) : <span className="text-gray-400">—</span>}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${classBadgeColor}`}>
-                          {row.class}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 font-mono">
-                        {row.subjectCode}
-                      </td>
-                      <td className={`px-6 py-4 text-sm font-medium ${textClassName}`}>
-                        {row.subjectName}
-                        {(() => {
-                          const timeRange = calculateTimeRange(row.timeSlot, row.duration)
-                          return timeRange ? (
-                            <div className="text-xs text-gray-400 font-normal mt-0.5">{timeRange}</div>
-                          ) : null
-                        })()}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        {formatAnswerSheet(row.answerSheet || 'none')}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                        {formatDuration(row.duration)}
-                      </td>
-                      {(activeTab === 'centre' || activeTab === 'centre10th' || activeTab === 'centre12th') && (
-                        <>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-right text-gray-900 dark:text-white">
-                            {row.candidateCount || 0}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-500 dark:text-gray-400">
-                            {row.roomsNeeded === 0 ? (
-                              <span className="italic text-xs text-amber-600 dark:text-amber-400">Shared</span>
-                            ) : (
-                              row.roomsNeeded
-                            )}
-                          </td>
-                        </>
-                      )}
-                    </tr>
-                  )
-                })
-                })()}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-      {/* Pagination - Show for all tabs when there are multiple pages */}
-      {!loading && !cbseLoading && !centreLoading && !normalizedSearchTerm && pagination.pages > 1 && (
-        <div className="bg-white dark:bg-gray-800 px-4 py-3 border-t border-gray-200 dark:border-gray-700 sm:px-6 mt-4">
-          <div className="flex items-center justify-between">
-            <div className="flex-1 flex justify-between sm:hidden">
-              <button
-                onClick={() => handlePageChange(pagination.page - 1)}
-                disabled={pagination.page === 1}
-                className="relative inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Previous
-              </button>
-              <button
-                onClick={() => handlePageChange(pagination.page + 1)}
-                disabled={pagination.page === pagination.pages}
-                className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Next
-              </button>
-            </div>
-            <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-              <div>
-                <p className="text-sm text-gray-700 dark:text-gray-300">
-                  Showing{' '}
-                  <span className="font-medium">
-                    {(pagination.page - 1) * pagination.limit + 1}
-                  </span>{' '}
-                  to{' '}
-                  <span className="font-medium">
-                    {Math.min(pagination.page * pagination.limit, pagination.total)}
-                  </span>{' '}
-                  of{' '}
-                  <span className="font-medium">{pagination.total}</span> results
-                </p>
-              </div>
-              <div>
-                <nav className="relative z-0 inline-flex rounded-lg shadow-sm -space-x-px" aria-label="Pagination">
-                  <button
-                    onClick={() => handlePageChange(pagination.page - 1)}
-                    disabled={pagination.page === 1}
-                    className="relative inline-flex items-center px-3 py-2 rounded-l-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus:z-20"
-                  >
-                    <span className="sr-only">Previous</span>
-                    <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
-                    </svg>
-                  </button>
-
-                  {/* Show limited page numbers with ellipsis if many pages */}
-                  {/* Use an IIFE to generate pagination items */}
-                  {(() => {
-                    const pages: (number | string)[] = [];
-                    const { page, pages: totalPages } = pagination;
-
-                    if (totalPages <= 7) {
-                      for (let i = 1; i <= totalPages; i++) {
-                        pages.push(i);
-                      }
-                    } else {
-                      // Always show first page
-                      pages.push(1);
-
-                      // Add left ellipsis
-                      if (page > 3) {
-                        pages.push('...');
-                      }
-
-                      // Show current page and neighbors
-                      const start = Math.max(2, page - 1);
-                      const end = Math.min(totalPages - 1, page + 1);
-
-                      for (let i = start; i <= end; i++) {
-                        pages.push(i);
-                      }
-
-                      // Add right ellipsis
-                      if (page < totalPages - 2) {
-                        pages.push('...');
-                      }
-
-                      // Always show last page
-                      pages.push(totalPages);
-                    }
-
-                    return pages.map((p, i) => (
-                      <button
-                        key={i}
-                        onClick={() => typeof p === 'number' && handlePageChange(p)}
-                        disabled={p === '...'}
-                        className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium focus:z-20 transition-colors ${p === pagination.page
-                          ? 'z-10 bg-blue-600 border-blue-600 text-white'
-                          : p === '...'
-                            ? 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 cursor-default'
-                            : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
-                          }`}
-                      >
-                        {p}
-                      </button>
-                    ));
-                  })()}
-
-                  <button
-                    onClick={() => handlePageChange(pagination.page + 1)}
-                    disabled={pagination.page === pagination.pages}
-                    className="relative inline-flex items-center px-3 py-2 rounded-r-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus:z-20"
-                  >
-                    <span className="sr-only">Next</span>
-                    <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
-                    </svg>
-                  </button>
-                </nav>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {centrePdfPreviewOpen && (centrePdfPreviewUrl || isDownloadingCentrePDF || centrePdfPreviewError) && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4">
-          <div className="w-full max-w-6xl h-[88vh] bg-white dark:bg-gray-900 rounded-xl shadow-xl overflow-hidden flex flex-col">
-            <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between flex-shrink-0">
-              <h4 className="text-sm font-semibold text-gray-900 dark:text-white truncate pr-4">
-                Centre Datesheet PDF Preview
-              </h4>
-              <div className="flex items-center gap-2 flex-shrink-0">
-                {centrePdfPreviewUrl && (
-                  <>
-                    <a
-                      href={centrePdfPreviewUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center px-3 py-1.5 rounded-md text-xs font-semibold border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
-                    >
-                      Open in New Tab
-                    </a>
-                    <a
-                      href={centrePdfPreviewUrl}
-                      download={getCentreDatesheetPdfFilename()}
-                      className="inline-flex items-center px-3 py-1.5 rounded-md text-xs font-semibold bg-blue-600 text-white hover:bg-blue-700"
-                    >
-                      Download PDF
-                    </a>
-                  </>
-                )}
-                <button
-                  type="button"
-                  onClick={closeCentrePdfPreview}
-                  className="inline-flex items-center px-3 py-1.5 rounded-md text-xs font-semibold border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-            <div className="w-full flex-1 overflow-auto bg-gray-100 dark:bg-gray-800 p-4 min-h-0">
-              {isDownloadingCentrePDF ? (
-                <div className="h-full w-full flex flex-col items-center justify-center gap-3 text-sm text-gray-600 dark:text-gray-300">
-                  <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
-                  <p>Generating preview...</p>
-                </div>
-              ) : centrePdfPreviewError ? (
-                <div className="h-full w-full flex flex-col items-center justify-center gap-2 p-6 text-center text-sm text-gray-600 dark:text-gray-300">
-                  <svg className="w-12 h-12 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                  <p>{centrePdfPreviewError}</p>
-                </div>
-              ) : centrePdfPreviewUrl ? (
-                <iframe
-                  src={`${centrePdfPreviewUrl}#toolbar=0`}
-                  className="w-full h-full min-h-[60vh] border-0 rounded-lg bg-white dark:bg-gray-900"
-                  title="Centre datesheet PDF preview"
-                />
-              ) : null}
-            </div>
-          </div>
-        </div>
-      )}
+                  Open in new tab
+                </Button>
+                <Button variant="primary" icon={Download} onClick={downloadCentrePdfLink}>
+                  Download PDF
+                </Button>
+              </>
+            ) : null}
+          </>
+        }
+      >
+        {isDownloadingCentrePDF ? (
+          <CardLoading label="Generating preview…" />
+        ) : centrePdfPreviewError ? (
+          <EmptyState icon={FileWarning} title="The preview couldn’t be generated" body={centrePdfPreviewError} />
+        ) : centrePdfPreviewUrl ? (
+          <PdfFrame src={centrePdfPreviewUrl} title="Centre datesheet PDF preview" />
+        ) : null}
+      </Sheet>
 
       {/* Import Modal */}
       {showImportModal && (
@@ -1371,7 +1081,7 @@ const DateSheets: React.FC = () => {
           }}
         />
       )}
-    </div>
+    </Page>
   )
 }
 

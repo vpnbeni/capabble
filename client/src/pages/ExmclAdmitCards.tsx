@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { Download } from 'lucide-react'
+import { ClipboardList, Contact, Download, Settings2, Users } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useNavigate } from 'react-router-dom'
 import exmclExamService, { type ExmclExamDefinition } from '@/services/exmclExamService'
@@ -14,6 +14,9 @@ import AdmitCardPreview, {
   type AdmitCardPreviewStudent,
   type AdmitCardPreviewSubject,
 } from '@/components/exmcl/AdmitCardPreview'
+import { Button, Card, CardToolbar, EmptyState, FilterBar, Page, Paper, PaperStage, Select } from '@/components/ui'
+import { CardLoading, errorMessage } from '@/components/exmcl/ExmclUi'
+import '@/components/exmcl/admit-cards.css'
 
 type ClassSectionEntry = {
   _id?: { class?: string; section?: string }
@@ -24,21 +27,14 @@ type ClassSectionEntry = {
 const sortClassNames = (left: string, right: string) =>
   left.localeCompare(right, undefined, { numeric: true, sensitivity: 'base' })
 
-const selectClassName =
-  'min-w-[140px] rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-60 dark:border-gray-600 dark:bg-gray-800 dark:text-white'
-
-const formatDate = (value?: string | Date) => {
+/** Date of birth as the printed card shows it (24.10.2010). */
+const formatCardDate = (value?: string | Date) => {
   if (!value) return ''
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return ''
   const day = String(date.getDate()).padStart(2, '0')
   const month = String(date.getMonth() + 1).padStart(2, '0')
   return `${day}.${month}.${date.getFullYear()}`
-}
-
-const PAGE_ASPECT: Record<'A4' | 'legal', Record<'portrait' | 'landscape', string>> = {
-  A4: { portrait: '210 / 297', landscape: '297 / 210' },
-  legal: { portrait: '8.5 / 14', landscape: '14 / 8.5' },
 }
 
 const ExmclAdmitCards: React.FC = () => {
@@ -81,8 +77,8 @@ const ExmclAdmitCards: React.FC = () => {
         setDesign(savedDesign)
         if (profile) setSchool(profile)
         if (examList.length > 0) setSelectedExamId(examList[0]._id)
-      } catch {
-        if (!cancelled) toast.error('Failed to load admit cards.')
+      } catch (error) {
+        if (!cancelled) toast.error(errorMessage(error, 'Exams and classes didn’t load. Check your connection and refresh the page.'))
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -173,7 +169,7 @@ const ExmclAdmitCards: React.FC = () => {
           section: student.section || selectedSection,
           rollNo: student.classRollNo || '',
           admissionNo: student.rollNumber || '',
-          dateOfBirth: formatDate(student.dateOfBirth),
+          dateOfBirth: formatCardDate(student.dateOfBirth),
           photoUrl: student.profileImage || '',
           pwdCategory: String(student.medicalInfo?.specialNeeds || '').trim() || 'Not Applicable',
           admitCardId: `AC${String(examCode).replace(/\s+/g, '')}${String(student.rollNumber || student._id).slice(-6)}`.toUpperCase(),
@@ -206,14 +202,15 @@ const ExmclAdmitCards: React.FC = () => {
   const selectedExam = exams.find((exam) => exam._id === selectedExamId)
   const canGenerate = Boolean(selectedExamId && selectedClass && selectedSection)
   const twoUp = design.copiesPerSheet === 2
-  const pageAspect = PAGE_ASPECT[design.pageSize || 'A4'][design.orientation || 'portrait']
   const schoolName = String(school.name || '').trim() || 'SCHOOL NAME'
   const schoolAddress = String(school.address || '').trim()
   const schoolCode = String(school.schoolCode || '').trim()
 
+  const sectionLabel = selectedClass && selectedSection ? `Class ${selectedClass}-${selectedSection}` : ''
+
   const handleGenerate = async () => {
     if (!canGenerate) {
-      toast.error('Select exam, class, and section.')
+      toast.error('Choose an exam, class and section first.')
       return
     }
 
@@ -225,141 +222,149 @@ const ExmclAdmitCards: React.FC = () => {
         selectedSection,
         selectedExam?.code || 'exam'
       )
-      toast.success('Admit cards PDF downloaded.')
-    } catch (error: any) {
-      toast.error(String(error?.message || 'Failed to generate admit cards.'))
+      toast.success(`Admit cards for ${sectionLabel} downloaded.`)
+    } catch (error) {
+      toast.error(errorMessage(error, 'Admit cards didn’t download. Try again in a moment.'))
     } finally {
       setGenerating(false)
     }
   }
 
-  return (
-    <div className="p-6">
-      <div className="mx-auto max-w-[1200px] space-y-4">
-        <div className="flex flex-col gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm dark:border-gray-700 dark:bg-gray-800 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex flex-1 flex-wrap items-center gap-2">
-            <select
-              title="Exam"
-              aria-label="Exam"
-              value={selectedExamId}
-              onChange={(e) => setSelectedExamId(e.target.value)}
-              disabled={loading}
-              className={`${selectClassName} min-w-[220px]`}
-            >
-              <option value="">{loading ? 'Loading exams...' : 'Select exam'}</option>
-              {exams.map((exam) => (
-                <option key={exam._id} value={exam._id}>
-                  {exam.code} — {exam.name}
-                </option>
-              ))}
-            </select>
-            <select
-              title="Class"
-              aria-label="Class"
-              value={selectedClass}
-              onChange={(e) => setSelectedClass(e.target.value)}
-              disabled={loading}
-              className={selectClassName}
-            >
-              <option value="">Class</option>
-              {classOptions.map((className) => (
-                <option key={className} value={className}>
-                  {className}
-                </option>
-              ))}
-            </select>
-            <select
-              title="Section"
-              aria-label="Section"
-              value={selectedSection}
-              onChange={(e) => setSelectedSection(e.target.value)}
-              disabled={loading || !selectedClass}
-              className={selectClassName}
-            >
-              <option value="">{selectedClass ? 'Section' : 'Select class first'}</option>
-              {sectionOptions.map((section) => (
-                <option key={section} value={section}>
-                  {section}
-                </option>
-              ))}
-            </select>
-            <p className="text-[11px] text-slate-500">
-              {selectedClass && selectedSection
-                ? previewLoading
-                  ? 'Loading students...'
-                  : studentCount === null
-                    ? 'Unable to load student count.'
-                    : `${studentCount} admit card${studentCount === 1 ? '' : 's'}`
-                : 'Select exam, class, and section'}
-              {' · '}
-              <button
-                type="button"
-                onClick={() => navigate('/exmcl/performas/admit-card')}
-                className="font-medium text-blue-600 hover:underline"
-              >
-                Change format
-              </button>
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={handleGenerate}
-            disabled={!canGenerate || generating}
-            className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            <Download className="h-3.5 w-3.5" />
-            {generating ? 'Generating...' : 'Download PDF'}
-          </button>
-        </div>
+  const previewSubtitle = !canGenerate
+    ? 'Choose an exam, class and section to see the first student’s card.'
+    : previewLoading
+      ? 'Loading students…'
+      : studentCount === null
+        ? 'The student count didn’t load. Choose the section again to retry.'
+        : [selectedExam?.name, sectionLabel, previewStudent?.name].filter(Boolean).join(' · ')
 
-        <div className="rounded-xl border border-gray-200 bg-slate-100 p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900">
-          <p className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-            Live preview
-            {selectedExam ? ` · ${selectedExam.name}` : ''}
-            {selectedClass && selectedSection ? ` · ${selectedClass}-${selectedSection}` : ''}
-            {previewStudent?.name ? ` · ${previewStudent.name}` : ''}
-          </p>
-          {!canGenerate ? (
-            <p className="py-16 text-center text-sm text-slate-500">
-              Select exam, class, and section to preview an admit card.
-            </p>
-          ) : previewLoading ? (
-            <p className="py-16 text-center text-sm text-slate-500">Loading preview...</p>
-          ) : studentCount === 0 ? (
-            <p className="py-16 text-center text-sm text-slate-500">
-              No students found for class {selectedClass}, section {selectedSection}.
-            </p>
-          ) : (
-            <div className="overflow-auto">
-              <div
-                className="mx-auto max-w-full bg-white p-3 shadow-md"
-                style={{
-                  aspectRatio: pageAspect,
-                  width: design.orientation === 'portrait' ? 'min(100%, 640px)' : '100%',
-                }}
-              >
-                <AdmitCardPreview
-                  design={design}
-                  compact={twoUp}
-                  data={{
-                    schoolName,
-                    schoolAddress,
-                    schoolCode,
-                    logoUrl: school.logoUrl,
-                    examName: selectedExam?.name || 'EXAMINATION',
-                    student: previewStudent || {
-                      className: selectedClass,
-                      section: selectedSection,
-                    },
-                    subjects: previewSubjects,
-                  }}
+  const downloadLabel =
+    canGenerate && studentCount
+      ? `Download ${studentCount} admit card${studentCount === 1 ? '' : 's'}`
+      : 'Download admit cards'
+
+  const renderStage = () => {
+    if (loading) return <CardLoading label="Loading exams and classes…" />
+    if (exams.length === 0) {
+      return (
+        <EmptyState
+          icon={ClipboardList}
+          title="No exams yet"
+          body="Add an exam first, then come back to print its admit cards."
+          action={
+            <Button variant="secondary" onClick={() => navigate('/exmcl/exams')}>
+              Add exam
+            </Button>
+          }
+        />
+      )
+    }
+    if (!canGenerate) {
+      return (
+        <EmptyState
+          icon={Contact}
+          title="No class chosen"
+          body="Choose an exam, class and section above to preview the admit card."
+        />
+      )
+    }
+    if (previewLoading) return <CardLoading label="Loading preview…" />
+    if (studentCount === 0) {
+      return (
+        <EmptyState
+          icon={Users}
+          title={`No active students in ${sectionLabel}`}
+          body="Add students to this section, or choose another section."
+        />
+      )
+    }
+    return (
+      <PaperStage flush>
+        <Paper pageSize={design.pageSize || 'A4'} orientation={design.orientation || 'portrait'}>
+          <AdmitCardPreview
+            design={design}
+            compact={twoUp}
+            data={{
+              schoolName,
+              schoolAddress,
+              schoolCode,
+              logoUrl: school.logoUrl,
+              examName: selectedExam?.name || 'EXAMINATION',
+              student: previewStudent || {
+                className: selectedClass,
+                section: selectedSection,
+              },
+              subjects: previewSubjects,
+            }}
+          />
+        </Paper>
+      </PaperStage>
+    )
+  }
+
+  return (
+    <Page>
+      <Card
+        flush
+        title="Preview"
+        subtitle={previewSubtitle}
+        action={
+          <Button variant="tertiary" size="sm" icon={Settings2} onClick={() => navigate('/exmcl/performas/admit-card')}>
+            Change format
+          </Button>
+        }
+      >
+        <CardToolbar>
+          <FilterBar
+            filters={
+              <>
+                <Select
+                  aria-label="Exam"
+                  size="sm"
+                  className="ex-ac-exam"
+                  value={selectedExamId}
+                  onChange={(e) => setSelectedExamId(e.target.value)}
+                  disabled={loading}
+                  placeholder={loading ? 'Loading exams…' : 'Choose exam'}
+                  options={exams.map((exam) => ({ value: exam._id, label: `${exam.code} · ${exam.name}` }))}
                 />
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
+                <Select
+                  aria-label="Class"
+                  size="sm"
+                  value={selectedClass}
+                  onChange={(e) => setSelectedClass(e.target.value)}
+                  disabled={loading}
+                  placeholder="Choose class"
+                  options={classOptions.map((className) => ({ value: className, label: `Class ${className}` }))}
+                />
+                <Select
+                  aria-label="Section"
+                  size="sm"
+                  value={selectedSection}
+                  onChange={(e) => setSelectedSection(e.target.value)}
+                  disabled={loading || !selectedClass}
+                  placeholder={selectedClass ? 'Choose section' : 'Choose class first'}
+                  options={sectionOptions.map((section) => ({ value: section, label: `Section ${section}` }))}
+                />
+              </>
+            }
+            actions={
+              <Button
+                variant="primary"
+                size="sm"
+                icon={Download}
+                onClick={handleGenerate}
+                disabled={!canGenerate}
+                loading={generating}
+              >
+                {generating ? 'Preparing PDF…' : downloadLabel}
+              </Button>
+            }
+          />
+        </CardToolbar>
+        {renderStage()}
+      </Card>
+    </Page>
   )
 }
 

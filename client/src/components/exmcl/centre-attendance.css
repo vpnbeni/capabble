@@ -1,0 +1,24 @@
+/* Exam centre — attendance register (per paper). Builds on the system's .cb-att register. Tokens only; scoped to .cb-app. */
+
+/* The register sits flush inside its card and scrolls under a sticky two-row header. */
+.cb-app .cx-att { padding: 0 0 var(--space-4); }
+.cb-app .cx-att .cb-att__scroll { border-width: 1px 0; border-radius: 0; max-height: calc(100dvh - 300px); overflow: auto; }
+.cb-app .cx-att .cb-att__legend { padding: 0 var(--space-4); }
+.cb-app .cx-att thead tr:first-child th { position: sticky; top: 0; z-index: 2; }
+.cb-app .cx-att thead tr:nth-child(2) th { position: sticky; top: 45px; z-index: 2; }
+.cb-app .cx-att thead th.cb-att__who { z-index: 3; }
+.cb-app .cx-att .cb-att__table th, .cb-app .cx-att .cb-att__table td { min-width: 64px; }
+.cb-app .cx-att .cb-att__table .cb-att__who { min-width: 200px; }
+
+/* Subject code under each date. */
+.cb-app .cx-att .cx-att__code { font: 500 12px/16px var(--font-sans); color: var(--ink-muted); font-variant-numeric: tabular-nums; }
+
+/* A rule between exam dates. */
+.cb-app .cx-att .cx-att__group { border-left: 1px solid var(--border); }
+
+/* Present / total per paper. */
+.cb-app .cx-att tfoot > tr > * { position: sticky; bottom: 0; background: var(--surface-sunken); border-top: 1px solid var(--border); border-bottom: 0; }
+.cb-app .cx-att tfoot th.cb-att__who { z-index: 2; font: 500 12px/16px var(--font-sans); color: var(--ink-muted); }
+.cb-app .cx-att .cx-att__total { font-variant-numeric: tabular-nums; }
+
+/* PDF preview inside a sheet. */

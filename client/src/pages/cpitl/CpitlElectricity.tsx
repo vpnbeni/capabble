@@ -1,39 +1,55 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
-import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import { CheckCircle2, Pencil, Plus, Zap } from 'lucide-react'
-import Modal from '@/components/common/Modal'
+import { BarChart3, CheckCircle2, ExternalLink, Gauge, IndianRupee, Pencil, Plus, Receipt, Trash2, Zap } from 'lucide-react'
+import {
+  Badge,
+  BulkBar,
+  BulkResultDialog,
+  Button,
+  Card,
+  Checkbox,
+  DataTable,
+  Dialog,
+  EmptyState,
+  Menu,
+  Page,
+  Select,
+  Sheet,
+  StatCard,
+  TextArea,
+  TextField,
+  useRowSelection,
+  type BulkResult,
+  type DataTableColumn,
+  type MenuItem,
+} from '@/components/ui'
 import { useAssetLocations, useElectricityAnalytics, useElectricityBills, useElectricityConnections, useInvalidateCpitl } from '@/hooks/useCpitl'
 import cpitlService, { Attachment, ElectricityBill, ElectricityConnection, PaymentMode } from '@/services/cpitlService'
+import cpitlBulkService from '@/services/cpitlBulkService'
 import AttachmentInput from '@/components/cpitl/AttachmentInput'
 import { todayIso } from '@/components/cpitl/QuickExpenseSheet'
-import { INCOME_COLOR, EXPENSE_COLOR } from './CpitlExpenses'
-import {
-  CpitlBadge,
-  CpitlCard,
-  CpitlEmpty,
-  CpitlPageShell,
-  Field,
-  MODE_LABELS,
-  MONTHS,
-  btnGhost,
-  btnPrimary,
-  btnSecondary,
-  errorMessage,
-  fmtDate,
-  inputClass,
-  inr,
-  inrShort,
-  tableHead,
-} from '@/components/cpitl/CpitlUi'
+import { CpitlBadge, MODE_LABELS, MONTHS, errorMessage, fmtDate, inr, inrShort } from '@/components/cpitl/CpitlUi'
+import '@/components/cpitl/utilities.css'
 
 const monthLabel = (key: string) => {
   const [y, m] = key.split('-').map(Number)
   return `${MONTHS[(m || 1) - 1]} ${y}`
 }
+const shortMonth = (key: string) => monthLabel(key).replace(/ \d{2}(\d{2})$/, " '$1")
 const currentMonth = () => todayIso().slice(0, 7)
+const kwh = (value: number) => `${value.toLocaleString('en-IN')} kWh`
 
-const ConnectionModal: React.FC<{ isOpen: boolean; onClose: () => void; connection?: ElectricityConnection | null; onSaved: () => void }> = ({
+const PAY_MODES = (['bank_transfer', 'upi', 'cheque', 'cash', 'card'] as PaymentMode[]).map((m) => ({ value: m, label: MODE_LABELS[m] }))
+
+const billId = (b: ElectricityBill) => b._id
+const billRowLabel = (b: ElectricityBill) => `Select ${b.connectionSnapshot.name} bill for ${monthLabel(b.billMonth)}`
+const billsNoun = (n: number) => (n === 1 ? 'bill' : 'bills')
+
+const isOverdue = (b: ElectricityBill) => b.status === 'unpaid' && Boolean(b.dueDate) && new Date(b.dueDate as string) < new Date()
+
+/* ---------------------------------------------------------------- connection form */
+
+const ConnectionSheet: React.FC<{ isOpen: boolean; onClose: () => void; connection?: ElectricityConnection | null; onSaved: () => void }> = ({
   isOpen,
   onClose,
   connection,
@@ -41,6 +57,7 @@ const ConnectionModal: React.FC<{ isOpen: boolean; onClose: () => void; connecti
 }) => {
   const { data: locations = [] } = useAssetLocations()
   const [form, setForm] = useState<Partial<ElectricityConnection>>({})
+  const [saving, setSaving] = useState(false)
   useEffect(() => {
     if (isOpen) setForm(connection || { name: '', consumerNo: '', meterNo: '', provider: '', locationId: null, locationText: '', sanctionedLoadKw: 0 })
   }, [isOpen, connection])
@@ -49,6 +66,7 @@ const ConnectionModal: React.FC<{ isOpen: boolean; onClose: () => void; connecti
       toast.error('Name the connection, e.g. "Main Block".')
       return
     }
+    setSaving(true)
     try {
       await cpitlService.saveElectricityConnection(form)
       toast.success('Connection saved.')
@@ -56,53 +74,75 @@ const ConnectionModal: React.FC<{ isOpen: boolean; onClose: () => void; connecti
       onClose()
     } catch (error) {
       toast.error(await errorMessage(error))
+    } finally {
+      setSaving(false)
     }
   }
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={form._id ? 'Edit connection' : 'New electricity connection'}>
-      <div className="grid grid-cols-2 gap-4">
-        <Field label="Name" className="col-span-2">
-          <input className={inputClass} value={form.name || ''} placeholder="Main Block / Hostel / Sports complex" onChange={(e) => setForm({ ...form, name: e.target.value })} />
-        </Field>
-        <Field label="Consumer / account no.">
-          <input className={inputClass} value={form.consumerNo || ''} onChange={(e) => setForm({ ...form, consumerNo: e.target.value })} />
-        </Field>
-        <Field label="Meter no.">
-          <input className={inputClass} value={form.meterNo || ''} onChange={(e) => setForm({ ...form, meterNo: e.target.value })} />
-        </Field>
-        <Field label="Provider">
-          <input className={inputClass} value={form.provider || ''} placeholder="e.g. DHBVN" onChange={(e) => setForm({ ...form, provider: e.target.value })} />
-        </Field>
-        <Field label="Sanctioned load (kW)">
-          <input type="number" min={0} className={inputClass} value={form.sanctionedLoadKw || ''} onChange={(e) => setForm({ ...form, sanctionedLoadKw: Number(e.target.value) })} />
-        </Field>
+    <Sheet
+      open={isOpen}
+      onClose={onClose}
+      icon={Zap}
+      title={form._id ? 'Edit connection' : 'Add connection'}
+      description="One connection per meter the school pays for."
+      onSubmit={(event) => {
+        event.preventDefault()
+        void save()
+      }}
+      footer={
+        <>
+          <Button onClick={onClose} disabled={saving}>
+            Cancel
+          </Button>
+          <Button type="submit" variant="primary" loading={saving}>
+            Save connection
+          </Button>
+        </>
+      }
+    >
+      <div className="cb-form-grid">
+        <TextField
+          className="is-wide"
+          label="Name"
+          required
+          value={form.name || ''}
+          placeholder="Main Block / Hostel / Sports complex"
+          onChange={(e) => setForm({ ...form, name: e.target.value })}
+        />
+        <TextField label="Consumer / account no." value={form.consumerNo || ''} onChange={(e) => setForm({ ...form, consumerNo: e.target.value })} />
+        <TextField label="Meter no." value={form.meterNo || ''} onChange={(e) => setForm({ ...form, meterNo: e.target.value })} />
+        <TextField label="Provider" value={form.provider || ''} placeholder="e.g. DHBVN" onChange={(e) => setForm({ ...form, provider: e.target.value })} />
+        <TextField
+          label="Sanctioned load"
+          suffix="kW"
+          type="number"
+          inputMode="decimal"
+          min={0}
+          value={form.sanctionedLoadKw || ''}
+          onChange={(e) => setForm({ ...form, sanctionedLoadKw: Number(e.target.value) })}
+        />
         {locations.length ? (
-          <Field label="Location (from Assets)" className="col-span-2">
-            <select className={inputClass} value={form.locationId || ''} onChange={(e) => setForm({ ...form, locationId: e.target.value || null })}>
-              <option value="">— Not linked —</option>
-              {locations.map((l) => (
-                <option key={l._id} value={l._id}>
-                  {l.path || l.name} ({l.type})
-                </option>
-              ))}
-            </select>
-          </Field>
+          <Select
+            className="is-wide"
+            label="Location (from Assets)"
+            value={form.locationId || ''}
+            onChange={(e) => setForm({ ...form, locationId: e.target.value || null })}
+            placeholder="Not linked"
+            options={locations.map((l) => ({ value: l._id, label: `${l.path || l.name} (${l.type})` }))}
+          />
         ) : null}
-        <Field label="Location / area served" className="col-span-2">
-          <input className={inputClass} value={form.locationText || ''} onChange={(e) => setForm({ ...form, locationText: e.target.value })} />
-        </Field>
+        <TextField
+          className="is-wide"
+          label="Location / area served"
+          value={form.locationText || ''}
+          onChange={(e) => setForm({ ...form, locationText: e.target.value })}
+        />
       </div>
-      <div className="mt-6 flex justify-end gap-2">
-        <button type="button" className={btnSecondary} onClick={onClose}>
-          Cancel
-        </button>
-        <button type="button" className={btnPrimary} onClick={save}>
-          Save
-        </button>
-      </div>
-    </Modal>
+    </Sheet>
   )
 }
+
+/* ---------------------------------------------------------------- bill form */
 
 type BillDraft = {
   _id?: string
@@ -122,7 +162,7 @@ type BillDraft = {
   reference: string
 }
 
-const BillModal: React.FC<{
+const BillSheet: React.FC<{
   isOpen: boolean
   onClose: () => void
   connections: ElectricityConnection[]
@@ -131,6 +171,7 @@ const BillModal: React.FC<{
   onSaved: () => void
 }> = ({ isOpen, onClose, connections, bill, lastReading, onSaved }) => {
   const [d, setD] = useState<BillDraft | null>(null)
+  const [saving, setSaving] = useState(false)
   const set = (patch: Partial<BillDraft>) => setD((prev) => (prev ? { ...prev, ...patch } : prev))
 
   useEffect(() => {
@@ -156,10 +197,11 @@ const BillModal: React.FC<{
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, bill])
 
-  if (!d) return null
-  const readingUnits = d.prevReading !== '' && d.currReading !== '' ? Number(d.currReading) - Number(d.prevReading) : null
+  const readingUnits = d && d.prevReading !== '' && d.currReading !== '' ? Number(d.currReading) - Number(d.prevReading) : null
 
   const save = async () => {
+    if (!d) return
+    setSaving(true)
     try {
       await cpitlService.saveElectricityBill({
         _id: d._id,
@@ -180,102 +222,107 @@ const BillModal: React.FC<{
       onClose()
     } catch (error) {
       toast.error(await errorMessage(error))
+    } finally {
+      setSaving(false)
     }
   }
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={d._id ? 'Edit bill' : 'Add electricity bill'} size="lg">
-      <div className="grid grid-cols-2 gap-4">
-        <Field label="Connection">
-          <select
-            className={inputClass}
+    <Sheet
+      open={isOpen && Boolean(d)}
+      onClose={onClose}
+      size="lg"
+      icon={Receipt}
+      title={d?._id ? 'Edit bill' : 'Add electricity bill'}
+      description="Enter both meter readings and the units are worked out for you."
+      onSubmit={(event) => {
+        event.preventDefault()
+        void save()
+      }}
+      footer={
+        <>
+          <Button onClick={onClose} disabled={saving}>
+            Cancel
+          </Button>
+          <Button type="submit" variant="primary" loading={saving}>
+            Save bill
+          </Button>
+        </>
+      }
+    >
+      {d ? (
+        <div className="cb-form-grid">
+          <Select
+            label="Connection"
             value={d.connectionId}
             onChange={(e) => set({ connectionId: e.target.value, prevReading: d._id ? d.prevReading : String(lastReading(e.target.value) ?? '') })}
-          >
-            {connections.map((c) => (
-              <option key={c._id} value={c._id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label="Bill month">
-          <input type="month" className={inputClass} value={d.billMonth} onChange={(e) => set({ billMonth: e.target.value })} />
-        </Field>
-        <Field label="Previous reading">
-          <input type="number" min={0} className={inputClass} value={d.prevReading} onChange={(e) => set({ prevReading: e.target.value })} />
-        </Field>
-        <Field label="Current reading">
-          <input type="number" min={0} className={inputClass} value={d.currReading} onChange={(e) => set({ currReading: e.target.value })} />
-        </Field>
-        <Field label="Units consumed" hint={readingUnits !== null ? 'Calculated from readings' : undefined}>
-          <input
+            options={connections.map((c) => ({ value: c._id, label: c.name }))}
+          />
+          <TextField label="Bill month" type="month" value={d.billMonth} onChange={(e) => set({ billMonth: e.target.value })} />
+          <TextField label="Previous reading" type="number" inputMode="numeric" min={0} value={d.prevReading} onChange={(e) => set({ prevReading: e.target.value })} />
+          <TextField
+            label="Current reading"
             type="number"
+            inputMode="numeric"
             min={0}
-            className={inputClass}
+            value={d.currReading}
+            error={readingUnits !== null && readingUnits < 0 ? 'Lower than the previous reading.' : undefined}
+            onChange={(e) => set({ currReading: e.target.value })}
+          />
+          <TextField
+            label="Units consumed"
+            suffix="kWh"
+            type="number"
+            inputMode="numeric"
+            min={0}
+            hint={readingUnits !== null ? 'Calculated from readings' : undefined}
             value={readingUnits !== null ? readingUnits : d.units}
             disabled={readingUnits !== null}
             onChange={(e) => set({ units: e.target.value })}
           />
-        </Field>
-        <Field label="Bill amount (₹)">
-          <input type="number" min={0} step="0.01" className={inputClass} value={d.amount} onChange={(e) => set({ amount: e.target.value })} />
-        </Field>
-        <Field label="Bill no.">
-          <input className={inputClass} value={d.billNo} onChange={(e) => set({ billNo: e.target.value })} />
-        </Field>
-        <Field label="Due date">
-          <input type="date" className={inputClass} value={d.dueDate} onChange={(e) => set({ dueDate: e.target.value })} />
-        </Field>
-        <div className="col-span-2">
-          <AttachmentInput value={d.attachments} onChange={(attachments) => set({ attachments })} label="Attach bill" />
-        </div>
-        {!d._id ? (
-          <div className="col-span-2 rounded-xl border border-slate-200 p-3 dark:border-slate-700">
-            <label className="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
-              <input type="checkbox" className="h-4 w-4 rounded" checked={d.markPaid} onChange={(e) => set({ markPaid: e.target.checked })} />
-              Already paid
-            </label>
-            {d.markPaid ? (
-              <div className="mt-3 grid grid-cols-3 gap-3">
-                <Field label="Paid on">
-                  <input type="date" className={inputClass} value={d.paidOn} onChange={(e) => set({ paidOn: e.target.value })} />
-                </Field>
-                <Field label="Mode">
-                  <select className={inputClass} value={d.mode} onChange={(e) => set({ mode: e.target.value as PaymentMode })}>
-                    {(['bank_transfer', 'upi', 'cheque', 'cash', 'card'] as PaymentMode[]).map((m) => (
-                      <option key={m} value={m}>
-                        {MODE_LABELS[m]}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-                <Field label="Reference">
-                  <input className={inputClass} value={d.reference} onChange={(e) => set({ reference: e.target.value })} />
-                </Field>
-              </div>
-            ) : null}
+          <TextField
+            label="Bill amount"
+            prefix="₹"
+            type="number"
+            inputMode="decimal"
+            min={0}
+            step="0.01"
+            value={d.amount}
+            onChange={(e) => set({ amount: e.target.value })}
+          />
+          <TextField label="Bill no." value={d.billNo} onChange={(e) => set({ billNo: e.target.value })} />
+          <TextField label="Due date" type="date" value={d.dueDate} onChange={(e) => set({ dueDate: e.target.value })} />
+          <div className="is-wide">
+            <AttachmentInput value={d.attachments} onChange={(attachments) => set({ attachments })} label="Attach bill" />
           </div>
-        ) : null}
-      </div>
-      <div className="mt-6 flex justify-end gap-2">
-        <button type="button" className={btnSecondary} onClick={onClose}>
-          Cancel
-        </button>
-        <button type="button" className={btnPrimary} onClick={save}>
-          Save bill
-        </button>
-      </div>
-    </Modal>
+          {!d._id ? (
+            <div className="is-wide cu-paid">
+              <Checkbox label="Already paid" checked={d.markPaid} onChange={(markPaid) => set({ markPaid })} />
+              {d.markPaid ? (
+                <div className="cb-form-grid cb-form-grid--3">
+                  <TextField label="Paid on" type="date" value={d.paidOn} onChange={(e) => set({ paidOn: e.target.value })} />
+                  <Select label="Mode" value={d.mode} onChange={(e) => set({ mode: e.target.value as PaymentMode })} options={PAY_MODES} />
+                  <TextField label="Reference" value={d.reference} onChange={(e) => set({ reference: e.target.value })} />
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+    </Sheet>
   )
 }
 
-const PayModal: React.FC<{ bill: ElectricityBill | null; onClose: () => void; onSaved: () => void }> = ({ bill, onClose, onSaved }) => {
+/* ---------------------------------------------------------------- pay + remove */
+
+const PayDialog: React.FC<{ bill: ElectricityBill | null; onClose: () => void; onSaved: () => void }> = ({ bill, onClose, onSaved }) => {
   const [paidOn, setPaidOn] = useState(todayIso())
   const [mode, setMode] = useState<PaymentMode>('bank_transfer')
   const [reference, setReference] = useState('')
+  const [busy, setBusy] = useState(false)
   const pay = async () => {
     if (!bill) return
+    setBusy(true)
     try {
       await cpitlService.payElectricityBill(bill._id, { paidOn, mode, reference })
       toast.success('Bill marked paid.')
@@ -283,50 +330,158 @@ const PayModal: React.FC<{ bill: ElectricityBill | null; onClose: () => void; on
       onClose()
     } catch (error) {
       toast.error(await errorMessage(error))
+    } finally {
+      setBusy(false)
     }
   }
   return (
-    <Modal isOpen={Boolean(bill)} onClose={onClose} title={`Pay ${bill ? inr(bill.amount) : ''} — ${bill?.connectionSnapshot.name || ''}`} size="sm">
-      <div className="space-y-4">
-        <Field label="Paid on">
-          <input type="date" className={inputClass} value={paidOn} max={todayIso()} onChange={(e) => setPaidOn(e.target.value)} />
-        </Field>
-        <Field label="Mode">
-          <select className={inputClass} value={mode} onChange={(e) => setMode(e.target.value as PaymentMode)}>
-            {(['bank_transfer', 'upi', 'cheque', 'cash', 'card'] as PaymentMode[]).map((m) => (
-              <option key={m} value={m}>
-                {MODE_LABELS[m]}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label="Reference / UTR">
-          <input className={inputClass} value={reference} onChange={(e) => setReference(e.target.value)} />
-        </Field>
-        <div className="flex justify-end gap-2">
-          <button type="button" className={btnSecondary} onClick={onClose}>
+    <Dialog
+      open={Boolean(bill)}
+      onClose={onClose}
+      size="sm"
+      title={`Pay ${bill ? inr(bill.amount) : ''}`}
+      description={bill ? `${bill.connectionSnapshot.name} · ${monthLabel(bill.billMonth)}` : undefined}
+      footer={
+        <>
+          <Button onClick={onClose} disabled={busy}>
             Cancel
-          </button>
-          <button type="button" className={btnPrimary} onClick={pay}>
+          </Button>
+          <Button variant="primary" icon={CheckCircle2} loading={busy} onClick={pay}>
             Mark paid
-          </button>
-        </div>
+          </Button>
+        </>
+      }
+    >
+      <div className="cu-form-stack">
+        <TextField label="Paid on" type="date" value={paidOn} max={todayIso()} onChange={(e) => setPaidOn(e.target.value)} />
+        <Select label="Mode" value={mode} onChange={(e) => setMode(e.target.value as PaymentMode)} options={PAY_MODES} />
+        <TextField label="Reference / UTR" value={reference} onChange={(e) => setReference(e.target.value)} />
       </div>
-    </Modal>
+    </Dialog>
   )
 }
 
+const RemoveBillDialog: React.FC<{ bill: ElectricityBill | null; onClose: () => void; onRemoved: () => void }> = ({ bill, onClose, onRemoved }) => {
+  const [reason, setReason] = useState('')
+  const [busy, setBusy] = useState(false)
+  useEffect(() => {
+    if (bill) setReason('')
+  }, [bill])
+  const confirm = async () => {
+    if (!bill || !reason.trim()) return
+    setBusy(true)
+    try {
+      await cpitlService.removeElectricityBill(bill._id, reason)
+      toast.success('Bill removed.')
+      onRemoved()
+      onClose()
+    } catch (error) {
+      toast.error(await errorMessage(error))
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <Dialog
+      open={Boolean(bill)}
+      onClose={onClose}
+      tone="danger"
+      size="sm"
+      title="Remove this bill?"
+      description={bill ? `${bill.connectionSnapshot.name}, ${monthLabel(bill.billMonth)} · ${inr(bill.amount)}.` : undefined}
+      footer={
+        <>
+          <Button onClick={onClose} disabled={busy}>
+            Cancel
+          </Button>
+          <Button variant="danger" loading={busy} disabled={!reason.trim()} onClick={confirm}>
+            Remove bill
+          </Button>
+        </>
+      }
+    >
+      <TextField label="Reason" required value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Duplicate, wrong month…" autoFocus />
+    </Dialog>
+  )
+}
+
+/* ---------------------------------------------------------------- usage chart */
+
+type ChartRow = { month: string; units: number; amount: number; lastYearUnits: number | null }
+
+/** Units per month; pairs last year's bar (chart-2) with this year's (chart-1) when there is history. */
+const UnitsChart: React.FC<{ rows: ChartRow[]; withLastYear: boolean }> = ({ rows, withLastYear }) => {
+  const max = Math.max(...rows.map((r) => Math.max(r.units, r.lastYearUnits || 0)), 1)
+  const bar = (value: number, tone: string) => (
+    <span className={value > 0 ? `cu-chart__bar ${tone}` : 'cu-chart__bar is-zero'} style={value > 0 ? { height: `${(value / max) * 100}%` } : undefined} />
+  )
+  return (
+    <div className="cu-chart">
+      <div className="cu-chart__plot" role="list" aria-label="Units per month">
+        {rows.map((r) => {
+          const label = `${monthLabel(r.month)}: ${kwh(r.units)}, ${inr(r.amount)}${withLastYear && r.lastYearUnits !== null ? `; last year ${kwh(r.lastYearUnits)}` : ''}`
+          return (
+            <div key={r.month} className="cu-chart__col" role="listitem" tabIndex={0} aria-label={label}>
+              {withLastYear ? bar(r.lastYearUnits || 0, 'cu-c2') : null}
+              {bar(r.units, 'cu-c1')}
+              <span className="cu-chart__label">{shortMonth(r.month)}</span>
+              <span className="cu-chart__tip" aria-hidden="true">
+                <strong>{monthLabel(r.month)}</strong>
+                This year {kwh(r.units)} · {inr(r.amount)}
+                {withLastYear ? (
+                  <>
+                    <br />
+                    Last year {r.lastYearUnits !== null ? kwh(r.lastYearUnits) : '—'}
+                  </>
+                ) : null}
+              </span>
+            </div>
+          )
+        })}
+      </div>
+      {withLastYear ? (
+        <div className="cu-chart__legend">
+          <span>
+            <i className="cu-c1" aria-hidden="true" />
+            This year
+          </span>
+          <span>
+            <i className="cu-c2" aria-hidden="true" />
+            Last year
+          </span>
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+/* ---------------------------------------------------------------- page */
+
 const CpitlElectricity: React.FC = () => {
   const invalidate = useInvalidateCpitl()
-  const { data: connections = [] } = useElectricityConnections()
-  const { data: bills = [], isLoading } = useElectricityBills()
+  const { data: connections = [], isLoading: connectionsLoading } = useElectricityConnections()
+  const { data: billData, isLoading } = useElectricityBills()
+  const bills = useMemo(() => billData || [], [billData])
   const { data: series = [] } = useElectricityAnalytics()
   const [selected, setSelected] = useState<string>('')
-  const [connModal, setConnModal] = useState<{ open: boolean; connection?: ElectricityConnection | null }>({ open: false })
-  const [billModal, setBillModal] = useState<{ open: boolean; bill?: ElectricityBill | null }>({ open: false })
+  const [connSheet, setConnSheet] = useState<{ open: boolean; connection?: ElectricityConnection | null }>({ open: false })
+  const [billSheet, setBillSheet] = useState<{ open: boolean; bill?: ElectricityBill | null }>({ open: false })
   const [payBill, setPayBill] = useState<ElectricityBill | null>(null)
+  const [removing, setRemoving] = useState<ElectricityBill | null>(null)
+  const [bulkDialog, setBulkDialog] = useState<'pay' | 'remove' | null>(null)
+  const [bulkReason, setBulkReason] = useState('')
+  const [bulkPaidOn, setBulkPaidOn] = useState(todayIso())
+  const [bulkMode, setBulkMode] = useState<PaymentMode>('bank_transfer')
+  const [bulkReference, setBulkReference] = useState('')
+  const [bulkBusy, setBulkBusy] = useState(false)
+  const [bulkResult, setBulkResult] = useState<(BulkResult & { action: string; noun: string }) | null>(null)
+  const bulk = useRowSelection(bills, billId, { rowLabel: billRowLabel })
+  const selectedUnpaid = bulk.selectedRows.filter((b) => b.status === 'unpaid')
+  const selectedUnpaidTotal = selectedUnpaid.reduce((s, b) => s + b.amount, 0)
+  const selectedTotal = bulk.selectedRows.reduce((s, b) => s + b.amount, 0)
 
   const activeConn = selected || connections[0]?._id || ''
+  const activeName = connections.find((c) => c._id === activeConn)?.name || ''
   const unpaid = bills.filter((b) => b.status === 'unpaid')
   const sessionTotal = bills.reduce((s, b) => s + b.amount, 0)
   const sessionUnits = bills.reduce((s, b) => s + (b.units || 0), 0)
@@ -336,216 +491,388 @@ const CpitlElectricity: React.FC = () => {
     return latest?.currReading ?? null
   }
 
-  const chartRows = useMemo(() => {
+  const chartRows = useMemo<ChartRow[]>(() => {
     const s = series.find((x) => x.connectionId === activeConn)
-    return (s?.months || []).slice(-12).map((m) => ({ ...m, label: monthLabel(m.month).replace(/ \d{2}(\d{2})$/, " '$1") }))
+    return (s?.months || []).slice(-12)
   }, [series, activeConn])
   const hasLastYear = chartRows.some((r) => r.lastYearUnits !== null)
+  // Always show a full 12-month window ending at the latest bill, so a few bills don't stretch across the card.
+  const chartMonths = useMemo<ChartRow[]>(() => {
+    if (!chartRows.length) return []
+    const byMonth = new Map(chartRows.map((r) => [r.month, r]))
+    const [y, m] = chartRows[chartRows.length - 1].month.split('-').map(Number)
+    return Array.from({ length: 12 }, (_, i) => {
+      const d = new Date(y, m - 1 - (11 - i), 1)
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+      return byMonth.get(key) || { month: key, units: 0, amount: 0, lastYearUnits: null }
+    })
+  }, [chartRows])
 
-  const remove = async (b: ElectricityBill) => {
-    const reason = window.prompt('Remove this bill? Reason:')
-    if (!reason?.trim()) return
+  /** Flags a bill whose units sit well away from that meter's other bills this session. */
+  const usageFlag = useMemo(() => {
+    const flags = new Map<string, { tone: 'warning' | 'info'; label: string; title: string }>()
+    bills.forEach((b) => {
+      if (!b.units) return
+      const others = bills.filter((o) => o._id !== b._id && o.connectionId === b.connectionId && o.units > 0)
+      if (others.length < 2) return
+      const avg = others.reduce((s, o) => s + o.units, 0) / others.length
+      const title = `Usual for this meter: about ${kwh(Math.round(avg))}`
+      if (b.units > avg * 1.3) flags.set(b._id, { tone: 'warning', label: `${Math.round((b.units / avg - 1) * 100)}% above usual`, title })
+      else if (b.units < avg * 0.5) flags.set(b._id, { tone: 'info', label: 'Unusually low', title })
+    })
+    return flags
+  }, [bills])
+
+  const openBulk = (kind: 'pay' | 'remove') => {
+    setBulkReason('')
+    setBulkPaidOn(todayIso())
+    setBulkMode('bank_transfer')
+    setBulkReference('')
+    setBulkDialog(kind)
+  }
+
+  const runBulk = async () => {
+    const kind = bulkDialog
+    if (!kind) return
+    const reason = bulkReason.trim()
+    if (kind === 'remove' && (!reason || !bulk.count)) return
+    if (kind === 'pay' && (!selectedUnpaid.length || !bulkPaidOn)) return
+    setBulkBusy(true)
     try {
-      await cpitlService.removeElectricityBill(b._id, reason)
-      toast.success('Bill removed.')
+      const result =
+        kind === 'pay'
+          ? await cpitlBulkService.payBills(
+              selectedUnpaid.map(billId),
+              { date: bulkPaidOn, mode: bulkMode, ...(bulkReference.trim() ? { reference: bulkReference.trim() } : {}) }
+            )
+          : await cpitlBulkService.removeBills(bulk.selectedIds, reason)
+      setBulkDialog(null)
+      bulk.clear()
+      const action = kind === 'pay' ? 'Mark bills paid' : 'Remove bills'
+      if (result.failed.length) setBulkResult({ ...result, action, noun: 'bills' })
+      else toast.success(`${result.succeeded} ${billsNoun(result.succeeded)} ${kind === 'pay' ? 'marked paid' : 'removed'}.`)
       invalidate()
     } catch (error) {
       toast.error(await errorMessage(error))
+    } finally {
+      setBulkBusy(false)
     }
   }
 
-  return (
-    <CpitlPageShell
-      title="Electricity"
-      subtitle="Bills, units and cost per connection"
-      actions={
-        <>
-          <button type="button" className={btnSecondary} onClick={() => setConnModal({ open: true, connection: null })}>
-            <Plus className="h-4 w-4" /> Connection
-          </button>
-          <button
-            type="button"
-            className={btnPrimary}
-            disabled={!connections.length}
-            title={connections.length ? undefined : 'Add a connection first'}
-            onClick={() => setBillModal({ open: true, bill: null })}
-          >
-            <Plus className="h-4 w-4" /> Add bill
-          </button>
-        </>
-      }
-    >
-      {!connections.length ? (
-        <CpitlEmpty
-          message="Add each electricity connection (meter) the school pays for, then log its monthly bills."
+  const openNewBill = () => setBillSheet({ open: true, bill: null })
+  const openNewConnection = () => setConnSheet({ open: true, connection: null })
+
+  const connectionColumns: DataTableColumn<ElectricityConnection>[] = [
+    {
+      key: 'name',
+      header: 'Connection',
+      mobile: 'title',
+      render: (c) => (
+        <span className="cu-entity">
+          <span className="cu-entity__name">{c.name}</span>
+          {c.consumerNo ? <span className="cu-entity__sub">Consumer {c.consumerNo}</span> : null}
+        </span>
+      ),
+    },
+    { key: 'provider', header: 'Provider', mobile: 'subtitle', render: (c) => c.provider || '—' },
+    { key: 'location', header: 'Location', render: (c) => c.locationText || '—' },
+    {
+      key: 'bills',
+      header: 'Bills',
+      align: 'right',
+      numeric: true,
+      render: (c) => bills.filter((b) => b.connectionId === c._id).length,
+    },
+    {
+      key: 'billed',
+      header: 'Billed this session',
+      align: 'right',
+      numeric: true,
+      mobile: 'aside',
+      render: (c) => inr(bills.filter((b) => b.connectionId === c._id).reduce((sum, b) => sum + b.amount, 0)),
+    },
+    {
+      key: 'edit',
+      header: <span className="cb-visually-hidden">Actions</span>,
+      headerLabel: 'Actions',
+      align: 'right',
+      interactive: true,
+      render: (c) => (
+        <Button variant="tertiary" size="sm" icon={Pencil} aria-label={`Edit ${c.name}`} onClick={() => setConnSheet({ open: true, connection: c })} />
+      ),
+    },
+  ]
+
+  const columns: DataTableColumn<ElectricityBill>[] = [
+    { key: 'month', header: 'Month', mobile: 'title', render: (b) => <span className="cu-strong">{monthLabel(b.billMonth)}</span> },
+    { key: 'connection', header: 'Connection', mobile: 'subtitle', render: (b) => b.connectionSnapshot.name },
+    {
+      key: 'units',
+      header: 'Units',
+      align: 'right',
+      numeric: true,
+      render: (b) => {
+        const flag = usageFlag.get(b._id)
+        return (
+          <span className="cu-num">
+            {b.units ? b.units.toLocaleString('en-IN') : '—'}
+            {flag ? (
+              <Badge tone={flag.tone} title={flag.title}>
+                {flag.label}
+              </Badge>
+            ) : null}
+          </span>
+        )
+      },
+    },
+    { key: 'amount', header: 'Amount', align: 'right', numeric: true, render: (b) => <span className="cu-strong">{inr(b.amount)}</span> },
+    { key: 'rate', header: '₹ / unit', align: 'right', numeric: true, render: (b) => (b.units ? `₹${(b.amount / b.units).toFixed(2)}` : '—') },
+    { key: 'due', header: 'Due', render: (b) => <span className={isOverdue(b) ? 'cu-overdue' : undefined}>{fmtDate(b.dueDate)}</span> },
+    {
+      key: 'status',
+      header: 'Status',
+      mobile: 'aside',
+      render: (b) => {
+        const overdue = isOverdue(b)
+        return (
+          <CpitlBadge
+            status={b.status === 'paid' ? 'paid' : overdue ? 'overdue' : 'due'}
+            label={b.status === 'paid' ? `Paid ${fmtDate(b.paidOn)}` : overdue ? 'Overdue' : 'Unpaid'}
+          />
+        )
+      },
+    },
+    {
+      key: 'actions',
+      header: <span className="cb-visually-hidden">Actions</span>,
+      headerLabel: 'Actions',
+      align: 'right',
+      interactive: true,
+      render: (b) => {
+        const items: MenuItem[] = []
+        if (b.attachments?.length) items.push({ label: 'View bill', icon: ExternalLink, onSelect: () => window.open(b.attachments[0].url, '_blank', 'noopener,noreferrer') })
+        items.push({ label: 'Edit bill', icon: Pencil, onSelect: () => setBillSheet({ open: true, bill: b }) })
+        items.push({ divider: true })
+        items.push({ label: 'Remove bill', icon: Trash2, tone: 'danger', onSelect: () => setRemoving(b) })
+        return (
+          <span className="cu-rowactions">
+            {b.status === 'unpaid' ? (
+              <Button size="sm" icon={CheckCircle2} onClick={() => setPayBill(b)}>
+                Pay
+              </Button>
+            ) : null}
+            <Menu label={`Actions for ${b.connectionSnapshot.name} ${monthLabel(b.billMonth)}`} items={items} />
+          </span>
+        )
+      },
+    },
+  ]
+
+  let content: React.ReactNode
+  if (connectionsLoading) {
+    content = (
+      <Card>
+        <div className="cb-table-state" role="status">
+          <span className="cb-spinner" aria-hidden="true" />
+          Loading connections…
+        </div>
+      </Card>
+    )
+  } else if (!connections.length) {
+    content = (
+      <Card>
+        <EmptyState
+          icon={Zap}
+          title="No electricity connections yet"
+          body="Add each connection (meter) the school pays for, then log its monthly bills."
           action={
-            <button type="button" className={btnPrimary} onClick={() => setConnModal({ open: true, connection: null })}>
-              <Plus className="h-4 w-4" /> Add connection
-            </button>
+            <Button variant="primary" icon={Plus} onClick={openNewConnection}>
+              Add connection
+            </Button>
           }
         />
-      ) : (
-        <>
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            {[
-              { label: 'Billed this session', value: inrShort(sessionTotal) },
-              { label: 'Units consumed', value: `${sessionUnits.toLocaleString('en-IN')} kWh` },
-              { label: 'Avg ₹ / unit', value: sessionUnits ? `₹${(sessionTotal / sessionUnits).toFixed(2)}` : '—' },
-              { label: 'Unpaid bills', value: `${unpaid.length} · ${inrShort(unpaid.reduce((s, b) => s + b.amount, 0))}` },
-            ].map((s) => (
-              <div key={s.label} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800">
-                <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{s.label}</p>
-                <p className="mt-1.5 text-xl font-semibold tabular-nums text-slate-900 dark:text-white">{s.value}</p>
-              </div>
-            ))}
-          </div>
+      </Card>
+    )
+  } else {
+    content = (
+      <>
+        <div className="cu-actions">
+          <Button icon={Plus} onClick={openNewConnection}>
+            Add connection
+          </Button>
+          <Button variant="primary" icon={Plus} onClick={openNewBill}>
+            Add bill
+          </Button>
+        </div>
 
-          <div className="grid gap-6 lg:grid-cols-5">
-            <CpitlCard title="Connections" className="lg:col-span-2">
-              <ul className="space-y-2">
-                {connections.map((c) => {
-                  const cBills = bills.filter((b) => b.connectionId === c._id)
-                  const on = c._id === activeConn
-                  return (
-                    <li key={c._id}>
-                      <div
-                        role="button"
-                        tabIndex={0}
-                        onClick={() => setSelected(c._id)}
-                        onKeyDown={(e) => e.key === 'Enter' && setSelected(c._id)}
-                        className={`flex cursor-pointer items-center gap-3 rounded-xl border p-3 transition ${
-                          on ? 'border-indigo-400 bg-indigo-50/60 dark:border-indigo-500 dark:bg-indigo-900/20' : 'border-slate-200 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-700/40'
-                        }`}
-                      >
-                        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-50 text-amber-600 dark:bg-amber-900/30">
-                          <Zap className="h-4 w-4" />
-                        </span>
-                        <div className="min-w-0 flex-1">
-                          <div className="truncate text-sm font-medium text-slate-900 dark:text-white">{c.name}</div>
-                          <div className="truncate text-xs text-slate-500">{[c.consumerNo && `Consumer ${c.consumerNo}`, c.provider, c.locationText].filter(Boolean).join(' · ')}</div>
-                        </div>
-                        <div className="text-right text-xs">
-                          <div className="font-semibold tabular-nums text-slate-900 dark:text-white">{inr(cBills.reduce((s, b) => s + b.amount, 0))}</div>
-                          <div className="text-slate-400">{cBills.length} bill(s)</div>
-                        </div>
-                        <button
-                          type="button"
-                          className={btnGhost}
-                          aria-label={`Edit ${c.name}`}
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            setConnModal({ open: true, connection: c })
-                          }}
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    </li>
-                  )
-                })}
-              </ul>
-            </CpitlCard>
+        <div className="cb-stats">
+          <StatCard label="Billed this session" value={inrShort(sessionTotal)} icon={IndianRupee} />
+          <StatCard label="Units consumed" value={sessionUnits.toLocaleString('en-IN')} unit="kWh" icon={Zap} />
+          <StatCard label="Avg ₹ / unit" value={sessionUnits ? `₹${(sessionTotal / sessionUnits).toFixed(2)}` : '—'} icon={Gauge} />
+          <StatCard
+            label="Unpaid bills"
+            value={unpaid.length}
+            hint={inrShort(unpaid.reduce((s, b) => s + b.amount, 0))}
+            icon={Receipt}
+          />
+        </div>
 
-            <CpitlCard title={`Units per month — ${connections.find((c) => c._id === activeConn)?.name || ''}`} className="lg:col-span-3">
-              {chartRows.length ? (
-                <div className="h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={chartRows} margin={{ top: 8, right: 8, left: 0, bottom: 0 }} barGap={2}>
-                      <CartesianGrid vertical={false} strokeOpacity={0.15} />
-                      <XAxis dataKey="label" tickLine={false} axisLine={false} fontSize={11} />
-                      <YAxis tickLine={false} axisLine={false} fontSize={12} width={48} />
-                      <Tooltip
-                        cursor={{ fillOpacity: 0.06 }}
-                        formatter={(value: number, name: string, item) =>
-                          name === 'This year' ? [`${value} kWh · ${inr(item?.payload?.amount)}`, name] : [`${value} kWh`, name]
-                        }
-                      />
-                      {hasLastYear ? <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} /> : null}
-                      {hasLastYear ? <Bar dataKey="lastYearUnits" name="Last year" fill={INCOME_COLOR} radius={[4, 4, 0, 0]} maxBarSize={22} /> : null}
-                      <Bar dataKey="units" name="This year" fill={EXPENSE_COLOR} radius={[4, 4, 0, 0]} maxBarSize={22} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              ) : (
-                <CpitlEmpty message="No bills for this connection yet." />
-              )}
-            </CpitlCard>
-          </div>
+        <Card
+          title={connections.length > 1 ? 'Units per month' : `Units per month · ${activeName}`}
+          subtitle={chartRows.length ? 'Last 12 months. Hover a month for units and cost.' : undefined}
+          action={
+            connections.length > 1 ? (
+              <Select
+                aria-label="Connection"
+                size="sm"
+                value={activeConn}
+                onChange={(event) => setSelected(event.target.value)}
+                options={connections.map((c) => ({ value: c._id, label: c.name }))}
+                className="cu-connselect"
+              />
+            ) : null
+          }
+        >
+          {chartRows.length ? (
+            <UnitsChart rows={chartMonths} withLastYear={hasLastYear} />
+          ) : (
+            <EmptyState
+              compact
+              icon={BarChart3}
+              title="No bills for this connection yet"
+              body="Add a bill to start the monthly chart."
+              action={
+                <Button icon={Plus} onClick={openNewBill}>
+                  Add bill
+                </Button>
+              }
+            />
+          )}
+        </Card>
 
-          <CpitlCard title="Bills this session">
-            {isLoading ? (
-              <div className="h-32 animate-pulse rounded-xl bg-slate-100 dark:bg-slate-700" />
-            ) : bills.length ? (
-              <div className="-mx-5 overflow-x-auto">
-                <table className="min-w-full text-sm">
-                  <thead className={tableHead}>
-                    <tr>
-                      <th className="px-5 py-2.5">Month</th>
-                      <th className="px-3 py-2.5">Connection</th>
-                      <th className="px-3 py-2.5 text-right">Units</th>
-                      <th className="px-3 py-2.5 text-right">Amount</th>
-                      <th className="px-3 py-2.5 text-right">₹ / unit</th>
-                      <th className="px-3 py-2.5">Due</th>
-                      <th className="px-3 py-2.5">Status</th>
-                      <th className="px-5 py-2.5" />
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-                    {bills.map((b) => {
-                      const overdue = b.status === 'unpaid' && b.dueDate && new Date(b.dueDate) < new Date()
-                      return (
-                        <tr key={b._id}>
-                          <td className="px-5 py-2.5 font-medium text-slate-900 dark:text-white">{monthLabel(b.billMonth)}</td>
-                          <td className="px-3 py-2.5">{b.connectionSnapshot.name}</td>
-                          <td className="px-3 py-2.5 text-right tabular-nums">{b.units ? b.units.toLocaleString('en-IN') : '—'}</td>
-                          <td className="px-3 py-2.5 text-right font-semibold tabular-nums">{inr(b.amount)}</td>
-                          <td className="px-3 py-2.5 text-right tabular-nums">{b.units ? `₹${(b.amount / b.units).toFixed(2)}` : '—'}</td>
-                          <td className={`px-3 py-2.5 ${overdue ? 'text-rose-600' : ''}`}>{fmtDate(b.dueDate)}</td>
-                          <td className="px-3 py-2.5">
-                            <CpitlBadge status={b.status === 'paid' ? 'paid' : overdue ? 'overdue' : 'due'} label={b.status === 'paid' ? `Paid ${fmtDate(b.paidOn)}` : overdue ? 'Overdue' : 'Unpaid'} />
-                          </td>
-                          <td className="px-5 py-2.5 text-right whitespace-nowrap">
-                            {b.attachments?.length ? (
-                              <a href={b.attachments[0].url} target="_blank" rel="noreferrer" className={btnGhost}>
-                                Bill
-                              </a>
-                            ) : null}
-                            {b.status === 'unpaid' ? (
-                              <button type="button" className={`${btnGhost} text-emerald-700`} onClick={() => setPayBill(b)}>
-                                <CheckCircle2 className="h-3.5 w-3.5" /> Pay
-                              </button>
-                            ) : null}
-                            <button type="button" className={btnGhost} onClick={() => setBillModal({ open: true, bill: b })}>
-                              Edit
-                            </button>
-                            <button type="button" className={`${btnGhost} text-rose-600`} onClick={() => remove(b)}>
-                              Remove
-                            </button>
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <CpitlEmpty message="No bills logged this session." />
-            )}
-          </CpitlCard>
-        </>
-      )}
+        <Card flush title="Bills this session" className="cu-records">
+          {bulk.count ? (
+            <div className="cu-bulk">
+              <BulkBar count={bulk.count} noun="bill" onClear={bulk.clear} busy={bulkBusy}>
+                <Button size="sm" icon={CheckCircle2} onClick={() => openBulk('pay')} disabled={bulkBusy || !selectedUnpaid.length} loading={bulkBusy && bulkDialog === 'pay'}>
+                  Mark paid
+                </Button>
+                <Button size="sm" variant="danger" icon={Trash2} onClick={() => openBulk('remove')} disabled={bulkBusy} loading={bulkBusy && bulkDialog === 'remove'}>
+                  Remove
+                </Button>
+              </BulkBar>
+            </div>
+          ) : null}
+          <DataTable
+            caption="Electricity bills this session"
+            columns={columns}
+            rows={bills}
+            getRowKey={(b) => b._id}
+            selection={bulk.selection}
+            onRowClick={(b) => setBillSheet({ open: true, bill: b })}
+            loading={isLoading}
+            loadingLabel="Loading bills…"
+            empty={
+              <EmptyState
+                icon={Receipt}
+                title="No bills logged this session"
+                body="Add each month's bill with its meter readings to track units and cost."
+                action={
+                  <Button icon={Plus} onClick={openNewBill}>
+                    Add bill
+                  </Button>
+                }
+              />
+            }
+          />
+        </Card>
 
-      <ConnectionModal isOpen={connModal.open} onClose={() => setConnModal({ open: false })} connection={connModal.connection} onSaved={invalidate} />
-      <BillModal
-        isOpen={billModal.open}
-        onClose={() => setBillModal({ open: false })}
+        <Card flush title="Connections" subtitle="Meters the school pays bills for." className="cu-records">
+          <DataTable
+            caption="Electricity connections"
+            columns={connectionColumns}
+            rows={connections}
+            getRowKey={(c) => c._id}
+            onRowClick={(c) => setConnSheet({ open: true, connection: c })}
+          />
+        </Card>
+      </>
+    )
+  }
+
+  return (
+    <Page>
+      {content}
+      <ConnectionSheet isOpen={connSheet.open} onClose={() => setConnSheet({ open: false })} connection={connSheet.connection} onSaved={invalidate} />
+      <BillSheet
+        isOpen={billSheet.open}
+        onClose={() => setBillSheet({ open: false })}
         connections={connections}
-        bill={billModal.bill}
+        bill={billSheet.bill}
         lastReading={lastReading}
         onSaved={invalidate}
       />
-      <PayModal bill={payBill} onClose={() => setPayBill(null)} onSaved={invalidate} />
-    </CpitlPageShell>
+      <PayDialog bill={payBill} onClose={() => setPayBill(null)} onSaved={invalidate} />
+      <RemoveBillDialog bill={removing} onClose={() => setRemoving(null)} onRemoved={invalidate} />
+      <Dialog
+        open={bulkDialog === 'pay'}
+        onClose={() => !bulkBusy && setBulkDialog(null)}
+        size="sm"
+        title={`Mark ${selectedUnpaid.length} ${billsNoun(selectedUnpaid.length)} paid?`}
+        description={`${inr(selectedUnpaidTotal)} is added to the expense ledger with these payment details.`}
+        footer={
+          <>
+            <Button onClick={() => setBulkDialog(null)} disabled={bulkBusy}>
+              Cancel
+            </Button>
+            <Button variant="primary" icon={CheckCircle2} loading={bulkBusy} disabled={!selectedUnpaid.length || !bulkPaidOn} onClick={() => void runBulk()}>
+              Mark {selectedUnpaid.length} paid
+            </Button>
+          </>
+        }
+      >
+        <div className="cu-form-stack">
+          {bulk.count > selectedUnpaid.length ? (
+            <p className="cu-bulknote">
+              {bulk.count - selectedUnpaid.length} selected {billsNoun(bulk.count - selectedUnpaid.length)} already paid and will be left as they are.
+            </p>
+          ) : null}
+          <TextField label="Paid on" type="date" required value={bulkPaidOn} max={todayIso()} onChange={(e) => setBulkPaidOn(e.target.value)} />
+          <Select label="Mode" value={bulkMode} onChange={(e) => setBulkMode(e.target.value as PaymentMode)} options={PAY_MODES} />
+          <TextField label="Reference / UTR" hint="Optional. Saved on every bill." value={bulkReference} onChange={(e) => setBulkReference(e.target.value)} />
+        </div>
+      </Dialog>
+      <Dialog
+        open={bulkDialog === 'remove'}
+        onClose={() => !bulkBusy && setBulkDialog(null)}
+        tone="danger"
+        size="sm"
+        title={`Remove ${bulk.count} ${billsNoun(bulk.count)}?`}
+        description={`${inr(selectedTotal)} in bills. Paid ones are taken out of the expense ledger. The records are kept with your reason.`}
+        footer={
+          <>
+            <Button onClick={() => setBulkDialog(null)} disabled={bulkBusy}>
+              Cancel
+            </Button>
+            <Button variant="danger" icon={Trash2} loading={bulkBusy} disabled={!bulkReason.trim() || !bulk.count} onClick={() => void runBulk()}>
+              Remove {bulk.count} {billsNoun(bulk.count)}
+            </Button>
+          </>
+        }
+      >
+        <TextArea
+          label="Reason"
+          required
+          autoFocus
+          rows={2}
+          value={bulkReason}
+          onChange={(e) => setBulkReason(e.target.value)}
+          placeholder="Duplicate, wrong month…"
+          hint="Saved on every removed bill."
+        />
+      </Dialog>
+      <BulkResultDialog result={bulkResult} onClose={() => setBulkResult(null)} />
+    </Page>
   )
 }
 

@@ -1,8 +1,25 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import toast from 'react-hot-toast'
-import { Archive, ArchiveRestore, Check, Copy, History, RefreshCw, Save, Users } from 'lucide-react'
-import Modal from '@/components/common/Modal'
+import {
+  Archive,
+  ArchiveRestore,
+  CalendarClock,
+  CalendarDays,
+  Copy,
+  FileStack,
+  GraduationCap,
+  History,
+  IndianRupee,
+  Layers,
+  ListChecks,
+  Pencil,
+  RefreshCw,
+  Save,
+  Timer,
+  Users,
+  type LucideIcon,
+} from 'lucide-react'
 import StructureArchiveDialog from '@/components/cpitl/StructureArchiveDialog'
 import {
   useCpitlClasses,
@@ -15,37 +32,56 @@ import {
 import cpitlService, { FeeFrequency, InstallmentPlan, LateFeeRule, StructureComponent, StructureRevision } from '@/services/cpitlService'
 import { useAcademicSession } from '@/contexts/AcademicSessionContext'
 import {
-  CpitlBadge,
-  CpitlCard,
-  CpitlEmpty,
-  CpitlPageShell,
-  FREQUENCY_LABELS,
-  Field,
-  MONTHS,
-  btnGhost,
-  btnPrimary,
-  btnSecondary,
-  errorMessage,
-  fmtDate,
-  inputClass,
-  inr,
-  tableHead,
-} from '@/components/cpitl/CpitlUi'
+  Badge,
+  Banner,
+  Button,
+  Card,
+  Checkbox,
+  DataTable,
+  DetailList,
+  Dialog,
+  EmptyState,
+  Icon,
+  Menu,
+  Page,
+  Select,
+  Sheet,
+  Tabs,
+  TextField,
+  cx,
+  type DataTableColumn,
+} from '@/components/ui'
+import { CpitlBadge, FREQUENCY_LABELS, MONTHS, errorMessage, fmtDate, inr } from '@/components/cpitl/CpitlUi'
 import { DEFAULT_PLAN, annualFor, schedulePreview, sessionYearFor } from '@/utils/cpitlFees'
+import '@/components/cpitl/fees.css'
 
 type Tab = 'components' | 'schedule' | 'assign' | 'history'
 
 const FREQUENCIES: FeeFrequency[] = ['one_time', 'monthly', 'quarterly', 'half_yearly', 'annual']
+const FREQUENCY_OPTIONS = FREQUENCIES.map((f) => ({ value: f, label: FREQUENCY_LABELS[f] }))
 const DEFAULT_LATE_FEE: LateFeeRule = { type: 'none', amount: 0, graceDays: 0, cap: 0 }
+const MONTH_OPTIONS = [4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2, 3].map((m) => ({ value: String(m), label: MONTHS[m - 1] }))
+const LATE_FEE_OPTIONS = [
+  { value: 'none', label: 'No late fee' },
+  { value: 'flat', label: 'Flat fine per installment' },
+  { value: 'per_day', label: 'Per day after due date' },
+]
 
-const MonthSelect: React.FC<{ value: number; onChange: (m: number) => void; disabled?: boolean }> = ({ value, onChange, disabled }) => (
-  <select className={inputClass} value={value} disabled={disabled} onChange={(e) => onChange(Number(e.target.value))}>
-    {[4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2, 3].map((m) => (
-      <option key={m} value={m}>
-        {MONTHS[m - 1]}
-      </option>
-    ))}
-  </select>
+const MonthSelect: React.FC<{ label?: string; value: number; onChange: (m: number) => void; disabled?: boolean; 'aria-label'?: string }> = ({
+  label,
+  value,
+  onChange,
+  disabled,
+  'aria-label': ariaLabel,
+}) => (
+  <Select
+    label={label}
+    aria-label={label ? undefined : ariaLabel}
+    options={MONTH_OPTIONS}
+    value={String(value)}
+    disabled={disabled}
+    onChange={(e) => onChange(Number(e.target.value))}
+  />
 )
 
 const formatChangeValue = (field: string, value: unknown) => {
@@ -55,74 +91,88 @@ const formatChangeValue = (field: string, value: unknown) => {
   return String(value)
 }
 
+const revisionWhen = (revision: StructureRevision) =>
+  `${fmtDate(revision.createdAt)} · ${new Date(revision.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}${
+    revision.changedBy?.name ? ` · ${revision.changedBy.name}` : ''
+  }`
+
 const RevisionItem: React.FC<{ revision: StructureRevision; isLatest: boolean; onView: () => void }> = ({ revision, isLatest, onView }) => {
   const { diff } = revision
   if (revision.event === 'archived' || revision.event === 'restored') {
     const archived = revision.event === 'archived'
-    const Icon = archived ? Archive : ArchiveRestore
     return (
-      <li className="relative pb-6 pl-8 last:pb-0">
-        <span className="absolute left-[7px] top-5 h-full w-px bg-slate-200 dark:bg-slate-700" aria-hidden />
-        <span className="absolute left-0 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-white ring-4 ring-white dark:bg-slate-800 dark:ring-slate-800">
-          <Icon className={`h-3.5 w-3.5 ${archived ? 'text-slate-500' : 'text-emerald-600'}`} />
+      <li className="cf-timeline__item">
+        <span className={cx('cf-timeline__marker', 'is-event', !archived && 'is-restored')} aria-hidden="true">
+          <Icon icon={archived ? Archive : ArchiveRestore} size={12} />
         </span>
-        <span className="font-semibold text-slate-900 dark:text-white">{archived ? 'Archived' : 'Restored'}</span>
-        <span className="ml-2 text-xs text-slate-500">at version {revision.version}</span>
-        <p className="text-xs text-slate-500">
-          {fmtDate(revision.createdAt)} · {new Date(revision.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
-          {revision.changedBy?.name ? ` · ${revision.changedBy.name}` : ''}
-        </p>
-        {revision.changeNote ? <p className="mt-1.5 text-sm text-slate-700 dark:text-slate-300">“{revision.changeNote}”</p> : null}
+        <div className="cf-timeline__head">
+          <div>
+            <span className="cf-timeline__title">{archived ? 'Archived' : 'Restored'}</span>
+            <span className="cf-timeline__meta"> at version {revision.version}</span>
+            <p className="cf-timeline__meta">{revisionWhen(revision)}</p>
+          </div>
+        </div>
+        {revision.changeNote ? <p className="cf-timeline__note">“{revision.changeNote}”</p> : null}
       </li>
     )
   }
   return (
-    <li className="relative pb-6 pl-8 last:pb-0">
-      <span className="absolute left-[7px] top-5 h-full w-px bg-slate-200 dark:bg-slate-700" aria-hidden />
-      <span
-        className={`absolute left-0 top-1 flex h-4 w-4 items-center justify-center rounded-full ring-4 ring-white dark:ring-slate-800 ${
-          isLatest ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-600'
-        }`}
-      />
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
+    <li className="cf-timeline__item">
+      <span className={cx('cf-timeline__marker', isLatest && 'is-current')} aria-hidden="true" />
+      <div className="cf-timeline__head">
         <div>
-          <span className="font-semibold text-slate-900 dark:text-white">Version {revision.version}</span>
-          {isLatest ? <span className="ml-2 text-xs font-medium text-indigo-600">current</span> : null}
-          <p className="text-xs text-slate-500">
-            {fmtDate(revision.createdAt)} · {new Date(revision.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
-            {revision.changedBy?.name ? ` · ${revision.changedBy.name}` : ''}
-          </p>
+          <span className="cf-timeline__title">Version {revision.version}</span>
+          {isLatest ? (
+            <Badge tone="accent" className="cf-timeline__badge">
+              Current
+            </Badge>
+          ) : null}
+          <p className="cf-timeline__meta">{revisionWhen(revision)}</p>
         </div>
-        <button type="button" className={btnGhost} onClick={onView}>
+        <Button variant="tertiary" size="sm" icon={History} onClick={onView}>
           View snapshot
-        </button>
+        </Button>
       </div>
-      {revision.changeNote ? <p className="mt-1.5 text-sm text-slate-700 dark:text-slate-300">“{revision.changeNote}”</p> : null}
+      {revision.changeNote ? <p className="cf-timeline__note">“{revision.changeNote}”</p> : null}
       {diff && !diff.isEmpty ? (
-        <ul className="mt-2 space-y-1 text-xs">
+        <ul className="cf-diff">
           {diff.added.map((c) => (
-            <li key={`a-${c.feeHead}`} className="text-emerald-700 dark:text-emerald-400">
-              + {c.name}: {inr(c.amount)} {FREQUENCY_LABELS[c.frequency]?.toLowerCase()}
+            <li key={`a-${c.feeHead}`} className="cf-diff__item is-added">
+              <span aria-hidden="true">+</span>
+              <span className="cb-visually-hidden">Added </span>
+              {c.name}: {inr(c.amount)} {FREQUENCY_LABELS[c.frequency]?.toLowerCase()}
             </li>
           ))}
           {diff.removed.map((c) => (
-            <li key={`r-${c.feeHead}`} className="text-rose-700 dark:text-rose-400">
-              − {c.name} removed
+            <li key={`r-${c.feeHead}`} className="cf-diff__item is-removed">
+              <span aria-hidden="true">−</span> {c.name} removed
             </li>
           ))}
           {diff.changed.map((c) => (
-            <li key={`c-${c.feeHead}`} className="text-amber-700 dark:text-amber-400">
-              ~ {c.name}:{' '}
-              {c.changes.map((ch) => `${formatChangeValue(ch.field, ch.from)} → ${formatChangeValue(ch.field, ch.to)}`).join(', ')}
+            <li key={`c-${c.feeHead}`} className="cf-diff__item is-changed">
+              <span aria-hidden="true">~</span>
+              <span className="cb-visually-hidden">Changed </span>
+              {c.name}: {c.changes.map((ch) => `${formatChangeValue(ch.field, ch.from)} → ${formatChangeValue(ch.field, ch.to)}`).join(', ')}
             </li>
           ))}
         </ul>
       ) : (
-        <p className="mt-1 text-xs text-slate-400">No fee amount changes.</p>
+        <p className="cf-timeline__meta">No fee amount changes.</p>
       )}
     </li>
   )
 }
+
+const Fact: React.FC<{ icon: LucideIcon; label: string; value: React.ReactNode; hint?: React.ReactNode }> = ({ icon, label, value, hint }) => (
+  <div className="cf-fact">
+    <Icon icon={icon} size={16} className="cf-fact__icon" />
+    <div className="cf-fact__text">
+      <span className="cf-fact__label">{label}</span>
+      <span className="cf-fact__value">{value}</span>
+      {hint ? <span className="cf-fact__hint">{hint}</span> : null}
+    </div>
+  </div>
+)
 
 const CpitlFeeStructureDetail: React.FC = () => {
   const { id } = useParams()
@@ -132,7 +182,7 @@ const CpitlFeeStructureDetail: React.FC = () => {
   const { currentSession } = useAcademicSession()
 
   const { data: structure, isLoading } = useFeeStructure(isNew ? undefined : id)
-  const { data: heads = [] } = useFeeHeads()
+  const { data: heads = [], isLoading: headsLoading } = useFeeHeads()
   const { data: classes = [] } = useCpitlClasses()
   const { data: revisions = [] } = useStructureRevisions(isNew ? undefined : id)
   const saveMutation = useSaveStructure()
@@ -151,6 +201,12 @@ const CpitlFeeStructureDetail: React.FC = () => {
   const [busy, setBusy] = useState<string | null>(null)
   const [snapshot, setSnapshot] = useState<StructureRevision | null>(null)
   const [archiveMode, setArchiveMode] = useState<'archive' | 'restore' | null>(null)
+  const [reapplyOpen, setReapplyOpen] = useState(false)
+  const [duplicating, setDuplicating] = useState(false)
+  // Sheets edit a draft copy; "Apply" writes it back into the structure being edited.
+  const [headsDraft, setHeadsDraft] = useState<StructureComponent[] | null>(null)
+  const [planDraft, setPlanDraft] = useState<InstallmentPlan | null>(null)
+  const [lateFeeDraft, setLateFeeDraft] = useState<LateFeeRule | null>(null)
 
   useEffect(() => {
     if (!structure) return
@@ -166,26 +222,57 @@ const CpitlFeeStructureDetail: React.FC = () => {
   const readOnly = structure?.status === 'archived'
   const touch = () => setDirty(true)
 
-  const componentByHead = useMemo(() => new Map(components.map((c) => [c.feeHead, c])), [components])
   const annual = useMemo(() => components.filter((c) => !c.isOptional).reduce((s, c) => s + annualFor(c, plan), 0), [components, plan])
   const annualOptional = useMemo(() => components.filter((c) => c.isOptional).reduce((s, c) => s + annualFor(c, plan), 0), [components, plan])
   const preview = useMemo(() => schedulePreview(components, plan), [components, plan])
+  const headById = useMemo(() => new Map(heads.map((h) => [h._id, h])), [heads])
+  const draftByHead = useMemo(() => new Map((headsDraft || []).map((c) => [c.feeHead, c])), [headsDraft])
+  const draftAnnual = useMemo(
+    () => (headsDraft || []).filter((c) => !c.isOptional).reduce((s, c) => s + annualFor(c, plan), 0),
+    [headsDraft, plan]
+  )
   const latestContentRevisionId = revisions.find((r) => !r.event || r.event === 'content')?._id
 
-  const toggleHead = (headId: string) => {
+  const toggleDraftHead = (headId: string) => {
     const head = heads.find((h) => h._id === headId)
     if (!head) return
-    setComponents((prev) =>
-      prev.some((c) => c.feeHead === headId)
-        ? prev.filter((c) => c.feeHead !== headId)
-        : [...prev, { feeHead: head._id, name: head.name, code: head.code, amount: 0, frequency: head.frequency, isOptional: Boolean(head.isOptional) }]
-    )
-    touch()
+    setHeadsDraft((prev) => {
+      const list = prev || []
+      return list.some((c) => c.feeHead === headId)
+        ? list.filter((c) => c.feeHead !== headId)
+        : [...list, { feeHead: head._id, name: head.name, code: head.code, amount: 0, frequency: head.frequency, isOptional: Boolean(head.isOptional) }]
+    })
   }
 
-  const updateComponent = (headId: string, patch: Partial<StructureComponent>) => {
-    setComponents((prev) => prev.map((c) => (c.feeHead === headId ? { ...c, ...patch } : c)))
-    touch()
+  const updateDraftHead = (headId: string, patch: Partial<StructureComponent>) => {
+    setHeadsDraft((prev) => (prev || []).map((c) => (c.feeHead === headId ? { ...c, ...patch } : c)))
+  }
+
+  const applyHeads = (event?: React.FormEvent) => {
+    event?.preventDefault()
+    if (headsDraft) {
+      setComponents(headsDraft)
+      touch()
+    }
+    setHeadsDraft(null)
+  }
+
+  const applyPlan = (event?: React.FormEvent) => {
+    event?.preventDefault()
+    if (planDraft) {
+      setPlan(planDraft)
+      touch()
+    }
+    setPlanDraft(null)
+  }
+
+  const applyLateFee = (event?: React.FormEvent) => {
+    event?.preventDefault()
+    if (lateFeeDraft) {
+      setLateFee(lateFeeDraft)
+      touch()
+    }
+    setLateFeeDraft(null)
   }
 
   const toggleClass = (cls: string) => {
@@ -258,6 +345,20 @@ const CpitlFeeStructureDetail: React.FC = () => {
     return run(`assign-${cls || 'all'}`, () => cpitlService.assignStructure(id, { classes: targetClasses, sections }))
   }
 
+  const duplicate = async () => {
+    setDuplicating(true)
+    try {
+      const copy = await cpitlService.duplicateStructure(id as string)
+      invalidate()
+      toast.success('Duplicated as draft.')
+      navigate(`/cpitl/fee-structures/${copy._id}`)
+    } catch (error) {
+      toast.error(await errorMessage(error))
+    } finally {
+      setDuplicating(false)
+    }
+  }
+
   const viewSnapshot = async (version: number) => {
     if (!id) return
     try {
@@ -269,105 +370,229 @@ const CpitlFeeStructureDetail: React.FC = () => {
 
   if (!isNew && isLoading) {
     return (
-      <CpitlPageShell>
-        <div className="h-96 animate-pulse rounded-2xl bg-slate-100 dark:bg-slate-800" />
-      </CpitlPageShell>
+      <Page>
+        <Card>
+          <div className="cb-table-state" role="status">
+            <span className="cb-spinner" aria-hidden="true" />
+            Loading fee structure…
+          </div>
+        </Card>
+      </Page>
     )
   }
   if (!isNew && !structure) {
     return (
-      <CpitlPageShell>
-        <CpitlEmpty message="Fee structure not found." />
-      </CpitlPageShell>
+      <Page>
+        <Card>
+          <EmptyState
+            icon={FileStack}
+            title="Fee structure not found"
+            body="It may have been removed, or the link is from another session."
+            action={<Button onClick={() => navigate('/cpitl/fee-structures')}>Go to fee structures</Button>}
+          />
+        </Card>
+      </Page>
     )
   }
 
-  const tabs: Array<{ key: Tab; label: string; disabled?: boolean }> = [
-    { key: 'components', label: 'Fee heads' },
-    { key: 'schedule', label: 'Installments & late fee' },
-    { key: 'assign', label: 'Assign to classes', disabled: isNew },
-    { key: 'history', label: `History${revisions.length ? ` (${revisions.length})` : ''}`, disabled: isNew },
+  const session = structure?.academicSession || currentSession || ''
+  const tabs = [
+    { id: 'components', label: 'Fee heads', count: components.length },
+    { id: 'schedule', label: 'Installments & late fee' },
+    ...(isNew
+      ? []
+      : [
+          { id: 'assign', label: 'Assign to classes' },
+          { id: 'history', label: 'History', count: revisions.length || undefined },
+        ]),
   ]
 
-  return (
-    <CpitlPageShell
-      title={isNew ? 'New fee structure' : structure?.name}
-      subtitle={
-        isNew
-          ? `Session ${currentSession || ''}`
-          : `Version ${structure?.version} · ${structure?.assignedCount || 0} students assigned · Session ${structure?.academicSession || currentSession || ''}`
-      }
-      actions={
-        <>
-          {!isNew && structure ? <CpitlBadge status={structure.status} /> : null}
-          {!isNew && structure ? (
-            readOnly ? (
-              <button type="button" className={btnSecondary} onClick={() => setArchiveMode('restore')}>
-                <ArchiveRestore className="h-4 w-4" /> Restore
-              </button>
-            ) : (
-              <button
-                type="button"
-                className={btnSecondary}
-                disabled={dirty}
-                title={dirty ? 'Save or discard your changes before archiving' : undefined}
-                onClick={() => setArchiveMode('archive')}
-              >
-                <Archive className="h-4 w-4" /> Archive
-              </button>
-            )
-          ) : null}
-          {!isNew ? (
-            <button
-              type="button"
-              className={btnSecondary}
-              onClick={async () => {
-                try {
-                  const copy = await cpitlService.duplicateStructure(id as string)
-                  invalidate()
-                  toast.success('Duplicated as draft.')
-                  navigate(`/cpitl/fee-structures/${copy._id}`)
-                } catch (error) {
-                  toast.error(await errorMessage(error))
-                }
-              }}
-            >
-              <Copy className="h-4 w-4" /> Duplicate
-            </button>
-          ) : null}
-          {!readOnly ? (
-            <button
-              type="button"
-              className={btnPrimary}
-              disabled={saveMutation.isPending || (!isNew && !dirty)}
-              onClick={() => (isNew ? save() : setNoteOpen(true))}
-            >
-              <Save className="h-4 w-4" /> {isNew ? 'Create structure' : 'Save new version'}
-            </button>
-          ) : null}
-        </>
-      }
-    >
-      {readOnly ? (
-        <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <span>
-              This structure is archived and read-only
-              {structure?.assignedCount ? `. Its ${structure.assignedCount} assigned students keep their dues` : ''}. Restore it to edit or
-              assign again, or duplicate it to start fresh.
+  const componentColumns: DataTableColumn<StructureComponent>[] = [
+    {
+      key: 'name',
+      header: 'Fee head',
+      mobile: 'title',
+      render: (c) => {
+        const head = headById.get(c.feeHead)
+        return (
+          <div className="cf-name">
+            <span className="cf-name__primary">{c.name}</span>
+            <span className="cf-name__secondary">
+              {c.code}
+              {head?.isRefundable ? ' · refundable' : ''}
             </span>
-            <button type="button" className={btnGhost} onClick={() => setArchiveMode('restore')}>
-              <ArchiveRestore className="h-3.5 w-3.5" /> Restore
-            </button>
+          </div>
+        )
+      },
+    },
+    { key: 'frequency', header: 'Frequency', mobile: 'subtitle', render: (c) => FREQUENCY_LABELS[c.frequency] || c.frequency },
+    {
+      key: 'amount',
+      header: 'Amount per installment',
+      headerLabel: 'Amount per installment',
+      align: 'right',
+      numeric: true,
+      render: (c) => (Number(c.amount) > 0 ? inr(c.amount) : <Badge tone="warning">Amount needed</Badge>),
+    },
+    {
+      key: 'type',
+      header: 'Type',
+      render: (c) => (c.isOptional ? <Badge tone="info">Optional</Badge> : <Badge tone="neutral">Mandatory</Badge>),
+    },
+    {
+      key: 'annual',
+      header: 'Per year',
+      align: 'right',
+      numeric: true,
+      mobile: 'aside',
+      render: (c) => <span className={c.isOptional ? 'cb-muted' : 'cb-strong'}>{inr(annualFor(c, plan))}</span>,
+    },
+  ]
+
+  const previewColumns: DataTableColumn<(typeof preview)[number]>[] = [
+    {
+      key: 'due',
+      header: 'Due date',
+      mobile: 'title',
+      render: (row) => (
+        <span className="cb-strong">
+          {plan.dueDay} {MONTHS[row.month - 1]} {sessionYearFor(row.month, session || undefined)}
+        </span>
+      ),
+    },
+    {
+      key: 'heads',
+      header: 'Fee heads',
+      mobile: 'subtitle',
+      render: (row) => <span className="cf-wrap">{row.heads.map((h) => h.name).join(', ')}</span>,
+    },
+    { key: 'amount', header: 'Amount', align: 'right', numeric: true, mobile: 'aside', render: (row) => inr(row.amount) },
+  ]
+
+  const snapshotPlan = { ...DEFAULT_PLAN, ...(snapshot?.snapshot?.installmentPlan || {}) }
+  const snapshotColumns: DataTableColumn<StructureComponent>[] = [
+    {
+      key: 'name',
+      header: 'Fee head',
+      mobile: 'title',
+      render: (c) => (
+        <span>
+          {c.name}
+          {c.isOptional ? <span className="cb-muted"> (optional)</span> : null}
+        </span>
+      ),
+    },
+    { key: 'frequency', header: 'Frequency', mobile: 'subtitle', render: (c) => FREQUENCY_LABELS[c.frequency] },
+    { key: 'amount', header: 'Amount', align: 'right', numeric: true, render: (c) => inr(c.amount) },
+    { key: 'annual', header: 'Per year', align: 'right', numeric: true, mobile: 'aside', render: (c) => inr(annualFor(c, snapshotPlan)) },
+  ]
+
+  const lateFeeLabel = LATE_FEE_OPTIONS.find((o) => o.value === lateFee.type)?.label || lateFee.type
+  const monthList = (months: number[]) => months.map((m) => MONTHS[m - 1]).join(', ')
+
+  const openHeadsSheet = () => setHeadsDraft(components.map((c) => ({ ...c })))
+
+  return (
+    <Page>
+
+      <Card className="cf-hero-card">
+        <div className="cf-hero">
+          <span className="cf-hero__tile" aria-hidden="true">
+            <Icon icon={Layers} size={24} />
+          </span>
+          <div className="cf-hero__main">
+            <div className="cf-hero__name">
+              <h2>{isNew ? name.trim() || 'New fee structure' : structure?.name}</h2>
+              {!isNew && structure ? <CpitlBadge status={structure.status} /> : <Badge tone="neutral">Not saved</Badge>}
+              {!isNew && dirty ? <Badge tone="warning">Unsaved changes</Badge> : null}
+            </div>
+            <div className="cf-hero__tags">
+              {!isNew ? (
+                <>
+                  <span>Version {structure?.version}</span>
+                  <span className="cf-hero__sep" aria-hidden="true">·</span>
+                </>
+              ) : null}
+              <span>Session {session || '—'}</span>
+              {!isNew && structure?.updatedAt ? (
+                <>
+                  <span className="cf-hero__sep" aria-hidden="true">·</span>
+                  <span>Updated {fmtDate(structure.updatedAt)}</span>
+                </>
+              ) : null}
+            </div>
+          </div>
+          <div className="cf-hero__actions">
+            {readOnly ? (
+              <Button variant="primary" icon={ArchiveRestore} onClick={() => setArchiveMode('restore')}>
+                Restore structure
+              </Button>
+            ) : (
+              <Button
+                variant="primary"
+                icon={Save}
+                loading={isNew && saveMutation.isPending}
+                disabled={saveMutation.isPending || (!isNew && !dirty)}
+                onClick={() => (isNew ? save() : setNoteOpen(true))}
+              >
+                {isNew ? 'Create structure' : 'Save new version'}
+              </Button>
+            )}
+            {!isNew ? (
+              <Menu
+                label="More structure actions"
+                items={[
+                  { label: duplicating ? 'Duplicating…' : 'Duplicate as draft', icon: Copy, disabled: duplicating, onSelect: () => void duplicate() },
+                  ...(readOnly
+                    ? []
+                    : [
+                        { divider: true as const },
+                        {
+                          label: 'Archive structure',
+                          icon: Archive,
+                          tone: 'danger' as const,
+                          disabled: dirty,
+                          hint: dirty ? 'Save first' : undefined,
+                          onSelect: () => setArchiveMode('archive'),
+                        },
+                      ]),
+                ]}
+              />
+            ) : null}
           </div>
         </div>
+
+        <div className="cf-facts">
+          <Fact
+            icon={IndianRupee}
+            label="Annual per student"
+            value={inr(annual)}
+            hint={annualOptional > 0 ? `+ ${inr(annualOptional)} optional` : 'Mandatory heads'}
+          />
+          <Fact icon={ListChecks} label="Fee heads" value={components.length} hint={`${components.filter((c) => c.isOptional).length} optional`} />
+          <Fact
+            icon={GraduationCap}
+            label="Classes"
+            value={applicableClasses.length || 'None'}
+            hint={applicableClasses.length ? applicableClasses.slice(0, 6).join(', ') + (applicableClasses.length > 6 ? '…' : '') : 'Pick below'}
+          />
+          <Fact icon={Users} label="Students assigned" value={(structure?.assignedCount || 0).toLocaleString('en-IN')} hint={isNew ? 'Assign after creating' : undefined} />
+        </div>
+      </Card>
+
+      {readOnly ? (
+        <Banner tone="neutral" title="This structure is archived and read-only">
+          {structure?.assignedCount ? `Its ${structure.assignedCount} assigned students keep their dues. ` : ''}
+          Restore it to edit or assign again, or duplicate it to start fresh.
+        </Banner>
       ) : null}
 
-      <CpitlCard>
-        <div className="grid gap-4 md:grid-cols-2">
-          <Field label="Structure name">
-            <input
-              className={inputClass}
+      <Card title="Details" subtitle="Name the structure and pick the classes it applies to.">
+        <div className="cb-form-section">
+          <div className="cb-form-grid">
+            <TextField
+              label="Structure name"
+              required
               value={name}
               disabled={readOnly}
               placeholder="e.g. Primary (Class I–V) — Day Scholar"
@@ -376,10 +601,8 @@ const CpitlFeeStructureDetail: React.FC = () => {
                 touch()
               }}
             />
-          </Field>
-          <Field label="Description">
-            <input
-              className={inputClass}
+            <TextField
+              label="Description"
               value={description}
               disabled={readOnly}
               placeholder="Optional notes"
@@ -388,410 +611,299 @@ const CpitlFeeStructureDetail: React.FC = () => {
                 touch()
               }}
             />
-          </Field>
-        </div>
-        <div className="mt-4">
-          <span className="text-xs font-medium text-slate-600 dark:text-slate-300">Applies to classes</span>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {classes.length ? (
-              classes.map((c) => {
-                const on = applicableClasses.includes(c.class)
-                return (
-                  <button
-                    key={c.class}
-                    type="button"
-                    disabled={readOnly}
-                    onClick={() => toggleClass(c.class)}
-                    className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition ${
-                      on
-                        ? 'border-indigo-500 bg-indigo-50 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-200'
-                        : 'border-slate-200 text-slate-600 hover:border-slate-300 dark:border-slate-600 dark:text-slate-300'
-                    }`}
-                  >
-                    {on ? <Check className="h-3.5 w-3.5" /> : null}
-                    {c.class}
-                    <span className="text-xs text-slate-400">{c.count}</span>
-                  </button>
-                )
-              })
-            ) : (
-              <span className="text-sm text-slate-400">No students found in this session. Add students first.</span>
-            )}
           </div>
-        </div>
-      </CpitlCard>
-
-      <div className="flex gap-1 overflow-x-auto border-b border-slate-200 dark:border-slate-700">
-        {tabs.map((t) => (
-          <button
-            key={t.key}
-            type="button"
-            disabled={t.disabled}
-            onClick={() => setTab(t.key)}
-            className={`-mb-px whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-40 ${
-              tab === t.key
-                ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400'
-                : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
-
-      {tab === 'components' && (
-        <CpitlCard>
-          <div className="-mx-5 overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead className={tableHead}>
-                <tr>
-                  <th className="w-10 px-5 py-2.5" />
-                  <th className="px-3 py-2.5">Fee head</th>
-                  <th className="w-40 px-3 py-2.5">Frequency</th>
-                  <th className="w-40 px-3 py-2.5">Amount / installment</th>
-                  <th className="w-24 px-3 py-2.5 text-center">Optional</th>
-                  <th className="w-36 px-5 py-2.5 text-right">Per year</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-                {heads.map((head) => {
-                  const component = componentByHead.get(head._id)
-                  const included = Boolean(component)
+          <div className="cf-field" role="group" aria-labelledby="cf-classes-label">
+            <span id="cf-classes-label" className="cb-field__label">
+              Applies to classes
+            </span>
+            {classes.length ? (
+              <div className="cf-chips">
+                {classes.map((c) => {
+                  const on = applicableClasses.includes(c.class)
                   return (
-                    <tr key={head._id} className={included ? '' : 'text-slate-400'}>
-                      <td className="px-5 py-2">
-                        <input
-                          type="checkbox"
-                          className="h-4 w-4 rounded border-slate-300 text-indigo-600"
-                          checked={included}
-                          disabled={readOnly}
-                          onChange={() => toggleHead(head._id)}
-                        />
-                      </td>
-                      <td className="px-3 py-2">
-                        <div className={`font-medium ${included ? 'text-slate-900 dark:text-white' : ''}`}>{head.name}</div>
-                        <div className="text-xs text-slate-400">
-                          {head.code}
-                          {head.isRefundable ? ' · refundable' : ''}
-                        </div>
-                      </td>
-                      <td className="px-3 py-2">
-                        {component ? (
-                          <select
-                            className={`${inputClass} mt-0`}
-                            value={component.frequency}
-                            disabled={readOnly}
-                            onChange={(e) => updateComponent(head._id, { frequency: e.target.value as FeeFrequency })}
-                          >
-                            {FREQUENCIES.map((f) => (
-                              <option key={f} value={f}>
-                                {FREQUENCY_LABELS[f]}
-                              </option>
-                            ))}
-                          </select>
-                        ) : (
-                          <span className="text-xs">{FREQUENCY_LABELS[head.frequency]}</span>
-                        )}
-                      </td>
-                      <td className="px-3 py-2">
-                        {component ? (
-                          <div className="relative">
-                            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">₹</span>
-                            <input
-                              type="number"
-                              min={0}
-                              className={`${inputClass} mt-0 pl-7 tabular-nums`}
-                              value={component.amount || ''}
-                              disabled={readOnly}
-                              placeholder="0"
-                              onChange={(e) => updateComponent(head._id, { amount: Number(e.target.value) })}
-                            />
-                          </div>
-                        ) : null}
-                      </td>
-                      <td className="px-3 py-2 text-center">
-                        {component ? (
-                          <input
-                            type="checkbox"
-                            className="h-4 w-4 rounded border-slate-300 text-indigo-600"
-                            checked={Boolean(component.isOptional)}
-                            disabled={readOnly}
-                            onChange={(e) => updateComponent(head._id, { isOptional: e.target.checked })}
-                          />
-                        ) : null}
-                      </td>
-                      <td className="px-5 py-2 text-right tabular-nums">
-                        {component ? (
-                          <span className={component.isOptional ? 'text-slate-400' : 'text-slate-900 dark:text-white'}>{inr(annualFor(component, plan))}</span>
-                        ) : null}
-                      </td>
-                    </tr>
+                    <button
+                      key={c.class}
+                      type="button"
+                      disabled={readOnly}
+                      aria-pressed={on}
+                      onClick={() => toggleClass(c.class)}
+                      className={cx('cb-chip', on && 'is-active')}
+                    >
+                      {c.class}
+                      <span className="cb-chip__count">{c.count}</span>
+                    </button>
                   )
                 })}
-              </tbody>
-              <tfoot className="border-t-2 border-slate-200 dark:border-slate-600">
-                <tr>
-                  <td colSpan={5} className="px-5 py-3 text-right text-sm font-medium text-slate-600 dark:text-slate-300">
-                    Annual total per student
-                    {annualOptional > 0 ? <span className="block text-xs font-normal text-slate-400">+ {inr(annualOptional)} for students opting into optional heads</span> : null}
-                  </td>
-                  <td className="px-5 py-3 text-right text-lg font-semibold tabular-nums text-slate-900 dark:text-white">{inr(annual)}</td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-          {!heads.length ? <p className="mt-3 text-sm text-slate-500">Loading fee heads…</p> : null}
-        </CpitlCard>
-      )}
-
-      {tab === 'schedule' && (
-        <div className="grid gap-6 lg:grid-cols-5">
-          <div className="space-y-6 lg:col-span-2">
-            <CpitlCard title="Installment months">
-              <div className="grid grid-cols-2 gap-4">
-                <Field label="Due day of month" hint="1–28">
-                  <input
-                    type="number"
-                    min={1}
-                    max={28}
-                    className={inputClass}
-                    value={plan.dueDay}
-                    disabled={readOnly}
-                    onChange={(e) => {
-                      setPlan({ ...plan, dueDay: Math.min(28, Math.max(1, Number(e.target.value) || 1)) })
-                      touch()
-                    }}
-                  />
-                </Field>
-                <Field label="One-time heads due in">
-                  <MonthSelect value={plan.oneTimeMonth} disabled={readOnly} onChange={(m) => { setPlan({ ...plan, oneTimeMonth: m }); touch() }} />
-                </Field>
-                <Field label="Annual heads due in">
-                  <MonthSelect value={plan.annualMonth} disabled={readOnly} onChange={(m) => { setPlan({ ...plan, annualMonth: m }); touch() }} />
-                </Field>
               </div>
-              <div className="mt-4">
-                <span className="text-xs font-medium text-slate-600 dark:text-slate-300">Half-yearly</span>
-                <div className="grid grid-cols-2 gap-3">
-                  {plan.halfYearlyMonths.map((m, i) => (
-                    <MonthSelect
-                      key={i}
-                      value={m}
-                      disabled={readOnly}
-                      onChange={(v) => {
-                        const next = [...plan.halfYearlyMonths]
-                        next[i] = v
-                        setPlan({ ...plan, halfYearlyMonths: next })
-                        touch()
-                      }}
-                    />
-                  ))}
-                </div>
-              </div>
-              <div className="mt-4">
-                <span className="text-xs font-medium text-slate-600 dark:text-slate-300">Quarterly</span>
-                <div className="grid grid-cols-4 gap-2">
-                  {plan.quarterlyMonths.map((m, i) => (
-                    <MonthSelect
-                      key={i}
-                      value={m}
-                      disabled={readOnly}
-                      onChange={(v) => {
-                        const next = [...plan.quarterlyMonths]
-                        next[i] = v
-                        setPlan({ ...plan, quarterlyMonths: next })
-                        touch()
-                      }}
-                    />
-                  ))}
-                </div>
-              </div>
-            </CpitlCard>
-
-            <CpitlCard title="Late fee">
-              <div className="grid grid-cols-2 gap-4">
-                <Field label="Rule">
-                  <select
-                    className={inputClass}
-                    value={lateFee.type}
-                    disabled={readOnly}
-                    onChange={(e) => {
-                      setLateFee({ ...lateFee, type: e.target.value as LateFeeRule['type'] })
-                      touch()
-                    }}
-                  >
-                    <option value="none">No late fee</option>
-                    <option value="flat">Flat fine per installment</option>
-                    <option value="per_day">Per day after due date</option>
-                  </select>
-                </Field>
-                {lateFee.type !== 'none' ? (
-                  <>
-                    <Field label={lateFee.type === 'per_day' ? 'Amount per day (₹)' : 'Fine amount (₹)'}>
-                      <input
-                        type="number"
-                        min={0}
-                        className={inputClass}
-                        value={lateFee.amount}
-                        disabled={readOnly}
-                        onChange={(e) => { setLateFee({ ...lateFee, amount: Number(e.target.value) }); touch() }}
-                      />
-                    </Field>
-                    <Field label="Grace days">
-                      <input
-                        type="number"
-                        min={0}
-                        className={inputClass}
-                        value={lateFee.graceDays}
-                        disabled={readOnly}
-                        onChange={(e) => { setLateFee({ ...lateFee, graceDays: Number(e.target.value) }); touch() }}
-                      />
-                    </Field>
-                    <Field label="Maximum fine (₹)" hint="0 = no cap">
-                      <input
-                        type="number"
-                        min={0}
-                        className={inputClass}
-                        value={lateFee.cap}
-                        disabled={readOnly}
-                        onChange={(e) => { setLateFee({ ...lateFee, cap: Number(e.target.value) }); touch() }}
-                      />
-                    </Field>
-                  </>
-                ) : null}
-              </div>
-            </CpitlCard>
-          </div>
-
-          <CpitlCard title="Payment calendar (per student, mandatory heads)" className="lg:col-span-3">
-            {preview.length ? (
-              <ul className="divide-y divide-slate-100 dark:divide-slate-700">
-                {preview.map((row) => (
-                  <li key={row.month} className="flex items-start justify-between gap-4 py-2.5">
-                    <div>
-                      <div className="text-sm font-medium text-slate-900 dark:text-white">
-                        {plan.dueDay} {MONTHS[row.month - 1]} {sessionYearFor(row.month, structure?.academicSession || currentSession || undefined)}
-                      </div>
-                      <div className="text-xs text-slate-500">{row.heads.map((h) => h.name).join(', ')}</div>
-                    </div>
-                    <div className="text-sm font-semibold tabular-nums text-slate-900 dark:text-white">{inr(row.amount)}</div>
-                  </li>
-                ))}
-              </ul>
             ) : (
-              <CpitlEmpty message="Add fee heads with amounts to see the payment calendar." />
+              <p className="cb-muted cf-help">No students found in this session. Add students first.</p>
             )}
-          </CpitlCard>
+          </div>
         </div>
-      )}
+      </Card>
 
-      {tab === 'assign' && !isNew && (
-        <div className="space-y-6">
-          {dirty ? (
-            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-200">
-              You have unsaved changes. Save a new version before assigning so students get the latest amounts.
+      <Card className="cf-tabs-card">
+        <Tabs items={tabs} value={tab} onChange={(t) => setTab(t as Tab)} label="Fee structure sections" className="cf-tabs" />
+
+        {tab === 'components' ? (
+          <div className="cf-section">
+            <div className="cf-section__head">
+              <div>
+                <h3 className="cf-section__title">Fee heads</h3>
+                <p className="cf-section__desc">Amounts are per installment; the per-year column follows the installment months.</p>
+              </div>
+              {!readOnly && components.length ? (
+                <Button icon={Pencil} onClick={openHeadsSheet} disabled={!heads.length}>
+                  Edit fee heads
+                </Button>
+              ) : null}
             </div>
-          ) : null}
-          <CpitlCard
-            title="Assign to students"
-            actions={
-              <button type="button" className={btnPrimary} disabled={Boolean(busy) || readOnly || dirty} onClick={() => assign()}>
-                <Users className="h-4 w-4" /> Assign to all selected classes
-              </button>
-            }
-          >
-            <p className="mb-4 text-sm text-slate-500">
-              Assigning creates each student's fee account and installments for this session. Students who already have a
-              structure are moved to this one; installments that already have payments are kept as they are.
-            </p>
+            {components.length ? (
+              <DataTable
+                columns={componentColumns}
+                rows={components}
+                getRowKey={(c) => c.feeHead}
+                onRowClick={readOnly || !heads.length ? undefined : openHeadsSheet}
+                caption="Fee heads in this structure"
+                footer={
+                  <div className="cf-total">
+                    <div>
+                      <span className="cf-total__label">Annual total per student</span>
+                      {annualOptional > 0 ? (
+                        <span className="cf-total__hint">+ {inr(annualOptional)} for students opting into optional heads</span>
+                      ) : null}
+                    </div>
+                    <span className="cf-total__value">{inr(annual)}</span>
+                  </div>
+                }
+              />
+            ) : headsLoading ? (
+              <div className="cb-table-state" role="status">
+                <span className="cb-spinner" aria-hidden="true" />
+                Loading fee heads…
+              </div>
+            ) : heads.length ? (
+              <EmptyState
+                icon={ListChecks}
+                title="No fee heads in this structure"
+                body={readOnly ? 'This archived structure has no fee heads.' : 'Choose the fee heads students pay and enter an amount for each.'}
+                action={
+                  readOnly ? undefined : (
+                    <Button icon={Pencil} onClick={openHeadsSheet}>
+                      Choose fee heads
+                    </Button>
+                  )
+                }
+              />
+            ) : (
+              <EmptyState
+                icon={ListChecks}
+                title="No fee heads set up yet"
+                body="Add fee heads such as Tuition or Transport in fee settings, then come back to build this structure."
+                action={<Button onClick={() => navigate('/cpitl/settings')}>Open fee settings</Button>}
+              />
+            )}
+          </div>
+        ) : null}
+
+        {tab === 'schedule' ? (
+          <div className="cb-grid-8-4">
+            <div className="cf-section">
+              <div className="cf-section__head">
+                <div>
+                  <h3 className="cf-section__title">Payment calendar</h3>
+                  <p className="cf-section__desc">Per student, mandatory heads only.</p>
+                </div>
+              </div>
+              <DataTable
+                columns={previewColumns}
+                rows={preview}
+                getRowKey={(row) => String(row.month)}
+                caption="Payment calendar"
+                empty={
+                  <EmptyState
+                    icon={CalendarDays}
+                    title="No installments yet"
+                    body="Add fee heads with amounts to see the payment calendar."
+                    compact
+                  />
+                }
+              />
+            </div>
+
+            <div className="cb-stack">
+              <section className="cf-panel" aria-labelledby="cf-plan-title">
+                <div className="cf-section__head">
+                  <h3 id="cf-plan-title" className="cf-section__title">
+                    Installment months
+                  </h3>
+                  {!readOnly ? (
+                    <Button size="sm" variant="tertiary" icon={Pencil} onClick={() => setPlanDraft({ ...plan })}>
+                      Edit
+                    </Button>
+                  ) : null}
+                </div>
+                <DetailList
+                  columns={1}
+                  items={[
+                    { label: 'Due day of month', value: plan.dueDay },
+                    { label: 'One-time heads due in', value: MONTHS[plan.oneTimeMonth - 1] },
+                    { label: 'Annual heads due in', value: MONTHS[plan.annualMonth - 1] },
+                    { label: 'Half-yearly', value: monthList(plan.halfYearlyMonths) },
+                    { label: 'Quarterly', value: monthList(plan.quarterlyMonths) },
+                  ]}
+                />
+              </section>
+
+              <section className="cf-panel" aria-labelledby="cf-late-title">
+                <div className="cf-section__head">
+                  <h3 id="cf-late-title" className="cf-section__title">
+                    Late fee
+                  </h3>
+                  {!readOnly ? (
+                    <Button size="sm" variant="tertiary" icon={Pencil} onClick={() => setLateFeeDraft({ ...lateFee })}>
+                      Edit
+                    </Button>
+                  ) : null}
+                </div>
+                <DetailList
+                  columns={1}
+                  items={[
+                    { label: 'Rule', value: lateFeeLabel },
+                    ...(lateFee.type !== 'none'
+                      ? [
+                          { label: lateFee.type === 'per_day' ? 'Amount per day' : 'Fine amount', value: inr(lateFee.amount) },
+                          { label: 'Grace days', value: lateFee.graceDays },
+                          { label: 'Maximum fine', value: lateFee.cap ? inr(lateFee.cap) : 'No cap' },
+                        ]
+                      : []),
+                  ]}
+                />
+              </section>
+            </div>
+          </div>
+        ) : null}
+
+        {tab === 'assign' && !isNew ? (
+          <div className="cf-section">
+            {dirty ? (
+              <Banner tone="warning" title="You have unsaved changes">
+                Save a new version before assigning so students get the latest amounts.
+              </Banner>
+            ) : null}
+            <div className="cf-section__head">
+              <div>
+                <h3 className="cf-section__title">Assign to students</h3>
+                <p className="cf-section__desc">
+                  Assigning creates each student's fee account and installments for this session. Students who already have a
+                  structure are moved to this one; installments that already have payments are kept as they are.
+                </p>
+              </div>
+              {applicableClasses.length ? (
+                <Button
+                  icon={Users}
+                  loading={busy === 'assign-all'}
+                  disabled={Boolean(busy) || readOnly || dirty}
+                  onClick={() => assign()}
+                >
+                  Assign to all selected classes
+                </Button>
+              ) : null}
+            </div>
             {applicableClasses.length ? (
-              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              <ul className="cf-assign">
                 {applicableClasses.map((cls) => {
                   const info = classes.find((c) => c.class === cls)
                   const picked = assignSections[cls] || []
                   return (
-                    <div key={cls} className="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
-                      <div className="flex items-center justify-between">
-                        <span className="font-semibold text-slate-900 dark:text-white">Class {cls}</span>
-                        <span className="text-xs text-slate-500">{info?.count || 0} students</span>
+                    <li key={cls} className="cf-assign__card">
+                      <div className="cf-assign__head">
+                        <span className="cf-assign__title">Class {cls}</span>
+                        <span className="cf-assign__meta">{info?.count || 0} students</span>
                       </div>
-                      <div className="mt-3 flex flex-wrap gap-1.5">
-                        {(info?.sections || []).map((s) => {
-                          const on = picked.includes(s.section)
-                          return (
-                            <button
-                              key={s.section}
-                              type="button"
-                              onClick={() =>
-                                setAssignSections((prev) => ({
-                                  ...prev,
-                                  [cls]: on ? picked.filter((x) => x !== s.section) : [...picked, s.section],
-                                }))
-                              }
-                              className={`rounded-md border px-2 py-0.5 text-xs ${
-                                on ? 'border-indigo-500 bg-indigo-50 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-200' : 'border-slate-200 text-slate-600 dark:border-slate-600 dark:text-slate-300'
-                              }`}
-                            >
-                              {s.section || '—'} ({s.count})
-                            </button>
-                          )
-                        })}
-                      </div>
-                      <button
-                        type="button"
-                        className={`${btnSecondary} mt-3 w-full`}
+                      {info?.sections?.length ? (
+                        <div className="cf-chips" role="group" aria-label={`Sections of class ${cls}`}>
+                          {info.sections.map((s) => {
+                            const on = picked.includes(s.section)
+                            return (
+                              <button
+                                key={s.section}
+                                type="button"
+                                aria-pressed={on}
+                                className={cx('cb-chip', on && 'is-active')}
+                                onClick={() =>
+                                  setAssignSections((prev) => ({
+                                    ...prev,
+                                    [cls]: on ? picked.filter((x) => x !== s.section) : [...picked, s.section],
+                                  }))
+                                }
+                              >
+                                {s.section || '—'}
+                                <span className="cb-chip__count">{s.count}</span>
+                              </button>
+                            )
+                          })}
+                        </div>
+                      ) : null}
+                      <Button
+                        size="sm"
+                        fullWidth
+                        loading={busy === `assign-${cls}`}
                         disabled={Boolean(busy) || readOnly || dirty}
                         onClick={() => assign(cls)}
                       >
-                        {busy === `assign-${cls}` ? 'Assigning…' : picked.length ? `Assign to section ${picked.join(', ')}` : 'Assign to whole class'}
-                      </button>
-                    </div>
+                        {picked.length ? `Assign to section ${picked.join(', ')}` : 'Assign to whole class'}
+                      </Button>
+                    </li>
                   )
                 })}
-              </div>
+              </ul>
             ) : (
-              <CpitlEmpty message="Select the classes this structure applies to (above), save, then assign." />
+              <EmptyState
+                icon={GraduationCap}
+                title="No classes selected"
+                body="Pick the classes this structure applies to in Details above, save, then assign."
+                compact
+              />
             )}
-          </CpitlCard>
 
-          {structure && structure.assignedCount > 0 ? (
-            <CpitlCard title="Apply latest version to assigned students">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <p className="text-sm text-slate-500">
-                  Saving a new version does not change dues already issued. Use this to recalculate the unpaid installments of all{' '}
-                  {structure.assignedCount} assigned students with version {structure.version}.
-                </p>
-                <button
-                  type="button"
-                  className={btnSecondary}
+            {structure && structure.assignedCount > 0 ? (
+              <div className="cf-reapply">
+                <div>
+                  <h3 className="cf-section__title">Apply latest version to assigned students</h3>
+                  <p className="cf-section__desc">
+                    Saving a new version does not change dues already issued. Use this to recalculate the unpaid installments of all{' '}
+                    {structure.assignedCount} assigned students with version {structure.version}.
+                  </p>
+                </div>
+                <Button
+                  icon={RefreshCw}
+                  loading={busy === 'reapply'}
                   disabled={Boolean(busy) || readOnly || dirty}
-                  onClick={() => {
-                    if (window.confirm('Recalculate unpaid installments for all assigned students?')) {
-                      run('reapply', () => cpitlService.reapplyStructure(structure._id))
-                    }
-                  }}
+                  onClick={() => setReapplyOpen(true)}
                 >
-                  <RefreshCw className={`h-4 w-4 ${busy === 'reapply' ? 'animate-spin' : ''}`} /> Re-apply to unpaid dues
-                </button>
+                  Re-apply to unpaid dues
+                </Button>
               </div>
-            </CpitlCard>
-          ) : null}
-        </div>
-      )}
+            ) : null}
+          </div>
+        ) : null}
 
-      {tab === 'history' && !isNew && (
-        <CpitlCard title="Change history">
-          {revisions.length ? (
-            <ol className="mt-2">
-              {revisions.map((r) => (
-                <RevisionItem key={r._id} revision={r} isLatest={r._id === latestContentRevisionId} onView={() => viewSnapshot(r.version)} />
-              ))}
-            </ol>
-          ) : (
-            <CpitlEmpty message="No history yet." />
-          )}
-        </CpitlCard>
-      )}
+        {tab === 'history' && !isNew ? (
+          <div className="cf-section">
+            <h3 className="cf-section__title">Change history</h3>
+            {revisions.length ? (
+              <ol className="cf-timeline">
+                {revisions.map((r) => (
+                  <RevisionItem key={r._id} revision={r} isLatest={r._id === latestContentRevisionId} onView={() => viewSnapshot(r.version)} />
+                ))}
+              </ol>
+            ) : (
+              <EmptyState icon={History} title="No history yet" body="Each saved version and archive appears here." compact />
+            )}
+          </div>
+        ) : null}
+      </Card>
 
       <StructureArchiveDialog
         structure={archiveMode && structure ? structure : null}
@@ -799,68 +911,295 @@ const CpitlFeeStructureDetail: React.FC = () => {
         onClose={() => setArchiveMode(null)}
       />
 
-      <Modal isOpen={noteOpen} onClose={() => setNoteOpen(false)} title="Save new version">
-        <div className="space-y-4">
-          <p className="text-sm text-slate-600 dark:text-slate-300">
-            This will be saved as version {(structure?.version || 0) + 1}. Already-issued dues won't change until you re-apply.
-          </p>
-          <Field label="What changed? (shown in history)">
-            <input
-              autoFocus
-              className={inputClass}
-              value={changeNote}
-              placeholder="e.g. Tuition increased by 8% as per management decision"
-              onChange={(e) => setChangeNote(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && save(changeNote)}
-            />
-          </Field>
-          <div className="flex justify-end gap-2">
-            <button type="button" className={btnSecondary} onClick={() => setNoteOpen(false)}>
+      {/* Edit fee heads */}
+      <Sheet
+        open={Boolean(headsDraft)}
+        onClose={() => setHeadsDraft(null)}
+        title="Edit fee heads"
+        description="Tick the heads this structure charges and set the amount per installment."
+        icon={ListChecks}
+        size="xl"
+        onSubmit={applyHeads}
+        footer={
+          <>
+            <span className="cf-sheet-total">
+              Annual total <strong className="is-num">{inr(draftAnnual)}</strong>
+            </span>
+            <Button variant="secondary" onClick={() => setHeadsDraft(null)}>
               Cancel
-            </button>
-            <button type="button" className={btnPrimary} disabled={saveMutation.isPending} onClick={() => save(changeNote)}>
-              <Save className="h-4 w-4" /> Save version
-            </button>
-          </div>
-        </div>
-      </Modal>
+            </Button>
+            <Button variant="primary" type="submit">
+              Apply changes
+            </Button>
+          </>
+        }
+      >
+        <ul className="cf-heads">
+          {heads.map((head) => {
+            const component = draftByHead.get(head._id)
+            return (
+              <li key={head._id} className={cx('cf-head', component && 'is-on')}>
+                <Checkbox
+                  className="cf-head__check"
+                  checked={Boolean(component)}
+                  onChange={() => toggleDraftHead(head._id)}
+                  label={head.name}
+                  description={`${head.code}${head.isRefundable ? ' · refundable' : ''}${component ? '' : ` · ${FREQUENCY_LABELS[head.frequency]}`}`}
+                />
+                {component ? (
+                  <div className="cf-head__fields">
+                    <Select
+                      size="sm"
+                      label="Frequency"
+                      options={FREQUENCY_OPTIONS}
+                      value={component.frequency}
+                      onChange={(e) => updateDraftHead(head._id, { frequency: e.target.value as FeeFrequency })}
+                    />
+                    <TextField
+                      size="sm"
+                      type="number"
+                      min={0}
+                      inputMode="decimal"
+                      label="Amount per installment"
+                      prefix="₹"
+                      className="cf-head__amount"
+                      value={component.amount || ''}
+                      placeholder="0"
+                      error={Number(component.amount) > 0 ? undefined : 'Enter an amount'}
+                      onChange={(e) => updateDraftHead(head._id, { amount: Number(e.target.value) })}
+                    />
+                    <Checkbox
+                      className="cf-head__optional"
+                      label="Optional"
+                      checked={Boolean(component.isOptional)}
+                      onChange={(checked) => updateDraftHead(head._id, { isOptional: checked })}
+                    />
+                    <span className="cf-head__annual">
+                      <span className="cf-head__annual-label">Per year</span>
+                      <span className="is-num">{inr(annualFor(component, plan))}</span>
+                    </span>
+                  </div>
+                ) : null}
+              </li>
+            )
+          })}
+        </ul>
+      </Sheet>
 
-      <Modal isOpen={Boolean(snapshot)} onClose={() => setSnapshot(null)} title={`Version ${snapshot?.version} snapshot`} size="lg">
-        {snapshot?.snapshot ? (
-          <div className="space-y-3 text-sm">
-            <div className="flex items-center gap-2 text-slate-500">
-              <History className="h-4 w-4" /> {fmtDate(snapshot.createdAt)} {snapshot.changedBy?.name ? `by ${snapshot.changedBy.name}` : ''}
+      {/* Installment months */}
+      <Sheet
+        open={Boolean(planDraft)}
+        onClose={() => setPlanDraft(null)}
+        title="Edit installment months"
+        description="When each kind of fee head falls due in the session."
+        icon={CalendarClock}
+        onSubmit={applyPlan}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setPlanDraft(null)}>
+              Cancel
+            </Button>
+            <Button variant="primary" type="submit">
+              Apply changes
+            </Button>
+          </>
+        }
+      >
+        {planDraft ? (
+          <div className="cb-form-section">
+            <div className="cb-form-grid">
+              <TextField
+                type="number"
+                min={1}
+                max={28}
+                label="Due day of month"
+                hint="1–28"
+                value={planDraft.dueDay}
+                onChange={(e) => setPlanDraft({ ...planDraft, dueDay: Math.min(28, Math.max(1, Number(e.target.value) || 1)) })}
+              />
+              <MonthSelect label="One-time heads due in" value={planDraft.oneTimeMonth} onChange={(m) => setPlanDraft({ ...planDraft, oneTimeMonth: m })} />
+              <MonthSelect label="Annual heads due in" value={planDraft.annualMonth} onChange={(m) => setPlanDraft({ ...planDraft, annualMonth: m })} />
             </div>
-            <p>
-              <span className="text-slate-500">Classes:</span> {(snapshot.snapshot.applicableClasses || []).join(', ') || '—'}
-            </p>
-            <table className="min-w-full text-sm">
-              <thead className={tableHead}>
-                <tr>
-                  <th className="px-3 py-2">Fee head</th>
-                  <th className="px-3 py-2">Frequency</th>
-                  <th className="px-3 py-2 text-right">Amount</th>
-                  <th className="px-3 py-2 text-right">Per year</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-                {(snapshot.snapshot.components || []).map((c) => (
-                  <tr key={c.feeHead}>
-                    <td className="px-3 py-2">
-                      {c.name}
-                      {c.isOptional ? <span className="ml-1 text-xs text-slate-400">(optional)</span> : null}
-                    </td>
-                    <td className="px-3 py-2">{FREQUENCY_LABELS[c.frequency]}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{inr(c.amount)}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{inr(annualFor(c, { ...DEFAULT_PLAN, ...(snapshot.snapshot?.installmentPlan || {}) }))}</td>
-                  </tr>
+            <div className="cf-field" role="group" aria-labelledby="cf-half-label">
+              <span id="cf-half-label" className="cb-field__label">
+                Half-yearly
+              </span>
+              <div className="cf-months cf-months--2">
+                {planDraft.halfYearlyMonths.map((m, i) => (
+                  <MonthSelect
+                    key={i}
+                    aria-label={`Half-yearly installment ${i + 1}`}
+                    value={m}
+                    onChange={(v) => {
+                      const next = [...planDraft.halfYearlyMonths]
+                      next[i] = v
+                      setPlanDraft({ ...planDraft, halfYearlyMonths: next })
+                    }}
+                  />
                 ))}
-              </tbody>
-            </table>
+              </div>
+            </div>
+            <div className="cf-field" role="group" aria-labelledby="cf-quarter-label">
+              <span id="cf-quarter-label" className="cb-field__label">
+                Quarterly
+              </span>
+              <div className="cf-months cf-months--4">
+                {planDraft.quarterlyMonths.map((m, i) => (
+                  <MonthSelect
+                    key={i}
+                    aria-label={`Quarterly installment ${i + 1}`}
+                    value={m}
+                    onChange={(v) => {
+                      const next = [...planDraft.quarterlyMonths]
+                      next[i] = v
+                      setPlanDraft({ ...planDraft, quarterlyMonths: next })
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
           </div>
         ) : null}
-      </Modal>
-    </CpitlPageShell>
+      </Sheet>
+
+      {/* Late fee */}
+      <Sheet
+        open={Boolean(lateFeeDraft)}
+        onClose={() => setLateFeeDraft(null)}
+        title="Edit late fee"
+        description="The fine added when an installment is paid after its due date."
+        icon={Timer}
+        onSubmit={applyLateFee}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setLateFeeDraft(null)}>
+              Cancel
+            </Button>
+            <Button variant="primary" type="submit">
+              Apply changes
+            </Button>
+          </>
+        }
+      >
+        {lateFeeDraft ? (
+          <div className="cb-form-section">
+            <Select
+              label="Rule"
+              options={LATE_FEE_OPTIONS}
+              value={lateFeeDraft.type}
+              onChange={(e) => setLateFeeDraft({ ...lateFeeDraft, type: e.target.value as LateFeeRule['type'] })}
+            />
+            {lateFeeDraft.type !== 'none' ? (
+              <div className="cb-form-grid">
+                <TextField
+                  type="number"
+                  min={0}
+                  prefix="₹"
+                  label={lateFeeDraft.type === 'per_day' ? 'Amount per day' : 'Fine amount'}
+                  value={lateFeeDraft.amount}
+                  onChange={(e) => setLateFeeDraft({ ...lateFeeDraft, amount: Number(e.target.value) })}
+                />
+                <TextField
+                  type="number"
+                  min={0}
+                  label="Grace days"
+                  value={lateFeeDraft.graceDays}
+                  onChange={(e) => setLateFeeDraft({ ...lateFeeDraft, graceDays: Number(e.target.value) })}
+                />
+                <TextField
+                  type="number"
+                  min={0}
+                  prefix="₹"
+                  label="Maximum fine"
+                  hint="0 means no cap"
+                  value={lateFeeDraft.cap}
+                  onChange={(e) => setLateFeeDraft({ ...lateFeeDraft, cap: Number(e.target.value) })}
+                />
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+      </Sheet>
+
+      {/* Save new version */}
+      <Dialog
+        open={noteOpen}
+        onClose={() => setNoteOpen(false)}
+        title="Save new version"
+        description={`This will be saved as version ${(structure?.version || 0) + 1}. Already-issued dues won't change until you re-apply.`}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setNoteOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="primary" icon={Save} loading={saveMutation.isPending} onClick={() => save(changeNote)}>
+              Save version
+            </Button>
+          </>
+        }
+      >
+        <TextField
+          autoFocus
+          label="What changed?"
+          hint="Shown in the change history."
+          value={changeNote}
+          placeholder="e.g. Tuition increased by 8% as per management decision"
+          onChange={(e) => setChangeNote(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && save(changeNote)}
+        />
+      </Dialog>
+
+      {/* Re-apply confirmation (was window.confirm) */}
+      <Dialog
+        open={reapplyOpen}
+        onClose={() => setReapplyOpen(false)}
+        tone="danger"
+        size="sm"
+        title="Recalculate unpaid installments?"
+        description={
+          structure
+            ? `Unpaid installments of all ${structure.assignedCount} assigned students will be recalculated with version ${structure.version}. Paid installments are not changed.`
+            : undefined
+        }
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setReapplyOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              icon={RefreshCw}
+              onClick={() => {
+                setReapplyOpen(false)
+                if (structure) run('reapply', () => cpitlService.reapplyStructure(structure._id))
+              }}
+            >
+              Re-apply to unpaid dues
+            </Button>
+          </>
+        }
+      />
+
+      {/* Revision snapshot */}
+      <Dialog open={Boolean(snapshot)} onClose={() => setSnapshot(null)} title={`Version ${snapshot?.version} snapshot`} size="lg">
+        {snapshot?.snapshot ? (
+          <div className="cf-snapshot">
+            <DetailList
+              items={[
+                { label: 'Saved', value: `${fmtDate(snapshot.createdAt)}${snapshot.changedBy?.name ? ` by ${snapshot.changedBy.name}` : ''}` },
+                { label: 'Classes', value: (snapshot.snapshot.applicableClasses || []).join(', ') || '—' },
+              ]}
+            />
+            <DataTable
+              columns={snapshotColumns}
+              rows={snapshot.snapshot.components || []}
+              getRowKey={(c) => c.feeHead}
+              caption={`Fee heads in version ${snapshot.version}`}
+            />
+          </div>
+        ) : null}
+      </Dialog>
+    </Page>
   )
 }
 

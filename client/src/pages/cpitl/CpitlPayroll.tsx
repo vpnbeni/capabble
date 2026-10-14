@@ -1,17 +1,22 @@
 import React, { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
-import { CalendarPlus, Users } from 'lucide-react'
+import { ArrowRight, CalendarPlus, CalendarRange, Users } from 'lucide-react'
 import { useInvalidateCpitl, usePayrollRuns } from '@/hooks/useCpitl'
-import cpitlService from '@/services/cpitlService'
-import { CpitlBadge, CpitlCard, CpitlEmpty, CpitlPageShell, Field, MONTHS, btnPrimary, btnSecondary, errorMessage, fmtDate, inputClass, inr, tableHead } from '@/components/cpitl/CpitlUi'
+import cpitlService, { PayrollRun } from '@/services/cpitlService'
+import { Button, Card, DataTable, EmptyState, Page, TextField, type DataTableColumn } from '@/components/ui'
+import { CpitlBadge, MONTHS, errorMessage, fmtDate, inr } from '@/components/cpitl/CpitlUi'
+import '@/components/cpitl/payroll.css'
 
 export const monthTitle = (month: string) => {
   const [y, m] = month.split('-').map(Number)
   return `${MONTHS[(m || 1) - 1]} ${y}`
 }
 
-const STATUS_BADGE: Record<string, string> = { draft: 'draft', finalized: 'due', paid: 'paid' }
+/** Payroll status → CpitlBadge tone key; the badge shows the run's own status word. */
+export const PAYROLL_STATUS_BADGE: Record<string, string> = { draft: 'draft', finalized: 'due', paid: 'paid' }
+
+type RunRow = Omit<PayrollRun, 'payslips'>
 
 const CpitlPayroll: React.FC = () => {
   const navigate = useNavigate()
@@ -21,6 +26,8 @@ const CpitlPayroll: React.FC = () => {
   const previousMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1)
   const [month, setMonth] = useState(`${previousMonth.getFullYear()}-${String(previousMonth.getMonth() + 1).padStart(2, '0')}`)
   const [creating, setCreating] = useState(false)
+
+  const exists = runs.some((r) => r.month === month)
 
   const create = async () => {
     setCreating(true)
@@ -36,69 +43,69 @@ const CpitlPayroll: React.FC = () => {
     }
   }
 
-  return (
-    <CpitlPageShell
-      title="Payroll"
-      subtitle="Monthly salary runs: draft → finalize → mark paid"
-      actions={
-        <Link to="/cpitl/salary" className={btnSecondary}>
-          <Users className="h-4 w-4" /> Staff salaries
-        </Link>
-      }
-    >
-      <CpitlCard>
-        <div className="flex flex-wrap items-end gap-3">
-          <Field label="Salary month" className="w-48">
-            <input type="month" className={inputClass} value={month} onChange={(e) => setMonth(e.target.value)} />
-          </Field>
-          <button type="button" className={btnPrimary} disabled={creating || runs.some((r) => r.month === month)} onClick={create}>
-            <CalendarPlus className="h-4 w-4" /> {runs.some((r) => r.month === month) ? 'Already created' : creating ? 'Creating…' : `Run payroll for ${monthTitle(month)}`}
-          </button>
-          <p className="text-xs text-slate-500">Loss-of-pay days are pre-filled from staff attendance when the Attendance module is on.</p>
-        </div>
-      </CpitlCard>
+  const columns: DataTableColumn<RunRow>[] = [
+    { key: 'month', header: 'Month', mobile: 'title', render: (r) => <span className="cp-strong">{monthTitle(r.month)}</span> },
+    { key: 'status', header: 'Status', mobile: 'aside', render: (r) => <CpitlBadge status={PAYROLL_STATUS_BADGE[r.status]} label={r.status} /> },
+    { key: 'staff', header: 'Staff', align: 'right', numeric: true, render: (r) => r.totals.staff },
+    { key: 'gross', header: 'Gross', align: 'right', numeric: true, render: (r) => inr(r.totals.gross) },
+    { key: 'deductions', header: 'Deductions', align: 'right', numeric: true, render: (r) => inr(r.totals.deductions) },
+    { key: 'net', header: 'Net pay', align: 'right', numeric: true, render: (r) => <span className="cp-strong">{inr(r.totals.net)}</span> },
+    { key: 'employer', header: 'Employer PF + ESI', align: 'right', numeric: true, render: (r) => inr(r.totals.employerPf + r.totals.employerEsi) },
+    { key: 'paidOn', header: 'Paid on', render: (r) => (r.paidOn ? fmtDate(r.paidOn) : '—') },
+  ]
 
-      <CpitlCard title="Payroll runs">
-        {isLoading ? (
-          <div className="h-40 animate-pulse rounded-xl bg-slate-100 dark:bg-slate-700" />
-        ) : runs.length ? (
-          <div className="-mx-5 overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead className={tableHead}>
-                <tr>
-                  <th className="px-5 py-2.5">Month</th>
-                  <th className="px-3 py-2.5 text-right">Staff</th>
-                  <th className="px-3 py-2.5 text-right">Gross</th>
-                  <th className="px-3 py-2.5 text-right">Deductions</th>
-                  <th className="px-3 py-2.5 text-right">Net pay</th>
-                  <th className="px-3 py-2.5 text-right">Employer PF + ESI</th>
-                  <th className="px-3 py-2.5">Status</th>
-                  <th className="px-5 py-2.5">Paid on</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-                {runs.map((r) => (
-                  <tr key={r._id} className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/40" onClick={() => navigate(`/cpitl/payroll/${r.month}`)}>
-                    <td className="px-5 py-2.5 font-medium text-slate-900 dark:text-white">{monthTitle(r.month)}</td>
-                    <td className="px-3 py-2.5 text-right tabular-nums">{r.totals.staff}</td>
-                    <td className="px-3 py-2.5 text-right tabular-nums">{inr(r.totals.gross)}</td>
-                    <td className="px-3 py-2.5 text-right tabular-nums">{inr(r.totals.deductions)}</td>
-                    <td className="px-3 py-2.5 text-right font-semibold tabular-nums">{inr(r.totals.net)}</td>
-                    <td className="px-3 py-2.5 text-right tabular-nums">{inr(r.totals.employerPf + r.totals.employerEsi)}</td>
-                    <td className="px-3 py-2.5">
-                      <CpitlBadge status={STATUS_BADGE[r.status]} label={r.status} />
-                    </td>
-                    <td className="px-5 py-2.5 text-slate-500">{r.paidOn ? fmtDate(r.paidOn) : '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+  return (
+    <Page>
+      <Card flush className="cp-card" title="Payroll runs" subtitle="Each month moves from draft to finalized to paid.">
+        <div className="cp-toolbar">
+          <div className="cp-runbar">
+            <TextField
+              type="month"
+              size="sm"
+              label="Salary month"
+              className="cp-runbar__month"
+              value={month}
+              onChange={(e) => setMonth(e.target.value)}
+            />
+            {exists ? (
+              <Button size="sm" iconRight={ArrowRight} onClick={() => navigate(`/cpitl/payroll/${month}`)}>
+                Open {monthTitle(month)}
+              </Button>
+            ) : (
+              <Button variant="primary" size="sm" icon={CalendarPlus} loading={creating} disabled={!month} onClick={create}>
+                {creating ? 'Creating…' : `Run payroll for ${monthTitle(month)}`}
+              </Button>
+            )}
+            <span className="cp-runbar__spacer" />
+            <Button variant="tertiary" size="sm" icon={Users} onClick={() => navigate('/cpitl/salary')}>
+              Staff salaries
+            </Button>
+            <p className="cp-runbar__hint">Loss-of-pay days are pre-filled from staff attendance when the Attendance module is on.</p>
           </div>
-        ) : (
-          <CpitlEmpty message="No payroll runs yet. Set staff salaries, then run payroll for a month." />
-        )}
-      </CpitlCard>
-    </CpitlPageShell>
+        </div>
+        <DataTable<RunRow>
+          columns={columns}
+          rows={runs}
+          getRowKey={(r) => r._id}
+          onRowClick={(r) => navigate(`/cpitl/payroll/${r.month}`)}
+          loading={isLoading}
+          loadingLabel="Loading payroll runs…"
+          caption="Payroll runs"
+          empty={
+            <EmptyState
+              icon={CalendarRange}
+              title="No payroll runs yet"
+              body="Set staff salaries, then run payroll for a month."
+              action={
+                <Button size="sm" icon={Users} onClick={() => navigate('/cpitl/salary')}>
+                  Set staff salaries
+                </Button>
+              }
+            />
+          }
+        />
+      </Card>
+    </Page>
   )
 }
 

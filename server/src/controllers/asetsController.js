@@ -238,7 +238,7 @@ const getDashboard = async (req, res) => {
     const Disposal = getModel(req, MODEL_KEYS.Disposal);
     const settings = await getOrCreateSettings(req);
 
-    const base = { isActive: { $ne: false }, isArchived: { $ne: false } };
+    const base = { isActive: { $ne: false }, isArchived: { $ne: true } };
     const [
       totalAssets,
       statusGroups,

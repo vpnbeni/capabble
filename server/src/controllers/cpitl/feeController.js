@@ -11,6 +11,7 @@ const {
 } = require('../../modules/cpitl/feeService');
 const { annualTotal, FEE_FREQUENCIES, normalizePlan } = require('../../modules/cpitl/feeSchedule');
 const { FEE_HEAD_CATEGORIES, PAYMENT_MODES } = require('../../modules/cpitl/constants');
+const { parseIds, runBulk, sendBulk, labelled } = require('../../modules/cpitl/bulk');
 
 const ok = (res, data, extra = {}) => res.json({ success: true, data, ...extra });
 
@@ -221,35 +222,65 @@ const duplicateStructure = asyncHandler(async (req, res) => {
 });
 
 /** Archive: hidden from new assignments; assigned students keep their dues. Not a new version. */
-const archiveStructure = asyncHandler(async (req, res) => {
-  const FeeStructure = getModel(req.models, 'FeeStructure');
-  const StudentFeeAccount = getModel(req.models, 'StudentFeeAccount');
-  const structure = await FeeStructure.findById(req.params.id);
-  if (!structure) throw httpError('Fee structure not found.', 404);
+const archiveStructureRecord = async (models, structure, reason, user) => {
+  const StudentFeeAccount = getModel(models, 'StudentFeeAccount');
   if (structure.status === 'archived') throw httpError('Structure is already archived.', 400);
   structure.status = 'archived';
-  structure.updatedBy = auditUser(req);
+  structure.updatedBy = user;
   await structure.save();
-  const reason = String(req.body?.reason || '').trim();
-  await recordRevision(req.models, structure, structure.toObject().components, reason, auditUser(req), 'archived');
-  const assignedCount = await StudentFeeAccount.countDocuments({ structureId: structure._id });
-  return ok(res, withComputed(structure, assignedCount), { message: 'Structure archived.' });
-});
+  await recordRevision(models, structure, structure.toObject().components, String(reason || '').trim(), user, 'archived');
+  return StudentFeeAccount.countDocuments({ structureId: structure._id });
+};
 
 /** Restore an archived structure: active if students are assigned, otherwise back to draft. */
-const restoreStructure = asyncHandler(async (req, res) => {
-  const FeeStructure = getModel(req.models, 'FeeStructure');
-  const StudentFeeAccount = getModel(req.models, 'StudentFeeAccount');
-  const structure = await FeeStructure.findById(req.params.id);
-  if (!structure) throw httpError('Fee structure not found.', 404);
+const restoreStructureRecord = async (models, structure, user) => {
+  const StudentFeeAccount = getModel(models, 'StudentFeeAccount');
   if (structure.status !== 'archived') throw httpError('Only archived structures can be restored.', 400);
   const assignedCount = await StudentFeeAccount.countDocuments({ structureId: structure._id });
   structure.status = assignedCount ? 'active' : 'draft';
-  structure.updatedBy = auditUser(req);
+  structure.updatedBy = user;
   await structure.save();
-  await recordRevision(req.models, structure, structure.toObject().components, '', auditUser(req), 'restored');
+  await recordRevision(models, structure, structure.toObject().components, '', user, 'restored');
+  return assignedCount;
+};
+
+const archiveStructure = asyncHandler(async (req, res) => {
+  const FeeStructure = getModel(req.models, 'FeeStructure');
+  const structure = await FeeStructure.findById(req.params.id);
+  if (!structure) throw httpError('Fee structure not found.', 404);
+  const assignedCount = await archiveStructureRecord(req.models, structure, req.body?.reason, auditUser(req));
+  return ok(res, withComputed(structure, assignedCount), { message: 'Structure archived.' });
+});
+
+const restoreStructure = asyncHandler(async (req, res) => {
+  const FeeStructure = getModel(req.models, 'FeeStructure');
+  const structure = await FeeStructure.findById(req.params.id);
+  if (!structure) throw httpError('Fee structure not found.', 404);
+  const assignedCount = await restoreStructureRecord(req.models, structure, auditUser(req));
   return ok(res, withComputed(structure, assignedCount), { message: `Structure restored as ${structure.status}.` });
 });
+
+/** Runs archive or restore for each id, exactly as the single-structure routes do. */
+const bulkStructureAction = (action) => asyncHandler(async (req, res) => {
+  const FeeStructure = getModel(req.models, 'FeeStructure');
+  const ids = parseIds(req.body?.ids);
+  const user = auditUser(req);
+  const result = await runBulk(ids, async (id) => {
+    const structure = await FeeStructure.findById(id);
+    if (!structure) throw httpError('Fee structure not found.', 404);
+    try {
+      if (action === 'archive') await archiveStructureRecord(req.models, structure, req.body?.reason, user);
+      else await restoreStructureRecord(req.models, structure, user);
+    } catch (error) {
+      throw labelled(error, structure.name);
+    }
+    return structure.name;
+  });
+  return sendBulk(res, result);
+});
+
+const bulkArchiveStructures = bulkStructureAction('archive');
+const bulkRestoreStructures = bulkStructureAction('restore');
 
 const listRevisions = asyncHandler(async (req, res) => {
   const FeeStructureRevision = getModel(req.models, 'FeeStructureRevision');
@@ -333,6 +364,8 @@ module.exports = {
   duplicateStructure,
   archiveStructure,
   restoreStructure,
+  bulkArchiveStructures,
+  bulkRestoreStructures,
   listRevisions,
   getRevision,
   assignStructureHandler,

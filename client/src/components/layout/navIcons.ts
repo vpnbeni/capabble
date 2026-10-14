@@ -83,6 +83,7 @@ import {
 
 /** Lucide glyph for each sidebar destination, by route. */
 const BY_HREF: Record<string, LucideIcon> = {
+  '/home': LayoutDashboard,
   '/school-hub': School,
   '/time-table/teachers': UserRound,
   '/time-table/classes': LayoutGrid,

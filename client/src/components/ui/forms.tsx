@@ -3,7 +3,7 @@ import { AlertCircle, ChevronDown, type LucideIcon } from 'lucide-react'
 import { cx } from './format'
 import { Icon } from './primitives'
 
-type FieldChrome = {
+export type FieldChrome = {
   label?: React.ReactNode
   hint?: React.ReactNode
   error?: React.ReactNode
@@ -12,7 +12,7 @@ type FieldChrome = {
 }
 
 /** Label, control and a hint or error underneath. Every field has a visible label. */
-const Field: React.FC<FieldChrome & { id: string; children: React.ReactNode }> = ({
+export const Field: React.FC<FieldChrome & { id: string; children: React.ReactNode }> = ({
   id,
   label,
   hint,
@@ -262,5 +262,70 @@ export const Switch: React.FC<{
         <span className="cb-switch__thumb" />
       </button>
     </div>
+  )
+}
+
+export interface RadioGroupProps {
+  label?: React.ReactNode
+  options: Array<{ value: string; label: React.ReactNode; description?: React.ReactNode; disabled?: boolean }>
+  value: string
+  onChange: (value: string) => void
+  variant?: 'list' | 'cards'
+  orientation?: 'vertical' | 'horizontal'
+  hint?: React.ReactNode
+  name?: string
+  className?: string
+}
+
+/** Exactly one of 2–5 options, all visible. More than five: use Select. */
+export const RadioGroup: React.FC<RadioGroupProps> = ({
+  label,
+  options,
+  value,
+  onChange,
+  variant = 'list',
+  orientation = 'vertical',
+  hint,
+  name,
+  className,
+}) => {
+  const autoId = useId()
+  const groupName = name || autoId
+  return (
+    <fieldset
+      className={cx(
+        'cb-radiogroup',
+        orientation === 'horizontal' && 'cb-radiogroup--h',
+        variant === 'cards' && 'cb-radiogroup--cards',
+        className
+      )}
+    >
+      {label ? <legend className="cb-field__label">{label}</legend> : null}
+      <div className="cb-radiogroup__opts">
+        {options.map((option) => {
+          const id = `${groupName}-${option.value}`
+          const on = option.value === value
+          return (
+            <label key={option.value} htmlFor={id} className={cx('cb-radio', on && 'is-on', option.disabled && 'is-disabled')}>
+              <input
+                id={id}
+                type="radio"
+                name={groupName}
+                value={option.value}
+                checked={on}
+                disabled={option.disabled}
+                onChange={() => onChange(option.value)}
+              />
+              <span className="cb-radio__dot" aria-hidden="true" />
+              <span className="cb-check__text">
+                <span className="cb-check__label">{option.label}</span>
+                {option.description ? <span className="cb-check__desc">{option.description}</span> : null}
+              </span>
+            </label>
+          )
+        })}
+      </div>
+      {hint ? <div className="cb-field__hint">{hint}</div> : null}
+    </fieldset>
   )
 }

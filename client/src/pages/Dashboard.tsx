@@ -1,9 +1,28 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { X } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { ArrowRight, CalendarX, Check, ChevronLeft, ChevronRight, Loader2, X } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { ExamTimeline } from '@/components/dashboard'
 import type { ExamTimelineItem } from '@/components/dashboard'
+import { CardLoading } from '@/components/exmcl/ExmclUi'
+import {
+  Badge,
+  Button,
+  Card,
+  DataTable,
+  DetailList,
+  EmptyState,
+  Entity,
+  Icon,
+  Page,
+  PageHeader,
+  Progress,
+  Select,
+  StatCard,
+  cx,
+  formatDate,
+  orDash,
+} from '@/components/ui'
+import type { DataTableColumn } from '@/components/ui'
 import { useTodaysExams, useDailyDuties, useDailyAnswerSheetSummary } from '@/hooks/useDashboard'
 import { useCentreDatesheetEntries } from '@/hooks/useSeatingPlan'
 import { useOnboardingStatus, useJobStatus } from '@/hooks/useOnboarding'
@@ -12,7 +31,7 @@ import type { TodaysExamsResponse, TodaysExam } from '@/services/dashboardServic
 import type { DailyDutiesResponse } from '@/services/dutiesService'
 import type { DailySummaryResponse, DailySummaryClassData } from '@/services/answerSheetService'
 
-// ─── Attendance Progress Widget ──────────────────────────────────────────────
+// ─── Attendance progress toast ───────────────────────────────────────────────
 
 const ATTENDANCE_JOB_KEY = 'cntr_attendance_job'
 
@@ -45,14 +64,14 @@ const AttendanceProgressWidget: React.FC<AttendanceProgressWidgetProps> = ({ job
       const xiiCount = r?.classXII?.uploaded ?? 0
       toast.success(
         xCount + xiiCount > 0
-          ? `Attendance processed! ${xCount + xiiCount} photos uploaded.`
-          : 'Attendance sheets processed (no photos found — tabular format).',
+          ? `Attendance processed. ${xCount + xiiCount} photos uploaded.`
+          : 'Attendance sheets processed. No photos found in the tabular format.',
         { duration: 6000 }
       )
       localStorage.removeItem(ATTENDANCE_JOB_KEY)
       setTimeout(() => { setDismissed(true); onDone() }, 3500)
     } else if (data?.state === 'failed') {
-      toast.error('Attendance processing failed. Please retry from Onboarding.', { duration: 8000 })
+      toast.error('Attendance processing failed. Retry it from onboarding.', { duration: 8000 })
       localStorage.removeItem(ATTENDANCE_JOB_KEY)
       setTimeout(() => { setDismissed(true); onDone() }, 4000)
     }
@@ -67,76 +86,39 @@ const AttendanceProgressWidget: React.FC<AttendanceProgressWidgetProps> = ({ job
   const total = (data?.progress as any)?.total as number | undefined
 
   const isFinished = state === 'completed' || state === 'failed'
-  const radius = 26
-  const circ = 2 * Math.PI * radius
-  const offset = circ - (Math.min(percent, 100) / 100) * circ
   const stageLabel = STAGE_LABELS[stage] ?? 'Processing…'
+  const tone = state === 'failed' ? 'danger' : state === 'completed' ? 'success' : 'info'
+  const glyph = state === 'failed' ? X : state === 'completed' ? Check : Loader2
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 select-none">
-      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-2xl rounded-2xl px-4 py-3 flex items-center gap-3 min-w-[230px] max-w-[280px]">
-        {/* Circular progress ring */}
-        <div className="relative flex-shrink-0 w-14 h-14">
-          <svg className="w-14 h-14 -rotate-90" viewBox="0 0 64 64">
-            {/* Track */}
-            <circle
-              cx="32" cy="32" r={radius}
-              fill="none" strokeWidth="5"
-              className="stroke-gray-100 dark:stroke-gray-800"
-            />
-            {/* Progress arc */}
-            <circle
-              cx="32" cy="32" r={radius}
-              fill="none" strokeWidth="5"
-              strokeDasharray={circ}
-              strokeDashoffset={offset}
-              strokeLinecap="round"
-              className={`transition-all duration-700 ease-in-out ${
-                state === 'failed'
-                  ? 'stroke-red-500'
-                  : state === 'completed'
-                  ? 'stroke-green-500'
-                  : 'stroke-blue-500'
-              }`}
-            />
-          </svg>
-          {/* Centre label */}
-          <div className="absolute inset-0 flex items-center justify-center">
-            {state === 'completed' ? (
-              <span className="text-base font-bold text-green-500">✓</span>
-            ) : state === 'failed' ? (
-              <span className="text-base font-bold text-red-500">✗</span>
-            ) : (
-              <span className="text-[11px] font-bold text-gray-700 dark:text-gray-200">
-                {percent}%
-              </span>
-            )}
-          </div>
-        </div>
-
-        {/* Text */}
-        <div className="flex-1 min-w-0">
-          <p className="text-xs font-semibold text-gray-800 dark:text-gray-100 truncate">
-            Processing Attendance
-          </p>
-          <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate mt-0.5">
+    <div className="cb-toaster">
+      <div className={cx('cb-toast', `cb-toast--${tone}`)} role="status" aria-live="polite">
+        <span className="cb-toast__icon">
+          <Icon icon={glyph} size={14} />
+        </span>
+        <div className="cb-toast__text">
+          <p className="cb-toast__title">Processing attendance</p>
+          <p className="cb-toast__desc">
             {stageLabel}
+            {typeof processed === 'number' && typeof total === 'number' && total > 0
+              ? ` · ${processed} of ${total} photos`
+              : ''}
           </p>
-          {typeof processed === 'number' && typeof total === 'number' && total > 0 && (
-            <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">
-              {processed} / {total} photos
-            </p>
-          )}
+          <Progress
+            value={state === 'completed' ? 100 : percent}
+            tone={state === 'failed' ? 'danger' : state === 'completed' ? 'success' : 'accent'}
+            size="sm"
+            showValue={false}
+          />
         </div>
-
-        {/* Dismiss button (only visible once job ends) */}
         {isFinished && (
           <button
+            type="button"
             onClick={() => { setDismissed(true); onDone() }}
-            className="flex-shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+            className="cb-toast__close"
             aria-label="Dismiss"
           >
-            <X className="w-4 h-4" />
+            <Icon icon={X} size={14} />
           </button>
         )}
       </div>
@@ -157,137 +139,102 @@ const normalizeClass = (v: string | undefined | null): 'X' | 'XII' | null => {
   return null
 }
 
-const cell = 'px-3 py-1.5 text-xs text-gray-800 dark:text-gray-200'
-const headerCell =
-  'px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800'
-const sectionTitle =
-  'text-[11px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5'
-const tableWrapper =
-  'overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900'
+const DASH = '—'
+
+type ClassRow = { label: string; x: string | number; xii: string | number }
+
+/** Detail | Class X | Class XII columns, showing only the classes sitting on this date. */
+const classColumns = (hasX: boolean, hasXII: boolean): DataTableColumn<ClassRow>[] => [
+  { key: 'label', header: 'Detail', mobile: 'title', render: (r) => <span className="cb-strong">{r.label}</span> },
+  ...(hasX ? [{ key: 'x', header: 'Class X', wrap: true, render: (r: ClassRow) => r.x } as DataTableColumn<ClassRow>] : []),
+  ...(hasXII ? [{ key: 'xii', header: 'Class XII', wrap: true, render: (r: ClassRow) => r.xii } as DataTableColumn<ClassRow>] : []),
+]
+
+const ViewLink: React.FC<{ to: string; children: React.ReactNode }> = ({ to, children }) => {
+  const navigate = useNavigate()
+  return (
+    <Button variant="tertiary" size="sm" iconRight={ArrowRight} onClick={() => navigate(to)}>
+      {children}
+    </Button>
+  )
+}
 
 // ---------------------------------------------------------------------------
-// Sub-components (sections matching wireframe)
+// Cards
 // ---------------------------------------------------------------------------
 
-/** 1. Candidate Details — Class X | Class XII columns */
+/** Papers on this date — Class X | Class XII */
 const CandidateDetails: React.FC<{ data: TodaysExamsResponse }> = ({ data }) => {
   const exams = data.exams ?? []
   const byClass = (target: 'X' | 'XII') => exams.filter((e) => normalizeClass(e.class) === target)
   const classX = byClass('X')
   const classXII = byClass('XII')
 
-  const hasX = classX.length > 0
-  const hasXII = classXII.length > 0
-
   const agg = (list: TodaysExam[]) => {
     const rooms = list.reduce((s, e) => s + (e.roomsUsed || 0), 0)
     return {
-      subject: list.map((e) => e.subjectName).join(', ') || '\u2014',
-      code: list.map((e) => e.subjectCode).join(', ') || '\u2014',
-      duration: list[0]?.duration ? `${list[0].duration} hr` : '\u2014',
+      subject: list.map((e) => e.subjectName).join(', ') || DASH,
+      code: list.map((e) => e.subjectCode).join(', ') || DASH,
+      duration: list[0]?.duration ? `${list[0].duration} hr` : DASH,
       candidates: list.reduce((s, e) => s + (e.candidateCount || 0), 0),
       rooms,
       invigilators: rooms > 0 ? rooms * 2 : 0,
       hindi: list.reduce((s, e) => s + (e.hindiMediumCandidateCount || 0), 0),
-      pwd: '\u2014',
+      pwd: DASH,
     }
   }
 
   const x = agg(classX)
   const xii = agg(classXII)
 
-  const rows: { label: string; x: string | number; xii: string | number }[] = [
+  const rows: ClassRow[] = [
     { label: 'Subject', x: x.subject, xii: xii.subject },
     { label: 'Code', x: x.code, xii: xii.code },
     { label: 'Duration', x: x.duration, xii: xii.duration },
-    { label: 'No of Candidates', x: x.candidates || '\u2014', xii: xii.candidates || '\u2014' },
-    { label: 'No of Rooms', x: x.rooms || '\u2014', xii: xii.rooms || '\u2014' },
-    { label: 'No of Invigilators', x: x.invigilators || '\u2014', xii: xii.invigilators || '\u2014' },
-    { label: 'Hindi Medium', x: x.hindi || '\u2014', xii: xii.hindi || '\u2014' },
-    { label: 'PWD', x: x.pwd, xii: xii.pwd },
+    { label: 'Candidates', x: x.candidates || DASH, xii: xii.candidates || DASH },
+    { label: 'Rooms', x: x.rooms || DASH, xii: xii.rooms || DASH },
+    { label: 'Invigilators', x: x.invigilators || DASH, xii: xii.invigilators || DASH },
+    { label: 'Hindi medium', x: x.hindi || DASH, xii: xii.hindi || DASH },
+    { label: 'PwD', x: x.pwd, xii: xii.pwd },
   ]
 
   return (
-    <div>
-      <Link
-        to="/datesheets"
-        className={sectionTitle + ' inline-flex items-center gap-1 hover:text-primary-600 dark:hover:text-primary-400 transition-colors'}
-      >
-        Candidate Details
-        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-        </svg>
-      </Link>
-      <div className={tableWrapper}>
-        <table className="w-full text-xs">
-          <thead>
-            <tr>
-              <th className={headerCell + ' text-left'}>Detail</th>
-              {hasX && <th className={headerCell + ' text-center'}>Class X</th>}
-              {hasXII && <th className={headerCell + ' text-center'}>Class XII</th>}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-            {rows.map((r) => (
-              <tr key={r.label}>
-                <td className={cell + ' font-medium'}>{r.label}</td>
-                {hasX && <td className={cell + ' text-center'}>{r.x}</td>}
-                {hasXII && <td className={cell + ' text-center'}>{r.xii}</td>}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
+    <Card
+      flush
+      title="Papers on this date"
+      subtitle="Candidates, rooms and invigilators by class"
+      action={<ViewLink to="/datesheets">View date sheet</ViewLink>}
+    >
+      <DataTable
+        caption="Papers on this date"
+        columns={classColumns(classX.length > 0, classXII.length > 0)}
+        rows={rows}
+        getRowKey={(r) => r.label}
+      />
+    </Card>
   )
 }
 
-/** 2. PwD Candidates */
+/** PwD candidates */
 const PwdCandidates: React.FC<{ data: TodaysExamsResponse }> = ({ data: _data }) => {
   // TODO: When PwD candidate data is available from the API, render
   // the full table with Roll No, Room No, Scribe, Sheet No, Extra Time, etc.
-  // For now, show a simple "No PwD Candidate" message.
   const hasPwdCandidates = false // will be driven by API data once available
 
   return (
-    <div>
-      <p className={sectionTitle}>PwD Candidates</p>
-      <div className={tableWrapper}>
-        {hasPwdCandidates ? (
-          <>
-            <table className="w-full text-xs">
-              <thead>
-                <tr>
-                  <th className={headerCell + ' text-left'}>Roll No</th>
-                  <th className={headerCell + ' text-center'}>Room No</th>
-                  <th className={headerCell + ' text-center'}>With/Without Scribe</th>
-                </tr>
-              </thead>
-              <tbody />
-            </table>
-            <table className="w-full text-xs mt-0 border-t border-gray-200 dark:border-gray-700">
-              <thead>
-                <tr>
-                  <th className={headerCell + ' text-left'}>Sheet No</th>
-                  <th className={headerCell + ' text-center'}>Extra Time</th>
-                  <th className={headerCell + ' text-center'}>60 Minutes</th>
-                  <th className={headerCell + ' text-center'}>Next Date</th>
-                </tr>
-              </thead>
-              <tbody />
-            </table>
-          </>
-        ) : (
-          <div className="flex items-center justify-center py-6 text-xs text-gray-400 dark:text-gray-500">
-            No PwD Candidate
-          </div>
-        )}
-      </div>
-    </div>
+    <Card title="PwD candidates" subtitle="Scribe and extra time for this date">
+      {hasPwdCandidates ? null : (
+        <EmptyState
+          compact
+          title="No PwD candidates on this date"
+          body="Candidates who need a scribe or extra time will be listed here."
+        />
+      )}
+    </Card>
   )
 }
 
-/** 3. Duties Summary */
+/** Duties */
 const DutiesSummary: React.FC<{
   dashData: TodaysExamsResponse
   dutiesData?: DailyDutiesResponse
@@ -295,60 +242,30 @@ const DutiesSummary: React.FC<{
   const byType = dashData.dutiesByType ?? {}
   const totalAssigned = dashData.dutiesAssignedCount ?? dutiesData?.totalAssigned ?? 0
 
-  const roles: { code: string; types: string[] }[] = [
-    { code: 'CS', types: ['Centre Superintendent'] },
-    { code: 'DCS', types: ['Deputy Centre Superintendent'] },
-    { code: 'OBR', types: ['Observer'] },
-    { code: 'ASC', types: ['ASI (CCTV)', 'ASI (Frisking Male)'] },
-    { code: 'ASI', types: ['Invigilator'] },
-    { code: 'ASF', types: ['ASI (Frisking Female)'] },
-    { code: 'CLR', types: ['Clerk'] },
-    { code: 'CLIV', types: ['Class IV'] },
+  const roles: { code: string; label: string; types: string[] }[] = [
+    { code: 'CS', label: 'Centre superintendent', types: ['Centre Superintendent'] },
+    { code: 'DCS', label: 'Deputy superintendent', types: ['Deputy Centre Superintendent'] },
+    { code: 'OBR', label: 'Observer', types: ['Observer'] },
+    { code: 'ASC', label: 'CCTV and frisking (male)', types: ['ASI (CCTV)', 'ASI (Frisking Male)'] },
+    { code: 'ASI', label: 'Invigilators', types: ['Invigilator'] },
+    { code: 'ASF', label: 'Frisking (female)', types: ['ASI (Frisking Female)'] },
+    { code: 'CLR', label: 'Clerk', types: ['Clerk'] },
+    { code: 'CLIV', label: 'Class IV', types: ['Class IV'] },
   ]
 
-  const getCount = (types: string[]) =>
-    types.reduce((s, t) => s + (byType[t] || 0), 0)
-
-  // Display as 2 columns of 4 roles each
-  const left = roles.slice(0, 4)
-  const right = roles.slice(4)
+  const getCount = (types: string[]) => types.reduce((s, t) => s + (byType[t] || 0), 0)
 
   return (
-    <div>
-      <p className={sectionTitle}>Duties Summary</p>
-      <div className={tableWrapper}>
-        <div className="px-3 py-2 bg-gray-900 dark:bg-gray-800 text-white text-[10px] font-semibold flex items-center justify-between">
-          <span>Assigned Duties</span>
-          <span>Total: {totalAssigned}</span>
-        </div>
-        <div className="grid grid-cols-2 divide-x divide-gray-200 dark:divide-gray-700">
-          {[left, right].map((group, gi) => (
-            <table key={gi} className="w-full text-xs">
-              <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                {group.map((r) => {
-                  const count = getCount(r.types)
-                  return (
-                    <tr key={r.code}>
-                      <td className={cell + ' font-semibold w-12'}>{r.code}</td>
-                      <td className={cell + ' text-center'}>
-                        <span className="inline-flex items-center justify-center min-w-[1.5rem] px-1.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border border-emerald-100 dark:border-emerald-800 font-semibold text-[11px]">
-                          {count}
-                        </span>
-                      </td>
-                      <td className={cell + ' text-gray-400 text-[10px]'}>Assigned</td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          ))}
-        </div>
-      </div>
-    </div>
+    <Card title="Duties" subtitle={`${totalAssigned} assigned for this date`}>
+      <DetailList
+        columns={2}
+        items={roles.map((r) => ({ label: r.label, value: <span className="is-num">{getCount(r.types)}</span> }))}
+      />
+    </Card>
   )
 }
 
-/** 4. Answer Sheet Detail */
+/** Answer sheets */
 const AnswerSheetDetail: React.FC<{
   data: TodaysExamsResponse
   summary?: DailySummaryResponse
@@ -367,70 +284,48 @@ const AnswerSheetDetail: React.FC<{
   const classXII = getClassData('12')
 
   const fmt = (val: DailySummaryClassData | null, field: 'type' | 'serialFrom' | 'serialTo' | 'totalAllocated' | 'totalDiscarded'): string | number => {
-    if (!val) return '\u2014'
+    if (!val) return DASH
     if (field === 'type') {
-      // Derive type from entries — pick the first entry's type or aggregate
       const types = [...new Set(val.entries.map(e => `${e.answerSheetType} ${e.pages}p`))]
-      return types.length ? types.join(', ') : '\u2014'
+      return types.length ? types.join(', ') : DASH
     }
-    if (field === 'serialFrom') return val.serialFrom || '\u2014'
-    if (field === 'serialTo') return val.serialTo || '\u2014'
-    if (field === 'totalAllocated') return val.totalAllocated || '\u2014'
-    if (field === 'totalDiscarded') return val.totalDiscarded || '\u2014'
-    return '\u2014'
+    if (field === 'serialFrom') return val.serialFrom || DASH
+    if (field === 'serialTo') return val.serialTo || DASH
+    if (field === 'totalAllocated') return val.totalAllocated || DASH
+    if (field === 'totalDiscarded') return val.totalDiscarded || DASH
+    return DASH
   }
 
-  const rows: { label: string; x: string | number; xii: string | number }[] = [
+  const rows: ClassRow[] = [
     { label: 'Type', x: fmt(classX, 'type'), xii: fmt(classXII, 'type') },
-    { label: 'From', x: fmt(classX, 'serialFrom'), xii: fmt(classXII, 'serialFrom') },
-    { label: 'To', x: fmt(classX, 'serialTo'), xii: fmt(classXII, 'serialTo') },
-    { label: 'Total', x: fmt(classX, 'totalAllocated'), xii: fmt(classXII, 'totalAllocated') },
+    { label: 'Serial from', x: fmt(classX, 'serialFrom'), xii: fmt(classXII, 'serialFrom') },
+    { label: 'Serial to', x: fmt(classX, 'serialTo'), xii: fmt(classXII, 'serialTo') },
+    { label: 'Allocated', x: fmt(classX, 'totalAllocated'), xii: fmt(classXII, 'totalAllocated') },
     { label: 'Discarded', x: fmt(classX, 'totalDiscarded'), xii: fmt(classXII, 'totalDiscarded') },
   ]
 
   return (
-    <div>
-      <Link
-        to="/answersheets"
-        className={sectionTitle + ' hover:text-blue-600 dark:hover:text-blue-400 transition-colors inline-flex items-center gap-1'}
-      >
-        Answer Sheet Detail
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-        </svg>
-      </Link>
-      <div className={tableWrapper}>
-        {isLoading ? (
-          <div className="flex items-center justify-center py-6">
-            <div className="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-blue-500" />
-            <span className="ml-2 text-xs text-gray-400">Loading...</span>
-          </div>
-        ) : (
-          <table className="w-full text-xs">
-            <thead>
-              <tr>
-                <th className={headerCell + ' text-left'}>Detail</th>
-                {hasX && <th className={headerCell + ' text-center'}>Class X</th>}
-                {hasXII && <th className={headerCell + ' text-center'}>Class XII</th>}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-              {rows.map((r) => (
-                <tr key={r.label}>
-                  <td className={cell + ' font-medium'}>{r.label}</td>
-                  {hasX && <td className={cell + ' text-center'}>{r.x}</td>}
-                  {hasXII && <td className={cell + ' text-center'}>{r.xii}</td>}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-    </div>
+    <Card
+      flush
+      title="Answer sheets"
+      subtitle="Serial ranges issued for this date"
+      action={<ViewLink to="/answersheets">View answer sheets</ViewLink>}
+    >
+      {isLoading ? (
+        <CardLoading label="Loading answer sheets…" />
+      ) : (
+        <DataTable
+          caption="Answer sheets"
+          columns={classColumns(hasX, hasXII)}
+          rows={rows}
+          getRowKey={(r) => r.label}
+        />
+      )}
+    </Card>
   )
 }
 
-/** 5. Status Tracker */
+/** Preparation status */
 const StatusTracker: React.FC<{ data: TodaysExamsResponse; dutiesData?: DailyDutiesResponse }> = ({
   data,
   dutiesData,
@@ -447,74 +342,41 @@ const StatusTracker: React.FC<{ data: TodaysExamsResponse; dutiesData?: DailyDut
   const assignmentsCount = dutiesData?.totalAssigned ?? 0
   const hasAssignments = assignmentsCount > 0
 
-  const items: { label: string; status: string }[] = [
-    { label: 'Room Selection', status: hasRooms ? 'Selected' : 'Pending' },
-    { label: 'Room Allocation', status: hasRooms ? 'Allotted' : 'Pending' },
-    {
-      label: 'Seating Plan Download',
-      status: hasRooms ? `Downloaded ${totalRooms}/${totalRooms}` : 'Pending',
-    },
-    { label: 'Functionary Update', status: hasSelections ? 'New Functionary Added' : 'Pending' },
-    { label: 'Functionary Selection', status: hasSelections ? `${selectionsCount} Selected` : 'Pending' },
-    {
-      label: 'Duty Assigned',
-      status: hasAssignments ? `${assignmentsCount}/${totalRooms} Rooms Assigned` : 'Pending',
-    },
+  const items: { label: string; status: string | null }[] = [
+    { label: 'Room selection', status: hasRooms ? 'Selected' : null },
+    { label: 'Room allocation', status: hasRooms ? 'Allotted' : null },
+    { label: 'Seating plan', status: hasRooms ? `${totalRooms} of ${totalRooms} downloaded` : null },
+    { label: 'Functionary update', status: hasSelections ? 'New functionary added' : null },
+    { label: 'Functionary selection', status: hasSelections ? `${selectionsCount} selected` : null },
+    { label: 'Duty assignment', status: hasAssignments ? `${assignmentsCount} of ${totalRooms} rooms` : null },
   ]
 
+  const done = items.filter((i) => i.status).length
+
   return (
-    <div>
-      <p className={sectionTitle}>Status Tracker</p>
-      <div className={tableWrapper}>
-        <table className="w-full text-xs">
-          <thead>
-            <tr>
-              <th className={headerCell + ' text-left'}>Step</th>
-              <th className={headerCell + ' text-left'}>Status</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-            {items.map((item) => {
-              const done = item.status !== 'Pending'
-              return (
-                <tr key={item.label}>
-                  <td className={cell + ' font-medium'}>{item.label}</td>
-                  <td className={cell}>
-                    <span
-                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${
-                        done
-                          ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border border-emerald-100 dark:border-emerald-800'
-                          : 'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border border-amber-100 dark:border-amber-800'
-                      }`}
-                    >
-                      {done && (
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                      )}
-                      {item.status}
-                    </span>
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </div>
-    </div>
+    <Card title="Preparation" subtitle={`${done} of ${items.length} steps done`}>
+      <DetailList
+        columns={1}
+        items={items.map((item) => ({
+          label: item.label,
+          value: item.status ? (
+            <Badge tone="success">{item.status}</Badge>
+          ) : (
+            <Badge tone="warning">Pending</Badge>
+          ),
+        }))}
+      />
+    </Card>
   )
 }
 
-/** 6. Packing Details */
+/** Packing */
 const PackingDetails: React.FC<{ data: TodaysExamsResponse }> = ({ data }) => {
   const p = data.packing
   const exams = data.exams ?? []
 
   const xExams = exams.filter((e) => normalizeClass(e.class) === 'X')
   const xiiExams = exams.filter((e) => normalizeClass(e.class) === 'XII')
-
-  const hasX = xExams.length > 0
-  const hasXII = xiiExams.length > 0
 
   const xCandidates = xExams.reduce((s, e) => s + (e.candidateCount || 0), 0)
   const xiiCandidates = xiiExams.reduce((s, e) => s + (e.candidateCount || 0), 0)
@@ -527,62 +389,38 @@ const PackingDetails: React.FC<{ data: TodaysExamsResponse }> = ({ data }) => {
   const xBags = xCandidates ? Math.max(1, Math.ceil(xCandidates / 100)) : 0
   const xiiBags = xiiCandidates ? Math.max(1, Math.ceil(xiiCandidates / 100)) : 0
 
-  const rows: { label: string; x: string | number; xii: string | number }[] = [
-    {
-      label: 'Cloth',
-      x: p?.clothColorClass10 || p?.clothColor || '\u2014',
-      xii: p?.clothColorClass12 || p?.clothColor || '\u2014',
-    },
-    {
-      label: 'Pen',
-      x: p?.markerClass10 || p?.marker || '\u2014',
-      xii: p?.markerClass12 || p?.marker || '\u2014',
-    },
-    { label: 'QP Packets', x: xQP || '\u2014', xii: xiiQP || '\u2014' },
-    { label: 'Answer Sheet Bags', x: xBags || '\u2014', xii: xiiBags || '\u2014' },
+  const rows: ClassRow[] = [
+    { label: 'Cloth', x: p?.clothColorClass10 || p?.clothColor || DASH, xii: p?.clothColorClass12 || p?.clothColor || DASH },
+    { label: 'Pen', x: p?.markerClass10 || p?.marker || DASH, xii: p?.markerClass12 || p?.marker || DASH },
+    { label: 'Question paper packets', x: xQP || DASH, xii: xiiQP || DASH },
+    { label: 'Answer sheet bags', x: xBags || DASH, xii: xiiBags || DASH },
   ]
 
   return (
-    <div>
-      <p className={sectionTitle}>Packing Details</p>
-      <div className={tableWrapper}>
-        <table className="w-full text-xs">
-          <thead>
-            <tr>
-              <th className={headerCell + ' text-left'}>Detail</th>
-              {hasX && <th className={headerCell + ' text-center'}>Class X</th>}
-              {hasXII && <th className={headerCell + ' text-center'}>Class XII</th>}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-            {rows.map((r) => (
-              <tr key={r.label}>
-                <td className={cell + ' font-medium'}>{r.label}</td>
-                {hasX && <td className={cell + ' text-center'}>{r.x}</td>}
-                {hasXII && <td className={cell + ' text-center'}>{r.xii}</td>}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
+    <Card flush title="Packing" subtitle="Cloth, pen and bags to dispatch">
+      <DataTable
+        caption="Packing"
+        columns={classColumns(xExams.length > 0, xiiExams.length > 0)}
+        rows={rows}
+        getRowKey={(r) => r.label}
+      />
+    </Card>
   )
 }
 
-/** 7. School Wise Distribution */
+/** Candidates by school */
 const SchoolWiseDistribution: React.FC<{ data: TodaysExamsResponse }> = ({ data }) => {
   const exams = data.exams ?? []
 
   const hasX = exams.some((e) => normalizeClass(e.class) === 'X')
   const hasXII = exams.some((e) => normalizeClass(e.class) === 'XII')
-  const colCount = 1 + (hasX ? 1 : 0) + (hasXII ? 1 : 0) + 1 // School + class cols + Total
 
   // Aggregate school-wise by class
   const map = new Map<string, { x: number; xii: number }>()
   exams.forEach((exam) => {
     const cls = normalizeClass(exam.class)
     ;(exam.schoolWiseCandidateCount ?? []).forEach((row) => {
-      const key = row.schoolName || '\u2014'
+      const key = row.schoolName || DASH
       const cur = map.get(key) || { x: 0, xii: 0 }
       if (cls === 'X') cur.x += row.count || 0
       if (cls === 'XII') cur.xii += row.count || 0
@@ -590,7 +428,8 @@ const SchoolWiseDistribution: React.FC<{ data: TodaysExamsResponse }> = ({ data 
     })
   })
 
-  const rows = Array.from(map.entries())
+  type SchoolRow = { name: string; x: number; xii: number; total: number }
+  const rows: SchoolRow[] = Array.from(map.entries())
     .map(([name, counts]) => ({ name, x: counts.x, xii: counts.xii, total: counts.x + counts.xii }))
     .sort((a, b) => b.total - a.total)
 
@@ -598,53 +437,38 @@ const SchoolWiseDistribution: React.FC<{ data: TodaysExamsResponse }> = ({ data 
   const totalXII = rows.reduce((s, r) => s + r.xii, 0)
   const grandTotal = totalX + totalXII
 
+  const columns: DataTableColumn<SchoolRow>[] = [
+    { key: 'name', header: 'School', mobile: 'title', wrap: true },
+    ...(hasX ? [{ key: 'x', header: 'Class X', align: 'right', numeric: true, render: (r: SchoolRow) => r.x || DASH } as DataTableColumn<SchoolRow>] : []),
+    ...(hasXII ? [{ key: 'xii', header: 'Class XII', align: 'right', numeric: true, render: (r: SchoolRow) => r.xii || DASH } as DataTableColumn<SchoolRow>] : []),
+    { key: 'total', header: 'Total', align: 'right', numeric: true, mobile: 'aside', render: (r) => <span className="cb-strong">{r.total}</span> },
+  ]
+
+  const totalParts = [hasX ? `Class X ${totalX || DASH}` : null, hasXII ? `Class XII ${totalXII || DASH}` : null].filter(Boolean)
+
   return (
-    <div>
-      <p className={sectionTitle}>School Wise Distribution</p>
-      <div className={tableWrapper}>
-        <table className="w-full text-xs">
-          <thead>
-            <tr>
-              <th className={headerCell + ' text-left'}>School</th>
-              {hasX && <th className={headerCell + ' text-center'}>Class X</th>}
-              {hasXII && <th className={headerCell + ' text-center'}>Class XII</th>}
-              <th className={headerCell + ' text-center'}>Total</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-            {rows.length === 0 && (
-              <tr>
-                <td colSpan={colCount} className={cell + ' text-center text-gray-400'}>
-                  No school data available
-                </td>
-              </tr>
-            )}
-            {rows.map((r, i) => (
-              <tr key={r.name + i}>
-                <td className={cell}>{r.name}</td>
-                {hasX && <td className={cell + ' text-center'}>{r.x || '\u2014'}</td>}
-                {hasXII && <td className={cell + ' text-center'}>{r.xii || '\u2014'}</td>}
-                <td className={cell + ' text-center font-semibold'}>{r.total}</td>
-              </tr>
-            ))}
-          </tbody>
-          {rows.length > 0 && (
-            <tfoot>
-              <tr className="bg-gray-50 dark:bg-gray-800">
-                <td className={cell + ' font-bold'}>Total</td>
-                {hasX && <td className={cell + ' text-center font-bold'}>{totalX || '\u2014'}</td>}
-                {hasXII && <td className={cell + ' text-center font-bold'}>{totalXII || '\u2014'}</td>}
-                <td className={cell + ' text-center font-bold'}>{grandTotal}</td>
-              </tr>
-            </tfoot>
-          )}
-        </table>
-      </div>
-    </div>
+    <Card flush title="Candidates by school" subtitle={rows.length ? `${rows.length} schools sitting on this date` : undefined}>
+      <DataTable
+        caption="Candidates by school"
+        columns={columns}
+        rows={rows}
+        getRowKey={(r) => r.name}
+        empty={<EmptyState compact title="No school data for this date" body="School counts come from the imported candidate list." />}
+        footer={
+          rows.length > 0 ? (
+            <span className="cb-muted">
+              {totalParts.join(' · ')}
+              {totalParts.length ? ' · ' : ''}
+              <span className="cb-strong">{grandTotal} in total</span>
+            </span>
+          ) : undefined
+        }
+      />
+    </Card>
   )
 }
 
-/** 8. Upcoming Exam Details */
+/** Upcoming exams */
 const UpcomingExamDetails: React.FC<{
   entries: CentreDatesheetEntry[]
   selectedDate: string
@@ -658,70 +482,51 @@ const UpcomingExamDetails: React.FC<{
     })
     .slice(0, 5)
 
+  const columns: DataTableColumn<CentreDatesheetEntry>[] = [
+    {
+      key: 'date',
+      header: 'Date',
+      mobile: 'subtitle',
+      render: (entry) => {
+        const d = new Date(entry.examDate)
+        const dayName = entry.dayName || d.toLocaleDateString('en-IN', { weekday: 'short' })
+        return <Entity primary={formatDate(d)} secondary={dayName} />
+      },
+    },
+    {
+      key: 'subject',
+      header: 'Subject',
+      mobile: 'title',
+      render: (entry) => <Entity primary={orDash(entry.subjectName)} secondary={entry.subjectCode} />,
+    },
+    { key: 'class', header: 'Class', render: (entry) => orDash(entry.class) },
+    { key: 'candidates', header: 'Candidates', align: 'right', numeric: true, mobile: 'aside', render: (entry) => entry.candidateCount ?? DASH },
+    { key: 'rooms', header: 'Rooms needed', align: 'right', numeric: true, render: (entry) => entry.roomsNeeded ?? DASH },
+    { key: 'hindi', header: 'Hindi medium', align: 'right', mobile: 'hidden', render: () => DASH },
+    { key: 'pwd', header: 'PwD', align: 'right', mobile: 'hidden', render: () => DASH },
+    { key: 'scribe', header: 'Scribe', align: 'right', mobile: 'hidden', render: () => DASH },
+  ]
+
   return (
-    <div>
-      <p className={sectionTitle}>Upcoming Exam Details</p>
-      <div className={tableWrapper}>
-        <table className="w-full text-xs">
-          <thead>
-            <tr>
-              <th className={headerCell + ' text-left'}>Date</th>
-              <th className={headerCell + ' text-left'}>Day</th>
-              <th className={headerCell + ' text-left'}>Subject</th>
-              <th className={headerCell + ' text-left'}>Code</th>
-              <th className={headerCell + ' text-center'}>Class</th>
-              <th className={headerCell + ' text-center'}>Candidates</th>
-              <th className={headerCell + ' text-center'}>Rooms Req.</th>
-              <th className={headerCell + ' text-center'}>Hindi Medium</th>
-              <th className={headerCell + ' text-center'}>PwD</th>
-              <th className={headerCell + ' text-center'}>Scribe</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-            {upcoming.length === 0 && (
-              <tr>
-                <td colSpan={10} className={cell + ' text-center text-gray-400'}>
-                  No upcoming exams
-                </td>
-              </tr>
-            )}
-            {upcoming.map((entry, i) => {
-              const d = new Date(entry.examDate)
-              const dateStr = d.toLocaleDateString('en-IN', {
-                day: '2-digit',
-                month: 'short',
-              })
-              const dayName = entry.dayName || d.toLocaleDateString('en-IN', { weekday: 'short' })
-              return (
-                <tr key={entry._id || i}>
-                  <td className={cell}>{dateStr}</td>
-                  <td className={cell}>{dayName}</td>
-                  <td className={cell}>{entry.subjectName ?? '\u2014'}</td>
-                  <td className={cell}>{entry.subjectCode ?? '\u2014'}</td>
-                  <td className={cell + ' text-center'}>{entry.class ?? '\u2014'}</td>
-                  <td className={cell + ' text-center'}>{entry.candidateCount ?? '\u2014'}</td>
-                  <td className={cell + ' text-center'}>{entry.roomsNeeded ?? '\u2014'}</td>
-                  <td className={cell + ' text-center'}>{'\u2014'}</td>
-                  <td className={cell + ' text-center'}>{'\u2014'}</td>
-                  <td className={cell + ' text-center'}>{'\u2014'}</td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </div>
-    </div>
+    <Card flush title="Upcoming exams" subtitle="Next five papers after this date">
+      <DataTable
+        caption="Upcoming exams"
+        columns={columns}
+        rows={upcoming}
+        getRowKey={(entry) => entry._id || `${entry.examDate}-${entry.subjectCode}-${entry.class}`}
+        empty={<EmptyState compact title="No exams after this date" body="Import the date sheet to schedule more papers." />}
+      />
+    </Card>
   )
 }
 
-/** 9. Seating & Invigilator Details */
+/** Rooms and invigilators */
 const SeatingInvigilatorDetails: React.FC<{
   data: TodaysExamsResponse
   dutiesData?: DailyDutiesResponse
 }> = ({ data, dutiesData }) => {
   const exams = data.exams ?? []
 
-  // Build room rows from dashboard exam data
   type RoomRow = {
     roomNo: string
     candidates: number
@@ -733,10 +538,7 @@ const SeatingInvigilatorDetails: React.FC<{
   }
 
   // Aggregate rooms across all exams
-  const roomMap = new Map<
-    string,
-    { candidates: number; subjects: string[] }
-  >()
+  const roomMap = new Map<string, { candidates: number; subjects: string[] }>()
   exams.forEach((exam) => {
     ;(exam.rooms ?? []).forEach((room) => {
       const cur = roomMap.get(room.roomNo) || { candidates: 0, subjects: [] }
@@ -747,18 +549,15 @@ const SeatingInvigilatorDetails: React.FC<{
   })
 
   // Build duty lookup by room
-  const dutyByRoom = new Map<
-    string,
-    { inv1Name: string; inv1Id: string; inv2Name: string; inv2Id: string }
-  >()
+  const dutyByRoom = new Map<string, { inv1Name: string; inv1Id: string; inv2Name: string; inv2Id: string }>()
   if (dutiesData?.duties) {
     dutiesData.duties.forEach((duty) => {
       const roomNo = duty.room?.roomNo
       if (!roomNo) return
       dutyByRoom.set(roomNo, {
-        inv1Name: duty.functionary?.name ?? '\u2014',
+        inv1Name: duty.functionary?.name ?? DASH,
         inv1Id: duty.functionary?.employeeId ?? '',
-        inv2Name: duty.functionary2?.name ?? '\u2014',
+        inv2Name: duty.functionary2?.name ?? DASH,
         inv2Id: duty.functionary2?.employeeId ?? '',
       })
     })
@@ -775,80 +574,34 @@ const SeatingInvigilatorDetails: React.FC<{
       return {
         roomNo,
         candidates: info.candidates,
-        school: Array.isArray(schools) ? schools.join(', ') : '\u2014',
-        inv1: duty?.inv1Name ?? '\u2014',
+        school: Array.isArray(schools) ? schools.join(', ') : DASH,
+        inv1: duty?.inv1Name ?? DASH,
         inv1Id: duty?.inv1Id ?? '',
-        inv2: duty?.inv2Name ?? '\u2014',
+        inv2: duty?.inv2Name ?? DASH,
         inv2Id: duty?.inv2Id ?? '',
       }
     })
 
+  const columns: DataTableColumn<RoomRow>[] = [
+    { key: 'roomNo', header: 'Room', mobile: 'title', render: (r) => <span className="cb-strong">{r.roomNo}</span> },
+    { key: 'candidates', header: 'Candidates', align: 'right', numeric: true, mobile: 'aside' },
+    { key: 'school', header: 'School', wrap: true },
+    { key: 'inv1', header: 'Invigilator 1', render: (r) => <Entity primary={r.inv1} secondary={r.inv1Id || undefined} /> },
+    { key: 'inv2', header: 'Invigilator 2', render: (r) => <Entity primary={r.inv2} secondary={r.inv2Id || undefined} /> },
+  ]
+
   return (
-    <div>
-      <p className={sectionTitle}>Seating &amp; Invigilator Details</p>
-      <div className={tableWrapper}>
-        <table className="w-full text-xs">
-          <thead>
-            <tr>
-              <th className={headerCell + ' text-left'}>Room No</th>
-              <th className={headerCell + ' text-center'}>Candidates</th>
-              <th className={headerCell + ' text-left'}>School</th>
-              <th className={headerCell + ' text-left'}>Invigilator 1</th>
-              <th className={headerCell + ' text-left'}>Invigilator 2</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-            {rows.length === 0 && (
-              <tr>
-                <td colSpan={5} className={cell + ' text-center text-gray-400'}>
-                  No seating data available
-                </td>
-              </tr>
-            )}
-            {rows.map((r) => (
-              <tr key={r.roomNo}>
-                <td className={cell + ' font-semibold'}>{r.roomNo}</td>
-                <td className={cell + ' text-center'}>{r.candidates}</td>
-                <td className={cell}>{r.school}</td>
-                <td className={cell}>
-                  {r.inv1}
-                  {r.inv1Id && (
-                    <span className="ml-1 text-[10px] text-gray-400">{r.inv1Id}</span>
-                  )}
-                </td>
-                <td className={cell}>
-                  {r.inv2}
-                  {r.inv2Id && (
-                    <span className="ml-1 text-[10px] text-gray-400">{r.inv2Id}</span>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
+    <Card flush title="Rooms and invigilators" subtitle={rows.length ? `${rows.length} rooms in use` : undefined}>
+      <DataTable
+        caption="Rooms and invigilators"
+        columns={columns}
+        rows={rows}
+        getRowKey={(r) => r.roomNo}
+        empty={<EmptyState compact title="No rooms allotted for this date" body="Allot rooms in the seating plan to see invigilators here." />}
+      />
+    </Card>
   )
 }
-
-/** Loading skeleton for a table section */
-const TableSkeleton: React.FC<{ rows?: number; cols?: number }> = ({
-  rows = 4,
-  cols = 3,
-}) => (
-  <div className={tableWrapper + ' animate-pulse'}>
-    <div className="h-8 bg-gray-50 dark:bg-gray-800" />
-    {Array.from({ length: rows }).map((_, i) => (
-      <div key={i} className="flex divide-x divide-gray-100 dark:divide-gray-800">
-        {Array.from({ length: cols }).map((_, j) => (
-          <div key={j} className="flex-1 px-3 py-2">
-            <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-3/4" />
-          </div>
-        ))}
-      </div>
-    ))}
-  </div>
-)
 
 // ---------------------------------------------------------------------------
 // Main Dashboard Component
@@ -940,134 +693,167 @@ const Dashboard: React.FC = () => {
     setSelectedDate(date)
   }, [])
 
+  // --- exam date picker (replaces the old timeline strip) ---
+  const examDates = useMemo(
+    () => Array.from(new Set(examTimelineItems.map((e) => e.date))).sort(),
+    [examTimelineItems]
+  )
+  const dateOptions = useMemo(() => {
+    const today = todayIso()
+    const dates = examDates.includes(selectedDate) ? examDates : [...examDates, selectedDate].sort()
+    return dates.map((date) => {
+      const subjects = Array.from(
+        new Set(examTimelineItems.filter((e) => e.date === date).map((e) => e.subject))
+      )
+      const when = `${formatDate(`${date}T12:00:00`)}${date === today ? ' (today)' : ''}`
+      return { value: date, label: subjects.length ? `${when} · ${subjects.join(', ')}` : `${when} · No exam` }
+    })
+  }, [examDates, examTimelineItems, selectedDate])
+  const prevDate = [...examDates].reverse().find((d) => d < selectedDate)
+  const nextDate = examDates.find((d) => d > selectedDate)
+
   // --- render ---
   const hasData = !!todaysExamsData
   const centreEntries = centreDatesheetEntries ?? []
+  const totalExams = todaysExamsData?.totalExams ?? 0
+
+  const exams = todaysExamsData?.exams ?? []
+  const candidatesFor = (cls: 'X' | 'XII') =>
+    exams.filter((e) => normalizeClass(e.class) === cls).reduce((s, e) => s + (e.candidateCount || 0), 0)
+  const totalCandidates = exams.reduce((s, e) => s + (e.candidateCount || 0), 0)
+  const totalRooms = exams.reduce((s, e) => s + (e.roomsUsed || 0), 0)
+  const functionariesSelected = todaysExamsData?.dutiesAssignedCount ?? 0
+  const roomsAssigned = dutiesData?.totalAssigned ?? 0
+  const candidateHint = [
+    exams.some((e) => normalizeClass(e.class) === 'X') ? `Class X ${candidatesFor('X')}` : null,
+    exams.some((e) => normalizeClass(e.class) === 'XII') ? `Class XII ${candidatesFor('XII')}` : null,
+  ]
+    .filter(Boolean)
+    .join(' · ')
+
+  const dateTitle = formatDate(`${selectedDate}T12:00:00`)
+  const subtitle = [
+    todaysExamsData?.dayName,
+    totalExams ? `${totalExams} ${totalExams === 1 ? 'paper' : 'papers'}` : 'No exam on this date',
+  ]
+    .filter(Boolean)
+    .join(' · ')
 
   return (
-    <div className="h-full min-h-0 flex flex-col bg-gray-50 dark:bg-gray-900">
-      {/* Floating attendance progress widget — only shown while a job is pending */}
+    <Page>
+      {/* Attendance progress — only shown while a job is pending */}
       {pendingJobId && (
         <AttendanceProgressWidget
           jobId={pendingJobId}
           onDone={() => setPendingJobId(null)}
         />
       )}
-      <div className="flex-1 min-h-0 flex flex-col p-4 md:p-5 overflow-y-auto space-y-4">
-        {/* ── Exam Timeline Date Strip ── */}
-        <div className="flex-shrink-0">
-          <ExamTimeline
-            exams={examTimelineItems}
-            selectedDate={selectedDate}
-            onSelectDate={handleSelectDate}
-          />
-        </div>
 
-        {/* ── Loading state ── */}
-        {isDashboardLoading && (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-            <div className="lg:col-span-5 space-y-4">
-              <TableSkeleton rows={8} cols={3} />
-              <TableSkeleton rows={5} cols={3} />
-              <TableSkeleton rows={4} cols={3} />
-            </div>
-            <div className="lg:col-span-4 space-y-4">
-              <TableSkeleton rows={3} cols={3} />
-              <TableSkeleton rows={6} cols={2} />
-            </div>
-            <div className="lg:col-span-3 space-y-4">
-              <TableSkeleton rows={4} cols={2} />
-              <TableSkeleton rows={6} cols={2} />
-            </div>
-          </div>
-        )}
-
-        {/* ── Main Grid Layout ── */}
-        {hasData && !isDashboardLoading && (todaysExamsData?.totalExams ?? 0) > 0 && (
+      <PageHeader
+        title={dateTitle}
+        subtitle={subtitle}
+        actions={
           <>
-            {/* ROW 1: Candidate Details | PwD Candidates + Duties Summary */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-              {/* Left: Candidate Details */}
-              <div className="lg:col-span-5">
-                <CandidateDetails data={todaysExamsData} />
-              </div>
-
-              {/* Middle: PwD Candidates */}
-              <div className="lg:col-span-4">
-                <PwdCandidates data={todaysExamsData} />
-              </div>
-
-              {/* Right: Duties Summary */}
-              <div className="lg:col-span-3">
-                <DutiesSummary dashData={todaysExamsData} dutiesData={dutiesData} />
-              </div>
-            </div>
-
-            {/* ROW 2: Answer Sheet Detail | Status Tracker */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-              {/* Left: Answer Sheet Detail */}
-              <div className="lg:col-span-5">
-                <AnswerSheetDetail
-                  data={todaysExamsData}
-                  summary={dailyAnswerSheetSummary}
-                  isLoading={isDailySummaryLoading}
-                />
-              </div>
-
-              {/* Middle: Packing Details */}
-              <div className="lg:col-span-4">
-                <PackingDetails data={todaysExamsData} />
-              </div>
-
-              {/* Right: Status Tracker */}
-              <div className="lg:col-span-3">
-                <StatusTracker data={todaysExamsData} dutiesData={dutiesData} />
-              </div>
-            </div>
-
-            {/* ROW 3: School Wise Distribution | Upcoming Exam Details */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-              <div className="lg:col-span-5">
-                <SchoolWiseDistribution data={todaysExamsData} />
-              </div>
-              <div className="lg:col-span-7">
-                <UpcomingExamDetails
-                  entries={centreEntries}
-                  selectedDate={selectedDate}
-                />
-              </div>
-            </div>
-
-            {/* ROW 4: Seating & Invigilator Details (full width) */}
-            <SeatingInvigilatorDetails
-              data={todaysExamsData}
-              dutiesData={dutiesData}
+            <Button
+              variant="tertiary"
+              icon={ChevronLeft}
+              aria-label="Previous exam date"
+              disabled={!prevDate}
+              onClick={() => prevDate && handleSelectDate(prevDate)}
+            />
+            <Select
+              aria-label="Exam date"
+              size="sm"
+              value={selectedDate}
+              options={dateOptions}
+              onChange={(event) => handleSelectDate(event.target.value)}
+            />
+            <Button
+              variant="tertiary"
+              icon={ChevronRight}
+              aria-label="Next exam date"
+              disabled={!nextDate}
+              onClick={() => nextDate && handleSelectDate(nextDate)}
             />
           </>
-        )}
+        }
+      />
 
-        {/* ── No exams state ── */}
-        {hasData && !isDashboardLoading && (todaysExamsData?.totalExams ?? 0) === 0 && (
-          <div className="flex flex-col items-center justify-center py-12 text-gray-400 dark:text-gray-500">
-            <svg
-              className="w-16 h-16 mb-3"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={1.5}
-                d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-              />
-            </svg>
-            <p className="text-sm font-medium">No exams scheduled for {todaysExamsData?.dayName || 'this date'}</p>
-            <p className="text-xs mt-1">Select another date from the timeline above</p>
+      {isDashboardLoading && (
+        <Card>
+          <CardLoading label="Loading the exam day…" />
+        </Card>
+      )}
+
+      {hasData && !isDashboardLoading && totalExams > 0 && (
+        <>
+          <section className="cb-stats" aria-label="This exam day">
+            <StatCard label="Candidates sitting" value={totalCandidates} hint={candidateHint || undefined} />
+            <StatCard label="Rooms in use" value={totalRooms} hint={`${totalRooms * 2} invigilators needed`} />
+            <StatCard
+              label="Functionaries selected"
+              value={functionariesSelected}
+              hint={functionariesSelected ? 'For duty on this date' : 'None selected yet'}
+            />
+            <StatCard
+              label="Rooms with invigilators"
+              value={roomsAssigned}
+              unit={totalRooms ? `of ${totalRooms}` : undefined}
+              hint={totalRooms && roomsAssigned >= totalRooms ? 'Every room covered' : 'Assign duties before the exam'}
+              progress={totalRooms ? Math.min(100, Math.round((roomsAssigned / totalRooms) * 100)) : undefined}
+            />
+          </section>
+
+          <div className="cb-grid-8-4">
+            <CandidateDetails data={todaysExamsData} />
+            <div className="cb-stack">
+              <StatusTracker data={todaysExamsData} dutiesData={dutiesData} />
+              <DutiesSummary dashData={todaysExamsData} dutiesData={dutiesData} />
+            </div>
           </div>
-        )}
-      </div>
-    </div>
+
+          <div className="cb-grid-6-6">
+            <AnswerSheetDetail
+              data={todaysExamsData}
+              summary={dailyAnswerSheetSummary}
+              isLoading={isDailySummaryLoading}
+            />
+            <PackingDetails data={todaysExamsData} />
+          </div>
+
+          <div className="cb-grid-8-4">
+            <SchoolWiseDistribution data={todaysExamsData} />
+            <PwdCandidates data={todaysExamsData} />
+          </div>
+
+          <SeatingInvigilatorDetails data={todaysExamsData} dutiesData={dutiesData} />
+
+          <UpcomingExamDetails entries={centreEntries} selectedDate={selectedDate} />
+        </>
+      )}
+
+      {hasData && !isDashboardLoading && totalExams === 0 && (
+        <>
+          <Card>
+            <EmptyState
+              icon={CalendarX}
+              title={`No exams on ${todaysExamsData?.dayName || 'this date'}`}
+              body={
+                examDates.length
+                  ? 'Pick another exam date above.'
+                  : 'Import the date sheet to see each exam day here.'
+              }
+              action={
+                examDates.length ? undefined : (
+                  <Button onClick={() => navigate('/datesheets')}>Import date sheet</Button>
+                )
+              }
+            />
+          </Card>
+          <UpcomingExamDetails entries={centreEntries} selectedDate={selectedDate} />
+        </>
+      )}
+    </Page>
   )
 }
 

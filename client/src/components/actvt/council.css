@@ -1,0 +1,138 @@
+/*
+ * Activities — student council board and student activity profile.
+ * Tokens only; a house colour arrives as --tone / --tone-ink from entityTone.toneStyle()
+ * and is used through the shared .actvt-tone-* classes or var(--tone) for fills/bars.
+ */
+
+.cb-app .asc { display: flex; flex-direction: column; gap: var(--space-6); min-width: 0; }
+
+/* ---------- Small text helpers ---------- */
+.cb-app .asc-hint { display: inline-flex; align-items: center; gap: var(--space-1); font-size: 12px; line-height: 16px; color: var(--ink-muted); }
+.cb-app .asc-hint--center { align-self: center; text-align: center; }
+.cb-app .asc-form { display: flex; flex-direction: column; gap: var(--space-4); }
+.cb-app .asc-field { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+.cb-app .asc-field__label { font: 500 13px/18px var(--font-sans); color: var(--ink); }
+.cb-app .asc-chips { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.cb-app .asc-chips .cb-chip { height: 28px; padding: 0 10px; font-size: 12px; }
+
+/* ---------- Council posts ---------- */
+.cb-app .asc-posts { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.cb-app .asc-post { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); min-width: 0; }
+.cb-app .asc-post:hover { background: var(--surface-hover); }
+.cb-app .asc-post.is-active { border-color: var(--accent-strong); background: var(--accent-soft); }
+.cb-app .asc-post__open { all: unset; flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; cursor: pointer; padding: var(--space-1) 0; border-radius: var(--radius-sm); }
+.cb-app .asc-post__open:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.cb-app .asc-post__line { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); min-width: 0; }
+.cb-app .asc-post__title { font: 600 14px/20px var(--font-sans); color: var(--ink); overflow-wrap: anywhere; }
+.cb-app .asc-post__meta { font-size: 12px; line-height: 16px; color: var(--ink-muted); font-variant-numeric: tabular-nums; }
+.cb-app .asc-post__actions { display: flex; align-items: center; gap: var(--space-1); flex: none; }
+.cb-app .asc-post--compact { background: var(--surface); }
+.cb-app .asc-post--compact .asc-post__title { font-size: 13px; line-height: 18px; }
+
+/* ---------- House councils (each tinted by the house's own colour) ---------- */
+.cb-app .asc-houses { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-4); grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr)); }
+.cb-app .asc-house { display: flex; flex-direction: column; min-width: 0; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); overflow: hidden; }
+.cb-app .asc-house__head { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--border); box-shadow: inset 0 3px 0 var(--tone); }
+.cb-app .asc-house__swatch { flex: none; width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; border-radius: var(--radius-sm); }
+.cb-app .asc-house__name { flex: 1; min-width: 0; font: 600 14px/20px var(--font-sans); color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cb-app .asc-house__count { flex: none; font-size: 12px; line-height: 16px; color: var(--ink-muted); font-variant-numeric: tabular-nums; }
+.cb-app .asc-house .asc-posts { padding: var(--space-3); }
+.cb-app .asc-house__empty { padding: var(--space-4); font-size: 13px; line-height: 18px; color: var(--ink-muted); }
+
+/* ---------- Registrations sheet ---------- */
+.cb-app .asc-postsum { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--space-3); padding: var(--space-3) var(--space-4); border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface-sunken); }
+.cb-app .asc-postsum__row { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); min-width: 0; }
+.cb-app .asc-postsum__meta { font-size: 13px; line-height: 18px; color: var(--ink-muted); font-variant-numeric: tabular-nums; }
+.cb-app .asc-postsum__status { width: 160px; }
+
+.cb-app .asc-finder { display: flex; flex-direction: column; gap: var(--space-2); }
+.cb-app .asc-finder__state { padding: var(--space-4); }
+.cb-app .asc-finder__none { padding: var(--space-3); font-size: 13px; line-height: 18px; color: var(--ink-muted); border: 1px dashed var(--border-control); border-radius: var(--radius-md); }
+.cb-app .asc-hits { list-style: none; margin: 0; padding: var(--space-1); max-height: 280px; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); }
+.cb-app .asc-hit { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2); border-radius: var(--radius-sm); }
+.cb-app .asc-hit:hover { background: var(--surface-hover); }
+
+.cb-app .asc-person { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.cb-app .asc-person__line { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); }
+.cb-app .asc-person__name { font: 600 14px/20px var(--font-sans); color: var(--ink); overflow-wrap: anywhere; }
+.cb-app .asc-person__link { all: unset; font: 600 14px/20px var(--font-sans); color: var(--accent-strong); cursor: pointer; border-radius: var(--radius-sm); }
+.cb-app .asc-person__link:hover { text-decoration: underline; }
+.cb-app .asc-person__link:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.cb-app .asc-person__meta { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 6px; font-size: 12px; line-height: 16px; color: var(--ink-muted); }
+
+.cb-app .asc-regs { display: flex; flex-direction: column; gap: var(--space-3); }
+.cb-app .asc-regs__title { display: flex; align-items: center; gap: var(--space-2); font: 600 14px/20px var(--font-sans); color: var(--ink); }
+.cb-app .asc-regs__count { font: 500 12px/16px var(--font-sans); color: var(--ink-muted); padding: 1px 8px; border-radius: var(--radius-full); background: var(--neutral-soft); font-variant-numeric: tabular-nums; }
+.cb-app .asc-reglist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.cb-app .asc-reg { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-3); padding: var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); }
+.cb-app .asc-reg__actions { display: flex; gap: var(--space-1); flex: none; }
+
+/* ---------- Student profile hero (on top of shared .actvt-hero) ---------- */
+.cb-app .asc-hero__photo { width: 72px; height: 72px; border-radius: var(--radius-lg); font-size: 24px; box-shadow: 0 0 0 3px var(--surface), 0 0 0 4px var(--tone); }
+.cb-app .asc-hero__tags { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2) var(--space-3); }
+.cb-app .asc-hero__meta { font-size: 13px; line-height: 18px; color: var(--ink-muted); }
+.cb-app .asc-housetag { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 10px 0 6px; border-radius: var(--radius-full); background: var(--surface); border: 1px solid color-mix(in srgb, var(--tone) 45%, var(--border)); font: 600 12px/16px var(--font-sans); color: var(--ink); }
+.cb-app .asc-housetag__logo { width: 16px; height: 16px; object-fit: contain; border-radius: var(--radius-sm); }
+
+.cb-app .asc-facts { flex: 1 1 100%; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-4); padding-top: var(--space-4); border-top: 1px solid color-mix(in srgb, var(--tone) 25%, var(--border)); }
+.cb-app .asc-fact { display: flex; align-items: flex-start; gap: var(--space-3); min-width: 0; }
+.cb-app .asc-fact + .asc-fact { border-left: 1px solid var(--border); padding-left: var(--space-4); }
+.cb-app .asc-fact__icon { flex: none; margin-top: 2px; color: var(--ink-subtle); }
+.cb-app .asc-fact__text { display: flex; flex-direction: column; min-width: 0; }
+.cb-app .asc-fact__label { font: 500 12px/16px var(--font-sans); color: var(--ink-muted); }
+.cb-app .asc-fact__value { font: 600 14px/20px var(--font-sans); color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+/* ---------- Wall of fame ---------- */
+.cb-app .asc-fame { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-3); grid-template-columns: repeat(auto-fill, minmax(min(240px, 100%), 1fr)); }
+.cb-app .asc-fame__item { display: flex; align-items: flex-start; gap: var(--space-3); padding: var(--space-4); border: 1px solid var(--warning-border); border-radius: var(--radius-md); background: var(--warning-soft); min-width: 0; }
+.cb-app .asc-fame__icon { flex: none; width: 40px; height: 40px; display: inline-flex; align-items: center; justify-content: center; border-radius: var(--radius-md); background: var(--surface); color: var(--warning-ink); }
+.cb-app .asc-fame__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.cb-app .asc-fame__role { font: 600 14px/20px var(--font-sans); color: var(--ink); }
+.cb-app .asc-fame__event { font-size: 13px; line-height: 18px; color: var(--ink); overflow-wrap: anywhere; }
+.cb-app .asc-fame__date { font-size: 12px; line-height: 16px; color: var(--ink-muted); }
+
+/* ---------- Simple record lists ---------- */
+.cb-app .asc-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.cb-app .asc-list__item { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-3) 0; border-top: 1px solid var(--border); }
+.cb-app .asc-list__item:first-child { border-top: 0; padding-top: 0; }
+.cb-app .asc-list__main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.cb-app .asc-list__line { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); }
+.cb-app .asc-list__title { font: 600 14px/20px var(--font-sans); color: var(--ink); overflow-wrap: anywhere; }
+.cb-app .asc-list__meta { font-size: 12px; line-height: 16px; color: var(--ink-muted); }
+
+/* ---------- Printable certificate (hidden on screen) ---------- */
+.cb-app .asc-print { display: none; }
+.cb-app .asc-cert { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 90vh; padding: 64px 48px; border: 10px solid var(--accent-strong); text-align: center; color: var(--ink); background: var(--surface); }
+.cb-app .asc-cert__brand { font: 600 14px/20px var(--font-sans); letter-spacing: 0.35em; text-transform: uppercase; color: var(--accent-strong); }
+.cb-app .asc-cert__title { margin-top: var(--space-6); font: 700 36px/44px var(--font-sans); }
+.cb-app .asc-cert__lead { margin-top: var(--space-8); font-size: 16px; color: var(--ink-muted); }
+.cb-app .asc-cert__name { margin-top: var(--space-3); font: 600 30px/38px var(--font-sans); }
+.cb-app .asc-cert__class { margin-top: var(--space-2); font-size: 14px; color: var(--ink-muted); }
+.cb-app .asc-cert__body { margin-top: var(--space-8); max-width: 42rem; font-size: 16px; line-height: 1.6; color: var(--ink-muted); }
+.cb-app .asc-cert__sign { margin-top: 64px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-8); width: 100%; max-width: 48rem; font-size: 14px; color: var(--ink-muted); }
+.cb-app .asc-cert__line { display: block; width: 160px; height: 1px; margin: 0 auto var(--space-2); background: var(--border-strong); }
+
+@media print {
+  .cb-app .asc-screen { display: none !important; }
+  .cb-app .asc-print { display: block; }
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 1023px) {
+  .cb-app .asc-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cb-app .asc-fact:nth-child(3) { border-left: 0; padding-left: 0; }
+}
+
+@media (max-width: 640px) {
+  .cb-app .asc { gap: var(--space-4); }
+  .cb-app .asc-houses { grid-template-columns: minmax(0, 1fr); }
+  .cb-app .asc-post__manage { display: none; }
+  .cb-app .asc-postsum__status { width: 100%; }
+  .cb-app .asc-reg__actions { width: 100%; padding-left: 44px; }
+  .cb-app .asc-hit { flex-wrap: wrap; }
+  .cb-app .asc-list__item { align-items: flex-start; flex-direction: column; }
+  .cb-app .asc-hero { padding: var(--space-4); }
+  .cb-app .asc-hero .actvt-hero__actions { width: 100%; }
+  .cb-app .asc-hero .actvt-hero__actions .cb-btn { flex: 1; justify-content: center; }
+  .cb-app .asc-fact__value { white-space: normal; }
+}

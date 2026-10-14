@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Fee Receipts</title>
+    <!-- Styles and page markup come from cpitl-fee-receipt.html (registered as partials by
+         collectionController.bulkReceiptsPdf), so the combined PDF matches the single receipt. -->
+    <style>
+      {{> cpitlReceiptStyles}}
+      .page + .page { break-before: page; page-break-before: always; }
+    </style>
+  </head>
+  <body>
+    {{#each receipts}}
+    {{> cpitlReceiptPage}}
+    {{/each}}
+  </body>
+</html>

@@ -59,6 +59,7 @@
 /* ---------- Badge ---------- */
 .cb-app .cb-badge { display: inline-flex; align-items: center; gap: 6px; height: 22px; padding: 0 8px; border-radius: var(--radius-sm); font: 500 12px/16px var(--font-sans); white-space: nowrap; }
 .cb-app .cb-badge--lg { height: 26px; padding: 0 10px; font-size: 13px; }
+.cb-app .cb-badge--sm { height: 18px; padding: 0 6px; gap: 4px; }
 .cb-app .cb-badge__dot { width: 6px; height: 6px; border-radius: var(--radius-full); background: currentColor; flex: none; }
 .cb-app .cb-badge--success { background: var(--success-soft); color: var(--success-ink); }
 .cb-app .cb-badge--warning { background: var(--warning-soft); color: var(--warning-ink); }
@@ -82,7 +83,7 @@
 .cb-app .cb-progress__fill--info { background: var(--info-solid); }
 
 /* ---------- Card ---------- */
-.cb-app .cb-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-xs); min-width: 0; display: flex; flex-direction: column; }
+.cb-app .cb-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-xs); min-width: 0; display: flex; flex-direction: column; overflow: clip; }
 .cb-app .cb-card__head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); padding: var(--space-4) var(--space-5) 0; }
 .cb-app .cb-card__title { margin: 0; font: 600 15px/22px var(--font-sans); color: var(--ink); }
 .cb-app .cb-card__subtitle { margin: 2px 0 0; font-size: 13px; line-height: 18px; color: var(--ink-muted); }
@@ -120,15 +121,17 @@
 @media (max-width: 640px) { .cb-app .cb-pagehead__title { font-size: 20px; line-height: 28px; } .cb-app .cb-pagehead__actions { width: 100%; } .cb-app .cb-pagehead__actions > .cb-btn { flex: 1; } }
 
 /* ---------- Tabs ---------- */
-.cb-app .cb-tabs { display: flex; gap: var(--space-5); border-bottom: 1px solid var(--border); overflow-x: auto; scrollbar-width: none; }
+/* The bottom rule is an inset shadow and the active underline sits on it, so nothing overflows the bar:
+   it scrolls sideways when tabs don't fit, never vertically. */
+.cb-app .cb-tabs { display: flex; gap: var(--space-5); box-shadow: inset 0 -1px 0 var(--border); overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
 .cb-app .cb-tabs::-webkit-scrollbar { display: none; }
 .cb-app .cb-tab { position: relative; display: inline-flex; align-items: center; gap: 6px; height: 40px; padding: 0; background: none; border: 0; font: 500 13px/18px var(--font-sans); color: var(--ink-muted); cursor: pointer; white-space: nowrap; border-radius: var(--radius-sm) var(--radius-sm) 0 0; }
 .cb-app .cb-tab:hover { color: var(--ink); }
 .cb-app .cb-tab.is-active { color: var(--ink); font-weight: 600; }
-.cb-app .cb-tab.is-active::after { content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; background: var(--accent); border-radius: 2px 2px 0 0; }
+.cb-app .cb-tab.is-active::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: var(--accent); border-radius: 2px 2px 0 0; }
 .cb-app .cb-tab__count { min-width: 20px; height: 18px; padding: 0 6px; border-radius: var(--radius-full); background: var(--surface-sunken); color: var(--ink-muted); font-size: 12px; line-height: 18px; text-align: center; }
 .cb-app .cb-tab.is-active .cb-tab__count { background: var(--accent-soft); color: var(--accent-soft-ink); }
-.cb-app .cb-tabs--segmented { display: inline-flex; gap: 2px; padding: 2px; border: 0; background: var(--surface-sunken); border-radius: var(--radius-md); }
+.cb-app .cb-tabs--segmented { display: inline-flex; gap: 2px; padding: 2px; border: 0; box-shadow: none; background: var(--surface-sunken); border-radius: var(--radius-md); }
 .cb-app .cb-tabs--segmented .cb-tab { height: 28px; padding: 0 12px; border-radius: 6px; }
 .cb-app .cb-tabs--segmented .cb-tab.is-active { background: var(--surface-raised); box-shadow: var(--shadow-xs); }
 .cb-app .cb-tabs--segmented .cb-tab.is-active::after { display: none; }
@@ -164,8 +167,11 @@
 .cb-app .cb-tcard.is-clickable { cursor: pointer; }
 .cb-app .cb-tcard__head { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--space-3); }
 .cb-app .cb-tcard__titles { min-width: 0; }
-.cb-app .cb-tcard__title { font-weight: 600; font-size: 14px; line-height: 20px; color: var(--ink); }
+.cb-app .cb-tcard__title { font-weight: 600; font-size: 14px; line-height: 20px; color: var(--ink); overflow-wrap: anywhere; }
+/* An Entity used as a card title keeps its second line secondary. */
+.cb-app .cb-tcard__title .cb-entity__secondary { font-weight: 400; color: var(--ink-muted); }
 .cb-app .cb-tcard__subtitle { font-size: 13px; line-height: 18px; color: var(--ink-muted); }
+.cb-app .cb-tcard__subtitle .cb-entity__primary { font-weight: 500; color: var(--ink-muted); }
 .cb-app .cb-tcard__aside { flex: none; }
 .cb-app .cb-tcard__fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2) var(--space-4); margin: var(--space-2) 0 0; }
 .cb-app .cb-tcard__field { min-width: 0; }
@@ -288,6 +294,8 @@
 .cb-app .cb-menu__panel { position: absolute; top: calc(100% + 4px); z-index: 50; min-width: 200px; padding: 4px; background: var(--surface-raised); border: 1px solid var(--border); border-radius: var(--radius-md); box-shadow: var(--shadow-overlay); display: flex; flex-direction: column; }
 .cb-app .cb-menu__panel--end { right: 0; }
 .cb-app .cb-menu__panel--start { left: 0; }
+/* Portalled panel: fixed to the viewport, above sheets and dialogs (z 100). */
+.cb-app .cb-menu__panel--floating { position: fixed; z-index: 130; max-height: calc(100vh - 16px); overflow-y: auto; }
 .cb-app .cb-menu__item { display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px; border: 0; background: none; border-radius: 6px; color: var(--ink); font: 400 14px/20px var(--font-sans); text-align: left; cursor: pointer; white-space: nowrap; }
 .cb-app .cb-menu__item .cb-icon { color: var(--ink-muted); }
 .cb-app .cb-menu__item:hover, .cb-app .cb-menu__item:focus-visible { background: var(--surface-hover); outline: none; }
@@ -490,3 +498,8 @@
 .cb-app .cb-select select { background-image: none; }
 .cb-app .cb-input input[type='date'] { min-width: 0; }
 .cb-app .cb-input input[type='search']::-webkit-search-cancel-button { cursor: pointer; }
+
+/* Pagination in a DataTable footer, and the PDF preview frame used in Sheets. */
+.cb-app .cb-pagination { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; font-variant-numeric: tabular-nums; }
+.cb-app .cb-pagination .cb-field { width: auto; }
+.cb-app .cb-pdf-frame { flex: 1; width: 100%; min-height: 60vh; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); }

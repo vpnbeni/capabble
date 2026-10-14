@@ -1,9 +1,11 @@
 import React, { useState } from 'react'
 import toast from 'react-hot-toast'
-import { Printer } from 'lucide-react'
+import { Printer, Users } from 'lucide-react'
+import { Banner, Button, Card, EmptyState, Page, Select, TextField } from '@/components/ui'
 import { useCpitlClasses } from '@/hooks/useCpitl'
 import cpitlService from '@/services/cpitlService'
-import { CpitlCard, CpitlEmpty, CpitlPageShell, Field, btnPrimary, errorMessage, inputClass } from '@/components/cpitl/CpitlUi'
+import { errorMessage } from '@/components/cpitl/CpitlUi'
+import '@/components/cpitl/collection.css'
 
 const endOfMonthIso = () => {
   const d = new Date()
@@ -17,9 +19,12 @@ const CpitlFeeSlips: React.FC = () => {
   const [section, setSection] = useState('')
   const [upto, setUpto] = useState(endOfMonthIso())
   const [busy, setBusy] = useState(false)
-  const sections = classes.find((c) => c.class === cls)?.sections || []
+  const classRow = classes.find((c) => c.class === cls)
+  const sections = classRow?.sections || []
+  const studentCount = section ? sections.find((s) => s.section === section)?.count ?? 0 : classRow?.count ?? 0
 
-  const generate = async () => {
+  const generate = async (event?: React.FormEvent) => {
+    event?.preventDefault()
     if (!cls) {
       toast.error('Select a class.')
       return
@@ -35,59 +40,79 @@ const CpitlFeeSlips: React.FC = () => {
   }
 
   return (
-    <CpitlPageShell title="Fee Slips" subtitle="Print fee slips (parent and school copy) for all pending dues of a class or section">
-      <CpitlCard className="max-w-3xl">
-        {isLoading ? (
-          <div className="h-32 animate-pulse rounded-xl bg-slate-100 dark:bg-slate-700" />
-        ) : classes.length ? (
-          <>
-            <div className="grid gap-4 sm:grid-cols-3">
-              <Field label="Class">
-                <select
-                  className={inputClass}
-                  value={cls}
-                  onChange={(e) => {
-                    setCls(e.target.value)
-                    setSection('')
-                  }}
-                >
-                  <option value="">Select class</option>
-                  {classes.map((c) => (
-                    <option key={c.class} value={c.class}>
-                      Class {c.class} ({c.count})
-                    </option>
-                  ))}
-                </select>
-              </Field>
-              <Field label="Section">
-                <select className={inputClass} value={section} disabled={!cls} onChange={(e) => setSection(e.target.value)}>
-                  <option value="">All sections</option>
-                  {sections.map((s) => (
-                    <option key={s.section} value={s.section}>
-                      {s.section || '—'} ({s.count})
-                    </option>
-                  ))}
-                </select>
-              </Field>
-              <Field label="Include dues up to" hint="Installments due after this date are left out">
-                <input type="date" className={inputClass} value={upto} onChange={(e) => setUpto(e.target.value)} />
-              </Field>
+    <Page>
+      {isLoading ? (
+        <Card className="cc-slips">
+          <div className="cb-table-state" role="status">
+            <span className="cb-spinner" aria-hidden="true" />
+            Loading classes…
+          </div>
+        </Card>
+      ) : classes.length ? (
+        <form onSubmit={generate} noValidate className="cc-slips">
+          <Card
+            title="Print class fee slips"
+            subtitle="Parent and school copy for every pending due in a class or section."
+            footer={
+              <div className="cc-slips__foot">
+                <span className="cc-slips__count" aria-live="polite">
+                  {cls ? (
+                    <>
+                      <strong>{studentCount}</strong> {studentCount === 1 ? 'student' : 'students'} in {section ? `Class ${cls}-${section}` : `Class ${cls}`}
+                    </>
+                  ) : (
+                    'Pick a class to print its slips.'
+                  )}
+                </span>
+                <Button type="submit" variant="primary" icon={Printer} loading={busy} disabled={!cls}>
+                  {busy ? 'Preparing PDF…' : 'Generate slips'}
+                </Button>
+              </div>
+            }
+          >
+            <div className="cb-form-grid cb-form-grid--3">
+              <Select
+                label="Class"
+                required
+                value={cls}
+                placeholder="Select class"
+                options={classes.map((c) => ({ value: c.class, label: `Class ${c.class} (${c.count})` }))}
+                onChange={(e) => {
+                  setCls(e.target.value)
+                  setSection('')
+                }}
+              />
+              <Select
+                label="Section"
+                value={section}
+                disabled={!cls}
+                placeholder="All sections"
+                options={sections.map((s) => ({ value: s.section, label: `${s.section || '—'} (${s.count})` }))}
+                onChange={(e) => setSection(e.target.value)}
+              />
+              <TextField
+                label="Include dues up to"
+                type="date"
+                value={upto}
+                hint="Installments due after this date are left out"
+                onChange={(e) => setUpto(e.target.value)}
+              />
             </div>
-            <div className="mt-5 flex justify-end">
-              <button type="button" className={btnPrimary} disabled={busy || !cls} onClick={generate}>
-                <Printer className="h-4 w-4" /> {busy ? 'Preparing PDF…' : 'Generate slips'}
-              </button>
-            </div>
-            <p className="mt-4 text-xs text-slate-500">
-              Only students with an unpaid balance get a slip. Late fees are calculated as of today. For a single student, use “Fee slip” on the
-              student's ledger.
-            </p>
-          </>
-        ) : (
-          <CpitlEmpty message="No students found in this session." />
-        )}
-      </CpitlCard>
-    </CpitlPageShell>
+          </Card>
+        </form>
+      ) : (
+        <Card className="cc-slips">
+          <EmptyState icon={Users} title="No students found in this session." body="Add students to the session, then come back to print their fee slips." />
+        </Card>
+      )}
+
+      {!isLoading && classes.length ? (
+        <Banner tone="info" className="cc-slips">
+          Only students with an unpaid balance get a slip. Late fees are calculated as of today. For a single student, use “Fee slip” on the
+          student's ledger.
+        </Banner>
+      ) : null}
+    </Page>
   )
 }
 

@@ -1,0 +1,51 @@
+/*
+ * Activities module — shared pieces. Tokens only, except the entity's own colour,
+ * which arrives as --tone (and --tone-ink for text on it) from entityTone.toneStyle().
+ * Everything sits inside .cb-app.
+ */
+
+/* ---------- Entity tone primitives ---------- */
+.cb-app .actvt-tone-fill { background: var(--tone); color: var(--tone-ink); }
+.cb-app .actvt-tone-soft { background: color-mix(in srgb, var(--tone) 12%, var(--surface)); }
+.cb-app .actvt-tone-border { border-color: color-mix(in srgb, var(--tone) 45%, var(--border)); }
+.cb-app .actvt-tone-bar { box-shadow: inset 4px 0 0 var(--tone); }
+.cb-app .actvt-tone-dot { display: inline-block; flex: none; width: 10px; height: 10px; border-radius: var(--radius-full); background: var(--tone); box-shadow: 0 0 0 1px color-mix(in srgb, var(--ink) 14%, transparent); }
+
+/* ---------- Entity card: tone band + logo + name ---------- */
+.cb-app .actvt-grid { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-4); grid-template-columns: repeat(auto-fill, minmax(232px, 1fr)); }
+.cb-app .actvt-card { position: relative; display: flex; flex-direction: column; min-width: 0; height: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-xs); overflow: hidden; }
+.cb-app .actvt-card__open { all: unset; display: flex; flex-direction: column; flex: 1; cursor: pointer; }
+.cb-app .actvt-card__open:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; border-radius: var(--radius-lg); }
+.cb-app .actvt-card:hover { border-color: color-mix(in srgb, var(--tone) 45%, var(--border)); }
+.cb-app .actvt-card__band { display: block; height: 64px; background: var(--tone); }
+.cb-app .actvt-card__logo { align-self: center; margin-top: -44px; width: 104px; height: 104px; display: flex; align-items: center; justify-content: center; border-radius: var(--radius-lg); background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow-xs); overflow: hidden; }
+.cb-app .actvt-card__logo img { width: 100%; height: 100%; object-fit: contain; padding: 6px; }
+.cb-app .actvt-card__initials { font: 600 28px/1 var(--font-sans); color: var(--tone-ink); background: var(--tone); width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
+.cb-app .actvt-card__body { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: var(--space-3) var(--space-4) var(--space-4); text-align: center; }
+.cb-app .actvt-card__name { font: 600 15px/22px var(--font-sans); color: var(--ink); }
+.cb-app .actvt-card__tagline { font-size: 13px; line-height: 18px; color: var(--ink-muted); }
+.cb-app .actvt-card__motto { margin-top: var(--space-1); font-size: 12px; line-height: 16px; color: var(--ink-subtle); font-style: italic; }
+.cb-app .actvt-card__meta { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--space-1); margin-top: var(--space-2); }
+.cb-app .actvt-card__foot { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); padding: var(--space-2) var(--space-3); border-top: 1px solid var(--border); }
+.cb-app .actvt-card__swatch { display: inline-flex; align-items: center; gap: 6px; min-width: 0; font: 500 12px/16px var(--font-sans); color: var(--ink-muted); font-variant-numeric: tabular-nums; }
+.cb-app .actvt-card__actions { display: inline-flex; gap: 2px; }
+
+/* ---------- Entity hero (detail pages) ---------- */
+.cb-app .actvt-hero { display: flex; align-items: center; gap: var(--space-4); flex-wrap: wrap; padding: var(--space-5); border-radius: var(--radius-lg); border: 1px solid color-mix(in srgb, var(--tone) 35%, var(--border)); background: color-mix(in srgb, var(--tone) 10%, var(--surface)); box-shadow: inset 0 4px 0 var(--tone); }
+.cb-app .actvt-hero__logo { width: 88px; height: 88px; flex: none; border-radius: var(--radius-lg); background: var(--surface); border: 1px solid var(--border); overflow: hidden; display: flex; align-items: center; justify-content: center; }
+.cb-app .actvt-hero__logo img { width: 100%; height: 100%; object-fit: contain; padding: 6px; }
+.cb-app .actvt-hero__main { flex: 1 1 260px; min-width: 0; display: flex; flex-direction: column; gap: var(--space-1); }
+.cb-app .actvt-hero__name { font: 600 22px/30px var(--font-sans); letter-spacing: -0.01em; color: var(--ink); }
+.cb-app .actvt-hero__tagline { font-size: 14px; line-height: 20px; color: var(--ink-muted); }
+.cb-app .actvt-hero__actions { display: flex; gap: var(--space-2); flex-wrap: wrap; }
+
+/* ---------- Color field (picker + hex) ---------- */
+.cb-app .actvt-colorfield { display: flex; align-items: center; gap: var(--space-2); }
+.cb-app .actvt-colorfield input[type='color'] { flex: none; width: var(--control-md); height: var(--control-md); padding: 3px; border: 1px solid var(--border-control); border-radius: var(--radius-md); background: var(--surface); cursor: pointer; }
+.cb-app .actvt-colorfield .cb-field { flex: 1; min-width: 0; }
+
+@media (max-width: 640px) {
+  .cb-app .actvt-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
+  .cb-app .actvt-card__logo { width: 80px; height: 80px; margin-top: -36px; }
+  .cb-app .actvt-card__band { height: 52px; }
+}

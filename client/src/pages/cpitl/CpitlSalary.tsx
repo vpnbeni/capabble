@@ -1,55 +1,81 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
-import { Plus, Save, Search, Trash2 } from 'lucide-react'
-import Modal from '@/components/common/Modal'
+import { ArrowLeft, Calculator, Eye, IndianRupee, Plus, Save, Trash2, TrendingUp, Users, Wallet } from 'lucide-react'
 import { useInvalidateCpitl, usePayrollSettings, useSalaryComponents, useStaffSalaries, useStaffSalary } from '@/hooks/useCpitl'
+import cpitlBulkService, { type SalaryRevisionResult } from '@/services/cpitlBulkService'
 import cpitlService, { PayrollSettings, PayslipCalc, SalaryCalc, SalaryComponent, SalaryLine, SalaryOptions, StaffSalaryRow } from '@/services/cpitlService'
 import { todayIso } from '@/components/cpitl/QuickExpenseSheet'
-import { CpitlCard, CpitlEmpty, CpitlPageShell, Field, btnGhost, btnPrimary, btnSecondary, errorMessage, fmtDate, inputClass, inr, tableHead } from '@/components/cpitl/CpitlUi'
+import {
+  Avatar,
+  Badge,
+  Banner,
+  BulkBar,
+  BulkResultDialog,
+  Button,
+  Card,
+  Checkbox,
+  DataTable,
+  Dialog,
+  EmptyState,
+  FilterBar,
+  Page,
+  Select,
+  Sheet,
+  StatCard,
+  Tabs,
+  TextField,
+  useRowSelection,
+  type BulkResult,
+  type DataTableColumn,
+} from '@/components/ui'
+import { errorMessage, fmtDate, inr } from '@/components/cpitl/CpitlUi'
+import '@/components/cpitl/payroll.css'
 
 type Tab = 'staff' | 'components'
+type SetFilter = 'all' | 'set' | 'missing'
 
 const CALC_LABELS: Record<SalaryCalc, string> = { fixed: '₹ per month', percent_of_basic: '% of Basic', percent_of_gross: '% of other earnings' }
+const CALC_OPTIONS = (Object.keys(CALC_LABELS) as SalaryCalc[]).map((k) => ({ value: k, label: CALC_LABELS[k] }))
 const DEFAULT_OPTIONS: SalaryOptions = { pf: true, pfWageCap: true, esi: 'auto', tdsMonthly: 0 }
 
 const PayslipPreview: React.FC<{ calc: PayslipCalc | null; loading: boolean }> = ({ calc, loading }) => (
-  <div className={`rounded-2xl border border-slate-200 p-4 text-sm dark:border-slate-700 ${loading ? 'opacity-60' : ''}`}>
-    <h4 className="mb-3 font-semibold text-slate-900 dark:text-white">Monthly payslip preview</h4>
+  <div className={`cp-slip${loading ? ' is-loading' : ''}`} aria-busy={loading || undefined}>
+    <h3 className="cp-slip__title">Monthly payslip preview</h3>
     {calc ? (
       <>
-        <div className="space-y-1">
+        <ul className="cp-slip__group" aria-label="Earnings">
           {calc.earnings.map((e) => (
-            <div key={e.code} className="flex justify-between text-slate-600 dark:text-slate-300">
+            <li key={e.code} className="cp-slip__row">
               <span>{e.name}</span>
-              <span className="tabular-nums">{inr(e.amount)}</span>
-            </div>
+              <span>{inr(e.amount)}</span>
+            </li>
           ))}
-          <div className="flex justify-between border-t border-slate-100 pt-1 font-medium dark:border-slate-700">
+          <li className="cp-slip__row is-sum">
             <span>Gross</span>
-            <span className="tabular-nums">{inr(calc.gross)}</span>
-          </div>
-        </div>
-        <div className="mt-3 space-y-1">
+            <span>{inr(calc.gross)}</span>
+          </li>
+        </ul>
+        <ul className="cp-slip__group" aria-label="Deductions">
           {calc.deductions.map((d) => (
-            <div key={d.code} className="flex justify-between text-rose-600 dark:text-rose-400">
+            <li key={d.code} className="cp-slip__row is-neg">
               <span>{d.name}</span>
-              <span className="tabular-nums">−{inr(d.amount)}</span>
-            </div>
+              <span>−{inr(d.amount)}</span>
+            </li>
           ))}
-          {!calc.deductions.length ? <p className="text-xs text-slate-400">No deductions</p> : null}
-        </div>
-        <div className="mt-3 flex justify-between rounded-xl bg-slate-50 px-3 py-2 text-base font-semibold dark:bg-slate-900/40">
+          {!calc.deductions.length ? <li className="cp-slip__empty">No deductions</li> : null}
+        </ul>
+        <div className="cp-slip__net" aria-live="polite">
           <span>Net pay</span>
-          <span className="tabular-nums">{inr(calc.net)}</span>
+          <strong>{inr(calc.net)}</strong>
         </div>
-        <p className="mt-2 text-xs text-slate-500">
+        <p className="cp-slip__note">
           Cost to school {inr(calc.employerCost)}
           {calc.employerPf ? ` · employer PF ${inr(calc.employerPf)}` : ''}
           {calc.employerEsi ? ` · employer ESI ${inr(calc.employerEsi)}` : ''}
         </p>
       </>
     ) : (
-      <p className="text-slate-400">Enter Basic pay to see the payslip.</p>
+      <p className="cp-slip__empty">Enter Basic pay to see the payslip.</p>
     )}
   </div>
 )
@@ -129,131 +155,146 @@ const SalaryEditor: React.FC<{ staff: StaffSalaryRow | null; components: SalaryC
 
   const earnings = components.filter((c) => c.type === 'earning')
   const deductions = components.filter((c) => c.type === 'deduction')
+  const setValue = (code: string, value: string) => setValues((p) => ({ ...p, [code]: value }))
 
   return (
-    <Modal isOpen={Boolean(staff)} onClose={onClose} title={`Salary — ${staff?.name || ''}`} size="xl">
-      {staff ? (
-        <div className="grid gap-6 md:grid-cols-5">
-          <div className="space-y-5 md:col-span-3">
-            <p className="text-sm text-slate-500">
-              {[staff.designation, staff.department, staff.employeeId && `Emp ID ${staff.employeeId}`].filter(Boolean).join(' · ')}
-              {!staff.employeeId ? (
-                <span className="mt-1 block text-xs text-amber-600">No employee ID — salary is linked to this session's staff record. Add an employee ID in Staff to carry it across sessions.</span>
-              ) : null}
-            </p>
-            <div>
-              <h4 className="mb-2 text-sm font-semibold text-slate-900 dark:text-white">Earnings</h4>
-              <div className="space-y-2">
-                {earnings.map((c) => (
-                  <div key={c._id} className="grid grid-cols-12 items-center gap-2">
-                    <span className="col-span-5 text-sm text-slate-700 dark:text-slate-200">{c.name}</span>
-                    <select
-                      aria-label={`${c.name} calculation`}
-                      className={`${inputClass} col-span-4 mt-0`}
-                      value={calcs[c.code] || c.calc}
-                      disabled={c.code === 'BASIC'}
-                      onChange={(e) => setCalcs((p) => ({ ...p, [c.code]: e.target.value as SalaryCalc }))}
-                    >
-                      {(Object.keys(CALC_LABELS) as SalaryCalc[]).map((k) => (
-                        <option key={k} value={k}>
-                          {CALC_LABELS[k]}
-                        </option>
-                      ))}
-                    </select>
-                    <input
-                      type="number"
-                      min={0}
-                      aria-label={`${c.name} value`}
-                      className={`${inputClass} col-span-3 mt-0 tabular-nums`}
-                      value={values[c.code] ?? ''}
-                      placeholder="0"
-                      onChange={(e) => setValues((p) => ({ ...p, [c.code]: e.target.value }))}
-                    />
-                  </div>
-                ))}
+    <Sheet
+      open={Boolean(staff)}
+      onClose={onClose}
+      size="xl"
+      icon={IndianRupee}
+      title={staff ? `Salary for ${staff.name}` : 'Salary'}
+      description={staff ? [staff.designation, staff.department, staff.employeeId && `Emp ID ${staff.employeeId}`].filter(Boolean).join(' · ') || undefined : undefined}
+      footer={
+        <>
+          <Button onClick={onClose}>Cancel</Button>
+          <Button variant="primary" icon={Save} loading={saving} disabled={!preview} onClick={save}>
+            {saving ? 'Saving…' : 'Save salary'}
+          </Button>
+        </>
+      }
+    >
+      {staff && isLoading ? (
+        <div className="cb-table-state" role="status">
+          <span className="cb-spinner" aria-hidden="true" />
+          Loading salary…
+        </div>
+      ) : staff ? (
+        <div className="cp-editor">
+          <div className="cp-editor__form">
+            {!staff.employeeId ? (
+              <Banner tone="warning" title="No employee ID">
+                Salary is linked to this session's staff record. Add an employee ID in Staff to carry it across sessions.
+              </Banner>
+            ) : null}
+
+            <div className="cb-form-section">
+              <h3 className="cb-form-section__title">Earnings</h3>
+              <div className="cp-lines">
+                {earnings.map((c) => {
+                  const calc = calcs[c.code] || c.calc
+                  return (
+                    <div key={c._id} className="cp-line">
+                      <span className="cp-line__name">{c.name}</span>
+                      <Select
+                        size="sm"
+                        aria-label={`${c.name} calculation`}
+                        value={calc}
+                        disabled={c.code === 'BASIC'}
+                        onChange={(e) => setCalcs((p) => ({ ...p, [c.code]: e.target.value as SalaryCalc }))}
+                        options={CALC_OPTIONS}
+                      />
+                      <TextField
+                        size="sm"
+                        type="number"
+                        min={0}
+                        aria-label={`${c.name} value`}
+                        prefix={calc === 'fixed' ? '₹' : undefined}
+                        suffix={calc === 'fixed' ? undefined : '%'}
+                        value={values[c.code] ?? ''}
+                        placeholder="0"
+                        onChange={(e) => setValue(c.code, e.target.value)}
+                      />
+                    </div>
+                  )
+                })}
               </div>
             </div>
+
             {deductions.length ? (
-              <div>
-                <h4 className="mb-2 text-sm font-semibold text-slate-900 dark:text-white">Fixed deductions</h4>
-                {deductions.map((c) => (
-                  <div key={c._id} className="grid grid-cols-12 items-center gap-2">
-                    <span className="col-span-9 text-sm text-slate-700 dark:text-slate-200">{c.name} (₹ per month)</span>
-                    <input
-                      type="number"
-                      min={0}
-                      aria-label={`${c.name} value`}
-                      className={`${inputClass} col-span-3 mt-0 tabular-nums`}
-                      value={values[c.code] ?? ''}
-                      placeholder="0"
-                      onChange={(e) => setValues((p) => ({ ...p, [c.code]: e.target.value }))}
-                    />
-                  </div>
-                ))}
+              <div className="cb-form-section">
+                <h3 className="cb-form-section__title">Fixed deductions</h3>
+                <div className="cp-lines">
+                  {deductions.map((c) => (
+                    <div key={c._id} className="cp-line cp-line--2">
+                      <span className="cp-line__name">{c.name} (₹ per month)</span>
+                      <TextField
+                        size="sm"
+                        type="number"
+                        min={0}
+                        aria-label={`${c.name} value`}
+                        prefix="₹"
+                        value={values[c.code] ?? ''}
+                        placeholder="0"
+                        onChange={(e) => setValue(c.code, e.target.value)}
+                      />
+                    </div>
+                  ))}
+                </div>
               </div>
             ) : null}
-            <div className="rounded-xl border border-slate-200 p-3 dark:border-slate-700">
-              <h4 className="mb-2 text-sm font-semibold text-slate-900 dark:text-white">Statutory</h4>
-              <div className="grid grid-cols-2 gap-3 text-sm">
-                <label className="flex items-center gap-2">
-                  <input type="checkbox" className="h-4 w-4 rounded" checked={options.pf} onChange={(e) => setOptions({ ...options, pf: e.target.checked })} />
-                  Provident Fund (12%)
-                </label>
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    className="h-4 w-4 rounded"
-                    checked={options.pfWageCap}
-                    disabled={!options.pf}
-                    onChange={(e) => setOptions({ ...options, pfWageCap: e.target.checked })}
-                  />
-                  Cap PF wage at ₹15,000
-                </label>
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    className="h-4 w-4 rounded"
-                    checked={options.esi === 'auto'}
-                    onChange={(e) => setOptions({ ...options, esi: e.target.checked ? 'auto' : 'off' })}
-                  />
-                  ESI when gross ≤ ₹21,000
-                </label>
-                <Field label="TDS per month (₹)">
-                  <input
-                    type="number"
-                    min={0}
-                    className={inputClass}
-                    value={options.tdsMonthly || ''}
-                    onChange={(e) => setOptions({ ...options, tdsMonthly: Number(e.target.value) || 0 })}
-                  />
-                </Field>
+
+            <div className="cb-form-section">
+              <h3 className="cb-form-section__title">Statutory</h3>
+              <div className="cp-checks">
+                <Checkbox label="Provident Fund (12%)" checked={options.pf} onChange={(checked) => setOptions({ ...options, pf: checked })} />
+                <Checkbox
+                  label="Cap PF wage at ₹15,000"
+                  checked={options.pfWageCap}
+                  disabled={!options.pf}
+                  onChange={(checked) => setOptions({ ...options, pfWageCap: checked })}
+                />
+                <Checkbox
+                  label="ESI when gross ≤ ₹21,000"
+                  checked={options.esi === 'auto'}
+                  onChange={(checked) => setOptions({ ...options, esi: checked ? 'auto' : 'off' })}
+                />
+                <TextField
+                  label="TDS per month"
+                  type="number"
+                  min={0}
+                  prefix="₹"
+                  value={options.tdsMonthly || ''}
+                  onChange={(e) => setOptions({ ...options, tdsMonthly: Number(e.target.value) || 0 })}
+                />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Effective from">
-                <input type="date" className={inputClass} value={effectiveFrom} onChange={(e) => setEffectiveFrom(e.target.value)} />
-              </Field>
-              <Field label="Note (shown in history)">
-                <input className={inputClass} value={note} placeholder="e.g. Annual increment 6%" onChange={(e) => setNote(e.target.value)} />
-              </Field>
+
+            <div className="cb-form-section">
+              <h3 className="cb-form-section__title">Revision</h3>
+              <div className="cb-form-grid">
+                <TextField label="Effective from" type="date" value={effectiveFrom} onChange={(e) => setEffectiveFrom(e.target.value)} />
+                <TextField label="Note" hint="Shown in salary history" value={note} placeholder="e.g. Annual increment 6%" onChange={(e) => setNote(e.target.value)} />
+              </div>
             </div>
           </div>
-          <div className="space-y-4 md:col-span-2">
+
+          <aside className="cp-editor__aside" aria-label="Net pay summary">
             <PayslipPreview calc={preview} loading={previewing} />
             {data?.structure?.revisions?.length ? (
-              <div>
-                <h4 className="mb-2 text-sm font-semibold text-slate-900 dark:text-white">Salary history</h4>
-                <ul className="space-y-2 text-xs">
+              <div className="cb-form-section">
+                <h3 className="cb-form-section__title">Salary history</h3>
+                <ul className="cp-history">
                   {[...data.structure.revisions].reverse().map((r, i) => (
-                    <li key={i} className="rounded-lg bg-slate-50 px-3 py-2 dark:bg-slate-900/40">
-                      <div className="flex justify-between font-medium text-slate-700 dark:text-slate-200">
+                    <li key={i} className="cp-history__item">
+                      <div className="cp-history__top">
                         <span>{fmtDate(r.effectiveFrom)}</span>
-                        <span className="tabular-nums">
+                        <span>
                           {r.fromGross ? `${inr(r.fromGross)} → ` : ''}
                           {inr(r.toGross)}
                         </span>
                       </div>
-                      <div className="text-slate-500">
+                      <div>
                         {r.note}
                         {r.by?.name ? ` · ${r.by.name}` : ''}
                       </div>
@@ -262,30 +303,243 @@ const SalaryEditor: React.FC<{ staff: StaffSalaryRow | null; components: SalaryC
                 </ul>
               </div>
             ) : null}
-          </div>
-          <div className="flex justify-end gap-2 md:col-span-5">
-            <button type="button" className={btnSecondary} onClick={onClose}>
-              Cancel
-            </button>
-            <button type="button" className={btnPrimary} disabled={saving || !preview} onClick={save}>
-              <Save className="h-4 w-4" /> {saving ? 'Saving…' : 'Save salary'}
-            </button>
-          </div>
+          </aside>
         </div>
       ) : null}
-    </Modal>
+    </Sheet>
+  )
+}
+
+type RevisionMode = 'percent' | 'amount'
+type RevisionRow = SalaryRevisionResult['rows'][number]
+type BulkOutcome = BulkResult & { action: string; noun: string }
+
+const REVISION_LIMITS: Record<RevisionMode, { min: number; max: number; message: string }> = {
+  percent: { min: -50, max: 100, message: 'Enter a % between −50 and 100.' },
+  amount: { min: -1000000, max: 1000000, message: 'Enter an amount within ±₹10,00,000.' },
+}
+
+const signedInr = (value: number) => (value > 0 ? `+${inr(value)}` : value < 0 ? `−${inr(Math.abs(value))}` : inr(0))
+
+const getStaffId = (s: StaffSalaryRow) => s.teacherId
+const staffRowLabel = (s: StaffSalaryRow) => `Select ${s.name}`
+
+/**
+ * Bulk salary revision: a % or ₹ change to the monthly gross of the selected staff. The
+ * preview step is the confirmation — nothing is saved until "Apply to N staff".
+ */
+const RevisionSheet: React.FC<{
+  staff: StaffSalaryRow[]
+  open: boolean
+  onClose: () => void
+  onDone: (outcome: BulkOutcome | null) => void
+}> = ({ staff, open, onClose, onDone }) => {
+  const [mode, setMode] = useState<RevisionMode>('percent')
+  const [value, setValue] = useState('')
+  const [effectiveFrom, setEffectiveFrom] = useState(todayIso())
+  const [note, setNote] = useState('')
+  const [preview, setPreview] = useState<SalaryRevisionResult | null>(null)
+  const [busy, setBusy] = useState<'preview' | 'apply' | null>(null)
+
+  useEffect(() => {
+    if (!open) return
+    setMode('percent')
+    setValue('')
+    setEffectiveFrom(todayIso())
+    setNote('')
+    setPreview(null)
+  }, [open])
+
+  // Any change to the inputs or the selection makes the preview stale (a background refetch does not).
+  const staffKey = staff.map((s) => s.teacherId).join(',')
+  useEffect(() => setPreview(null), [mode, value, effectiveFrom, note, staffKey])
+
+  const num = Number(value)
+  const limits = REVISION_LIMITS[mode]
+  const valueError =
+    value.trim() === ''
+      ? undefined
+      : !Number.isFinite(num) || num === 0
+        ? 'Enter a change other than zero.'
+        : num < limits.min || num > limits.max
+          ? limits.message
+          : undefined
+  const canPreview = value.trim() !== '' && !valueError && Boolean(effectiveFrom) && staff.length > 0
+
+  const body = () => ({
+    teacherIds: staff.map((s) => s.teacherId),
+    mode,
+    value: num,
+    effectiveFrom,
+    note: note.trim() || undefined,
+  })
+
+  const runPreview = async () => {
+    if (!canPreview) return
+    setBusy('preview')
+    try {
+      setPreview(await cpitlBulkService.reviseSalaries({ ...body(), preview: true }))
+    } catch (error) {
+      toast.error(await errorMessage(error))
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const apply = async () => {
+    setBusy('apply')
+    try {
+      const result = await cpitlBulkService.reviseSalaries({ ...body(), preview: false })
+      onDone(result.failed.length ? { ...result, action: 'Revise salaries', noun: 'salaries' } : null)
+      if (!result.failed.length) toast.success(`Salary revised for ${result.succeeded} staff from ${fmtDate(effectiveFrom)}.`)
+    } catch (error: any) {
+      // 422: every record was skipped — still a result worth showing.
+      const data = error?.response?.status === 422 ? (error.response.data?.data as SalaryRevisionResult | undefined) : undefined
+      if (data) onDone({ ...data, action: 'Revise salaries', noun: 'salaries' })
+      else toast.error(await errorMessage(error))
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const ready = preview?.rows.filter((r) => !r.error) || []
+  const skipped = preview?.rows.filter((r) => r.error) || []
+  const beforeTotal = ready.reduce((sum, r) => sum + r.beforeGross, 0)
+  const afterTotal = ready.reduce((sum, r) => sum + r.afterGross, 0)
+
+  const previewColumns: DataTableColumn<RevisionRow>[] = [
+    { key: 'name', header: 'Staff', mobile: 'title', render: (r) => r.name },
+    {
+      key: 'gross',
+      header: 'Gross / month',
+      align: 'right',
+      numeric: true,
+      mobile: 'subtitle',
+      render: (r) =>
+        r.error ? (
+          <span className="cp-sub is-warn">{r.error}</span>
+        ) : (
+          <span className="cp-nowrap">
+            {inr(r.beforeGross)} → <span className="cp-strong">{inr(r.afterGross)}</span>
+          </span>
+        ),
+    },
+    {
+      key: 'net',
+      header: 'Net change',
+      align: 'right',
+      numeric: true,
+      mobile: 'aside',
+      render: (r) => (r.error ? 'Skipped' : signedInr((r.afterNet ?? 0) - (r.beforeNet ?? 0))),
+    },
+  ]
+
+  const busyNow = busy !== null
+  return (
+    <Sheet
+      open={open}
+      onClose={busyNow ? undefined : onClose}
+      size="lg"
+      icon={TrendingUp}
+      title={`Revise salary for ${staff.length} staff`}
+      description="Changes the monthly gross. Deductions and PF/ESI/TDS settings stay as they are; statutory amounts are recalculated."
+      onSubmit={(e) => {
+        e.preventDefault()
+        if (!preview) runPreview()
+      }}
+      footer={
+        preview ? (
+          <>
+            <Button icon={ArrowLeft} disabled={busyNow} onClick={() => setPreview(null)}>
+              Back
+            </Button>
+            <Button variant="primary" icon={Save} loading={busy === 'apply'} disabled={!ready.length || busyNow} onClick={apply}>
+              {`Apply to ${ready.length} staff`}
+            </Button>
+          </>
+        ) : (
+          <>
+            <Button disabled={busyNow} onClick={onClose}>
+              Cancel
+            </Button>
+            <Button type="submit" variant="primary" icon={Eye} loading={busy === 'preview'} disabled={!canPreview || busyNow}>
+              Preview changes
+            </Button>
+          </>
+        )
+      }
+    >
+      {!preview ? (
+        <div className="cb-form-section">
+          <div className="cb-form-grid">
+            <Select
+              label="Change"
+              value={mode}
+              onChange={(e) => setMode(e.target.value as RevisionMode)}
+              options={[
+                { value: 'percent', label: 'Increase by %' },
+                { value: 'amount', label: 'Change by ₹' },
+              ]}
+            />
+            <TextField
+              label={mode === 'percent' ? 'Percent' : 'Amount per month'}
+              type="number"
+              step={mode === 'percent' ? '0.1' : '1'}
+              inputMode="decimal"
+              prefix={mode === 'amount' ? '₹' : undefined}
+              suffix={mode === 'percent' ? '%' : undefined}
+              value={value}
+              placeholder={mode === 'percent' ? 'e.g. 6' : 'e.g. 1000'}
+              hint={mode === 'percent' ? 'Use a minus sign to reduce, e.g. −5.' : 'Use a minus sign to reduce. Spread across earnings in proportion.'}
+              error={valueError}
+              onChange={(e) => setValue(e.target.value)}
+              required
+            />
+            <TextField label="Effective from" type="date" value={effectiveFrom} onChange={(e) => setEffectiveFrom(e.target.value)} required />
+            <TextField label="Note" hint="Shown in salary history" value={note} maxLength={200} placeholder="e.g. Annual increment 2026" onChange={(e) => setNote(e.target.value)} />
+          </div>
+          <p className="cp-slip__note">
+            Every fixed earning is scaled by the same ratio, so Basic and allowances keep their share. You'll see each person's new salary before anything is saved.
+          </p>
+        </div>
+      ) : (
+        <div className="cb-form-section">
+          <Banner tone="info" title={`Effective from ${fmtDate(effectiveFrom)}`}>
+            {ready.length
+              ? `${ready.length} staff · monthly gross ${inr(beforeTotal)} → ${inr(afterTotal)} (${signedInr(afterTotal - beforeTotal)}). Used from the next payroll you run or edit; finalized and paid payroll stays as it is.`
+              : 'None of the selected staff can be revised.'}
+          </Banner>
+          {skipped.length ? (
+            <Banner tone="warning" title={`${skipped.length} will be skipped`}>
+              {skipped.slice(0, 4).map((r) => `${r.name} (${r.error})`).join(', ')}
+              {skipped.length > 4 ? '…' : ''}
+            </Banner>
+          ) : null}
+          <DataTable<RevisionRow>
+            columns={previewColumns}
+            rows={preview.rows}
+            getRowKey={(r) => r.teacherId}
+            caption="Salary revision preview"
+            maxHeight="50vh"
+          />
+        </div>
+      )}
+    </Sheet>
   )
 }
 
 const ComponentsTab: React.FC<{ components: SalaryComponent[]; settings?: PayrollSettings; onChanged: () => void }> = ({ components, settings, onChanged }) => {
   const [draft, setDraft] = useState<Partial<SalaryComponent> | null>(null)
   const [form, setForm] = useState<PayrollSettings | null>(null)
+  const [removing, setRemoving] = useState<SalaryComponent | null>(null)
+  const [busy, setBusy] = useState<string | null>(null)
   useEffect(() => {
     if (settings) setForm(settings)
   }, [settings])
 
   const saveComponent = async () => {
     if (!draft) return
+    setBusy('component')
     try {
       await cpitlService.saveSalaryComponent(draft)
       toast.success('Component saved.')
@@ -293,180 +547,235 @@ const ComponentsTab: React.FC<{ components: SalaryComponent[]; settings?: Payrol
       onChanged()
     } catch (error) {
       toast.error(await errorMessage(error))
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const removeComponent = async () => {
+    if (!removing) return
+    setBusy('remove')
+    try {
+      await cpitlService.archiveSalaryComponent(removing._id)
+      setRemoving(null)
+      onChanged()
+    } catch (error) {
+      toast.error(await errorMessage(error))
+    } finally {
+      setBusy(null)
     }
   }
 
   const saveSettings = async () => {
     if (!form) return
+    setBusy('settings')
     try {
       await cpitlService.savePayrollSettings(form)
       toast.success('Statutory settings saved.')
       onChanged()
     } catch (error) {
       toast.error(await errorMessage(error))
+    } finally {
+      setBusy(null)
     }
   }
 
+  const setSlab = (i: number, patch: Partial<PayrollSettings['ptSlabs'][number]>) =>
+    form && setForm({ ...form, ptSlabs: form.ptSlabs.map((s, idx) => (idx === i ? { ...s, ...patch } : s)) })
+
   return (
-    <div className="grid gap-6 lg:grid-cols-2">
-      <CpitlCard
+    <div className="cb-grid-6-6">
+      <Card
         title="Salary components"
-        actions={
-          <button type="button" className={btnGhost} onClick={() => setDraft({ name: '', code: '', type: 'earning', calc: 'fixed', defaultValue: 0, sortOrder: 10 })}>
-            <Plus className="h-3.5 w-3.5" /> Add
-          </button>
+        subtitle="Earnings and fixed deductions that make up a salary."
+        action={
+          <Button size="sm" icon={Plus} onClick={() => setDraft({ name: '', code: '', type: 'earning', calc: 'fixed', defaultValue: 0, sortOrder: 10 })}>
+            Add component
+          </Button>
         }
       >
-        <ul className="divide-y divide-slate-100 dark:divide-slate-700">
-          {components.map((c) => (
-            <li key={c._id} className="flex items-center gap-3 py-2 text-sm">
-              <span className="w-20 font-mono text-xs text-slate-500">{c.code}</span>
-              <span className="flex-1 text-slate-800 dark:text-slate-100">{c.name}</span>
-              <span className="text-xs text-slate-500">
-                {c.type === 'deduction' ? 'Deduction · ' : ''}
-                {CALC_LABELS[c.calc]}
-                {c.defaultValue ? ` · default ${c.defaultValue}` : ''}
-              </span>
-              <button type="button" className={btnGhost} onClick={() => setDraft(c)}>
-                Edit
-              </button>
-              {c.code !== 'BASIC' ? (
-                <button
-                  type="button"
-                  className="text-slate-300 hover:text-rose-600"
-                  aria-label={`Remove ${c.name}`}
-                  onClick={async () => {
-                    if (!window.confirm(`Remove ${c.name}?`)) return
-                    try {
-                      await cpitlService.archiveSalaryComponent(c._id)
-                      onChanged()
-                    } catch (error) {
-                      toast.error(await errorMessage(error))
-                    }
-                  }}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              ) : null}
-            </li>
-          ))}
-        </ul>
-        <p className="mt-3 text-xs text-slate-500">PF, ESI, Professional Tax and TDS are calculated automatically and don't need components.</p>
-        {draft ? (
-          <div className="mt-4 grid grid-cols-2 gap-3 rounded-xl border border-slate-200 p-3 dark:border-slate-700">
-            <Field label="Name">
-              <input className={inputClass} value={draft.name || ''} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
-            </Field>
-            <Field label="Code">
-              <input
-                className={`${inputClass} uppercase`}
-                value={draft.code || ''}
-                disabled={draft.code === 'BASIC' && Boolean(draft._id)}
-                onChange={(e) => setDraft({ ...draft, code: e.target.value.toUpperCase().replace(/\s+/g, '_') })}
-              />
-            </Field>
-            <Field label="Type">
-              <select className={inputClass} value={draft.type} onChange={(e) => setDraft({ ...draft, type: e.target.value as SalaryComponent['type'], calc: e.target.value === 'deduction' ? 'fixed' : draft.calc })}>
-                <option value="earning">Earning</option>
-                <option value="deduction">Deduction (fixed)</option>
-              </select>
-            </Field>
-            <Field label="Calculated as">
-              <select className={inputClass} value={draft.calc} disabled={draft.type === 'deduction'} onChange={(e) => setDraft({ ...draft, calc: e.target.value as SalaryCalc })}>
-                {(Object.keys(CALC_LABELS) as SalaryCalc[]).map((k) => (
-                  <option key={k} value={k}>
-                    {CALC_LABELS[k]}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <Field label="Default value">
-              <input type="number" min={0} className={inputClass} value={draft.defaultValue ?? 0} onChange={(e) => setDraft({ ...draft, defaultValue: Number(e.target.value) })} />
-            </Field>
-            <div className="flex items-end justify-end gap-2">
-              <button type="button" className={btnSecondary} onClick={() => setDraft(null)}>
-                Cancel
-              </button>
-              <button type="button" className={btnPrimary} onClick={saveComponent}>
-                Save
-              </button>
-            </div>
-          </div>
-        ) : null}
-      </CpitlCard>
+        {components.length ? (
+          <ul className="cp-comps">
+            {components.map((c) => (
+              <li key={c._id} className="cp-comp">
+                <span className="cp-comp__code">{c.code}</span>
+                <span className="cp-comp__main">
+                  <span className="cp-comp__name">{c.name}</span>
+                  <span className="cp-comp__meta">
+                    {c.type === 'deduction' ? 'Deduction · ' : ''}
+                    {CALC_LABELS[c.calc]}
+                    {c.defaultValue ? ` · default ${c.defaultValue}` : ''}
+                  </span>
+                </span>
+                <Button variant="tertiary" size="sm" onClick={() => setDraft(c)}>
+                  Edit
+                </Button>
+                {c.code !== 'BASIC' ? (
+                  <Button variant="tertiary" size="sm" icon={Trash2} aria-label={`Remove ${c.name}`} onClick={() => setRemoving(c)} />
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <EmptyState compact icon={Calculator} title="No salary components" body="Add Basic pay first, then allowances such as HRA or DA." />
+        )}
+        <p className="cp-footnote">PF, ESI, Professional Tax and TDS are calculated automatically and don't need components.</p>
+      </Card>
 
       {form ? (
-        <CpitlCard title="Statutory rates" actions={<button type="button" className={btnPrimary} onClick={saveSettings}><Save className="h-4 w-4" /> Save</button>}>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="PF rate (%)">
-              <input type="number" className={inputClass} value={form.pfRate} onChange={(e) => setForm({ ...form, pfRate: Number(e.target.value) })} />
-            </Field>
-            <Field label="PF wage ceiling (₹)">
-              <input type="number" className={inputClass} value={form.pfWageCeiling} onChange={(e) => setForm({ ...form, pfWageCeiling: Number(e.target.value) })} />
-            </Field>
-            <Field label="ESI employee (%)">
-              <input type="number" step="0.01" className={inputClass} value={form.esiEmployee} onChange={(e) => setForm({ ...form, esiEmployee: Number(e.target.value) })} />
-            </Field>
-            <Field label="ESI employer (%)">
-              <input type="number" step="0.01" className={inputClass} value={form.esiEmployer} onChange={(e) => setForm({ ...form, esiEmployer: Number(e.target.value) })} />
-            </Field>
-            <Field label="ESI applies up to gross (₹)">
-              <input type="number" className={inputClass} value={form.esiGrossLimit} onChange={(e) => setForm({ ...form, esiGrossLimit: Number(e.target.value) })} />
-            </Field>
-          </div>
-          <div className="mt-5">
-            <div className="mb-2 flex items-center justify-between">
-              <h4 className="text-sm font-semibold text-slate-900 dark:text-white">Professional Tax slabs (monthly gross)</h4>
-              <button type="button" className={btnGhost} onClick={() => setForm({ ...form, ptSlabs: [...form.ptSlabs, { min: 0, max: null, amount: 0 }] })}>
-                <Plus className="h-3.5 w-3.5" /> Slab
-              </button>
+        <Card
+          title="Statutory rates"
+          subtitle="Used for every staff salary and payroll run."
+          action={
+            <Button variant="primary" size="sm" icon={Save} loading={busy === 'settings'} onClick={saveSettings}>
+              Save rates
+            </Button>
+          }
+        >
+          <div className="cb-form-section">
+            <div className="cb-form-grid">
+              <TextField label="PF rate" suffix="%" type="number" value={form.pfRate} onChange={(e) => setForm({ ...form, pfRate: Number(e.target.value) })} />
+              <TextField
+                label="PF wage ceiling"
+                prefix="₹"
+                type="number"
+                value={form.pfWageCeiling}
+                onChange={(e) => setForm({ ...form, pfWageCeiling: Number(e.target.value) })}
+              />
+              <TextField
+                label="ESI employee"
+                suffix="%"
+                type="number"
+                step="0.01"
+                value={form.esiEmployee}
+                onChange={(e) => setForm({ ...form, esiEmployee: Number(e.target.value) })}
+              />
+              <TextField
+                label="ESI employer"
+                suffix="%"
+                type="number"
+                step="0.01"
+                value={form.esiEmployer}
+                onChange={(e) => setForm({ ...form, esiEmployer: Number(e.target.value) })}
+              />
+              <TextField
+                label="ESI applies up to gross"
+                prefix="₹"
+                type="number"
+                value={form.esiGrossLimit}
+                onChange={(e) => setForm({ ...form, esiGrossLimit: Number(e.target.value) })}
+              />
             </div>
-            {form.ptSlabs.length ? (
-              <div className="space-y-2">
-                {form.ptSlabs.map((slab, i) => (
-                  <div key={i} className="grid grid-cols-12 items-center gap-2 text-sm">
-                    <input
-                      type="number"
-                      aria-label="From"
-                      className={`${inputClass} col-span-4 mt-0`}
-                      value={slab.min}
-                      onChange={(e) => setForm({ ...form, ptSlabs: form.ptSlabs.map((s, idx) => (idx === i ? { ...s, min: Number(e.target.value) } : s)) })}
-                    />
-                    <input
-                      type="number"
-                      aria-label="To"
-                      placeholder="and above"
-                      className={`${inputClass} col-span-4 mt-0`}
-                      value={slab.max ?? ''}
-                      onChange={(e) =>
-                        setForm({ ...form, ptSlabs: form.ptSlabs.map((s, idx) => (idx === i ? { ...s, max: e.target.value === '' ? null : Number(e.target.value) } : s)) })
-                      }
-                    />
-                    <input
-                      type="number"
-                      aria-label="Tax"
-                      className={`${inputClass} col-span-3 mt-0`}
-                      value={slab.amount}
-                      onChange={(e) => setForm({ ...form, ptSlabs: form.ptSlabs.map((s, idx) => (idx === i ? { ...s, amount: Number(e.target.value) } : s)) })}
-                    />
-                    <button
-                      type="button"
-                      aria-label="Remove slab"
-                      className="col-span-1 text-slate-300 hover:text-rose-600"
-                      onClick={() => setForm({ ...form, ptSlabs: form.ptSlabs.filter((_, idx) => idx !== i) })}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                ))}
-                <p className="text-xs text-slate-400">From ₹ · To ₹ (blank = no upper limit) · Tax ₹ per month</p>
-              </div>
-            ) : (
-              <p className="text-xs text-slate-500">No Professional Tax. Add your state's slabs if it levies PT (e.g. Maharashtra, Karnataka, West Bengal).</p>
-            )}
           </div>
-        </CpitlCard>
+          <div className="cb-form-section">
+            <div className="cp-slabs">
+              <div className="cp-slabs__head">
+                <h3 className="cb-form-section__title">Professional Tax slabs (monthly gross)</h3>
+                <Button
+                  variant="tertiary"
+                  size="sm"
+                  icon={Plus}
+                  onClick={() => setForm({ ...form, ptSlabs: [...form.ptSlabs, { min: 0, max: null, amount: 0 }] })}
+                >
+                  Add slab
+                </Button>
+              </div>
+              {form.ptSlabs.length ? (
+                <>
+                  {form.ptSlabs.map((slab, i) => (
+                    <div key={i} className="cp-slab">
+                      <TextField size="sm" type="number" aria-label={`Slab ${i + 1} from`} prefix="₹" value={slab.min} onChange={(e) => setSlab(i, { min: Number(e.target.value) })} />
+                      <TextField
+                        size="sm"
+                        type="number"
+                        aria-label={`Slab ${i + 1} to`}
+                        prefix="₹"
+                        placeholder="and above"
+                        value={slab.max ?? ''}
+                        onChange={(e) => setSlab(i, { max: e.target.value === '' ? null : Number(e.target.value) })}
+                      />
+                      <TextField size="sm" type="number" aria-label={`Slab ${i + 1} tax`} prefix="₹" value={slab.amount} onChange={(e) => setSlab(i, { amount: Number(e.target.value) })} />
+                      <Button
+                        variant="tertiary"
+                        size="sm"
+                        icon={Trash2}
+                        aria-label={`Remove slab ${i + 1}`}
+                        onClick={() => setForm({ ...form, ptSlabs: form.ptSlabs.filter((_, idx) => idx !== i) })}
+                      />
+                    </div>
+                  ))}
+                  <p className="cp-slip__note">From · To (blank = no upper limit) · Tax per month</p>
+                </>
+              ) : (
+                <p className="cp-slip__note">No Professional Tax. Add your state's slabs if it levies PT (e.g. Maharashtra, Karnataka, West Bengal).</p>
+              )}
+            </div>
+          </div>
+        </Card>
       ) : null}
+
+      <Sheet
+        open={Boolean(draft)}
+        onClose={() => setDraft(null)}
+        size="md"
+        icon={Calculator}
+        title={draft?._id ? `Edit ${draft.name || 'component'}` : 'Add salary component'}
+        footer={
+          <>
+            <Button onClick={() => setDraft(null)}>Cancel</Button>
+            <Button variant="primary" icon={Save} loading={busy === 'component'} onClick={saveComponent}>
+              Save component
+            </Button>
+          </>
+        }
+      >
+        {draft ? (
+          <div className="cb-form-section">
+            <TextField label="Name" value={draft.name || ''} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
+            <TextField
+              label="Code"
+              hint="Capitals, no spaces — e.g. HRA"
+              value={draft.code || ''}
+              disabled={draft.code === 'BASIC' && Boolean(draft._id)}
+              onChange={(e) => setDraft({ ...draft, code: e.target.value.toUpperCase().replace(/\s+/g, '_') })}
+            />
+            <Select
+              label="Type"
+              value={draft.type}
+              onChange={(e) => setDraft({ ...draft, type: e.target.value as SalaryComponent['type'], calc: e.target.value === 'deduction' ? 'fixed' : draft.calc })}
+              options={[
+                { value: 'earning', label: 'Earning' },
+                { value: 'deduction', label: 'Deduction (fixed)' },
+              ]}
+            />
+            <Select
+              label="Calculated as"
+              value={draft.calc}
+              disabled={draft.type === 'deduction'}
+              onChange={(e) => setDraft({ ...draft, calc: e.target.value as SalaryCalc })}
+              options={CALC_OPTIONS}
+            />
+            <TextField label="Default value" type="number" min={0} value={draft.defaultValue ?? 0} onChange={(e) => setDraft({ ...draft, defaultValue: Number(e.target.value) })} />
+          </div>
+        ) : null}
+      </Sheet>
+
+      <Dialog
+        open={Boolean(removing)}
+        onClose={() => setRemoving(null)}
+        tone="danger"
+        size="sm"
+        title={`Remove ${removing?.name || 'component'}?`}
+        description="It is no longer offered for new salaries. Salaries already saved keep their amounts."
+        footer={
+          <>
+            <Button onClick={() => setRemoving(null)}>Cancel</Button>
+            <Button variant="danger" icon={Trash2} loading={busy === 'remove'} onClick={removeComponent}>
+              Remove component
+            </Button>
+          </>
+        }
+      />
     </div>
   )
 }
@@ -475,99 +784,201 @@ const CpitlSalary: React.FC = () => {
   const invalidate = useInvalidateCpitl()
   const [tab, setTab] = useState<Tab>('staff')
   const [q, setQ] = useState('')
-  const [onlyMissing, setOnlyMissing] = useState(false)
+  const [setFilter, setSetFilter] = useState<SetFilter>('all')
+  const [department, setDepartment] = useState('')
   const [editing, setEditing] = useState<StaffSalaryRow | null>(null)
+  const [revising, setRevising] = useState(false)
+  const [outcome, setOutcome] = useState<BulkOutcome | null>(null)
   const { data: staff = [], isLoading } = useStaffSalaries()
   const { data: components = [] } = useSalaryComponents()
   const { data: settings } = usePayrollSettings()
 
-  const filtered = staff.filter((s) => {
-    if (onlyMissing && s.salary) return false
-    const needle = q.trim().toLowerCase()
-    return !needle || [s.name, s.designation, s.employeeId, s.department].some((v) => String(v || '').toLowerCase().includes(needle))
+  const departments = useMemo(
+    () => Array.from(new Set(staff.map((s) => (s.department || '').trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
+    [staff]
+  )
+
+  const filtered = useMemo(
+    () =>
+      staff.filter((s) => {
+        if (setFilter === 'missing' && s.salary) return false
+        if (setFilter === 'set' && !s.salary) return false
+        if (department && (s.department || '').trim() !== department) return false
+        const needle = q.trim().toLowerCase()
+        return !needle || [s.name, s.designation, s.employeeId, s.department].some((v) => String(v || '').toLowerCase().includes(needle))
+      }),
+    [staff, setFilter, department, q]
+  )
+  const { selection, selectedRows, count, clear } = useRowSelection(filtered, getStaffId, {
+    resetKey: `${tab}|${q}|${setFilter}|${department}`,
+    rowLabel: staffRowLabel,
   })
+  const selectedWithoutSalary = selectedRows.filter((s) => !s.salary).length
   const withSalary = staff.filter((s) => s.salary)
   const monthlyGross = withSalary.reduce((sum, s) => sum + (s.salary?.gross || 0), 0)
+  const monthlyNet = withSalary.reduce((sum, s) => sum + (s.salary?.net || 0), 0)
   const monthlyCost = withSalary.reduce((sum, s) => sum + (s.salary?.employerCost || 0), 0)
+  const hasFilters = Boolean(q.trim() || department || setFilter !== 'all')
+
+  const columns: DataTableColumn<StaffSalaryRow>[] = [
+    {
+      key: 'name',
+      header: 'Staff',
+      mobile: 'title',
+      render: (s) => (
+        <span className="cp-person">
+          <Avatar name={s.name} size="sm" />
+          <span className="cp-person__text">
+            <span className="cp-person__name">{s.name}</span>
+            <span className="cp-person__meta">{s.employeeId ? `Emp ID ${s.employeeId}` : 'No employee ID'}</span>
+          </span>
+        </span>
+      ),
+    },
+    { key: 'designation', header: 'Designation', mobile: 'subtitle', render: (s) => s.designation || s.dutyType || '—' },
+    { key: 'gross', header: 'Gross / month', align: 'right', numeric: true, render: (s) => (s.salary ? inr(s.salary.gross) : '—') },
+    {
+      key: 'deductions',
+      header: 'Deductions',
+      align: 'right',
+      numeric: true,
+      render: (s) => (s.salary ? <span className={s.salary.deductions ? 'cp-neg' : undefined}>{inr(s.salary.deductions)}</span> : '—'),
+    },
+    { key: 'net', header: 'Net / month', align: 'right', numeric: true, render: (s) => (s.salary ? <span className="cp-strong">{inr(s.salary.net)}</span> : '—') },
+    { key: 'effectiveFrom', header: 'Effective from', render: (s) => (s.salary ? fmtDate(s.salary.effectiveFrom) : '—') },
+    {
+      key: 'status',
+      header: 'Status',
+      mobile: 'aside',
+      render: (s) => (s.salary ? <Badge tone="success">Salary set</Badge> : <Badge tone="warning">Not set</Badge>),
+    },
+    {
+      key: 'action',
+      header: '',
+      headerLabel: 'Action',
+      interactive: true,
+      render: (s) => (
+        <span className="cp-actions">
+          <Button variant="tertiary" size="sm" onClick={() => setEditing(s)}>
+            {s.salary ? 'Edit salary' : 'Set salary'}
+          </Button>
+        </span>
+      ),
+    },
+  ]
 
   return (
-    <CpitlPageShell title="Salary" subtitle={`${withSalary.length} of ${staff.length} staff have a salary · monthly gross ${inr(monthlyGross)} · cost to school ${inr(monthlyCost)}`}>
-      <div className="flex gap-1 border-b border-slate-200 dark:border-slate-700">
-        {([
-          ['staff', 'Staff salaries'],
-          ['components', 'Components & statutory'],
-        ] as Array<[Tab, string]>).map(([key, label]) => (
-          <button
-            key={key}
-            type="button"
-            onClick={() => setTab(key)}
-            className={`-mb-px border-b-2 px-4 py-2.5 text-sm font-medium ${
-              tab === key ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400' : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-            }`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+    <Page>
+      <section className="cb-stats" aria-label="Salary summary">
+        <StatCard
+          label="Staff with a salary"
+          value={`${withSalary.length} of ${staff.length}`}
+          icon={Users}
+          progress={staff.length ? (withSalary.length / staff.length) * 100 : 0}
+          progressTone={withSalary.length === staff.length ? 'success' : 'warning'}
+          hint={staff.length - withSalary.length ? `${staff.length - withSalary.length} not set` : 'Everyone is set'}
+        />
+        <StatCard label="Monthly gross" value={inr(monthlyGross)} icon={IndianRupee} />
+        <StatCard label="Monthly net pay" value={inr(monthlyNet)} icon={Wallet} />
+        <StatCard label="Cost to school" value={inr(monthlyCost)} icon={Calculator} hint="Per month, incl. employer PF/ESI" />
+      </section>
+
+      <Tabs
+        label="Salary sections"
+        value={tab}
+        onChange={(id) => setTab(id as Tab)}
+        items={[
+          { id: 'staff', label: 'Staff salaries', count: staff.length },
+          { id: 'components', label: 'Components & statutory' },
+        ]}
+      />
 
       {tab === 'staff' ? (
-        <CpitlCard>
-          <div className="mb-4 flex flex-wrap items-center gap-3">
-            <div className="relative w-72">
-              <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
-                <Search className="h-4 w-4" />
-              </span>
-              <input className={`${inputClass} !mt-0 pl-9`} placeholder="Search staff" value={q} onChange={(e) => setQ(e.target.value)} />
-            </div>
-            <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
-              <input type="checkbox" className="h-4 w-4 rounded" checked={onlyMissing} onChange={(e) => setOnlyMissing(e.target.checked)} />
-              Only staff without salary ({staff.length - withSalary.length})
-            </label>
+        <Card flush className="cp-card">
+          <div className="cp-toolbar">
+            <FilterBar
+              search={{ placeholder: 'Search name, designation or employee ID', value: q, onChange: setQ, label: 'Search staff' }}
+              chips={[
+                { id: 'all', label: 'All', count: staff.length, active: setFilter === 'all' },
+                { id: 'set', label: 'Salary set', count: withSalary.length, active: setFilter === 'set' },
+                { id: 'missing', label: 'Not set', count: staff.length - withSalary.length, active: setFilter === 'missing' },
+              ]}
+              chipsLabel="Salary status"
+              onChipClick={(id) => setSetFilter(id as SetFilter)}
+              filters={
+                departments.length || hasFilters ? (
+                  <>
+                    {departments.length ? (
+                      <Select
+                        aria-label="Department"
+                        size="sm"
+                        className="cp-filter"
+                        value={department}
+                        onChange={(e) => setDepartment(e.target.value)}
+                        placeholder="All departments"
+                        options={departments}
+                      />
+                    ) : null}
+                    {hasFilters ? (
+                      <Button
+                        variant="tertiary"
+                        size="sm"
+                        onClick={() => {
+                          setQ('')
+                          setDepartment('')
+                          setSetFilter('all')
+                        }}
+                      >
+                        Clear filters
+                      </Button>
+                    ) : null}
+                  </>
+                ) : undefined
+              }
+            />
+            <BulkBar count={count} noun="staff member" nounPlural="staff" onClear={clear} busy={revising}>
+              {selectedWithoutSalary ? <span className="cp-sub">{selectedWithoutSalary} without a salary will be skipped</span> : null}
+              <Button size="sm" icon={TrendingUp} onClick={() => setRevising(true)}>
+                Revise salary
+              </Button>
+            </BulkBar>
           </div>
-          {isLoading ? (
-            <div className="h-60 animate-pulse rounded-xl bg-slate-100 dark:bg-slate-700" />
-          ) : filtered.length ? (
-            <div className="-mx-5 overflow-x-auto">
-              <table className="min-w-full text-sm">
-                <thead className={tableHead}>
-                  <tr>
-                    <th className="px-5 py-2.5">Staff</th>
-                    <th className="px-3 py-2.5">Designation</th>
-                    <th className="px-3 py-2.5 text-right">Gross / month</th>
-                    <th className="px-3 py-2.5 text-right">Net / month</th>
-                    <th className="px-3 py-2.5">Effective from</th>
-                    <th className="px-5 py-2.5" />
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-                  {filtered.map((s) => (
-                    <tr key={s.teacherId} className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/40" onClick={() => setEditing(s)}>
-                      <td className="px-5 py-2.5">
-                        <div className="font-medium text-slate-900 dark:text-white">{s.name}</div>
-                        <div className="text-xs text-slate-500">{s.employeeId ? `Emp ID ${s.employeeId}` : 'No employee ID'}</div>
-                      </td>
-                      <td className="px-3 py-2.5 text-slate-600 dark:text-slate-300">{s.designation || s.dutyType || '—'}</td>
-                      <td className="px-3 py-2.5 text-right tabular-nums">{s.salary ? inr(s.salary.gross) : '—'}</td>
-                      <td className="px-3 py-2.5 text-right font-semibold tabular-nums">{s.salary ? inr(s.salary.net) : '—'}</td>
-                      <td className="px-3 py-2.5 text-slate-500">{s.salary ? fmtDate(s.salary.effectiveFrom) : <span className="text-amber-600">Not set</span>}</td>
-                      <td className="px-5 py-2.5 text-right">
-                        <span className={btnGhost}>{s.salary ? 'Edit' : 'Set salary'}</span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <CpitlEmpty message={staff.length ? 'No staff match.' : 'No active staff in this session. Add staff in the Staff module first.'} />
-          )}
-        </CpitlCard>
+          <DataTable<StaffSalaryRow>
+            columns={columns}
+            rows={filtered}
+            selection={selection}
+            getRowKey={(s) => s.teacherId}
+            onRowClick={setEditing}
+            loading={isLoading}
+            loadingLabel="Loading staff salaries…"
+            caption="Staff salaries"
+            empty={
+              staff.length ? (
+                <EmptyState icon={Users} title="No staff match these filters" body="Try another search or clear the filters." compact />
+              ) : (
+                <EmptyState icon={Users} title="No active staff in this session" body="Add staff in the Staff module first, then set their salaries here." />
+              )
+            }
+          />
+        </Card>
       ) : (
         <ComponentsTab components={components} settings={settings} onChanged={invalidate} />
       )}
 
       <SalaryEditor staff={editing} components={components} onClose={() => setEditing(null)} onSaved={invalidate} />
-    </CpitlPageShell>
+      <RevisionSheet
+        staff={selectedRows}
+        open={revising}
+        onClose={() => setRevising(false)}
+        onDone={(result) => {
+          setRevising(false)
+          clear()
+          invalidate()
+          if (result) setOutcome(result)
+        }}
+      />
+      <BulkResultDialog result={outcome} onClose={() => setOutcome(null)} />
+    </Page>
   )
 }
 

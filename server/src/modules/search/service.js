@@ -1,5 +1,8 @@
 const { escapeRegex } = require('../../utils/escapeRegex');
 const { PROVIDERS } = require('./providers');
+const {
+  fuzzyTokens, buildGramPattern, fuzzyDistance, tokenize
+} = require('./fuzzy');
 
 const MIN_QUERY_LENGTH = 2;
 const MAX_QUERY_LENGTH = 64;
@@ -8,6 +11,9 @@ const MAX_LIMIT = 10;
 // Over-fetch so ranking can float exact/prefix hits above arbitrary substring hits.
 const FETCH_MULTIPLIER = 4;
 const QUERY_TIMEOUT_MS = 800;
+// Typo fallback reads more candidates (name fields only) and ranks them in memory.
+const FUZZY_CANDIDATES = 1000;
+const FUZZY_TIMEOUT_MS = 1200;
 
 const parseSearchParams = (query = {}) => {
   const rawQ = typeof query.q === 'string' ? query.q.trim().replace(/\s+/g, ' ') : '';
@@ -82,6 +88,69 @@ const searchProvider = async (provider, ctx) => {
     }));
 };
 
+/**
+ * Typo fallback for one provider: n-gram regex over its name (`contains`) fields,
+ * then keep docs whose words are within the allowed edit distance, closest first.
+ */
+const fuzzySearchProvider = async (provider, ctx, tokens) => {
+  const { contains = [] } = provider.fields;
+  const pattern = buildGramPattern(tokens);
+  if (!contains.length || !pattern) return [];
+
+  const Model = ctx.models[provider.modelKey];
+  const filter = {
+    $and: [
+      provider.baseFilter || {},
+      { $or: contains.map((field) => ({ [field]: { $regex: pattern, $options: 'i' } })) }
+    ]
+  };
+  const docs = await Model.find(filter)
+    .select(buildSelect(provider))
+    .limit(FUZZY_CANDIDATES)
+    .maxTimeMS(FUZZY_TIMEOUT_MS)
+    .lean();
+
+  return docs
+    .map((doc) => {
+      // The first `contains` field is the record's own name; a match only on secondary
+      // fields (father's name, email…) costs one extra edit so it ranks below name matches.
+      const [primary, ...secondary] = contains;
+      const own = fuzzyDistance(tokens, tokenize(getPath(doc, primary)));
+      const other = secondary.length
+        ? fuzzyDistance(tokens, secondary.flatMap((field) => tokenize(getPath(doc, field))))
+        : null;
+      const candidates = [own, other === null ? null : other + 1].filter((value) => value !== null);
+      return { doc, distance: candidates.length ? Math.min(...candidates) : null };
+    })
+    .filter(({ distance }) => distance !== null)
+    .sort((left, right) => left.distance - right.distance)
+    .slice(0, ctx.limit)
+    .map(({ doc, distance }) => ({
+      id: String(doc._id),
+      type: provider.type,
+      // Always below exact-pass scores (40+); fewer edits rank higher.
+      score: Math.max(30 - distance * 5, 5),
+      fuzzy: true,
+      ...provider.map(doc, ctx)
+    }));
+};
+
+const collectGroups = (providers, settled) => {
+  const groups = [];
+  settled.forEach((result, index) => {
+    const provider = providers[index];
+    if (result.status === 'rejected') {
+      console.warn(`[search] provider "${provider.type}" failed:`, result.reason?.message || result.reason);
+      return;
+    }
+    if (result.value.length) {
+      groups.push({ type: provider.type, label: provider.label, items: result.value });
+    }
+  });
+  // Groups whose best hit is strongest come first.
+  return groups.sort((left, right) => (right.items[0]?.score || 0) - (left.items[0]?.score || 0));
+};
+
 const getActiveProviders = ({ models, toggles, role, types }) => PROVIDERS.filter((provider) => (
   (!types || types.has(provider.type))
   && models[provider.modelKey]
@@ -94,23 +163,21 @@ const runSearch = async ({ q, limit, types, models, toggles, role }) => {
   const providers = getActiveProviders({ models, toggles, role, types });
 
   const settled = await Promise.allSettled(providers.map((provider) => searchProvider(provider, ctx)));
+  const groups = collectGroups(providers, settled);
+  if (groups.length) {
+    return { q, groups, fuzzy: false, tookMs: Date.now() - startedAt };
+  }
 
-  const groups = [];
-  settled.forEach((result, index) => {
-    const provider = providers[index];
-    if (result.status === 'rejected') {
-      console.warn(`[search] provider "${provider.type}" failed:`, result.reason?.message || result.reason);
-      return;
-    }
-    if (result.value.length) {
-      groups.push({ type: provider.type, label: provider.label, items: result.value });
-    }
-  });
-
-  // Groups whose best hit is strongest come first.
-  groups.sort((left, right) => (right.items[0]?.score || 0) - (left.items[0]?.score || 0));
-
-  return { q, groups, tookMs: Date.now() - startedAt };
+  // Nothing matched exactly — look for the closest spellings instead.
+  const tokens = fuzzyTokens(q);
+  if (!tokens) {
+    return { q, groups, fuzzy: false, tookMs: Date.now() - startedAt };
+  }
+  const fuzzySettled = await Promise.allSettled(
+    providers.map((provider) => fuzzySearchProvider(provider, ctx, tokens))
+  );
+  const fuzzyGroups = collectGroups(providers, fuzzySettled);
+  return { q, groups: fuzzyGroups, fuzzy: fuzzyGroups.length > 0, tookMs: Date.now() - startedAt };
 };
 
 module.exports = {

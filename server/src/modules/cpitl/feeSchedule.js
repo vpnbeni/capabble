@@ -300,7 +300,17 @@ const diffComponents = (before = [], after = []) => {
   return { added, removed, changed, isEmpty: !added.length && !removed.length && !changed.length };
 };
 
+/**
+ * First instant of next month, as the UTC-midnight date the schedule uses. Demands with a
+ * due date before it are "due up to this month". The month is the school's (India) month.
+ */
+const dueThroughMonthCutoff = (now = new Date()) => {
+  const ist = new Date(now.getTime() + 330 * 60 * 1000);
+  return new Date(Date.UTC(ist.getUTCFullYear(), ist.getUTCMonth() + 1, 1));
+};
+
 module.exports = {
+  dueThroughMonthCutoff,
   FEE_FREQUENCIES,
   FREQUENCY_LABELS,
   MONTH_NAMES,

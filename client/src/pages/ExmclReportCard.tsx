@@ -1,14 +1,36 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { Download, Eye } from 'lucide-react'
-import { Document, Page, pdfjs } from 'react-pdf'
+import { AlertCircle, ClipboardList, Download, FileText, Settings2, Users } from 'lucide-react'
+import { Document, Page as PdfPage, pdfjs } from 'react-pdf'
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 import { useNavigate } from 'react-router-dom'
+import toast from 'react-hot-toast'
 import exmclExamService, { type ExmclExamDefinition } from '@/services/exmclExamService'
 import exmclReportCardService from '@/services/exmclReportCardService'
 import api from '@/services/api'
-import toast from 'react-hot-toast'
 import { sortSectionNames } from '@/constants/studentClasses'
 import { resolveApiBaseUrl } from '@/utils/tenantRuntime'
+import {
+  Avatar,
+  BulkBar,
+  Button,
+  Card,
+  CardToolbar,
+  DataTable,
+  EmptyState,
+  Entity,
+  FilterBar,
+  PAPER_PAGES_CLASS,
+  Page,
+  Paper,
+  PaperStage,
+  Select,
+  Sheet,
+  useRowSelection,
+  type DataTableColumn,
+} from '@/components/ui'
+import { CardLoading, errorMessage } from '@/components/exmcl/ExmclUi'
+import '@/components/exmcl/exmcl.css'
+import '@/components/exmcl/report-card.css'
 
 pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl
 
@@ -32,16 +54,6 @@ const getProfileImageUrl = (profileImage?: string | null) => {
   return `${SERVER_URL}${profileImage}`
 }
 
-const getInitials = (name: string) => {
-  const parts = String(name || '')
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean)
-  if (parts.length === 0) return '?'
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
-  return `${parts[0][0] || ''}${parts[1][0] || ''}`.toUpperCase()
-}
-
 type ClassSectionEntry = {
   _id?: { class?: string; section?: string }
   count?: number
@@ -58,9 +70,15 @@ const extractStudentList = (payload: any): StudentRow[] => {
   return []
 }
 
+const getStudentId = (student: StudentRow) => student._id
+
+/** Width of each PDF page inside the preview sheet. */
+const pdfPageWidth = () => (typeof window !== 'undefined' ? Math.max(260, Math.min(680, window.innerWidth - 72)) : 680)
+
 const ExmclReportCard: React.FC = () => {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
+  const [reloadKey, setReloadKey] = useState(0)
   const [studentsLoading, setStudentsLoading] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [exams, setExams] = useState<ExmclExamDefinition[]>([])
@@ -71,7 +89,6 @@ const ExmclReportCard: React.FC = () => {
   const [selectedClass, setSelectedClass] = useState('')
   const [selectedSection, setSelectedSection] = useState('')
 
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [downloadingIds, setDownloadingIds] = useState<Set<string>>(new Set())
   const [previewingIds, setPreviewingIds] = useState<Set<string>>(new Set())
   const [bulkDownloading, setBulkDownloading] = useState(false)
@@ -97,10 +114,10 @@ const ExmclReportCard: React.FC = () => {
           : []
         setExams(examList)
         setClassSectionEntries(byClassSection)
-        if (examList.length > 0) setSelectedExamId(examList[0]._id)
-      } catch (error: any) {
+        if (examList.length > 0) setSelectedExamId((prev) => prev || examList[0]._id)
+      } catch (error) {
         if (cancelled) return
-        const message = String(error?.response?.data?.message || error?.message || 'Failed to load data.')
+        const message = errorMessage(error, 'Exams and classes didn’t load. Check your connection and try again.')
         setLoadError(message)
         toast.error(message)
       } finally {
@@ -108,8 +125,10 @@ const ExmclReportCard: React.FC = () => {
       }
     }
     void load()
-    return () => { cancelled = true }
-  }, [])
+    return () => {
+      cancelled = true
+    }
+  }, [reloadKey])
 
   const populatedClassSections = useMemo(
     () =>
@@ -179,13 +198,12 @@ const ExmclReportCard: React.FC = () => {
       })
       .then((response) => {
         if (cancelled) return
-        const list = extractStudentList(response?.data)
-        setStudents(list)
+        setStudents(extractStudentList(response?.data))
       })
-      .catch((error: any) => {
+      .catch((error) => {
         if (cancelled) return
         setStudents([])
-        toast.error(String(error?.response?.data?.message || error?.message || 'Failed to load students.'))
+        toast.error(errorMessage(error, 'Students didn’t load. Pick the section again to retry.'))
       })
       .finally(() => {
         if (!cancelled) setStudentsLoading(false)
@@ -212,9 +230,15 @@ const ExmclReportCard: React.FC = () => {
     })
   }, [students])
 
-  // Reset selection/preview when filters change
-  useEffect(() => {
-    setSelectedIds(new Set())
+  // Selection clears whenever the exam, class or section changes.
+  const filterKey = `${selectedExamId}|${selectedClass}|${selectedSection}`
+  const { selection, selectedIds, count: selectedCount, clear: clearSelection } = useRowSelection(
+    filteredStudents,
+    getStudentId,
+    { resetKey: filterKey, rowLabel: (student) => `Select ${student.name}` }
+  )
+
+  const clearPreview = useCallback(() => {
     setPreviewStudent(null)
     setPreviewPageCount(0)
     setPreviewRenderError(null)
@@ -222,7 +246,12 @@ const ExmclReportCard: React.FC = () => {
       if (prev) URL.revokeObjectURL(prev)
       return null
     })
-  }, [selectedExamId, selectedClass, selectedSection])
+  }, [])
+
+  // Reset the preview when filters change.
+  useEffect(() => {
+    clearPreview()
+  }, [selectedExamId, selectedClass, selectedSection, clearPreview])
 
   useEffect(() => {
     return () => {
@@ -230,427 +259,351 @@ const ExmclReportCard: React.FC = () => {
     }
   }, [previewUrl])
 
-  const allSelected = filteredStudents.length > 0 && selectedIds.size === filteredStudents.length
-  const someSelected = selectedIds.size > 0
+  const handleDownloadSingle = useCallback(
+    async (student: StudentRow) => {
+      if (!selectedExamId) return
+      setDownloadingIds((prev) => new Set([...prev, student._id]))
+      try {
+        await exmclReportCardService.downloadSingle(selectedExamId, student._id, student.name)
+      } catch (error) {
+        toast.error(errorMessage(error, `${student.name}’s report card wasn’t generated. Try again.`))
+      } finally {
+        setDownloadingIds((prev) => {
+          const next = new Set(prev)
+          next.delete(student._id)
+          return next
+        })
+      }
+    },
+    [selectedExamId]
+  )
 
-  const toggleAll = useCallback(() => {
-    setSelectedIds(allSelected ? new Set() : new Set(filteredStudents.map((s) => s._id)))
-  }, [allSelected, filteredStudents])
-
-  const toggleOne = useCallback((id: string) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
-      return next
-    })
-  }, [])
-
-  const handleDownloadSingle = useCallback(async (student: StudentRow) => {
-    if (!selectedExamId) return
-    setDownloadingIds((prev) => new Set([...prev, student._id]))
-    try {
-      await exmclReportCardService.downloadSingle(selectedExamId, student._id, student.name)
-    } catch (error: any) {
-      toast.error(String(error?.response?.data?.message || error?.message || 'Failed to generate report card.'))
-    } finally {
-      setDownloadingIds((prev) => {
-        const next = new Set(prev)
-        next.delete(student._id)
-        return next
-      })
-    }
-  }, [selectedExamId])
-
-  const handlePreviewSingle = useCallback(async (student: StudentRow) => {
-    if (!selectedExamId) return
-    setPreviewingIds((prev) => new Set([...prev, student._id]))
-    setPreviewLoading(true)
-    setPreviewStudent(student)
-    setPreviewPageCount(0)
-    setPreviewRenderError(null)
-    try {
-      const blob = await exmclReportCardService.fetchSinglePdfBlob(selectedExamId, student._id)
-      const url = URL.createObjectURL(blob)
-      setPreviewUrl((prev) => {
-        if (prev) URL.revokeObjectURL(prev)
-        return url
-      })
-    } catch (error: any) {
-      setPreviewStudent(null)
+  const handlePreviewSingle = useCallback(
+    async (student: StudentRow) => {
+      if (!selectedExamId || previewingIds.has(student._id)) return
+      setPreviewingIds((prev) => new Set([...prev, student._id]))
+      setPreviewLoading(true)
+      setPreviewStudent(student)
       setPreviewPageCount(0)
       setPreviewRenderError(null)
-      setPreviewUrl((prev) => {
-        if (prev) URL.revokeObjectURL(prev)
-        return null
-      })
-      toast.error(String(error?.response?.data?.message || error?.message || 'Failed to preview report card.'))
-    } finally {
-      setPreviewLoading(false)
-      setPreviewingIds((prev) => {
-        const next = new Set(prev)
-        next.delete(student._id)
-        return next
-      })
-    }
-  }, [selectedExamId])
+      try {
+        const blob = await exmclReportCardService.fetchSinglePdfBlob(selectedExamId, student._id)
+        const url = URL.createObjectURL(blob)
+        setPreviewUrl((prev) => {
+          if (prev) URL.revokeObjectURL(prev)
+          return url
+        })
+      } catch (error) {
+        clearPreview()
+        toast.error(errorMessage(error, `${student.name}’s report card couldn’t be previewed. Try again.`))
+      } finally {
+        setPreviewLoading(false)
+        setPreviewingIds((prev) => {
+          const next = new Set(prev)
+          next.delete(student._id)
+          return next
+        })
+      }
+    },
+    [selectedExamId, previewingIds, clearPreview]
+  )
 
   const handleDownloadBulk = useCallback(async () => {
-    if (!selectedExamId || !selectedClass || !selectedSection || selectedIds.size === 0) return
+    if (!selectedExamId || !selectedClass || !selectedSection || selectedIds.length === 0) return
     setBulkDownloading(true)
     try {
-      await exmclReportCardService.downloadBulk(
-        selectedExamId,
-        selectedClass,
-        selectedSection,
-        Array.from(selectedIds)
-      )
-    } catch (error: any) {
-      toast.error(String(error?.response?.data?.message || error?.message || 'Failed to generate bulk report cards.'))
+      await exmclReportCardService.downloadBulk(selectedExamId, selectedClass, selectedSection, selectedIds)
+    } catch (error) {
+      toast.error(errorMessage(error, 'The report cards weren’t generated. Try again.'))
     } finally {
       setBulkDownloading(false)
     }
   }, [selectedExamId, selectedClass, selectedSection, selectedIds])
 
-  const canDownloadBulk = Boolean(selectedExamId && selectedClass && selectedSection && someSelected)
   const filtersComplete = Boolean(selectedExamId && selectedClass && selectedSection)
+  const selectedExam = exams.find((exam) => exam._id === selectedExamId)
+  const sectionLabel = selectedClass && selectedSection ? `Class ${selectedClass}-${selectedSection}` : ''
+
+  const columns: DataTableColumn<StudentRow>[] = [
+    {
+      key: 'roll',
+      header: 'Roll no.',
+      width: 72,
+      numeric: true,
+      mobile: 'hidden',
+      render: (student) => (student.classRollNo != null ? student.classRollNo : '—'),
+    },
+    {
+      key: 'name',
+      header: 'Student',
+      mobile: 'title',
+      render: (student) => (
+        <div className="ex-rc-student">
+          <Avatar name={student.name} src={getProfileImageUrl(student.profileImage)} size="sm" />
+          <Entity
+            primary={student.name}
+            secondary={`Adm. no ${student.rollNumber || '—'}${
+              student.classRollNo != null ? ` · Roll ${student.classRollNo}` : ''
+            }`}
+          />
+        </div>
+      ),
+    },
+    { key: 'father', header: 'Father’s name', render: (student) => student.fatherName || '—' },
+    { key: 'mother', header: 'Mother’s name', render: (student) => student.motherName || '—' },
+    {
+      key: 'actions',
+      header: '',
+      headerLabel: 'Report card',
+      align: 'right',
+      interactive: true,
+      mobile: 'aside',
+      render: (student) => (
+        <Button
+          variant="tertiary"
+          size="sm"
+          icon={Download}
+          loading={downloadingIds.has(student._id)}
+          disabled={!selectedExamId}
+          onClick={() => void handleDownloadSingle(student)}
+          aria-label={`Download ${student.name}’s report card`}
+        >
+          {downloadingIds.has(student._id) ? 'Preparing…' : 'Download'}
+        </Button>
+      ),
+    },
+  ]
+
+  const renderEmpty = () => {
+    if (!selectedExamId) {
+      return (
+        <EmptyState
+          icon={ClipboardList}
+          title="Pick an exam"
+          body="Report cards are generated for one exam at a time."
+        />
+      )
+    }
+    if (!selectedClass || !selectedSection) {
+      return (
+        <EmptyState
+          icon={Users}
+          title="Pick a class and section"
+          body="Its students appear here, ready to preview or download."
+        />
+      )
+    }
+    return (
+      <EmptyState
+        icon={Users}
+        title={`No active students in ${sectionLabel}`}
+        body="Add students to this section, or pick another section."
+      />
+    )
+  }
+
+  const renderBody = () => {
+    if (loadError) {
+      return (
+        <EmptyState
+          icon={AlertCircle}
+          title="Exams and classes didn’t load"
+          body={loadError}
+          action={
+            <Button size="sm" onClick={() => setReloadKey((key) => key + 1)}>
+              Try again
+            </Button>
+          }
+        />
+      )
+    }
+    if (!loading && exams.length === 0) {
+      return (
+        <EmptyState
+          icon={ClipboardList}
+          title="No exams set up for this session"
+          body="Add the exams your school holds first. Report cards are generated per exam."
+          action={
+            <Button size="sm" onClick={() => navigate('/exmcl/exams')}>
+              Set up exams
+            </Button>
+          }
+        />
+      )
+    }
+    return (
+      <DataTable<StudentRow>
+        caption={sectionLabel ? `Students in ${sectionLabel}` : 'Students'}
+        columns={columns}
+        rows={filtersComplete ? filteredStudents : []}
+        getRowKey={getStudentId}
+        onRowClick={(student) => void handlePreviewSingle(student)}
+        selection={filtersComplete ? selection : undefined}
+        loading={loading || studentsLoading}
+        loadingLabel={loading ? 'Loading exams and classes…' : 'Loading students…'}
+        maxHeight="70vh"
+        empty={renderEmpty()}
+        footer={
+          filtersComplete && filteredStudents.length > 0 ? (
+            <span className="is-num">
+              {filteredStudents.length} student{filteredStudents.length !== 1 ? 's' : ''} · Select a student to preview
+              their report card
+            </span>
+          ) : undefined
+        }
+      />
+    )
+  }
+
+  const previewDescription = previewStudent
+    ? [
+        `Adm. no ${previewStudent.rollNumber || '—'}`,
+        previewStudent.classRollNo != null ? `Roll ${previewStudent.classRollNo}` : null,
+        selectedExam ? selectedExam.name : null,
+      ]
+        .filter(Boolean)
+        .join(' · ')
+    : undefined
 
   return (
-    <div className="p-8 max-w-[1400px] mx-auto min-h-screen bg-gray-50/50 dark:bg-gray-900">
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-
-        {/* Header / Filters */}
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between px-4 py-3 bg-gray-50/50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700">
-          <div className="flex flex-1 flex-wrap items-center gap-2">
-            <select
-              title="Select exam"
-              aria-label="Select exam"
-              value={selectedExamId}
-              onChange={(e) => setSelectedExamId(e.target.value)}
-              className="min-w-[200px] rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-            >
-              <option value="">Exam</option>
-              {exams.map((exam) => (
-                <option key={exam._id} value={exam._id}>
-                  {exam.code} - {exam.name}
-                </option>
-              ))}
-            </select>
-            <select
-              title="Select class"
-              aria-label="Select class"
-              value={selectedClass}
-              onChange={(e) => setSelectedClass(e.target.value)}
-              className="min-w-[130px] rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-            >
-              <option value="">Class</option>
-              {classOptions.map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
-            <select
-              title="Select section"
-              aria-label="Select section"
-              value={selectedSection}
-              onChange={(e) => setSelectedSection(e.target.value)}
-              disabled={!selectedClass}
-              className="min-w-[140px] rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-            >
-              <option value="">{selectedClass ? 'Section' : 'Select class first'}</option>
-              {sectionOptions.map((s) => (
-                <option key={s} value={s}>{s}</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="flex items-center gap-3 shrink-0">
-            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-              Report Card
-              {' · '}
-              <button
-                type="button"
-                onClick={() => navigate('/exmcl/performas/report-card')}
-                className="font-medium text-blue-600 hover:underline"
+    <Page>
+      <Card
+        flush
+        title="Report cards"
+        subtitle="Pick an exam, class and section, then preview or download each student’s report card."
+        action={
+          <Button
+            variant="tertiary"
+            size="sm"
+            icon={Settings2}
+            onClick={() => navigate('/exmcl/performas/report-card')}
+          >
+            Change format
+          </Button>
+        }
+      >
+        <CardToolbar>
+          <FilterBar
+            filters={
+              <>
+                <Select
+                  aria-label="Exam"
+                  size="sm"
+                  className="ex-rc-exam"
+                  value={selectedExamId}
+                  onChange={(e) => setSelectedExamId(e.target.value)}
+                  disabled={loading}
+                  placeholder={loading ? 'Loading exams…' : 'Choose exam'}
+                  options={exams.map((exam) => ({ value: exam._id, label: `${exam.code} · ${exam.name}` }))}
+                />
+                <Select
+                  aria-label="Class"
+                  size="sm"
+                  value={selectedClass}
+                  onChange={(e) => setSelectedClass(e.target.value)}
+                  disabled={loading}
+                  placeholder="Choose class"
+                  options={classOptions.map((className) => ({ value: className, label: `Class ${className}` }))}
+                />
+                <Select
+                  aria-label="Section"
+                  size="sm"
+                  value={selectedSection}
+                  onChange={(e) => setSelectedSection(e.target.value)}
+                  disabled={loading || !selectedClass}
+                  placeholder={selectedClass ? 'Choose section' : 'Choose class first'}
+                  options={sectionOptions.map((section) => ({ value: section, label: `Section ${section}` }))}
+                />
+              </>
+            }
+          />
+        </CardToolbar>
+        {selectedCount > 0 ? (
+          <div className="ex-rc-bulk">
+            <BulkBar count={selectedCount} noun="student" onClear={clearSelection} busy={bulkDownloading}>
+              <Button
+                variant="primary"
+                size="sm"
+                icon={Download}
+                loading={bulkDownloading}
+                onClick={() => void handleDownloadBulk()}
               >
-                Change format
-              </button>
-            </h3>
-            <button
-              onClick={handleDownloadBulk}
-              disabled={!canDownloadBulk || bulkDownloading}
-              title={!canDownloadBulk ? 'Select students to download' : `Download ${selectedIds.size} selected report card(s)`}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1 transition-colors"
-            >
-              {bulkDownloading ? (
-                <>
-                  <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-                  </svg>
-                  Generating…
-                </>
-              ) : (
-                <>
-                  <Download size={14} />
-                  Download{someSelected ? ` (${selectedIds.size})` : ' Selected'}
-                </>
-              )}
-            </button>
+                {bulkDownloading
+                  ? 'Preparing PDF…'
+                  : `Download ${selectedCount} report card${selectedCount !== 1 ? 's' : ''}`}
+              </Button>
+            </BulkBar>
           </div>
-        </div>
+        ) : null}
+        {renderBody()}
+      </Card>
 
-        {/* Body */}
-        <div className="max-h-[70vh] overflow-x-auto overflow-y-auto">
-          {loading ? (
-            <div className="p-10 text-center text-sm text-gray-500 dark:text-gray-400">Loading…</div>
-          ) : loadError ? (
-            <div className="p-10 text-center text-sm text-red-600 dark:text-red-400">{loadError}</div>
-          ) : !filtersComplete ? (
-            <div className="p-10 text-center text-sm text-gray-500 dark:text-gray-400">
-              Select Exam, Class, and Section to load students.
-            </div>
-          ) : studentsLoading ? (
-            <div className="p-10 text-center text-sm text-gray-500 dark:text-gray-400">Loading students...</div>
-          ) : filteredStudents.length === 0 ? (
-            <div className="p-10 text-center text-sm text-gray-500 dark:text-gray-400">
-              No students found for this class-section.
-            </div>
-          ) : (
-            <table className="w-max divide-y divide-gray-200 dark:divide-gray-700">
-              <thead className="sticky top-0 z-10 bg-gray-50/95 backdrop-blur dark:bg-gray-900/95">
-                <tr>
-                  <th className="whitespace-nowrap px-2 py-2">
-                    <input
-                      type="checkbox"
-                      aria-label="Select all students"
-                      checked={allSelected}
-                      onChange={toggleAll}
-                      className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
-                    />
-                  </th>
-                  <th className="whitespace-nowrap px-2 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                    Adm. No
-                  </th>
-                  <th className="whitespace-nowrap px-2 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                    Photo
-                  </th>
-                  <th className="whitespace-nowrap px-2 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                    Roll No
-                  </th>
-                  <th className="whitespace-nowrap px-2 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                    Student Name
-                  </th>
-                  <th className="whitespace-nowrap px-2 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                    Father Name
-                  </th>
-                  <th className="whitespace-nowrap px-2 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                    Mother Name
-                  </th>
-                  <th className="whitespace-nowrap px-2 py-2 text-right text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                    Report Card
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200 bg-white dark:divide-gray-700 dark:bg-gray-800">
-                {filteredStudents.map((student) => {
-                  const isChecked = selectedIds.has(student._id)
-                  const isDownloading = downloadingIds.has(student._id)
-                  const isPreviewing = previewingIds.has(student._id)
-                  const photoUrl = getProfileImageUrl(student.profileImage)
-                  return (
-                    <tr
-                      key={student._id}
-                      className={`hover:bg-gray-50 dark:hover:bg-gray-700/50 ${isChecked ? 'bg-indigo-50/40 dark:bg-indigo-900/10' : ''}`}
-                    >
-                      <td className="whitespace-nowrap px-2 py-1.5">
-                        <input
-                          type="checkbox"
-                          aria-label={`Select ${student.name}`}
-                          checked={isChecked}
-                          onChange={() => toggleOne(student._id)}
-                          className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
-                        />
-                      </td>
-                      <td className="whitespace-nowrap px-2 py-1.5 text-sm font-medium text-gray-900 dark:text-white">
-                        {student.rollNumber}
-                      </td>
-                      <td className="whitespace-nowrap px-2 py-1.5">
-                        {photoUrl ? (
-                          <img
-                            src={photoUrl}
-                            alt=""
-                            className="h-8 w-8 rounded-full object-cover ring-1 ring-gray-200 dark:ring-gray-600"
-                          />
-                        ) : (
-                          <span
-                            aria-hidden
-                            className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-slate-200 text-[10px] font-semibold text-slate-600 dark:bg-slate-700 dark:text-slate-200"
-                          >
-                            {getInitials(student.name)}
-                          </span>
-                        )}
-                      </td>
-                      <td className="whitespace-nowrap px-2 py-1.5 text-sm text-gray-900 dark:text-white">
-                        {student.classRollNo != null ? student.classRollNo : '—'}
-                      </td>
-                      <td className="whitespace-nowrap px-2 py-1.5 text-sm text-gray-900 dark:text-white">
-                        {student.name}
-                      </td>
-                      <td className="whitespace-nowrap px-2 py-1.5 text-sm text-gray-600 dark:text-gray-300">
-                        {student.fatherName || '—'}
-                      </td>
-                      <td className="whitespace-nowrap px-2 py-1.5 text-sm text-gray-600 dark:text-gray-300">
-                        {student.motherName || '—'}
-                      </td>
-                      <td className="whitespace-nowrap px-2 py-1.5 text-right">
-                        <div className="inline-flex items-center gap-2">
-                          <button
-                            onClick={() => handlePreviewSingle(student)}
-                            disabled={isPreviewing || !selectedExamId}
-                            title="Preview report card PDF"
-                            className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1 transition-colors dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
-                          >
-                            {isPreviewing ? (
-                              <>
-                                <svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none">
-                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-                                </svg>
-                                Previewing...
-                              </>
-                            ) : (
-                              <>
-                                <Eye size={12} />
-                                Preview
-                              </>
-                            )}
-                          </button>
-
-                        <button
-                          onClick={() => handleDownloadSingle(student)}
-                          disabled={isDownloading || !selectedExamId}
-                          title="Download report card PDF"
-                          className="inline-flex items-center gap-1.5 rounded-md border border-indigo-300 bg-white px-2.5 py-1 text-xs font-medium text-indigo-700 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1 transition-colors dark:border-indigo-700 dark:bg-gray-800 dark:text-indigo-400 dark:hover:bg-indigo-900/20"
-                        >
-                          {isDownloading ? (
-                            <>
-                              <svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none">
-                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-                              </svg>
-                              Generating…
-                            </>
-                          ) : (
-                            <>
-                              <Download size={12} />
-                              Download
-                            </>
-                          )}
-                        </button>
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          )}
-        </div>
-
-        {/* Footer count */}
-        {filtersComplete && filteredStudents.length > 0 && (
-          <div className="px-4 py-2 border-t border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/50 text-xs text-gray-500 dark:text-gray-400 flex items-center justify-between">
-            <span>{filteredStudents.length} student{filteredStudents.length !== 1 ? 's' : ''}</span>
-            {someSelected && (
-              <span className="text-indigo-600 dark:text-indigo-400 font-medium">
-                {selectedIds.size} selected
-              </span>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Inline preview panel */}
-      {filtersComplete ? (
-        <div className="mt-4 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
-          <div className="flex items-center justify-between gap-3 border-b border-gray-200 px-4 py-2.5 dark:border-gray-700">
-            <div>
-              <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">Report card preview</h3>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                {previewStudent
-                  ? `${previewStudent.name} · Adm. ${previewStudent.rollNumber}${
-                      previewStudent.classRollNo != null ? ` · Roll ${previewStudent.classRollNo}` : ''
-                    }`
-                  : 'Click Preview on a student row to show the PDF here.'}
-              </p>
-            </div>
-            {previewUrl ? (
-              <button
-                type="button"
-                onClick={() => {
-                  setPreviewStudent(null)
-                  setPreviewPageCount(0)
-                  setPreviewRenderError(null)
-                  setPreviewUrl((prev) => {
-                    if (prev) URL.revokeObjectURL(prev)
-                    return null
-                  })
-                }}
-                className="rounded-lg border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+      <Sheet
+        open={Boolean(previewStudent)}
+        onClose={clearPreview}
+        size="xl"
+        icon={FileText}
+        title={previewStudent ? `${previewStudent.name}’s report card` : 'Report card'}
+        description={previewDescription}
+        footer={
+          previewStudent ? (
+            <>
+              <Button onClick={clearPreview}>Close</Button>
+              <Button
+                variant="primary"
+                icon={Download}
+                loading={downloadingIds.has(previewStudent._id)}
+                disabled={!selectedExamId}
+                onClick={() => void handleDownloadSingle(previewStudent)}
               >
-                Clear
-              </button>
-            ) : null}
-          </div>
-
-          <div className="max-h-[75vh] overflow-auto bg-slate-100/80 p-3 dark:bg-gray-900/40">
-            {previewLoading ? (
-              <div className="flex h-48 items-center justify-center text-sm text-gray-500 dark:text-gray-400">
-                Generating preview…
-              </div>
-            ) : previewUrl ? (
-              previewRenderError ? (
-                <div className="flex h-48 items-center justify-center px-4 text-center text-sm text-red-600 dark:text-red-400">
-                  {previewRenderError}
-                </div>
-              ) : (
-                <Document
-                  file={previewUrl}
-                  loading={
-                    <div className="flex h-48 items-center justify-center text-sm text-gray-500 dark:text-gray-400">
-                      Rendering preview…
-                    </div>
-                  }
-                  onLoadSuccess={({ numPages }) => {
-                    setPreviewPageCount(numPages)
-                    setPreviewRenderError(null)
-                  }}
-                  onLoadError={(error) => {
-                    const message = (error as Error)?.message || 'Unknown PDF render error'
-                    setPreviewRenderError(`Failed to render preview (${message}).`)
-                  }}
-                  className="flex flex-col items-center gap-4"
-                >
-                  {Array.from({ length: previewPageCount }).map((_, index) => (
-                    <Page
-                      key={`report-card-preview-page-${index + 1}`}
-                      pageNumber={index + 1}
-                      width={Math.min(920, typeof window !== 'undefined' ? window.innerWidth - 96 : 920)}
-                      renderTextLayer={false}
-                      renderAnnotationLayer={false}
-                      className="overflow-hidden rounded-md bg-white shadow-sm"
-                    />
-                  ))}
-                </Document>
-              )
-            ) : (
-              <div className="flex h-48 items-center justify-center text-sm text-gray-500 dark:text-gray-400">
-                No preview yet.
-              </div>
-            )}
-          </div>
-        </div>
-      ) : null}
-    </div>
+                Download report card
+              </Button>
+            </>
+          ) : null
+        }
+      >
+        <PaperStage
+          state={
+            previewLoading ? (
+              <CardLoading label="Generating preview…" />
+            ) : !previewUrl ? (
+              <EmptyState compact icon={FileText} title="No preview yet" />
+            ) : previewRenderError ? (
+              <EmptyState
+                icon={AlertCircle}
+                title="The preview couldn’t be shown"
+                body={`${previewRenderError} Download the report card to open it instead.`}
+              />
+            ) : undefined
+          }
+        >
+          <Document
+            file={previewUrl}
+            className={PAPER_PAGES_CLASS}
+            loading={<CardLoading label="Rendering preview…" />}
+            onLoadSuccess={({ numPages }) => {
+              setPreviewPageCount(numPages)
+              setPreviewRenderError(null)
+            }}
+            onLoadError={(error) => {
+              const message = (error as Error)?.message || 'Unknown PDF render error'
+              setPreviewRenderError(`The PDF didn’t render (${message}).`)
+            }}
+          >
+            {Array.from({ length: previewPageCount }).map((_, index) => (
+              <Paper key={`report-card-preview-page-${index + 1}`}>
+                <PdfPage
+                  pageNumber={index + 1}
+                  width={pdfPageWidth()}
+                  renderTextLayer={false}
+                  renderAnnotationLayer={false}
+                />
+              </Paper>
+            ))}
+          </Document>
+        </PaperStage>
+      </Sheet>
+    </Page>
   )
 }
 

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import Cropper, { type Area } from 'react-easy-crop'
 import 'react-easy-crop/react-easy-crop.css'
 
@@ -487,8 +488,9 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
     }
   }
 
-  return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-900/55 p-4">
+  // Portalled above kit Sheets/Dialogs (z-100), which it usually opens from.
+  return createPortal(
+    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-900/55 p-4" role="dialog" aria-modal="true">
       <div className="w-full max-w-xl overflow-hidden rounded-[24px] bg-white shadow-2xl">
         <div className="border-b border-slate-100 px-5 py-4">
           <div className="flex items-start justify-between gap-3">
@@ -690,7 +692,8 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 

@@ -1,0 +1,17 @@
+/* Exams — report cards page and report card format designer. Tokens only; scoped to .cb-app. */
+
+/* Exam picker in the filter bar is wider than the class/section selects. */
+.cb-app .cb-filterbar__filters .cb-field.ex-rc-exam { width: 260px; }
+@media (max-width: 640px) {
+  .cb-app .cb-filterbar__filters .cb-field.ex-rc-exam { width: auto; grid-column: 1 / -1; }
+}
+
+/* Bulk bar sits in the card toolbar strip, under the filters. */
+.cb-app .ex-rc-bulk { padding: 0 var(--space-5) var(--space-4); }
+@media (max-width: 640px) { .cb-app .ex-rc-bulk { padding: 0 var(--space-4) var(--space-3); } }
+
+/* Student cell: photo (or initials) beside name and admission no. */
+.cb-app .ex-rc-student { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
+
+.cb-app .ex-rcf-merge { font-size: 12px; line-height: 16px; color: var(--ink-muted); overflow-wrap: anywhere; }
+.cb-app .ex-rcf-merge code { font: 500 12px/16px var(--font-sans); color: var(--ink); }

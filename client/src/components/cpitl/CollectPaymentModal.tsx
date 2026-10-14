@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
-import { IndianRupee } from 'lucide-react'
-import Modal from '@/components/common/Modal'
-import cpitlService, { FeeDemand, PaymentMode, StudentAccount } from '@/services/cpitlService'
-import { Field, MODE_LABELS, btnPrimary, btnSecondary, errorMessage, fmtDate, inputClass, inr } from './CpitlUi'
+import { AlertCircle, CheckCircle2, IndianRupee, Printer } from 'lucide-react'
+import { Button, Checkbox, Icon, Sheet, TextField, cx } from '@/components/ui'
+import cpitlService, { FeeDemand, FeePayment, PaymentMode, StudentAccount } from '@/services/cpitlService'
+import { MODE_LABELS, errorMessage, fmtDate, inr } from './CpitlUi'
+import './collection.css'
 
 const MODES: PaymentMode[] = ['cash', 'upi', 'cheque', 'dd', 'bank_transfer', 'card']
 
@@ -22,6 +23,7 @@ const previewAllocation = (demands: FeeDemand[], amount: number) => {
   })
 }
 
+/** "Collect fee" form, shown as a kit Sheet. Keeps its historical name so callers don't change. */
 const CollectPaymentModal: React.FC<{
   isOpen: boolean
   onClose: () => void
@@ -47,6 +49,8 @@ const CollectPaymentModal: React.FC<{
   const [remarks, setRemarks] = useState('')
   const [printReceipt, setPrintReceipt] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState<FeePayment | null>(null)
+  const [printing, setPrinting] = useState(false)
 
   useEffect(() => {
     if (!isOpen) return
@@ -59,6 +63,7 @@ const CollectPaymentModal: React.FC<{
     setChequeNo('')
     setChequeBank('')
     setRemarks('')
+    setSaved(null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen])
 
@@ -78,10 +83,24 @@ const CollectPaymentModal: React.FC<{
 
   const needsRef = mode === 'upi' || mode === 'bank_transfer' || mode === 'card'
   const isCheque = mode === 'cheque' || mode === 'dd'
-  const invalid = amount < 0 || amount > outstanding + 0.001 || amount + lateFee <= 0 || (isCheque && !chequeNo.trim())
+  const overLimit = amount > outstanding + 0.001
+  const invalid = amount < 0 || overLimit || amount + lateFee <= 0 || (isCheque && !chequeNo.trim())
+  const total = (amount || 0) + (lateFee || 0)
 
-  const submit = async () => {
-    if (invalid) return
+  const openReceipt = async (payment: FeePayment) => {
+    setPrinting(true)
+    try {
+      await cpitlService.openReceipt(payment)
+    } catch (error) {
+      toast.error(await errorMessage(error, 'Could not open receipt.'))
+    } finally {
+      setPrinting(false)
+    }
+  }
+
+  const submit = async (event?: React.FormEvent) => {
+    event?.preventDefault()
+    if (invalid || saving) return
     setSaving(true)
     try {
       const payment = await cpitlService.collectPayment(data.student._id, {
@@ -95,10 +114,8 @@ const CollectPaymentModal: React.FC<{
       })
       toast.success(`Receipt ${payment.receiptNo} generated.`)
       onCollected()
-      onClose()
-      if (printReceipt) {
-        cpitlService.openReceipt(payment).catch(async (error) => toast.error(await errorMessage(error, 'Could not open receipt.')))
-      }
+      setSaved(payment)
+      if (printReceipt) void openReceipt(payment)
     } catch (error) {
       toast.error(await errorMessage(error, 'Payment could not be recorded.'))
     } finally {
@@ -106,147 +123,208 @@ const CollectPaymentModal: React.FC<{
     }
   }
 
+  if (saved) {
+    return (
+      <Sheet
+        open={isOpen}
+        onClose={onClose}
+        icon={IndianRupee}
+        size="lg"
+        title="Payment recorded"
+        description={data.student.name}
+        footer={
+          <>
+            <Button onClick={onClose}>Done</Button>
+            <Button variant="primary" icon={Printer} loading={printing} onClick={() => openReceipt(saved)}>
+              Print receipt
+            </Button>
+          </>
+        }
+      >
+        <div className="cc-done" role="status">
+          <span className="cc-done__icon" aria-hidden="true">
+            <Icon icon={CheckCircle2} size={24} />
+          </span>
+          <p className="cc-done__amount">{inr(saved.total, { decimals: true })}</p>
+          <p className="cc-done__text">
+            Receipt <strong className="cc-code">{saved.receiptNo}</strong> · {MODE_LABELS[saved.mode]} · {fmtDate(saved.date)}
+          </p>
+          {printReceipt ? <p className="cc-done__text">The receipt opens in a new tab. Print it again any time from here or from Receipts.</p> : null}
+        </div>
+      </Sheet>
+    )
+  }
+
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={`Collect fee — ${data.student.name}`} size="xl">
-      <div className="grid gap-6 md:grid-cols-5">
-        <div className="space-y-4 md:col-span-3">
-          <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900/40">
-            <label className="text-xs font-medium uppercase tracking-wide text-slate-500">Amount towards fees</label>
-            <div className="mt-1 flex items-center gap-2">
-              <IndianRupee className="h-7 w-7 text-slate-400" />
-              <input
-                type="number"
-                min={0}
-                step="0.01"
-                autoFocus
-                className="w-full bg-transparent text-4xl font-semibold tabular-nums text-slate-900 outline-none dark:text-white"
-                value={amount || ''}
-                placeholder="0"
-                onChange={(e) => setAmount(Number(e.target.value))}
-              />
-            </div>
-            <div className="mt-3 flex flex-wrap gap-1.5">
-              {quickPicks.map((p) => (
-                <button
-                  key={p.label}
-                  type="button"
-                  onClick={() => setAmount(p.value)}
-                  className={`rounded-full border px-3 py-1 text-xs font-medium ${
-                    amount === p.value
-                      ? 'border-indigo-500 bg-indigo-50 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-200'
-                      : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300'
-                  }`}
-                >
-                  {p.label} · {inr(p.value)}
-                </button>
-              ))}
-            </div>
-            {amount > outstanding + 0.001 ? (
-              <p className="mt-2 text-xs text-rose-600">Amount is more than the outstanding {inr(outstanding)}.</p>
-            ) : null}
-          </div>
-
-          <div>
-            <span className="text-xs font-medium text-slate-600 dark:text-slate-300">Payment mode</span>
-            <div className="mt-1.5 grid grid-cols-3 gap-2">
-              {MODES.map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  onClick={() => setMode(m)}
-                  className={`rounded-xl border px-3 py-2 text-sm font-medium ${
-                    mode === m
-                      ? 'border-indigo-500 bg-indigo-50 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-200'
-                      : 'border-slate-200 text-slate-600 hover:border-slate-300 dark:border-slate-600 dark:text-slate-300'
-                  }`}
-                >
-                  {MODE_LABELS[m]}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <Field label="Payment date">
-              <input type="date" className={inputClass} value={date} max={todayIso()} onChange={(e) => setDate(e.target.value)} />
-            </Field>
-            <Field label="Late fee / fine (₹)" hint={suggestedLateFee > 0 ? `Suggested ${inr(suggestedLateFee)}` : undefined}>
-              <input type="number" min={0} className={inputClass} value={lateFee} onChange={(e) => setLateFee(Number(e.target.value))} />
-            </Field>
-            {isCheque ? (
-              <>
-                <Field label={mode === 'dd' ? 'DD number' : 'Cheque number'}>
-                  <input className={inputClass} value={chequeNo} onChange={(e) => setChequeNo(e.target.value)} />
-                </Field>
-                <Field label="Bank">
-                  <input className={inputClass} value={chequeBank} onChange={(e) => setChequeBank(e.target.value)} />
-                </Field>
-              </>
-            ) : needsRef ? (
-              <Field label="Transaction / UTR reference" className="col-span-2">
-                <input className={inputClass} value={reference} onChange={(e) => setReference(e.target.value)} />
-              </Field>
-            ) : null}
-            <Field label="Remarks" className="col-span-2">
-              <input className={inputClass} value={remarks} onChange={(e) => setRemarks(e.target.value)} placeholder="Optional" />
-            </Field>
-          </div>
+    <Sheet
+      open={isOpen}
+      onClose={onClose}
+      icon={IndianRupee}
+      size="lg"
+      title="Collect fee"
+      description={`${data.student.name} · Class ${data.student.class}${data.student.section ? `-${data.student.section}` : ''} · Roll ${data.student.rollNumber}`}
+      onSubmit={submit}
+      footer={
+        <>
+          <Button onClick={onClose}>Cancel</Button>
+          <Button type="submit" variant="primary" icon={IndianRupee} disabled={invalid} loading={saving}>
+            {`Receive ${inr(total)}`}
+          </Button>
+        </>
+      }
+    >
+      <dl className="cc-pay__summary">
+        <div className="cc-pay__metric">
+          <dt>Outstanding</dt>
+          <dd>{inr(outstanding)}</dd>
         </div>
+        <div className={cx('cc-pay__metric', overdueTotal > 0 && 'is-danger')}>
+          <dt>Overdue</dt>
+          <dd>{inr(overdueTotal)}</dd>
+        </div>
+        <div className="cc-pay__metric">
+          <dt>Late fee due</dt>
+          <dd>{inr(suggestedLateFee)}</dd>
+        </div>
+      </dl>
 
-        <div className="md:col-span-2">
-          <div className="rounded-2xl border border-slate-200 p-4 dark:border-slate-700">
-            <h4 className="text-sm font-semibold text-slate-900 dark:text-white">Applied to</h4>
-            <ul className="mt-3 space-y-2 text-sm">
-              {allocation.map(({ demand, amount: applied }) => (
-                <li key={demand._id} className={`flex items-center justify-between gap-2 ${applied > 0 ? '' : 'opacity-40'}`}>
-                  <div>
-                    <div className="font-medium text-slate-800 dark:text-slate-100">{demand.label}</div>
-                    <div className={`text-xs ${demand.isOverdue ? 'text-rose-600' : 'text-slate-500'}`}>
-                      Due {fmtDate(demand.dueDate)} · {inr(demand.balance)} open
-                    </div>
-                  </div>
-                  <span className="tabular-nums">{applied > 0 ? inr(applied) : '—'}</span>
-                </li>
-              ))}
-              {!allocation.length ? <li className="text-slate-500">No open installments.</li> : null}
-            </ul>
-            <div className="mt-4 space-y-1 border-t border-slate-100 pt-3 text-sm dark:border-slate-700">
-              <div className="flex justify-between text-slate-500">
-                <span>Fees</span>
-                <span className="tabular-nums">{inr(amount, { decimals: true })}</span>
-              </div>
-              {lateFee > 0 ? (
-                <div className="flex justify-between text-slate-500">
-                  <span>Late fee</span>
-                  <span className="tabular-nums">{inr(lateFee, { decimals: true })}</span>
-                </div>
-              ) : null}
-              <div className="flex justify-between text-base font-semibold text-slate-900 dark:text-white">
-                <span>Total received</span>
-                <span className="tabular-nums">{inr((amount || 0) + (lateFee || 0), { decimals: true })}</span>
-              </div>
-              <div className="flex justify-between text-xs text-slate-500">
-                <span>Balance after</span>
-                <span className="tabular-nums">{inr(Math.max(0, outstanding - (amount || 0)))}</span>
-              </div>
-            </div>
+      <div className={cx('cc-amount', overLimit && 'is-invalid')}>
+        <label className="cc-amount__label" htmlFor="cc-amount-input">
+          Amount towards fees
+        </label>
+        <div className="cc-amount__row">
+          <span className="cc-amount__currency" aria-hidden="true">
+            ₹
+          </span>
+          <input
+            id="cc-amount-input"
+            className="cc-amount__input"
+            type="number"
+            inputMode="decimal"
+            min={0}
+            step="0.01"
+            autoFocus
+            value={amount || ''}
+            placeholder="0"
+            aria-invalid={overLimit || undefined}
+            onChange={(e) => setAmount(Number(e.target.value))}
+          />
+        </div>
+        {quickPicks.length ? (
+          <div className="cc-picks" role="group" aria-label="Quick amounts">
+            {quickPicks.map((p) => (
+              <button
+                key={p.label}
+                type="button"
+                className={cx('cb-chip', amount === p.value && 'is-active')}
+                aria-pressed={amount === p.value}
+                onClick={() => setAmount(p.value)}
+              >
+                {p.label} · <span className="is-num">{inr(p.value)}</span>
+              </button>
+            ))}
           </div>
-          <label className="mt-4 flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
-            <input type="checkbox" className="h-4 w-4 rounded border-slate-300 text-indigo-600" checked={printReceipt} onChange={(e) => setPrintReceipt(e.target.checked)} />
-            Open receipt after saving
-          </label>
+        ) : null}
+        {overLimit ? (
+          <p className="cc-amount__error" role="alert">
+            <Icon icon={AlertCircle} size={14} />
+            Amount is more than the outstanding {inr(outstanding)}.
+          </p>
+        ) : null}
+      </div>
+
+      <fieldset className="cc-group">
+        <legend>Payment mode</legend>
+        <div className="cc-modes" role="radiogroup" aria-label="Payment mode">
+          {MODES.map((m) => (
+            <button
+              key={m}
+              type="button"
+              role="radio"
+              aria-checked={mode === m}
+              className={cx('cc-mode', mode === m && 'is-on')}
+              onClick={() => setMode(m)}
+            >
+              {MODE_LABELS[m]}
+            </button>
+          ))}
+        </div>
+      </fieldset>
+
+      <div className="cb-form-grid">
+        <TextField label="Payment date" type="date" value={date} max={todayIso()} onChange={(e) => setDate(e.target.value)} />
+        <TextField
+          label="Late fee or fine"
+          type="number"
+          min={0}
+          prefix="₹"
+          value={lateFee}
+          hint={suggestedLateFee > 0 ? `Suggested ${inr(suggestedLateFee)}` : undefined}
+          onChange={(e) => setLateFee(Number(e.target.value))}
+        />
+        {isCheque ? (
+          <>
+            <TextField
+              label={mode === 'dd' ? 'DD number' : 'Cheque number'}
+              required
+              value={chequeNo}
+              hint={!chequeNo.trim() ? 'Required for cheque and DD payments' : undefined}
+              onChange={(e) => setChequeNo(e.target.value)}
+            />
+            <TextField label="Bank" value={chequeBank} onChange={(e) => setChequeBank(e.target.value)} />
+          </>
+        ) : needsRef ? (
+          <TextField
+            label="Transaction or UTR reference"
+            className="is-wide"
+            value={reference}
+            onChange={(e) => setReference(e.target.value)}
+          />
+        ) : null}
+        <TextField label="Remarks" className="is-wide" value={remarks} placeholder="Optional" onChange={(e) => setRemarks(e.target.value)} />
+      </div>
+
+      <div className="cb-form-section">
+        <h3 className="cb-form-section__title">Applied to (oldest first)</h3>
+        <ul className="cc-alloc">
+          {allocation.map(({ demand, amount: applied }) => (
+            <li key={demand._id} className={applied > 0 ? undefined : 'is-skipped'}>
+              <div className="cc-cell">
+                <span className="cc-alloc__label">{demand.label}</span>
+                <span className={cx('cc-alloc__due', demand.isOverdue && 'is-overdue')}>
+                  {demand.isOverdue ? 'Overdue · ' : ''}Due {fmtDate(demand.dueDate)} · {inr(demand.balance)} open
+                </span>
+              </div>
+              <span className="cc-alloc__amount">{applied > 0 ? inr(applied) : '—'}</span>
+            </li>
+          ))}
+          {!allocation.length ? <li className="cc-alloc__empty">No open installments.</li> : null}
+        </ul>
+      </div>
+
+      <div className="cc-total" aria-live="polite">
+        <div className="cc-total__row">
+          <span>Fees</span>
+          <span>{inr(amount, { decimals: true })}</span>
+        </div>
+        {lateFee > 0 ? (
+          <div className="cc-total__row">
+            <span>Late fee</span>
+            <span>{inr(lateFee, { decimals: true })}</span>
+          </div>
+        ) : null}
+        <div className="cc-total__row is-grand">
+          <span>Total received</span>
+          <span>{inr(total, { decimals: true })}</span>
+        </div>
+        <div className="cc-total__row">
+          <span>Balance after</span>
+          <span>{inr(Math.max(0, outstanding - (amount || 0)))}</span>
         </div>
       </div>
 
-      <div className="mt-6 flex justify-end gap-2">
-        <button type="button" className={btnSecondary} onClick={onClose}>
-          Cancel
-        </button>
-        <button type="button" className={btnPrimary} disabled={invalid || saving} onClick={submit}>
-          {saving ? 'Saving…' : `Receive ${inr((amount || 0) + (lateFee || 0))}`}
-        </button>
-      </div>
-    </Modal>
+      <Checkbox label="Open receipt after saving" checked={printReceipt} onChange={setPrintReceipt} />
+    </Sheet>
   )
 }
 

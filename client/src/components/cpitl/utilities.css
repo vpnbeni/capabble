@@ -1,0 +1,100 @@
+/* CPITL utilities pages (fuel per vehicle, electricity bills). Tokens only; inside .cb-app. */
+
+/* ---------- Page action row and tabs with a trailing action ---------- */
+.cb-app .cu-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-2); }
+.cb-app .cu-tabbar { display: flex; align-items: center; gap: var(--space-4); border-bottom: 1px solid var(--border); }
+.cb-app .cu-tabbar .cb-tabs { flex: 1 1 auto; min-width: 0; border-bottom: 0; box-shadow: none; }
+.cb-app .cu-tabbar > .cb-btn { flex: none; }
+@media (max-width: 640px) {
+  .cb-app .cu-actions .cb-btn { flex: 1 1 0; }
+  .cb-app .cu-tabbar { flex-direction: column-reverse; align-items: stretch; gap: var(--space-2); }
+}
+
+/* ---------- Records card: toolbar above a flush table ---------- */
+.cb-app .cu-records .cb-table-wrap { border-top: 1px solid var(--border); }
+.cb-app .cu-toolbar { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-4) var(--space-5); }
+.cb-app .cu-toolbar__note { font-size: 13px; line-height: 18px; color: var(--ink-muted); max-width: 720px; }
+@media (max-width: 640px) { .cb-app .cu-toolbar { padding: var(--space-3) var(--space-4); } }
+
+/* ---------- Cells ---------- */
+.cb-app .cu-entity { display: flex; flex-direction: column; min-width: 0; }
+.cb-app .cu-entity__primary { font-weight: 600; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cb-app .cu-entity__secondary { font-size: 12px; line-height: 16px; color: var(--ink-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cb-app .cu-strong { font-weight: 600; color: var(--ink); }
+.cb-app .cu-num { display: inline-flex; flex-direction: column; align-items: flex-end; gap: 2px; font-variant-numeric: tabular-nums; }
+.cb-app .cb-tcard .cu-num { align-items: flex-start; }
+.cb-app .cu-overdue { color: var(--danger-ink); font-weight: 600; }
+.cb-app .cu-rowactions { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-1); }
+.cb-app .cb-tcard .cu-rowactions { justify-content: flex-start; }
+.cb-app .cu-clip { display: inline-block; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle; }
+
+/* ---------- Totals line under a table ---------- */
+.cb-app .cu-totals { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-2) var(--space-6); font-size: 13px; line-height: 18px; color: var(--ink-muted); }
+.cb-app .cu-totals strong { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+.cb-app .cu-totals__label { color: var(--ink); font-weight: 600; margin-right: auto; }
+
+/* ---------- Growth input in the projection toolbar ---------- */
+.cb-app .cu-growth { display: flex; align-items: flex-end; gap: var(--space-2); flex-wrap: wrap; }
+.cb-app .cu-growth .cb-field { width: 168px; }
+@media (max-width: 640px) { .cb-app .cu-growth .cb-field { flex: 1 1 140px; width: auto; } }
+
+/* ---------- Sparkline: tiny monthly bars per vehicle ---------- */
+.cb-app .cu-spark { display: inline-flex; align-items: flex-end; gap: 2px; height: 24px; width: 96px; vertical-align: middle; }
+.cb-app .cu-spark__bar { flex: 1 1 0; min-width: 2px; background: var(--chart-1); border-radius: 2px 2px 0 0; }
+.cb-app .cu-spark__bar.is-zero { background: var(--border); height: 2px; border-radius: 1px; }
+
+/* ---------- Monthly bar chart (single or paired series) ---------- */
+.cb-app .cu-chart { display: flex; flex-direction: column; gap: var(--space-3); }
+.cb-app .cu-chart__plot { display: flex; align-items: flex-end; gap: var(--space-2); height: 184px; margin-bottom: 22px; border-bottom: 1px solid var(--border); }
+.cb-app .cu-chart__col { position: relative; flex: 1 1 0; min-width: 0; height: 100%; display: flex; align-items: flex-end; justify-content: center; gap: 2px; cursor: default; }
+.cb-app .cu-chart__col:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; border-radius: 4px; }
+.cb-app .cu-chart__bar { flex: 1 1 0; max-width: 24px; min-height: 2px; border-radius: 4px 4px 0 0; }
+.cb-app .cu-chart__bar.is-zero { background: var(--border); height: 2px; border-radius: 1px; }
+.cb-app .cu-chart__col:hover .cu-chart__bar, .cb-app .cu-chart__col:focus-visible .cu-chart__bar { filter: brightness(0.92); }
+.cb-app .cu-chart__label { position: absolute; bottom: -20px; left: 50%; transform: translateX(-50%); font-size: 11px; line-height: 14px; color: var(--ink-subtle); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.cb-app .cu-chart__tip { position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%); z-index: 2; display: none; padding: 6px 10px; border-radius: var(--radius-md); background: var(--surface-raised); border: 1px solid var(--border); box-shadow: var(--shadow-overlay); font-size: 12px; line-height: 16px; color: var(--ink); white-space: nowrap; pointer-events: none; font-variant-numeric: tabular-nums; }
+.cb-app .cu-chart__col:first-child .cu-chart__tip { left: 0; transform: none; }
+.cb-app .cu-chart__col:last-child .cu-chart__tip { left: auto; right: 0; transform: none; }
+.cb-app .cu-chart__col:hover .cu-chart__tip, .cb-app .cu-chart__col:focus-visible .cu-chart__tip { display: block; }
+.cb-app .cu-chart__tip strong { display: block; font-weight: 600; margin-bottom: 2px; }
+.cb-app .cu-chart__legend { display: flex; gap: var(--space-4); flex-wrap: wrap; font-size: 12px; line-height: 16px; color: var(--ink-muted); }
+.cb-app .cu-chart__legend span { display: inline-flex; align-items: center; gap: 6px; }
+.cb-app .cu-chart__legend i { width: 10px; height: 10px; border-radius: 3px; }
+.cb-app .cu-c1 { background: var(--chart-1); }
+.cb-app .cu-c2 { background: var(--chart-2); }
+@media (max-width: 640px) {
+  .cb-app .cu-chart__plot { gap: var(--space-1); }
+  .cb-app .cu-chart__col:nth-child(even) .cu-chart__label { display: none; }
+}
+
+/* ---------- Electricity: connections beside the usage chart ---------- */
+.cb-app .cu-split { display: grid; gap: var(--space-6); grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); align-items: start; }
+@media (max-width: 1023px) { .cb-app .cu-split { grid-template-columns: minmax(0, 1fr); gap: var(--space-4); } }
+
+.cb-app .cu-conns { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.cb-app .cu-conn { display: flex; align-items: center; gap: var(--space-2); padding-right: var(--space-2); border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); }
+.cb-app .cu-conn:hover { background: var(--surface-hover); }
+.cb-app .cu-conn.is-active { border-color: var(--accent-strong); background: var(--accent-soft); }
+.cb-app .cu-conn__select { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3); background: none; border: 0; border-radius: var(--radius-lg); font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.cb-app .cu-conn__select:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.cb-app .cu-conn__icon { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: var(--radius-md); background: var(--surface-sunken); color: var(--ink-muted); }
+.cb-app .cu-conn.is-active .cu-conn__icon { background: var(--surface); color: var(--accent-strong); }
+.cb-app .cu-conn__text { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.cb-app .cu-conn__name { font: 600 13px/18px var(--font-sans); color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cb-app .cu-conn__meta { font-size: 12px; line-height: 16px; color: var(--ink-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cb-app .cu-conn__sum { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; font-size: 12px; line-height: 16px; color: var(--ink-muted); font-variant-numeric: tabular-nums; }
+.cb-app .cu-conn__sum strong { font-size: 13px; line-height: 18px; font-weight: 600; color: var(--ink); }
+
+/* ---------- Sheet extras ---------- */
+.cb-app .cu-paid { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-3) var(--space-4); border: 1px solid var(--border); border-radius: var(--radius-md); }
+.cb-app .cu-form-stack { display: flex; flex-direction: column; gap: var(--space-4); }
+
+/* Connection picker in the chart card header. */
+.cb-app .cu-connselect { width: 220px; }
+@media (max-width: 640px) { .cb-app .cu-connselect { width: 160px; } }
+
+/* Bulk bar inside a flush records card (fuel log, electricity bills) */
+.cb-app .cu-bulk { padding: 0 var(--space-5) var(--space-3); }
+.cb-app .cu-bulk--top { padding-top: var(--space-3); }
+@media (max-width: 640px) { .cb-app .cu-bulk { padding: 0 var(--space-4) var(--space-3); } .cb-app .cu-bulk--top { padding-top: var(--space-3); } }
+.cb-app .cu-bulknote { margin: 0 0 var(--space-3); font-size: 13px; line-height: 18px; color: var(--ink-muted); }

@@ -1,5 +1,7 @@
 import React, { useMemo } from 'react'
+import { cx } from '@/components/ui'
 import '@/styles/houseFlagFly.css'
+import '@/components/actvt/houses.css'
 
 type HouseFlagFlyProps = {
   src: string
@@ -22,6 +24,8 @@ const SLICE_OVERLAP_PX = 2
 /**
  * House flag with pole + fabric wave (flying in wind).
  * Cloth is split into vertical slices with staggered sway for a fabric feel.
+ * Motion lives in styles/houseFlagFly.css; the mast is re-skinned with design tokens in
+ * houses.css (`.ah-flag`) so it follows light and dark mode.
  */
 export const HouseFlagFly: React.FC<HouseFlagFlyProps> = ({
   src,
@@ -51,7 +55,13 @@ export const HouseFlagFly: React.FC<HouseFlagFlyProps> = ({
 
   return (
     <div
-      className={`house-flag-fly ${hoist ? 'house-flag-fly--hoist' : ''} ${compact ? 'house-flag-fly--compact' : ''} ${className}`}
+      className={cx(
+        'house-flag-fly',
+        'ah-flag',
+        hoist && 'house-flag-fly--hoist',
+        compact && 'house-flag-fly--compact',
+        className
+      )}
       style={
         {
           '--flag-h': `${height}px`,

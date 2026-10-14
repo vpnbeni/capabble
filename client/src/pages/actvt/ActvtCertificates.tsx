@@ -2,10 +2,29 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import toast from 'react-hot-toast'
 import { Award, Printer, Trash2 } from 'lucide-react'
 import api from '@/services/api'
+import {
+  Badge,
+  Button,
+  Card,
+  DataTable,
+  Dialog,
+  FilterBar,
+  Page,
+  Select,
+  TextArea,
+  TextField,
+  EmptyState,
+  formatDate,
+  type DataTableColumn,
+} from '@/components/ui'
+import { toneStyle } from '@/components/actvt/entityTone'
+import '@/components/actvt/actvt.css'
+import '@/components/actvt/sports.css'
 
 type HouseOption = {
   _id?: string
   name?: string
+  color?: string
 }
 
 type ActivityEvent = {
@@ -52,11 +71,7 @@ const emptyForm = (): CertForm => ({
   issuedOn: new Date().toISOString().slice(0, 10),
 })
 
-const inputClass =
-  'h-10 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100'
-
-const textareaClass =
-  'w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100'
+const ROLE_OPTIONS = ['Participant', 'Winner', 'Runner-up', 'Second Runner-up', 'Volunteer']
 
 const ActvtCertificates: React.FC = () => {
   const printRef = useRef<HTMLDivElement | null>(null)
@@ -67,6 +82,9 @@ const ActvtCertificates: React.FC = () => {
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [query, setQuery] = useState('')
+  const [pendingRemove, setPendingRemove] = useState<CertificateRecord | null>(null)
+  const [removing, setRemoving] = useState(false)
 
   const houseMap = useMemo(() => {
     const map = new Map<string, HouseOption>()
@@ -160,7 +178,7 @@ const ActvtCertificates: React.FC = () => {
   }
 
   const handleRemove = async (item: CertificateRecord) => {
-    if (!item._id || !window.confirm(`Remove certificate for "${item.participantName}"?`)) return
+    if (!item._id) return
     try {
       await api.delete(`/actvt/certificates/${item._id}`)
       toast.success('Certificate removed.')
@@ -183,135 +201,256 @@ const ActvtCertificates: React.FC = () => {
     window.print()
   }
 
+  const houseIndex = useMemo(() => {
+    const map = new Map<string, number>()
+    houses.forEach((house, index) => map.set(String(house._id), index))
+    return map
+  }, [houses])
+
+  const visibleRecords = useMemo(() => {
+    const needle = query.trim().toLowerCase()
+    if (!needle) return records
+    return records.filter((item) =>
+      `${item.participantName || ''} ${item.title || ''} ${item.eventTitle || ''} ${item.houseName || ''} ${item.role || ''} ${item.className || ''}`
+        .toLowerCase()
+        .includes(needle)
+    )
+  }, [records, query])
+
+  const visibleIds = visibleRecords.map((item) => String(item._id || '')).filter(Boolean)
+  const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.includes(id))
+  const someVisibleSelected = visibleIds.some((id) => selectedIds.includes(id))
+
+  const toggleAllVisible = () => {
+    setSelectedIds((prev) =>
+      allVisibleSelected ? prev.filter((id) => !visibleIds.includes(id)) : Array.from(new Set([...prev, ...visibleIds]))
+    )
+  }
+
+  const confirmRemove = async () => {
+    if (!pendingRemove) return
+    setRemoving(true)
+    try {
+      await handleRemove(pendingRemove)
+    } finally {
+      setRemoving(false)
+      setPendingRemove(null)
+    }
+  }
+
+  const columns: DataTableColumn<CertificateRecord>[] = [
+    {
+      key: 'participantName',
+      header: 'Participant',
+      mobile: 'title',
+      render: (item) => (
+        <span className="asp-person">
+          <span className="asp-person__name">{item.participantName || 'Unnamed'}</span>
+          {item.className || item.section ? (
+            <span className="asp-person__sub">
+              Class {item.className || '—'}
+              {item.section ? `-${item.section}` : ''}
+            </span>
+          ) : null}
+        </span>
+      ),
+    },
+    {
+      key: 'title',
+      header: 'Certificate',
+      mobile: 'subtitle',
+      render: (item) => `${item.title || 'Certificate'}${item.role ? ` · ${item.role}` : ''}`,
+    },
+    { key: 'eventTitle', header: 'Activity', render: (item) => item.eventTitle || '—' },
+    {
+      key: 'houseName',
+      header: 'House',
+      render: (item) => {
+        if (!item.houseName && !item.houseId) return '—'
+        const house = item.houseId ? houseMap.get(String(item.houseId)) : undefined
+        const name = house?.name || item.houseName || 'House'
+        if (!house) return name
+        return (
+          <span className="asp-swatchname" style={toneStyle(house.color, houseIndex.get(String(item.houseId)) || 0)}>
+            <span className="actvt-tone-dot" aria-hidden="true" />
+            <span>{name}</span>
+          </span>
+        )
+      },
+    },
+    { key: 'issuedOn', header: 'Issued on', render: (item) => formatDate(item.issuedOn) },
+    {
+      key: 'status',
+      header: 'Status',
+      mobile: 'aside',
+      render: (item) =>
+        String(item.status || 'issued').toLowerCase() === 'issued' ? (
+          <Badge tone="success">Issued</Badge>
+        ) : (
+          <Badge tone="neutral">{item.status}</Badge>
+        ),
+    },
+    {
+      key: 'actions',
+      header: '',
+      headerLabel: 'Actions',
+      align: 'right',
+      interactive: true,
+      width: 48,
+      render: (item) => (
+        <Button
+          variant="tertiary"
+          size="sm"
+          icon={Trash2}
+          aria-label={`Remove certificate for ${item.participantName || 'participant'}`}
+          onClick={() => setPendingRemove(item)}
+        />
+      ),
+    },
+  ]
+
+  const participantCount = form.participants.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).length
+
   return (
-    <div className="p-6">
-      <div className="mx-auto max-w-[1400px] space-y-6 print:max-w-none print:space-y-0 print:p-0">
-        <div className="grid gap-6 xl:grid-cols-[1fr_1.15fr] print:hidden">
-          <form onSubmit={handleGenerate} className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="mb-4 flex items-center gap-2">
-              <Award className="h-5 w-5 text-indigo-600" />
-              <h2 className="text-lg font-semibold text-slate-900">Generate certificates</h2>
-            </div>
-
-            <div className="grid gap-3">
-              <label className="text-xs">
-                <span className="mb-1 block font-medium text-slate-500">Certificate title</span>
-                <input required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className={inputClass} />
-              </label>
-
-              <label className="text-xs">
-                <span className="mb-1 block font-medium text-slate-500">House activity (optional)</span>
-                <select value={form.eventId} onChange={(e) => setForm({ ...form, eventId: e.target.value })} className={inputClass}>
-                  <option value="">Select activity from board</option>
-                  {events.map((item) => (
-                    <option key={item._id} value={item._id}>
-                      {item.title}{item.date ? ` · ${item.date}` : ''}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="text-xs">
-                <span className="mb-1 block font-medium text-slate-500">House (optional)</span>
-                <select value={form.houseId} onChange={(e) => setForm({ ...form, houseId: e.target.value })} className={inputClass}>
-                  <option value="">Select house</option>
-                  {houses.map((house) => (
-                    <option key={house._id} value={house._id}>{house.name}</option>
-                  ))}
-                </select>
-              </label>
-
-              <div className="grid gap-3 sm:grid-cols-3">
-                <label className="text-xs">
-                  <span className="mb-1 block font-medium text-slate-500">Role</span>
-                  <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} className={inputClass}>
-                    <option>Participant</option>
-                    <option>Winner</option>
-                    <option>Runner-up</option>
-                    <option>Second Runner-up</option>
-                    <option>Volunteer</option>
-                  </select>
-                </label>
-                <label className="text-xs">
-                  <span className="mb-1 block font-medium text-slate-500">Class</span>
-                  <input value={form.className} onChange={(e) => setForm({ ...form, className: e.target.value })} className={inputClass} />
-                </label>
-                <label className="text-xs">
-                  <span className="mb-1 block font-medium text-slate-500">Section</span>
-                  <input value={form.section} onChange={(e) => setForm({ ...form, section: e.target.value })} className={inputClass} />
-                </label>
-              </div>
-
-              <label className="text-xs">
-                <span className="mb-1 block font-medium text-slate-500">Issued on</span>
-                <input type="date" value={form.issuedOn} onChange={(e) => setForm({ ...form, issuedOn: e.target.value })} className={inputClass} />
-              </label>
-
-              <label className="text-xs">
-                <span className="mb-1 block font-medium text-slate-500">Participants (one name per line)</span>
-                <textarea
-                  required
-                  rows={8}
-                  value={form.participants}
-                  onChange={(e) => setForm({ ...form, participants: e.target.value })}
-                  placeholder={'Aarav Sharma\nIsha Verma\nKabir Singh'}
-                  className={textareaClass}
+    <>
+      <Page className="print:hidden">
+        <div className="asp-split">
+          <Card title="Generate certificates" subtitle="One certificate per participant name">
+            <form className="asp-form" onSubmit={handleGenerate} noValidate>
+              <TextField
+                label="Certificate title"
+                required
+                value={form.title}
+                onChange={(e) => setForm({ ...form, title: e.target.value })}
+              />
+              <Select
+                label="Activity"
+                hint="Optional. Pick an activity from the board."
+                value={form.eventId}
+                onChange={(e) => setForm({ ...form, eventId: e.target.value })}
+                placeholder="No activity"
+                options={events
+                  .filter((item) => item._id)
+                  .map((item) => ({
+                    value: String(item._id),
+                    label: `${item.title || 'Untitled activity'}${item.date ? ` · ${item.date}` : ''}`,
+                  }))}
+              />
+              <Select
+                label="House"
+                hint="Optional."
+                value={form.houseId}
+                onChange={(e) => setForm({ ...form, houseId: e.target.value })}
+                placeholder="No house"
+                options={houses
+                  .filter((house) => house._id)
+                  .map((house) => ({ value: String(house._id), label: house.name || 'Untitled house' }))}
+              />
+              <div className="cb-form-grid cb-form-grid--3">
+                <Select
+                  label="Role"
+                  value={form.role}
+                  onChange={(e) => setForm({ ...form, role: e.target.value })}
+                  options={ROLE_OPTIONS}
                 />
-              </label>
-
-              <button type="submit" disabled={saving} className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60">
-                {saving ? 'Generating...' : 'Generate certificates'}
-              </button>
-            </div>
-          </form>
-
-          <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <h3 className="text-lg font-semibold text-slate-900">Issued certificates</h3>
-              <button
-                type="button"
-                onClick={handlePrint}
-                disabled={selectedCertificates.length === 0}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-              >
-                <Printer className="h-4 w-4" />
-                Print selected ({selectedCertificates.length})
-              </button>
-            </div>
-
-            {loading ? <p className="text-sm text-slate-500">Loading...</p> : null}
-            {!loading && records.length === 0 ? (
-              <p className="text-sm text-slate-500">No certificates yet. Generate from the form.</p>
-            ) : (
-              <div className="space-y-2">
-                {records.map((item) => {
-                  const id = String(item._id || '')
-                  const checked = selectedIds.includes(id)
-                  return (
-                    <div key={id} className="flex items-start justify-between gap-3 rounded-2xl border border-slate-100 px-3 py-2.5">
-                      <label className="flex min-w-0 flex-1 cursor-pointer items-start gap-3">
-                        <input type="checkbox" checked={checked} onChange={() => toggleSelected(id)} className="mt-1" />
-                        <div className="min-w-0">
-                          <p className="font-medium text-slate-900">{item.participantName}</p>
-                          <p className="text-xs text-slate-500">
-                            {item.title}
-                            {item.eventTitle ? ` · ${item.eventTitle}` : ''}
-                            {item.houseName ? ` · ${item.houseName}` : ''}
-                            {item.role ? ` · ${item.role}` : ''}
-                          </p>
-                        </div>
-                      </label>
-                      <button type="button" onClick={() => void handleRemove(item)} className="text-rose-600">
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
-                  )
-                })}
+                <TextField label="Class" value={form.className} onChange={(e) => setForm({ ...form, className: e.target.value })} />
+                <TextField label="Section" value={form.section} onChange={(e) => setForm({ ...form, section: e.target.value })} />
               </div>
-            )}
-          </section>
+              <TextField
+                label="Issued on"
+                type="date"
+                value={form.issuedOn}
+                onChange={(e) => setForm({ ...form, issuedOn: e.target.value })}
+              />
+              <TextArea
+                label="Participants"
+                required
+                rows={8}
+                value={form.participants}
+                onChange={(e) => setForm({ ...form, participants: e.target.value })}
+                placeholder={'Aarav Sharma\nIsha Verma\nKabir Singh'}
+                hint={
+                  participantCount
+                    ? `${participantCount} ${participantCount === 1 ? 'name' : 'names'} · one name per line`
+                    : 'One name per line.'
+                }
+              />
+              <div className="asp-form__actions">
+                <Button variant="primary" type="submit" icon={Award} loading={saving}>
+                  {participantCount > 1 ? `Generate ${participantCount} certificates` : 'Generate certificates'}
+                </Button>
+              </div>
+            </form>
+          </Card>
+
+          <Card flush className="asp-certs-card">
+            <div className="asp-certs-head">
+              <FilterBar
+                search={{ placeholder: 'Search certificates', value: query, onChange: setQuery }}
+                actions={
+                  <Button icon={Printer} onClick={handlePrint} disabled={selectedCertificates.length === 0}>
+                    {selectedCertificates.length ? `Print ${selectedCertificates.length} selected` : 'Print selected'}
+                  </Button>
+                }
+              />
+            </div>
+            <DataTable
+              caption="Issued certificates"
+              columns={columns}
+              rows={visibleRecords}
+              getRowKey={(item) => String(item._id || `${item.participantName}-${item.issuedOn}`)}
+              loading={loading}
+              loadingLabel="Loading certificates…"
+              selection={{
+                isSelected: (item) => selectedIds.includes(String(item._id || '')),
+                onToggle: (item) => {
+                  if (item._id) toggleSelected(String(item._id))
+                },
+                allSelected: allVisibleSelected,
+                someSelected: someVisibleSelected,
+                onToggleAll: toggleAllVisible,
+                rowLabel: (item) => `Select certificate for ${item.participantName || 'participant'}`,
+              }}
+              empty={
+                <EmptyState
+                  icon={Award}
+                  title={query.trim() ? 'No certificates match your search' : 'No certificates issued yet'}
+                  body={
+                    query.trim()
+                      ? 'Try a different name, activity or house.'
+                      : 'Add participant names in the form to generate certificates, then select them here to print.'
+                  }
+                  action={query.trim() ? <Button onClick={() => setQuery('')}>Clear search</Button> : undefined}
+                  compact
+                />
+              }
+              footer={`${records.length} issued · ${selectedCertificates.length} selected for printing`}
+            />
+          </Card>
         </div>
 
+        <Dialog
+          open={Boolean(pendingRemove)}
+          onClose={() => (removing ? undefined : setPendingRemove(null))}
+          tone="danger"
+          size="sm"
+          title={`Remove certificate for ${pendingRemove?.participantName || 'this participant'}?`}
+          description="The certificate record is deleted and can't be printed again. This can't be undone."
+          footer={
+            <>
+              <Button onClick={() => setPendingRemove(null)} disabled={removing}>
+                Cancel
+              </Button>
+              <Button variant="danger" loading={removing} onClick={() => void confirmRemove()}>
+                Remove certificate
+              </Button>
+            </>
+          }
+        />
+      </Page>
+
+      {/* Printed certificates: artwork kept exactly as before; shown only when printing. */}
+      <div className="hidden p-6 print:block">
         <div ref={printRef} className="hidden print:block">
           {selectedCertificates.map((item) => (
             <div
@@ -346,7 +485,7 @@ const ActvtCertificates: React.FC = () => {
           ))}
         </div>
       </div>
-    </div>
+    </>
   )
 }
 

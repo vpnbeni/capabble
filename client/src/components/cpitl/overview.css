@@ -1,0 +1,90 @@
+/* CPITL fee dashboard and fee settings. Tokens only; everything sits inside .cb-app. */
+
+/* ---------- Top bar ---------- */
+.cb-app .co-toolbar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
+.cb-app .co-toolbar__lede { font-size: 14px; line-height: 20px; color: var(--ink-muted); min-width: 0; }
+.cb-app .co-toolbar__lede strong { color: var(--ink); font-weight: 600; }
+@media (max-width: 640px) {
+  .cb-app .co-toolbar > .cb-btn { width: 100%; }
+}
+/* Six headline figures: two rows of three on wide screens. */
+@media (min-width: 1024px) { .cb-app .co-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+/* ---------- Monthly columns (single hue, or income/expense pairs) ---------- */
+.cb-app .co-trend { display: flex; flex-direction: column; gap: var(--space-3); }
+.cb-app .co-trend__scale { display: flex; justify-content: space-between; font-size: 12px; line-height: 16px; color: var(--ink-subtle); font-variant-numeric: tabular-nums; }
+.cb-app .co-trend__plot { position: relative; display: flex; align-items: flex-end; gap: var(--space-2); height: 184px; margin-bottom: 22px; border-bottom: 1px solid var(--border); }
+.cb-app .co-trend__col { position: relative; flex: 1 1 0; min-width: 0; height: 100%; display: flex; align-items: flex-end; justify-content: center; gap: 3px; }
+.cb-app .co-trend__col:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; border-radius: 4px; }
+.cb-app .co-trend__bar { display: block; flex: 1 1 0; max-width: 40px; min-height: 2px; border-radius: 4px 4px 0 0; background: var(--chart-1); }
+.cb-app .co-trend__bar--expense { background: var(--chart-6); }
+.cb-app .co-trend__bar.is-zero { background: var(--border); height: 2px; border-radius: 1px; }
+.cb-app .co-trend__col:hover .co-trend__bar, .cb-app .co-trend__col:focus-visible .co-trend__bar { filter: brightness(0.92); }
+.cb-app .co-trend__label { position: absolute; bottom: -20px; left: 50%; transform: translateX(-50%); font-size: 11px; line-height: 14px; color: var(--ink-subtle); white-space: nowrap; }
+.cb-app .co-trend__tip { position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%); z-index: 2; display: none; padding: 6px 10px; border-radius: var(--radius-md); background: var(--surface-raised); border: 1px solid var(--border); box-shadow: var(--shadow-overlay); font-size: 12px; line-height: 16px; color: var(--ink); white-space: nowrap; pointer-events: none; font-variant-numeric: tabular-nums; }
+.cb-app .co-trend__col:hover .co-trend__tip, .cb-app .co-trend__col:focus-visible .co-trend__tip { display: block; }
+.cb-app .co-trend__col:first-child .co-trend__tip { left: 0; transform: none; }
+.cb-app .co-trend__col:last-child .co-trend__tip { left: auto; right: 0; transform: none; }
+.cb-app .co-trend__tip strong { display: block; font-weight: 600; margin-bottom: 2px; }
+.cb-app .co-trend__legend { display: flex; gap: var(--space-4); flex-wrap: wrap; font-size: 12px; line-height: 16px; color: var(--ink-muted); }
+.cb-app .co-trend__legend span { display: inline-flex; align-items: center; gap: 6px; }
+.cb-app .co-trend__legend i { width: 10px; height: 10px; border-radius: 3px; background: var(--chart-1); }
+.cb-app .co-trend__legend i.is-expense { background: var(--chart-6); }
+@media (max-width: 640px) {
+  .cb-app .co-trend__plot { gap: 3px; height: 152px; }
+  .cb-app .co-trend__label { font-size: 10px; }
+  .cb-app .co-trend__col:nth-child(even) .co-trend__label { display: none; }
+}
+/* ---------- Income vs expenses figures ---------- */
+.cb-app .co-figures { display: grid; gap: var(--space-3); grid-template-columns: repeat(3, minmax(0, 1fr)); margin-bottom: var(--space-4); }
+.cb-app .co-figure { display: flex; flex-direction: column; gap: 2px; padding: var(--space-3); border-radius: var(--radius-md); background: var(--surface-sunken); min-width: 0; }
+.cb-app .co-figure__label { font-size: 12px; line-height: 16px; color: var(--ink-muted); }
+.cb-app .co-figure__value { font: 600 18px/24px var(--font-sans); color: var(--ink); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.cb-app .co-figure__value.is-success { color: var(--success-ink); }
+.cb-app .co-figure__value.is-danger { color: var(--danger-ink); }
+@media (max-width: 640px) {
+  .cb-app .co-figures { gap: var(--space-2); }
+  .cb-app .co-figure { padding: var(--space-2); }
+  .cb-app .co-figure__value { font-size: 14px; line-height: 20px; }
+}
+/* ---------- Defaulters table cells ---------- */
+.cb-app .co-person { display: flex; flex-direction: column; min-width: 0; }
+.cb-app .co-person__name { font-weight: 500; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cb-app .co-person__sub { font-size: 12px; line-height: 16px; color: var(--ink-muted); }
+.cb-app .co-overdue { color: var(--danger-ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+/* ---------- Settings ---------- */
+.cb-app .co-code { font-family: var(--font-mono, ui-monospace, monospace); font-size: 12px; color: var(--ink-muted); }
+.cb-app .co-flags { display: flex; flex-wrap: wrap; gap: var(--space-1); }
+.cb-app .co-rowactions { display: inline-flex; gap: var(--space-1); justify-content: flex-end; }
+.cb-app .co-presets { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-3); }
+.cb-app .co-preset { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 1fr) auto; align-items: end; gap: var(--space-3); }
+.cb-app .co-preset + .co-preset { padding-top: var(--space-3); border-top: 1px solid var(--border); }
+.cb-app .co-preset__remove { padding-bottom: 2px; }
+@media (max-width: 767px) {
+  .cb-app .co-preset { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cb-app .co-preset > :first-child { grid-column: 1 / -1; }
+  .cb-app .co-preset__remove { grid-column: 1 / -1; justify-self: end; padding-bottom: 0; }
+}
+.cb-app .co-checks { display: flex; flex-direction: column; gap: var(--space-2); }
+.cb-app .co-savebar { display: flex; justify-content: flex-end; }
+@media (max-width: 640px) { .cb-app .co-savebar > .cb-btn { width: 100%; }
+}
+
+/* Stat row: at most four across, like the design system's dashboard. */
+.cb-app .co-stats { display: grid; gap: var(--space-4); grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); }
+.cb-app .co-session { display: flex; flex-direction: column; gap: var(--space-5); height: 100%; }
+
+/* Paired cards in a row share the row's height. */
+.cb-app .co-row { align-items: stretch; }
+/* Twelve month labels crowd a phone screen: show every other one. */
+@media (max-width: 640px) { .cb-app .co-trend__col:nth-child(even) .co-trend__label { display: none; } }
+
+/* Collection by class: each progress row opens Fee collection for that class. */
+.cb-app .co-classlist { gap: var(--space-1); }
+.cb-app .co-classrow { display: block; width: calc(100% + 2 * var(--space-2)); margin: 0 calc(-1 * var(--space-2)); padding: var(--space-2); border: 0; border-radius: var(--radius-md); background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.cb-app .co-classrow:hover { background: var(--surface-hover); }
+.cb-app .co-classrow:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+
+/* Top defaulters: bulk actions above the table */
+.cb-app .co-bulk { padding: 0 var(--space-5) var(--space-3); }
+@media (max-width: 640px) { .cb-app .co-bulk { padding: 0 var(--space-4) var(--space-3); } }

@@ -13,7 +13,7 @@
     "label": "School Hub",
     "path": "/school-hub",
     "group": "School Hub",
-    "module": "timetable",
+    "module": "core",
     "prefixes": ["/school-hub"],
     "fallbackPriority": 20
   },

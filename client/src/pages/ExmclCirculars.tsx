@@ -1,22 +1,45 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
+import { FileText, Pencil, Plus, Send, Trash2 } from 'lucide-react'
 import exmclCircularService, { type ExmclCircular, type ExmclCircularPageSize } from '@/services/exmclCircularService'
 import CircularRichTextEditor from '@/components/exmcl/CircularRichTextEditor'
+import {
+  Badge,
+  Button,
+  Card,
+  CardToolbar,
+  DataTable,
+  Dialog,
+  EmptyState,
+  Entity,
+  FilterBar,
+  Menu,
+  Page,
+  Select,
+  Sheet,
+  TextField,
+  formatDate,
+  type DataTableColumn,
+} from '@/components/ui'
+import { errorMessage } from '@/components/exmcl/ExmclUi'
+import '@/components/exmcl/exmcl.css'
 
 const PAGE_SIZE_OPTIONS: Array<{ value: ExmclCircularPageSize; label: string }> = [
   { value: 'A4', label: 'A4' },
-  { value: 'legal', label: 'Lgl' },
-  { value: 'letter', label: 'Ltr' },
+  { value: 'legal', label: 'Legal' },
+  { value: 'letter', label: 'Letter' },
 ]
 
-const fieldClassName =
-  'rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white'
+// Local calendar date (toISOString would give yesterday's date before 5:30 am IST).
+const ymdLocal = (date: Date) =>
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+const today = () => ymdLocal(new Date())
 
 const toInputDate = (value?: string | null) => {
   if (!value) return ''
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return ''
-  return date.toISOString().slice(0, 10)
+  return ymdLocal(date)
 }
 
 const deriveSeriesFromReference = (referenceNumber?: string | null) => {
@@ -48,47 +71,54 @@ const getNextReferenceNumber = (seriesRaw: string, circulars: ExmclCircular[]) =
   return `${series}${String(maxCounter + 1).padStart(3, '0')}`
 }
 
-const formatDate = (value?: string | null) => {
-  if (!value) return '-'
-  return new Date(value).toLocaleString('en-IN', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-}
+const pageSizeLabel = (value?: string) => PAGE_SIZE_OPTIONS.find((option) => option.value === value)?.label || 'A4'
 
-const pageSizeLabel = (value?: string) =>
-  PAGE_SIZE_OPTIONS.find((option) => option.value === value)?.label || 'A4'
-
-const isBlankHtml = (html: string) =>
+const plainText = (html: string) =>
   String(html || '')
     .replace(/<[^>]+>/g, ' ')
     .replace(/&nbsp;/gi, ' ')
-    .trim() === ''
+    .replace(/\s+/g, ' ')
+    .trim()
 
 const looksLikeHtml = (value: string) => /<\/?[a-z][\s\S]*>/i.test(value)
+
+type CircularForm = {
+  title: string
+  content: string
+  circularDate: string
+  referenceSeries: string
+  referenceNumber: string
+  pageSize: ExmclCircularPageSize
+}
+
+type StatusFilter = 'all' | 'draft' | 'published'
 
 const ExmclCirculars: React.FC = () => {
   const [circulars, setCirculars] = useState<ExmclCircular[]>([])
   const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
+  const [status, setStatus] = useState<StatusFilter>('all')
+  const [sheetOpen, setSheetOpen] = useState(false)
+  const [editing, setEditing] = useState<ExmclCircular | null>(null)
+  const [form, setForm] = useState<CircularForm>({
+    title: '',
+    content: '',
+    circularDate: today(),
+    referenceSeries: '',
+    referenceNumber: '',
+    pageSize: 'A4',
+  })
+  const [tried, setTried] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [title, setTitle] = useState('')
-  const [content, setContent] = useState('')
-  const [circularDate, setCircularDate] = useState(() => new Date().toISOString().slice(0, 10))
-  const [referenceSeries, setReferenceSeries] = useState('')
-  const [referenceNumber, setReferenceNumber] = useState('')
-  const [pageSize, setPageSize] = useState<ExmclCircularPageSize>('A4')
+  const [publishing, setPublishing] = useState<ExmclCircular | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [removing, setRemoving] = useState<ExmclCircular | null>(null)
 
   const loadCirculars = async () => {
-    setLoading(true)
     try {
-      const data = await exmclCircularService.getAll()
-      setCirculars(data)
-    } catch {
-      toast.error('Failed to load circulars.')
+      setCirculars(await exmclCircularService.getAll())
+    } catch (error) {
+      toast.error(errorMessage(error, 'Circulars didn’t load. Check your connection and try again.'))
     } finally {
       setLoading(false)
     }
@@ -98,274 +128,344 @@ const ExmclCirculars: React.FC = () => {
     void loadCirculars()
   }, [])
 
-  const resetForm = () => {
-    setEditingId(null)
-    setTitle('')
-    setContent('')
-    setCircularDate(new Date().toISOString().slice(0, 10))
-    setPageSize('A4')
+  const set = (patch: Partial<CircularForm>) => setForm((prev) => ({ ...prev, ...patch }))
+
+  // New circulars continue the latest reference series and take its next number.
+  useEffect(() => {
+    if (editing || !sheetOpen) return
+    setForm((prev) => ({ ...prev, referenceNumber: getNextReferenceNumber(prev.referenceSeries, circulars) }))
+  }, [form.referenceSeries, circulars, editing, sheetOpen])
+
+  const openAdd = () => {
+    const latest = circulars.find((item) => item.referenceSeries?.trim() || item.referenceNumber?.trim())
+    const series = latest ? latest.referenceSeries?.trim() || deriveSeriesFromReference(latest.referenceNumber) : ''
+    setEditing(null)
+    setForm({
+      title: '',
+      content: '',
+      circularDate: today(),
+      referenceSeries: series,
+      referenceNumber: getNextReferenceNumber(series, circulars),
+      pageSize: 'A4',
+    })
+    setTried(false)
+    setSheetOpen(true)
   }
 
-  useEffect(() => {
-    if (editingId) return
-    if (referenceSeries.trim()) return
-    const latestWithSeries = circulars.find((item) => item.referenceSeries?.trim() || item.referenceNumber?.trim())
-    if (!latestWithSeries) return
-    const fallbackSeries = latestWithSeries.referenceSeries?.trim() || deriveSeriesFromReference(latestWithSeries.referenceNumber)
-    if (fallbackSeries) setReferenceSeries(fallbackSeries)
-  }, [circulars, editingId, referenceSeries])
+  const openEdit = (item: ExmclCircular) => {
+    setEditing(item)
+    setForm({
+      title: item.title,
+      content: looksLikeHtml(item.content) ? item.content : String(item.content || '').replace(/\n/g, '<br>'),
+      circularDate: toInputDate(item.circularDate),
+      referenceSeries: item.referenceSeries?.trim() || deriveSeriesFromReference(item.referenceNumber),
+      referenceNumber: item.referenceNumber || '',
+      pageSize: item.pageSize === 'legal' || item.pageSize === 'letter' ? item.pageSize : 'A4',
+    })
+    setTried(false)
+    setSheetOpen(true)
+  }
 
-  useEffect(() => {
-    if (editingId) return
-    setReferenceNumber(getNextReferenceNumber(referenceSeries, circulars))
-  }, [referenceSeries, circulars, editingId])
+  const contentBlank = plainText(form.content) === ''
 
-  const handleSave = async () => {
-    if (!title.trim() || isBlankHtml(content) || !circularDate || !referenceNumber.trim()) {
-      toast.error('Title, content, date, and reference number are required.')
-      return
-    }
-
+  const save = async () => {
+    setTried(true)
+    if (!form.title.trim() || contentBlank || !form.circularDate || !form.referenceNumber.trim()) return
     setSaving(true)
     try {
-      if (editingId) {
-        await exmclCircularService.update(editingId, {
-          title,
-          content,
-          circularDate,
-          referenceSeries: referenceSeries.trim(),
-          referenceNumber: referenceNumber.trim(),
-          pageSize,
-        })
-        toast.success('Circular updated.')
-      } else {
-        await exmclCircularService.create({
-          title,
-          content,
-          circularDate,
-          referenceSeries: referenceSeries.trim(),
-          referenceNumber: referenceNumber.trim(),
-          pageSize,
-        })
-        toast.success('Circular drafted.')
+      const payload = {
+        title: form.title,
+        content: form.content,
+        circularDate: form.circularDate,
+        referenceSeries: form.referenceSeries.trim(),
+        referenceNumber: form.referenceNumber.trim(),
+        pageSize: form.pageSize,
       }
-      resetForm()
+      if (editing) await exmclCircularService.update(editing._id, payload)
+      else await exmclCircularService.create(payload)
+      toast.success(editing ? 'Circular saved.' : 'Circular saved as a draft.')
+      setSheetOpen(false)
       await loadCirculars()
-    } catch {
-      toast.error('Unable to save circular.')
+    } catch (error) {
+      toast.error(errorMessage(error, 'The circular wasn’t saved. Try again.'))
     } finally {
       setSaving(false)
     }
   }
 
-  const handleEdit = (item: ExmclCircular) => {
-    setEditingId(item._id)
-    setTitle(item.title)
-    setContent(looksLikeHtml(item.content) ? item.content : String(item.content || '').replace(/\n/g, '<br>'))
-    setCircularDate(toInputDate(item.circularDate))
-    setReferenceSeries(item.referenceSeries?.trim() || deriveSeriesFromReference(item.referenceNumber))
-    setReferenceNumber(item.referenceNumber || '')
-    setPageSize(item.pageSize === 'legal' || item.pageSize === 'letter' ? item.pageSize : 'A4')
-  }
-
-  const handlePublish = async (id: string) => {
+  const publish = async () => {
+    if (!publishing) return
+    setBusy(true)
     try {
-      await exmclCircularService.publish(id)
-      toast.success('Circular published.')
+      await exmclCircularService.publish(publishing._id)
+      toast.success(`${publishing.referenceNumber || 'Circular'} published.`)
+      setPublishing(null)
       await loadCirculars()
-    } catch {
-      toast.error('Failed to publish circular.')
+    } catch (error) {
+      toast.error(errorMessage(error, 'The circular wasn’t published. Try again.'))
+    } finally {
+      setBusy(false)
     }
   }
 
-  const handleDelete = async (id: string) => {
-    if (!window.confirm('Delete this circular?')) return
+  const remove = async () => {
+    if (!removing) return
+    setBusy(true)
     try {
-      await exmclCircularService.remove(id)
+      await exmclCircularService.remove(removing._id)
       toast.success('Circular deleted.')
-      if (editingId === id) {
-        resetForm()
-      }
+      if (editing?._id === removing._id) setSheetOpen(false)
+      setRemoving(null)
       await loadCirculars()
-    } catch {
-      toast.error('Failed to delete circular.')
+    } catch (error) {
+      toast.error(errorMessage(error, 'The circular wasn’t deleted. Try again.'))
+    } finally {
+      setBusy(false)
     }
   }
 
   const publishedCount = useMemo(() => circulars.filter((item) => item.status === 'published').length, [circulars])
   const draftCount = circulars.length - publishedCount
 
-  return (
-    <div className="p-6">
-      <div className="mx-auto max-w-[1400px] space-y-4">
-      <section className="rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-        <div className="flex flex-wrap items-center gap-2">
-          <input
-            id="circular-title"
-            type="text"
-            value={title}
-            onChange={(event) => setTitle(event.target.value)}
-            placeholder="Title"
-            title="Title"
-            aria-label="Title"
-            className={`${fieldClassName} min-w-[180px] flex-1`}
-          />
-          <input
-            id="circular-date"
-            type="date"
-            value={circularDate}
-            onChange={(event) => setCircularDate(event.target.value)}
-            title="Date"
-            aria-label="Date"
-            className={`${fieldClassName} w-[150px]`}
-          />
-          <input
-            id="circular-reference-series"
-            type="text"
-            value={referenceSeries}
-            onChange={(event) => setReferenceSeries(event.target.value)}
-            placeholder="Ref. series"
-            title="Reference series"
-            aria-label="Reference series"
-            className={`${fieldClassName} min-w-[140px]`}
-          />
-          <input
-            id="circular-reference-number"
-            type="text"
-            value={referenceNumber}
-            readOnly={!editingId}
-            onChange={(event) => setReferenceNumber(event.target.value)}
-            placeholder="Ref. number"
-            title="Reference number"
-            aria-label="Reference number"
-            className={`${fieldClassName} min-w-[150px] bg-slate-50 dark:bg-gray-900`}
-          />
-          <select
-            title="Page size"
-            aria-label="Page size"
-            value={pageSize}
-            onChange={(event) => setPageSize(event.target.value as ExmclCircularPageSize)}
-            className={`${fieldClassName} w-[88px]`}
-          >
-            {PAGE_SIZE_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={saving}
-            className="inline-flex items-center rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {saving ? 'Saving...' : editingId ? 'Update' : 'Save Draft'}
-          </button>
-          {editingId && (
-            <button
-              type="button"
-              onClick={resetForm}
-              className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
-            >
-              Cancel
-            </button>
-          )}
-        </div>
-        <div className="mt-3">
-          <CircularRichTextEditor value={content} onChange={setContent} />
-        </div>
-      </section>
+  const rows = useMemo(() => {
+    const needle = search.trim().toLowerCase()
+    return circulars.filter((item) => {
+      if (status !== 'all' && (item.status === 'published' ? 'published' : 'draft') !== status) return false
+      if (!needle) return true
+      return [item.title, item.referenceNumber, plainText(item.content)].some((v) =>
+        String(v || '').toLowerCase().includes(needle)
+      )
+    })
+  }, [circulars, search, status])
 
-      <section className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-        <div className="mb-3 flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Circulars</h2>
-            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-              Draft: {draftCount} | Published: {publishedCount}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => void loadCirculars()}
-            className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
-          >
-            Refresh
-          </button>
-        </div>
-
-        {loading ? (
-          <div className="py-10 text-center text-sm text-slate-500 dark:text-slate-400">Loading circulars...</div>
-        ) : circulars.length === 0 ? (
-          <div className="py-10 text-center text-sm text-slate-500 dark:text-slate-400">
-            No circulars yet. Draft your first circular above.
-          </div>
+  const columns: DataTableColumn<ExmclCircular>[] = [
+    {
+      key: 'title',
+      header: 'Circular',
+      mobile: 'title',
+      wrap: true,
+      render: (item) => <Entity primary={item.title} secondary={plainText(item.content).slice(0, 120) || undefined} />,
+    },
+    { key: 'ref', header: 'Ref. no.', mobile: 'subtitle', render: (item) => item.referenceNumber || '—' },
+    { key: 'date', header: 'Date', render: (item) => formatDate(item.circularDate) },
+    { key: 'page', header: 'Paper', mobile: 'hidden', render: (item) => pageSizeLabel(item.pageSize) },
+    {
+      key: 'status',
+      header: 'Status',
+      mobile: 'aside',
+      render: (item) =>
+        item.status === 'published' ? (
+          <Badge tone="success" title={item.publishedAt ? `Published ${formatDate(item.publishedAt)}` : undefined}>
+            Published
+          </Badge>
         ) : (
-          <div className="space-y-3">
-            {circulars.map((item) => (
-              <article
-                key={item._id}
-                className="rounded-xl border border-slate-200 p-4 dark:border-slate-700"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <h3 className="text-base font-semibold text-slate-900 dark:text-white">{item.title}</h3>
-                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                      Date: {formatDate(item.circularDate)} | Ref: {item.referenceNumber || '-'} | Page: {pageSizeLabel(item.pageSize)}
-                    </p>
-                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                      Updated: {formatDate(item.updatedAt)} | Published: {formatDate(item.publishedAt)}
-                    </p>
-                    <span className={`mt-2 inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                      item.status === 'published'
-                        ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
-                        : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
-                    }`}>
-                      {item.status === 'published' ? 'Published' : 'Draft'}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => handleEdit(item)}
-                      className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200"
+          <Badge tone="neutral">Draft</Badge>
+        ),
+    },
+    {
+      key: 'actions',
+      header: '',
+      headerLabel: 'Actions',
+      align: 'right',
+      width: 48,
+      interactive: true,
+      render: (item) => (
+        <Menu
+          label={`Actions for ${item.title}`}
+          items={[
+            { label: 'Edit circular', icon: Pencil, onSelect: () => openEdit(item) },
+            ...(item.status !== 'published'
+              ? [{ label: 'Publish circular', icon: Send, onSelect: () => setPublishing(item) }]
+              : []),
+            { divider: true },
+            { label: 'Delete circular', icon: Trash2, tone: 'danger', onSelect: () => setRemoving(item) },
+          ]}
+        />
+      ),
+    },
+  ]
+
+  const filtered = Boolean(search.trim() || status !== 'all')
+
+  return (
+    <Page>
+      <Card flush title="Circulars" subtitle="Notices to staff and parents about exams, numbered in series">
+        <CardToolbar>
+          <FilterBar
+            search={{ placeholder: 'Search title, reference or text', value: search, onChange: setSearch, label: 'Search circulars' }}
+            chips={[
+              { id: 'all', label: 'All', count: circulars.length, active: status === 'all' },
+              { id: 'draft', label: 'Drafts', count: draftCount, active: status === 'draft' },
+              { id: 'published', label: 'Published', count: publishedCount, active: status === 'published' },
+            ]}
+            onChipClick={(id) => setStatus(id as StatusFilter)}
+            chipsLabel="Status"
+            actions={
+              <Button variant="primary" icon={Plus} onClick={openAdd}>
+                Write circular
+              </Button>
+            }
+          />
+        </CardToolbar>
+        <DataTable
+          caption="Circulars"
+          columns={columns}
+          rows={rows}
+          getRowKey={(item) => item._id}
+          onRowClick={openEdit}
+          loading={loading}
+          loadingLabel="Loading circulars…"
+          empty={
+            circulars.length === 0 ? (
+              <EmptyState
+                icon={FileText}
+                title="No circulars yet"
+                body="Write one and save it as a draft. Publish it when it’s ready to go out."
+                action={
+                  <Button size="sm" icon={Plus} onClick={openAdd}>
+                    Write circular
+                  </Button>
+                }
+              />
+            ) : (
+              <EmptyState
+                compact
+                icon={FileText}
+                title="No circulars match these filters"
+                action={
+                  filtered ? (
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        setSearch('')
+                        setStatus('all')
+                      }}
                     >
-                      Edit
-                    </button>
-                    {item.status !== 'published' && (
-                      <button
-                        type="button"
-                        onClick={() => void handlePublish(item._id)}
-                        className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
-                      >
-                        Publish
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => void handleDelete(item._id)}
-                      className="rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-rose-700"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </div>
-                {looksLikeHtml(item.content) ? (
-                  <div
-                    className="prose prose-sm mt-3 max-w-none text-slate-700 dark:prose-invert dark:text-slate-300"
-                    dangerouslySetInnerHTML={{ __html: item.content }}
-                  />
-                ) : (
-                  <p className="mt-3 whitespace-pre-wrap text-sm text-slate-700 dark:text-slate-300">
-                    {item.content}
-                  </p>
-                )}
-              </article>
-            ))}
+                      Clear filters
+                    </Button>
+                  ) : undefined
+                }
+              />
+            )
+          }
+        />
+      </Card>
+
+      <Sheet
+        open={sheetOpen}
+        onClose={() => setSheetOpen(false)}
+        title={editing ? `Edit ${editing.referenceNumber || 'circular'}` : 'Write circular'}
+        description={
+          editing?.status === 'published'
+            ? `Published ${formatDate(editing.publishedAt)}. Changes show on the printed copy.`
+            : 'Saved as a draft until you publish it.'
+        }
+        icon={FileText}
+        size="xl"
+        onSubmit={(event) => {
+          event.preventDefault()
+          if (!saving) void save()
+        }}
+        footer={
+          <>
+            <Button onClick={() => setSheetOpen(false)} disabled={saving}>
+              Cancel
+            </Button>
+            <Button type="submit" variant="primary" loading={saving}>
+              {editing ? 'Save circular' : 'Save draft'}
+            </Button>
+          </>
+        }
+      >
+        <div className="cb-form-section">
+          <div className="cb-form-grid cb-form-grid--3">
+            <TextField
+              className="is-wide"
+              label="Title"
+              required
+              autoFocus
+              placeholder="e.g. Half-yearly exam schedule"
+              value={form.title}
+              onChange={(e) => set({ title: e.target.value })}
+              error={tried && !form.title.trim() ? 'Enter a title.' : undefined}
+            />
+            <TextField
+              label="Date"
+              type="date"
+              required
+              value={form.circularDate}
+              onChange={(e) => set({ circularDate: e.target.value })}
+              error={tried && !form.circularDate ? 'Pick the circular’s date.' : undefined}
+            />
+            <TextField
+              label="Reference series"
+              placeholder="e.g. EXM/2026/"
+              value={form.referenceSeries}
+              onChange={(e) => set({ referenceSeries: e.target.value })}
+            />
+            <TextField
+              label="Reference no."
+              required
+              readOnly={!editing}
+              hint={editing ? undefined : 'Next number in the series'}
+              value={form.referenceNumber}
+              onChange={(e) => set({ referenceNumber: e.target.value })}
+              error={tried && !form.referenceNumber.trim() ? 'Enter a reference series to number it.' : undefined}
+            />
+            <Select
+              label="Paper size"
+              value={form.pageSize}
+              onChange={(e) => set({ pageSize: e.target.value as ExmclCircularPageSize })}
+              options={PAGE_SIZE_OPTIONS}
+            />
           </div>
-        )}
-      </section>
-      </div>
-    </div>
+        </div>
+        <div className="cb-form-section">
+          <CircularRichTextEditor
+            value={form.content}
+            onChange={(content) => set({ content })}
+            error={tried && contentBlank ? 'Write the circular’s text.' : undefined}
+          />
+        </div>
+      </Sheet>
+
+      <Dialog
+        open={Boolean(publishing)}
+        onClose={() => setPublishing(null)}
+        size="sm"
+        title={`Publish ${publishing?.referenceNumber || 'this circular'}?`}
+        description="It’s marked published. You can still edit it afterwards."
+        footer={
+          <>
+            <Button onClick={() => setPublishing(null)} disabled={busy}>
+              Keep as draft
+            </Button>
+            <Button variant="primary" loading={busy} onClick={() => void publish()}>
+              Publish circular
+            </Button>
+          </>
+        }
+      />
+
+      <Dialog
+        open={Boolean(removing)}
+        onClose={() => setRemoving(null)}
+        tone="danger"
+        size="sm"
+        title={`Delete ${removing?.referenceNumber || 'this circular'}?`}
+        description={`“${removing?.title || ''}” is removed for good.`}
+        footer={
+          <>
+            <Button onClick={() => setRemoving(null)} disabled={busy}>
+              Keep circular
+            </Button>
+            <Button variant="danger" loading={busy} onClick={() => void remove()}>
+              Delete circular
+            </Button>
+          </>
+        }
+      />
+    </Page>
   )
 }
 

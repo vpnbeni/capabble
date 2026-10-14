@@ -1,4 +1,7 @@
 import React, { useMemo, useState } from 'react'
+import { Check, Search } from 'lucide-react'
+import { Icon as KitIcon, TextField, cx } from '@/components/ui'
+import './expenses.css'
 import {
   Apple, Archive, Baby, Banknote, Battery, Bike, Book, BookOpen, Box, Briefcase, Brush, Building2, Bus, Calculator, Camera, Car,
   Coffee, Coins, CreditCard, Droplets, Dumbbell, Fan, FileText, Flame, Flower2, Fuel, Gift, Globe, GraduationCap, Hammer, HardHat,
@@ -93,18 +96,23 @@ export const CATEGORY_ICONS: Record<string, { icon: LucideIcon; label: string }>
 
 export const CATEGORY_COLORS = ['#6366f1', '#0ea5e9', '#06b6d4', '#14b8a6', '#22c55e', '#84cc16', '#f59e0b', '#f97316', '#ef4444', '#ec4899', '#8b5cf6', '#64748b']
 
+type CatStyle = React.CSSProperties & { '--ce-cat'?: string }
+
+/** Inline style carrying a user-chosen category colour into the `ce-` classes. */
+export const catStyle = (color?: string | null): CatStyle | undefined => (color ? { '--ce-cat': color } : undefined)
+
+/** A category's icon in a tinted circle, in the colour the school chose for it. Renders inside `.cb-app`. */
 export const CategoryIcon: React.FC<{ icon?: string; color?: string; size?: 'sm' | 'md' | 'lg'; className?: string }> = ({
   icon,
   color = '#6366f1',
   size = 'md',
   className = '',
 }) => {
-  const Icon = CATEGORY_ICONS[icon || '']?.icon || Shapes
-  const box = size === 'lg' ? 'h-12 w-12' : size === 'sm' ? 'h-7 w-7' : 'h-10 w-10'
-  const glyph = size === 'lg' ? 'h-6 w-6' : size === 'sm' ? 'h-3.5 w-3.5' : 'h-5 w-5'
+  const Glyph = CATEGORY_ICONS[icon || '']?.icon || Shapes
+  const glyph = size === 'lg' ? 24 : size === 'sm' ? 14 : 20
   return (
-    <span className={`inline-flex shrink-0 items-center justify-center rounded-full ${box} ${className}`} style={{ backgroundColor: `${color}1f`, color }}>
-      <Icon className={glyph} />
+    <span className={cx('ce-caticon', size !== 'md' && `ce-caticon--${size}`, className)} style={catStyle(color)} aria-hidden="true">
+      <KitIcon icon={Glyph} size={glyph} />
     </span>
   )
 }
@@ -116,16 +124,10 @@ export const IconPicker: React.FC<{ value: string; color?: string; onChange: (ke
     return Object.entries(CATEGORY_ICONS).filter(([key, def]) => !needle || key.includes(needle) || def.label.toLowerCase().includes(needle))
   }, [q])
   return (
-    <div>
-      <input
-        className="mb-2 block w-full rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-700 dark:text-white"
-        placeholder="Search icons…"
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-      />
-      <div className="grid max-h-48 grid-cols-8 gap-1.5 overflow-y-auto sm:grid-cols-10">
+    <div className="ce-iconpicker">
+      <TextField size="sm" icon={Search} type="search" aria-label="Search icons" placeholder="Search icons" value={q} onChange={(e) => setQ(e.target.value)} />
+      <div className="ce-iconpicker__grid" role="group" aria-label="Icons">
         {entries.map(([key, def]) => {
-          const Icon = def.icon
           const on = key === value
           return (
             <button
@@ -133,33 +135,38 @@ export const IconPicker: React.FC<{ value: string; color?: string; onChange: (ke
               type="button"
               title={def.label}
               aria-label={def.label}
+              aria-pressed={on}
               onClick={() => onChange(key)}
-              className={`flex aspect-square w-full items-center justify-center rounded-lg border transition ${
-                on ? 'border-transparent ring-2 ring-inset dark:ring-offset-slate-800' : 'border-slate-200 text-slate-500 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700'
-              }`}
-              style={on ? { backgroundColor: `${color}1f`, color, ['--tw-ring-color' as string]: color } : undefined}
+              className={cx('ce-iconpicker__btn', on && 'is-active')}
+              style={catStyle(color)}
             >
-              <Icon className="h-4 w-4 shrink-0" />
+              <KitIcon icon={def.icon} size={16} />
             </button>
           )
         })}
-        {!entries.length ? <p className="col-span-full py-4 text-center text-xs text-slate-400">No icons match.</p> : null}
+        {!entries.length ? <p className="ce-iconpicker__none">No icons match “{q.trim()}”.</p> : null}
       </div>
     </div>
   )
 }
 
 export const ColorSwatches: React.FC<{ value: string; onChange: (color: string) => void }> = ({ value, onChange }) => (
-  <div className="flex flex-wrap gap-2">
-    {CATEGORY_COLORS.map((c) => (
-      <button
-        key={c}
-        type="button"
-        aria-label={`Colour ${c}`}
-        onClick={() => onChange(c)}
-        className={`h-7 w-7 rounded-full transition ${value === c ? 'ring-2 ring-offset-2 dark:ring-offset-slate-800' : 'hover:scale-110'}`}
-        style={{ backgroundColor: c, ['--tw-ring-color' as string]: c }}
-      />
-    ))}
+  <div className="ce-swatches" role="group" aria-label="Colours">
+    {CATEGORY_COLORS.map((c) => {
+      const on = value === c
+      return (
+        <button
+          key={c}
+          type="button"
+          aria-label={`Colour ${c}`}
+          aria-pressed={on}
+          onClick={() => onChange(c)}
+          className={cx('ce-swatch', on && 'is-active')}
+          style={{ backgroundColor: c }}
+        >
+          {on ? <KitIcon icon={Check} size={14} /> : null}
+        </button>
+      )
+    })}
   </div>
 )

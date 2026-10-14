@@ -1,7 +1,23 @@
-import React, { useMemo, useCallback } from 'react'
+import React, { useMemo, useCallback, useState } from 'react'
 import { useQueries, useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import Loader from '../components/common/Loader'
+import { Wallet } from 'lucide-react'
+import {
+  Badge,
+  Banner,
+  Button,
+  Card,
+  CardToolbar,
+  DataTable,
+  EmptyState,
+  Entity,
+  FilterBar,
+  Page,
+  StatCard,
+  formatINR,
+  type DataTableColumn,
+} from '@/components/ui'
+import { CardLoading } from '@/components/exmcl/ExmclUi'
 import dutiesService from '../services/dutiesService'
 import { useCentreDetails } from '../hooks/useCentreDetails'
 import teacherService, { type Teacher } from '../services/teacherService'
@@ -61,7 +77,20 @@ const DUTIES_SUMMARY_ITEMS = [
   { dutyType: 'Class IV', groupKey: 'class_iv' },
 ] as const
 
-const formatMoney = (value: number) => (value ? value.toLocaleString('en-IN') : '—')
+/** Zero amounts show "—", as before. */
+const money = (value: number) => (value ? formatINR(value) : '—')
+
+type DutySummaryRow = {
+  dutyType: string
+  groupKey: string
+  dutyCount: number
+  remuneration: number
+  conveyance: number
+  refreshment: number
+  total: number
+}
+
+type InvigilatorFilter = 'all' | 'self' | 'outside'
 const normalizeDutyType = (value: string | undefined) => String(value || '').trim()
 const hasDutyType = (teacher: Teacher | undefined, dutyType: string) => {
   if (!teacher) return false
@@ -114,6 +143,7 @@ const Remuneration: React.FC = () => {
   const { data: centreDetails } = useCentreDetails()
   const { data: ratesData } = useRemunerationRates()
   const ratesByDutyType = ratesData?.byDutyType ?? {}
+  const [invigilatorFilter, setInvigilatorFilter] = useState<InvigilatorFilter>('all')
   const teachersQuery = useQuery({
     queryKey: ['teachers', 'all-for-remuneration'] as const,
     queryFn: async (): Promise<Teacher[]> => {
@@ -259,7 +289,7 @@ const Remuneration: React.FC = () => {
   }, [rows])
 
   const dutiesSummary = useMemo(() => {
-    const summaryRows = DUTIES_SUMMARY_ITEMS.map(({ dutyType, groupKey }) => {
+    const summaryRows: DutySummaryRow[] = DUTIES_SUMMARY_ITEMS.map(({ dutyType, groupKey }) => {
       const matchingRows = rows.filter((row) => normalizeDutyType(row.functionaryType) === dutyType)
       const dutyCount = matchingRows.reduce((sum, row) => sum + Number(row.dutyCount || 0), 0)
       const remuneration = matchingRows.reduce((sum, row) => sum + Number(row.remuneration || 0), 0)
@@ -301,396 +331,240 @@ const Remuneration: React.FC = () => {
     navigate(`/remuneration/${id}`)
   }, [navigate])
 
-  const handleRowKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLTableRowElement>, functionaryId: string) => {
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault()
-        openDetails(functionaryId)
-      }
-    },
-    [openDetails]
-  )
-
   const scrollToGroup = useCallback((groupKey: string) => {
     const element = document.getElementById(`remuneration-group-${groupKey}`)
     if (!element) return
     element.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }, [])
 
-  return (
-    <div className="space-y-6">
-      {isLoading ? (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden px-6 py-10 flex items-center justify-center">
-          <Loader />
-        </div>
-      ) : error ? (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden px-6 py-10 text-center text-sm text-red-600 dark:text-red-400">
-          Failed to load remuneration data.
-        </div>
-      ) : rows.length === 0 ? (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden px-6 py-10 text-center text-sm text-gray-500 dark:text-gray-400">
-          No duties found yet. Assign duties in the Duties page to populate this table.
-        </div>
-      ) : (
-        <div className="space-y-6">
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm ring-1 ring-gray-200/70 dark:ring-gray-700/60 overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-200/70 dark:border-gray-700/60 bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-800 flex items-start justify-between gap-4">
-              <div>
-                <h3 className="text-base font-semibold text-gray-900 dark:text-white">
-                  Duties Summary
-                </h3>
-                <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-                  Duty-wise totals computed from the assigned remuneration records shown below.
-                </p>
-              </div>
-              <span className="inline-flex items-center rounded-full bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300 px-2.5 py-1 text-xs font-semibold">
-                {dutiesSummary.grandTotal.dutyCount} duties
-              </span>
-            </div>
+  const summaryColumns: DataTableColumn<DutySummaryRow>[] = [
+    { key: 'dutyType', header: 'Duty type', mobile: 'title', render: (row) => <span className="cb-strong">{row.dutyType}</span> },
+    { key: 'dutyCount', header: 'Duties', numeric: true, align: 'right', mobile: 'aside', render: (row) => (row.dutyCount ? row.dutyCount : '—') },
+    { key: 'remuneration', header: 'Remuneration', numeric: true, align: 'right', mobile: 'hidden', render: (row) => money(row.remuneration) },
+    { key: 'conveyance', header: 'Conveyance', numeric: true, align: 'right', mobile: 'hidden', render: (row) => money(row.conveyance) },
+    { key: 'refreshment', header: 'Refreshment', numeric: true, align: 'right', mobile: 'hidden', render: (row) => money(row.refreshment) },
+    { key: 'total', header: 'Total', numeric: true, align: 'right', render: (row) => money(row.total) },
+  ]
 
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                <thead className="bg-gray-50/80 dark:bg-gray-700/70 sticky top-0 backdrop-blur">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      Sr No
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      Duty Type
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      No Of Duties
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      Remuneration
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      Conveyance
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      Refreshment
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      Total
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                  {dutiesSummary.rows.map((row, index) => (
-                    <tr
-                      key={`duties-summary-${row.dutyType}`}
-                      className={`${index % 2 === 0 ? 'bg-white dark:bg-gray-800' : 'bg-gray-50/60 dark:bg-gray-700/30'}`}
-                    >
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                        {index + 1}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900 dark:text-white">
-                        <button
-                          type="button"
-                          onClick={() => scrollToGroup(row.groupKey)}
-                          className="text-left text-indigo-700 hover:text-indigo-800 hover:underline dark:text-indigo-300 dark:hover:text-indigo-200"
-                        >
-                          {row.dutyType}
-                        </button>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900 dark:text-white">
-                        {row.dutyCount || '-'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                        {formatMoney(row.remuneration)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                        {formatMoney(row.conveyance)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                        {formatMoney(row.refreshment)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900 dark:text-white">
-                        {formatMoney(row.total)}
-                      </td>
-                    </tr>
-                  ))}
-                  <tr className="bg-gray-100/80 dark:bg-gray-700/60">
-                    <td colSpan={2} className="px-6 py-4 text-sm font-semibold text-gray-900 dark:text-white">
-                      Grand Total
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900 dark:text-white">
-                      {dutiesSummary.grandTotal.dutyCount || '-'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900 dark:text-white">
-                      {formatMoney(dutiesSummary.grandTotal.remuneration)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900 dark:text-white">
-                      {formatMoney(dutiesSummary.grandTotal.conveyance)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900 dark:text-white">
-                      {formatMoney(dutiesSummary.grandTotal.refreshment)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900 dark:text-white">
-                      {formatMoney(dutiesSummary.grandTotal.total)}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
+  const functionaryColumn: DataTableColumn<RemunerationRow> = {
+    key: 'functionary',
+    header: 'Functionary',
+    mobile: 'title',
+    render: (row) => <Entity primary={row.functionaryName} secondary={row.oasisId === '—' || row.oasisId === 'N/A' ? undefined : `Oasis ID ${row.oasisId}`} />,
+  }
+  const dutiesColumn: DataTableColumn<RemunerationRow> = {
+    key: 'dutyCount',
+    header: 'Duties',
+    numeric: true,
+    align: 'right',
+    mobile: 'subtitle',
+    render: (row) => `${row.dutyCount} ${row.dutyCount === 1 ? 'duty' : 'duties'}`,
+  }
+  const totalColumn: DataTableColumn<RemunerationRow> = {
+    key: 'total',
+    header: 'Total',
+    numeric: true,
+    align: 'right',
+    mobile: 'aside',
+    render: (row) => <span className="cb-strong">{money(row.remuneration + row.conveyance + row.refreshment)}</span>,
+  }
+
+  const columnsForGroup = (groupKey: string): DataTableColumn<RemunerationRow>[] => {
+    if (groupKey === 'cs') {
+      // Centre Superintendent: remuneration and conveyance are broken down per CS duty.
+      const csDuties = ['CS', 'QP Collection', 'AB Deposit'] as const
+      const refreshmentPerDay = Number((ratesByDutyType['Centre Superintendent']?.refreshment ?? 0) || 0)
+      return [
+        functionaryColumn,
+        dutiesColumn,
+        {
+          key: 'duty',
+          header: 'Duty',
+          mobile: 'hidden',
+          render: () => csDuties.map((label) => <div key={label}>{label}</div>),
+        },
+        {
+          key: 'remuneration',
+          header: 'Remuneration',
+          numeric: true,
+          align: 'right',
+          render: (row) =>
+            csDuties.map((label) => (
+              <div key={label}>{money(row.dutyCount * Number(ratesByDutyType[label]?.remuneration || 0))}</div>
+            )),
+        },
+        {
+          key: 'conveyance',
+          header: 'Conveyance',
+          numeric: true,
+          align: 'right',
+          render: (row) =>
+            csDuties.map((label) => (
+              <div key={label}>{money(row.dutyCount * Number(ratesByDutyType[label]?.conveyance || 0))}</div>
+            )),
+        },
+        {
+          key: 'refreshment',
+          header: 'Refreshment',
+          numeric: true,
+          align: 'right',
+          mobile: 'hidden',
+          render: (row) => money(row.dutyCount * refreshmentPerDay),
+        },
+        totalColumn,
+      ]
+    }
+
+    const moneyColumns: DataTableColumn<RemunerationRow>[] = [
+      { key: 'remuneration', header: 'Remuneration', numeric: true, align: 'right', mobile: 'hidden', render: (row) => money(row.remuneration) },
+      { key: 'conveyance', header: 'Conveyance', numeric: true, align: 'right', mobile: 'hidden', render: (row) => money(row.conveyance) },
+      { key: 'refreshment', header: 'Refreshment', numeric: true, align: 'right', mobile: 'hidden', render: (row) => money(row.refreshment) },
+      totalColumn,
+    ]
+
+    if (groupKey === 'inv') {
+      return [
+        functionaryColumn,
+        {
+          key: 'school',
+          header: 'School',
+          render: (row) => (
+            <Badge dot={false}>{invigilatorGroups.selfSchool.includes(row) ? 'Self school' : 'Outside school'}</Badge>
+          ),
+        },
+        dutiesColumn,
+        ...moneyColumns,
+      ]
+    }
+
+    return [
+      functionaryColumn,
+      dutiesColumn,
+      {
+        key: 'duty',
+        header: 'Duty',
+        mobile: 'hidden',
+        render: () => getDutyLabelsForGroup(groupKey).map((label) => <div key={label}>{label}</div>),
+      },
+      ...moneyColumns,
+    ]
+  }
+
+  const invigilatorRows =
+    invigilatorFilter === 'self'
+      ? invigilatorGroups.selfSchool
+      : invigilatorFilter === 'outside'
+        ? invigilatorGroups.outsideSchool
+        : [...invigilatorGroups.selfSchool, ...invigilatorGroups.outsideSchool]
+
+  const { grandTotal } = dutiesSummary
+
+  return (
+    <Page>
+
+      {isLoading ? (
+        <Card>
+          <CardLoading label="Loading remuneration…" />
+        </Card>
+      ) : error ? (
+        <Banner tone="danger" title="Couldn't load remuneration data">
+          Refresh the page to try again.
+        </Banner>
+      ) : rows.length === 0 ? (
+        <Card>
+          <EmptyState
+            icon={Wallet}
+            title="No duties assigned yet"
+            body="Assign duties on the Duties page and remuneration will be worked out here."
+            action={
+              <Button variant="primary" onClick={() => navigate('/duties')}>
+                Go to duties
+              </Button>
+            }
+          />
+        </Card>
+      ) : (
+        <>
+          <div className="cb-stats">
+            <StatCard label="Duties" value={grandTotal.dutyCount} hint={`${rows.length} functionary records`} />
+            <StatCard label="Remuneration" value={formatINR(grandTotal.remuneration)} />
+            <StatCard label="Conveyance and refreshment" value={formatINR(grandTotal.conveyance + grandTotal.refreshment)} />
+            <StatCard label="Grand total" value={formatINR(grandTotal.total)} />
           </div>
 
-          {grouped.map(({ group, rows: groupRows }, groupIdx) => (
-            <div id={`remuneration-group-${group.key}`} key={group.key} className="bg-white dark:bg-gray-800 rounded-xl shadow-sm ring-1 ring-gray-200/70 dark:ring-gray-700/60 overflow-hidden">
-              <div className="px-6 py-4 border-b border-gray-200/70 dark:border-gray-700/60 bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-800 flex items-start justify-between gap-4">
-                <div className="flex items-start gap-3 min-w-0">
-                  <span className="inline-flex items-center justify-center w-10 h-10 rounded-2xl bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300 font-bold shrink-0">
-                    {groupIdx + 1}
+          <Card
+            flush
+            title="Duties summary"
+            subtitle="Totals by duty type. Select a row to jump to its functionaries."
+            action={<Badge dot={false}>{grandTotal.dutyCount} duties</Badge>}
+          >
+            <DataTable
+              caption="Duties summary"
+              columns={summaryColumns}
+              rows={dutiesSummary.rows}
+              getRowKey={(row) => row.dutyType}
+              onRowClick={(row) => scrollToGroup(row.groupKey)}
+              footer={
+                <>
+                  <span>Grand total</span>
+                  <span className="cb-strong is-num">
+                    {grandTotal.dutyCount || '—'} duties · {money(grandTotal.total)}
                   </span>
-                  <div className="min-w-0">
-                    <h3 className="text-base font-semibold text-gray-900 dark:text-white truncate">
-                      {group.title}
-                    </h3>
-                    <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-                      {group.key === 'inv'
-                        ? `${invigilatorGroups.selfSchool.length} self • ${invigilatorGroups.outsideSchool.length} outside`
-                        : `${groupRows.length} ${groupRows.length === 1 ? 'functionary' : 'functionaries'}`}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 flex-wrap justify-end">
-                  <span className="inline-flex items-center rounded-full bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300 px-2.5 py-1 text-xs font-semibold">
-                    {groupRows.reduce((sum, r) => sum + (r.dutyCount || 0), 0)} duties
-                  </span>
-                </div>
+                </>
+              }
+            />
+          </Card>
+
+          {grouped.map(({ group, rows: groupRows }) => {
+            const dutyTotal = groupRows.reduce((sum, r) => sum + (r.dutyCount || 0), 0)
+            const isInv = group.key === 'inv'
+            return (
+              <div id={`remuneration-group-${group.key}`} key={group.key}>
+                <Card
+                  flush
+                  title={group.title}
+                  subtitle={
+                    isInv
+                      ? `${invigilatorGroups.selfSchool.length} self school · ${invigilatorGroups.outsideSchool.length} outside school`
+                      : `${groupRows.length} ${groupRows.length === 1 ? 'functionary' : 'functionaries'}`
+                  }
+                  action={<Badge dot={false}>{dutyTotal} duties</Badge>}
+                >
+                  {isInv && groupRows.length > 0 ? (
+                    <CardToolbar>
+                      <FilterBar
+                        chipsLabel="School"
+                        chips={[
+                          { id: 'all', label: 'All', count: groupRows.length, active: invigilatorFilter === 'all' },
+                          { id: 'self', label: 'Self school', count: invigilatorGroups.selfSchool.length, active: invigilatorFilter === 'self' },
+                          { id: 'outside', label: 'Outside school', count: invigilatorGroups.outsideSchool.length, active: invigilatorFilter === 'outside' },
+                        ]}
+                        onChipClick={(id) => setInvigilatorFilter(id as InvigilatorFilter)}
+                      />
+                    </CardToolbar>
+                  ) : null}
+                  <DataTable
+                    caption={group.title}
+                    columns={columnsForGroup(group.key)}
+                    rows={isInv ? invigilatorRows : groupRows}
+                    getRowKey={(row) => `${row.functionaryId}::${row.functionaryType}`}
+                    onRowClick={(row) => openDetails(row.functionaryId)}
+                    empty={
+                      <EmptyState
+                        compact
+                        title={isInv && groupRows.length > 0 ? 'No invigilators in this list' : 'No duties for this group yet'}
+                        body={isInv && groupRows.length > 0 ? 'Choose another school filter.' : 'Assign these duties on the Duties page.'}
+                      />
+                    }
+                  />
+                </Card>
               </div>
-
-              {groupRows.length === 0 ? (
-                <div className="px-6 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
-                  No records found for this group.
-                </div>
-              ) : (
-                <div className="space-y-5 p-4">
-                  {group.key === 'inv' ? (
-                    <>
-                      {[
-                        { key: 'self', title: 'Self School', rows: invigilatorGroups.selfSchool, pillClass: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300' },
-                        { key: 'outside', title: 'Outside School', rows: invigilatorGroups.outsideSchool, pillClass: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300' },
-                      ].map((sub) => (
-                        <div key={sub.key} className="border border-gray-200/70 dark:border-gray-700/60 rounded-xl overflow-hidden">
-                          <div className="px-4 py-3 bg-gray-50 dark:bg-gray-700/40 flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <h4 className="text-sm font-semibold text-gray-900 dark:text-white">{sub.title}</h4>
-                              <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${sub.pillClass}`}>
-                                {sub.rows.length}
-                              </span>
-                            </div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400">
-                              {sub.rows.reduce((sum, r) => sum + (r.dutyCount || 0), 0)} duties
-                            </div>
-                          </div>
-                          {sub.rows.length === 0 ? (
-                            <div className="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
-                              No records found.
-                            </div>
-                          ) : (
-                            <div className="overflow-x-auto">
-                              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                                <thead className="bg-white/70 dark:bg-gray-800/60 sticky top-0 backdrop-blur">
-                                  <tr className="text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                    <th className="px-6 py-3 text-left">Sr No</th>
-                                    <th className="px-6 py-3 text-left">Functionary Name</th>
-                                    <th className="px-6 py-3 text-left">Oasis ID</th>
-                                    <th className="px-6 py-3 text-left">No of Duties</th>
-                                    <th className="px-6 py-3 text-left">Remuneration</th>
-                                    <th className="px-6 py-3 text-left">Conveyance</th>
-                                    <th className="px-6 py-3 text-left">Refreshment</th>
-                                    <th className="px-6 py-3 text-left">Total</th>
-                                  </tr>
-                                </thead>
-                                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                                  {sub.rows.map((row, index) => (
-                                    // total computed per row
-                                    <tr
-                                      key={row.functionaryId}
-                                      role="button"
-                                      tabIndex={0}
-                                      onClick={() => openDetails(row.functionaryId)}
-                                      onKeyDown={(e) => handleRowKeyDown(e, row.functionaryId)}
-                                      className={`cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500 ${index % 2 === 0 ? 'bg-white dark:bg-gray-800' : 'bg-gray-50/60 dark:bg-gray-700/30'} hover:bg-indigo-50/60 dark:hover:bg-indigo-900/15`}
-                                      title="Open details"
-                                    >
-                                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{index + 1}</td>
-                                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{String(row.functionaryName || '').toUpperCase()}</td>
-                                      <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-900 dark:text-white">{row.oasisId}</td>
-                                      <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900 dark:text-white">{row.dutyCount}</td>
-                                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{formatMoney(row.remuneration)}</td>
-                                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{formatMoney(row.conveyance)}</td>
-                                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{formatMoney(row.refreshment)}</td>
-                                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                                        {formatMoney(row.remuneration + row.conveyance + row.refreshment)}
-                                      </td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </>
-                  ) : (
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                        <thead className="bg-gray-50/80 dark:bg-gray-700/70 sticky top-0 backdrop-blur">
-                          <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                              Sr No
-                            </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                              Functionary Name
-                            </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                              Oasis ID
-                            </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                              No of Duties
-                            </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                              Duty
-                            </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                              Remuneration
-                            </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                              Conveyance
-                            </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                              Refreshment
-                            </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                              Total
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                          {group.key === 'cs'
-                            ? groupRows.flatMap((row, index) => {
-                              const csDuties = ['CS', 'QP Collection', 'AB Deposit'] as const
-                              const refreshmentPerDay = Number((ratesByDutyType['Centre Superintendent']?.refreshment ?? 0) || 0)
-                              const refreshmentTotal = row.dutyCount * refreshmentPerDay
-                              const csRowTotal = row.remuneration + row.conveyance + row.refreshment
-
-                              return csDuties.map((label, subIdx) => {
-                                const subRate = ratesByDutyType[label] || { remuneration: 0, conveyance: 0, refreshment: 0 }
-                                const subRem = row.dutyCount * Number(subRate.remuneration || 0)
-                                const subConv = row.dutyCount * Number(subRate.conveyance || 0)
-                                const zebra = index % 2 === 0 ? 'bg-white dark:bg-gray-800' : 'bg-gray-50/60 dark:bg-gray-700/30'
-
-                                return (
-                                  <tr
-                                    key={`${row.functionaryId}::cs-sub::${label}`}
-                                    role="button"
-                                    tabIndex={0}
-                                    onClick={() => openDetails(row.functionaryId)}
-                                    onKeyDown={(e) => handleRowKeyDown(e, row.functionaryId)}
-                                    className={`cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500 ${zebra} hover:bg-indigo-50/60 dark:hover:bg-indigo-900/15`}
-                                    title="Open details"
-                                  >
-                                    {subIdx === 0 && (
-                                      <>
-                                        <td rowSpan={csDuties.length} className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                                          {index + 1}
-                                        </td>
-                                        <td rowSpan={csDuties.length} className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                                          {String(row.functionaryName || '').toUpperCase()}
-                                        </td>
-                                        <td rowSpan={csDuties.length} className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-900 dark:text-white">
-                                          {row.oasisId}
-                                        </td>
-                                        <td rowSpan={csDuties.length} className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900 dark:text-white">
-                                          {row.dutyCount}
-                                        </td>
-                                      </>
-                                    )}
-
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white font-semibold">
-                                      {label}
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                                      {formatMoney(subRem)}
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                                      {formatMoney(subConv)}
-                                    </td>
-                                    {subIdx === 0 && (
-                                      <>
-                                        <td rowSpan={csDuties.length} className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                                          {formatMoney(refreshmentTotal)}
-                                        </td>
-                                        <td rowSpan={csDuties.length} className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                                          {formatMoney(csRowTotal)}
-                                        </td>
-                                      </>
-                                    )}
-                                  </tr>
-                                )
-                              })
-                            })
-                            : groupRows.map((row, index) => (
-                              <tr
-                                key={`${row.functionaryId}::${row.functionaryType}`}
-                                role="button"
-                                tabIndex={0}
-                                onClick={() => openDetails(row.functionaryId)}
-                                onKeyDown={(e) => handleRowKeyDown(e, row.functionaryId)}
-                                className={`cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500 ${index % 2 === 0 ? 'bg-white dark:bg-gray-800' : 'bg-gray-50/60 dark:bg-gray-700/30'} hover:bg-indigo-50/60 dark:hover:bg-indigo-900/15`}
-                                title="Open details"
-                              >
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                                  {index + 1}
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                                  {String(row.functionaryName || '').toUpperCase()}
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-900 dark:text-white">
-                                  {row.oasisId}
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900 dark:text-white">
-                                  {row.dutyCount}
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                                  <div className="space-y-0.5">
-                                    {getDutyLabelsForGroup(group.key).map((label) => (
-                                      <div key={label} className="leading-tight">
-                                        {label}
-                                      </div>
-                                    ))}
-                                  </div>
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                                  {formatMoney(row.remuneration)}
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                                  {formatMoney(row.conveyance)}
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                                  {formatMoney(row.refreshment)}
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                                  {formatMoney(row.remuneration + row.conveyance + row.refreshment)}
-                                </td>
-                              </tr>
-                            ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          ))}
-
-        </div>
+            )
+          })}
+        </>
       )}
-    </div>
+    </Page>
   )
 }
 
 export default Remuneration
-

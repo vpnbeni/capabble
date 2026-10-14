@@ -1,8 +1,28 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
-import { Check, Crown, Home, Plus, Search, Trash2, Users, X } from 'lucide-react'
+import { Check, Crown, Home, ListChecks, Plus, Search, SlidersHorizontal, Trash2, UserPlus, Users, X } from 'lucide-react'
 import api from '@/services/api'
+import {
+  Avatar,
+  Badge,
+  Button,
+  Card,
+  Dialog,
+  EmptyState,
+  Icon,
+  Menu,
+  Page,
+  Select,
+  Sheet,
+  StatCard,
+  TextField,
+  cx,
+  type Tone,
+} from '@/components/ui'
+import { toneStyle } from '@/components/actvt/entityTone'
+import '@/components/actvt/actvt.css'
+import '@/components/actvt/council.css'
 
 type HouseOption = { _id?: string; name?: string; color?: string }
 
@@ -30,11 +50,13 @@ type CouncilPost = {
 type Registration = {
   _id?: string
   postId?: string
+  studentId?: string
   studentName?: string
   rollNumber?: string
   className?: string
   section?: string
   gender?: string
+  houseId?: string
   houseName?: string
   status?: string
 }
@@ -51,19 +73,30 @@ type StudentHit = {
   phone?: string
 }
 
+type PostStatus = 'closed' | 'open' | 'accepting'
+
 const GENDER_OPTIONS = ['Boy', 'Girl', 'Other'] as const
+const COUNCIL_PATH = '/actvt/student-council'
 
-const fieldClass =
-  'h-10 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100'
-
-const tone: Record<string, string> = {
-  closed: 'bg-slate-100 text-slate-600',
-  open: 'bg-emerald-50 text-emerald-700',
-  accepting: 'bg-amber-50 text-amber-700',
-  pending: 'bg-sky-50 text-sky-700',
-  accepted: 'bg-emerald-50 text-emerald-700',
-  rejected: 'bg-rose-50 text-rose-700',
+const POST_STATUS: Record<string, { label: string; tone: Tone }> = {
+  open: { label: 'Open', tone: 'success' },
+  accepting: { label: 'Accepting', tone: 'info' },
+  closed: { label: 'Closed', tone: 'neutral' },
 }
+
+const REGISTRATION_STATUS: Record<string, { label: string; tone: Tone }> = {
+  pending: { label: 'Pending', tone: 'warning' },
+  accepted: { label: 'Selected', tone: 'success' },
+  rejected: { label: 'Rejected', tone: 'danger' },
+}
+
+const STATUS_OPTIONS = [
+  { value: 'open', label: 'Open' },
+  { value: 'accepting', label: 'Accepting' },
+  { value: 'closed', label: 'Closed' },
+]
+
+const postStatusOf = (post: CouncilPost) => POST_STATUS[post.registrationStatus || 'closed'] || POST_STATUS.closed
 
 const normalizeGender = (value?: string) => {
   const raw = String(value || '').trim()
@@ -104,7 +137,43 @@ const toggleClassValue = (className: string, current: string[], setter: (next: s
   else setter([...current, className])
 }
 
+const studentMeta = (parts: { gender?: string; className?: string; section?: string; rollNumber?: string }) =>
+  [
+    parts.gender || 'Gender not set',
+    parts.className ? `Class ${parts.className}${parts.section ? `-${parts.section}` : ''}` : '',
+    parts.rollNumber ? `Adm ${parts.rollNumber}` : '',
+  ]
+    .filter(Boolean)
+    .join(' · ')
+
+const ClassChips: React.FC<{ options: string[]; value: string[]; onChange: (next: string[]) => void }> = ({
+  options,
+  value,
+  onChange,
+}) =>
+  options.length === 0 ? (
+    <p className="asc-hint">No classes found. Add students to pick classes here.</p>
+  ) : (
+    <div className="asc-chips" role="group" aria-label="Preferred classes">
+      {options.map((className) => {
+        const active = value.includes(className)
+        return (
+          <button
+            key={className}
+            type="button"
+            className={cx('cb-chip', active && 'is-active')}
+            aria-pressed={active}
+            onClick={() => toggleClassValue(className, value, onChange)}
+          >
+            {className}
+          </button>
+        )
+      })}
+    </div>
+  )
+
 const ActvtStudentCouncil: React.FC = () => {
+  const navigate = useNavigate()
   const [houses, setHouses] = useState<HouseOption[]>([])
   const [classOptions, setClassOptions] = useState<string[]>([])
   const [schoolCouncil, setSchoolCouncil] = useState<Council | null>(null)
@@ -131,6 +200,8 @@ const ActvtStudentCouncil: React.FC = () => {
   const [studentQuery, setStudentQuery] = useState('')
   const [studentHits, setStudentHits] = useState<StudentHit[]>([])
   const [searchingStudents, setSearchingStudents] = useState(false)
+  const [removeTarget, setRemoveTarget] = useState<{ post: CouncilPost; acrossAllHouses: boolean } | null>(null)
+  const [removing, setRemoving] = useState(false)
 
   const allPosts = useMemo(
     () => [...schoolPosts, ...houseCouncils.flatMap((council) => council.posts || [])],
@@ -153,6 +224,37 @@ const ActvtStudentCouncil: React.FC = () => {
     () => studentHits.filter((student) => isStudentEligible(selectedPost, student)),
     [studentHits, selectedPost]
   )
+  const editingPost = useMemo(
+    () => schoolPosts.find((item) => String(item._id) === editingPostId) || null,
+    [schoolPosts, editingPostId]
+  )
+
+  /** House colour lookup by id first, then by name (registrations and search hits carry either). */
+  const houseTone = useMemo(() => {
+    const byId = new Map<string, { color?: string; index: number }>()
+    const byName = new Map<string, { color?: string; index: number }>()
+    houses.forEach((house, index) => {
+      const entry = { color: house.color, index }
+      if (house._id) byId.set(String(house._id), entry)
+      if (house.name) byName.set(house.name.trim().toLowerCase(), entry)
+    })
+    return (id?: string, name?: string) =>
+      (id && byId.get(String(id))) || (name && byName.get(name.trim().toLowerCase())) || null
+  }, [houses])
+
+  const totals = useMemo(() => {
+    let open = 0
+    let pending = 0
+    let selected = 0
+    let seats = 0
+    allPosts.forEach((post) => {
+      if (post.registrationStatus === 'open' || post.registrationStatus === 'accepting') open += 1
+      pending += post.pendingCount || 0
+      selected += post.acceptedCount || 0
+      seats += post.seats || 1
+    })
+    return { posts: allPosts.length, open, pending, selected, seats }
+  }, [allPosts])
 
   const loadClassOptions = async () => {
     try {
@@ -305,7 +407,7 @@ const ActvtStudentCouncil: React.FC = () => {
     }
   }
 
-  const onSetPostStatus = async (post: CouncilPost, registrationStatus: 'closed' | 'open' | 'accepting') => {
+  const onSetPostStatus = async (post: CouncilPost, registrationStatus: PostStatus) => {
     if (!post._id) return
     try {
       await api.put(`/actvt/council-posts/${post._id}`, { registrationStatus })
@@ -315,19 +417,20 @@ const ActvtStudentCouncil: React.FC = () => {
     }
   }
 
-  const onRemovePost = async (post: CouncilPost, acrossAllHouses = false) => {
-    if (!post._id) return
-    const label = acrossAllHouses
-      ? `Remove "${post.title}" from all house councils?`
-      : `Remove post "${post.title}"?`
-    if (!window.confirm(label)) return
+  const onConfirmRemovePost = async () => {
+    if (!removeTarget?.post._id) return
+    const { post, acrossAllHouses } = removeTarget
+    setRemoving(true)
     try {
       await api.delete(`/actvt/council-posts/${post._id}`, {
         params: acrossAllHouses ? { applyToAllHouseCouncils: true } : undefined,
       })
+      setRemoveTarget(null)
       await loadBoard()
     } catch (error: any) {
       // API interceptor already shows the error toast.
+    } finally {
+      setRemoving(false)
     }
   }
 
@@ -375,266 +478,145 @@ const ActvtStudentCouncil: React.FC = () => {
     }
   }
 
+  const openHousePostForm = () => {
+    if (!houses.length) {
+      toast.error('Add a house first to add posts to the house council.')
+      return
+    }
+    setShowHousePostForm(true)
+  }
+
+  const closeRegistrations = () => {
+    setSelectedPostId('')
+    setStudentQuery('')
+    setStudentHits([])
+  }
+
+  const openStudentProfile = (studentId?: string) => {
+    if (!studentId) return
+    navigate(`/actvt/students/${studentId}`, { state: { from: COUNCIL_PATH } })
+  }
+
+  const renderHouseDot = (houseId?: string, houseName?: string) => {
+    const match = houseTone(houseId, houseName)
+    if (!match) return null
+    return <span className="actvt-tone-dot" style={toneStyle(match.color, match.index)} aria-hidden="true" />
+  }
+
+  const selectedStatus = selectedPost ? postStatusOf(selectedPost) : POST_STATUS.closed
+  const selectedClosed = selectedPost?.registrationStatus === 'closed' || !selectedPost?.registrationStatus
+  const selectedHouseMatch =
+    selectedCouncil?.councilType === 'house' ? houseTone(selectedCouncil.houseId, selectedCouncil.houseName) : null
+  const booting = loading && !schoolCouncil && allPosts.length === 0
+
   return (
-    <div className="p-6">
-      <div className="mx-auto max-w-[1400px] space-y-6">
-        <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <Crown className="h-5 w-5 text-indigo-600" />
-              <div>
-                <h2 className="text-lg font-semibold text-slate-900">School Council</h2>
-                <p className="text-xs text-slate-500">
-                  Set preferred gender and class on each post — only matching students can register
-                </p>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => setShowSchoolPostForm((prev) => !prev)}
-              className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-indigo-600 px-4 text-sm font-semibold text-white hover:bg-indigo-700"
-            >
-              <Plus className="h-4 w-4" />
+    <Page>
+      <div className="asc">
+        <div className="cb-stats">
+          <StatCard label="Council posts" value={totals.posts} icon={Crown} hint={`${totals.seats} seats in all`} />
+          <StatCard label="Taking registrations" value={totals.open} icon={ListChecks} hint="Open or accepting" />
+          <StatCard label="Pending registrations" value={totals.pending} icon={Users} hint="Waiting for a decision" />
+          <StatCard label="Members selected" value={totals.selected} icon={Check} hint="Across all councils" />
+        </div>
+
+        <Card
+          title="School council"
+          subtitle="Each post can prefer a gender and classes. Only matching students can register."
+          action={
+            <Button variant="primary" icon={Plus} onClick={() => setShowSchoolPostForm(true)}>
               Add post
-            </button>
-          </div>
-
-          {showSchoolPostForm ? (
-            <form
-              onSubmit={onAddSchoolPost}
-              className="mb-4 flex flex-wrap items-center gap-2 rounded-2xl border border-indigo-100 bg-indigo-50/40 p-2.5"
-            >
-              <input
-                required
-                value={schoolPostTitle}
-                onChange={(event) => setSchoolPostTitle(event.target.value)}
-                placeholder="Post title (e.g. Head Boy)"
-                className="h-9 min-w-[140px] flex-1 rounded-lg border border-slate-200 bg-white px-2.5 text-sm outline-none focus:border-indigo-400"
-              />
-              <input
-                type="number"
-                min={1}
-                value={schoolPostSeats}
-                onChange={(event) => setSchoolPostSeats(event.target.value)}
-                className="h-9 w-14 rounded-lg border border-slate-200 bg-white px-2 text-center text-sm outline-none focus:border-indigo-400"
-                title="Seats"
-              />
-              <select
-                value={schoolPostGender}
-                onChange={(event) => setSchoolPostGender(event.target.value)}
-                className="h-9 w-[118px] rounded-lg border border-slate-200 bg-white px-2 text-sm outline-none focus:border-indigo-400"
-                title="Preferred gender"
-              >
-                <option value="">Any gender</option>
-                {GENDER_OPTIONS.map((gender) => (
-                  <option key={gender} value={gender}>{gender}</option>
-                ))}
-              </select>
-              <div
-                className="flex h-9 min-w-[180px] max-w-[320px] flex-1 items-center gap-1 overflow-x-auto rounded-lg border border-slate-200 bg-white px-1.5"
-                title="Preferred class(es) — leave empty for any class"
-              >
-                {classOptions.length === 0 ? (
-                  <span className="px-1 text-xs text-slate-400">No classes</span>
-                ) : (
-                  classOptions.map((className) => {
-                    const active = schoolPostClasses.includes(className)
-                    return (
-                      <button
-                        key={className}
-                        type="button"
-                        onClick={() => toggleClassValue(className, schoolPostClasses, setSchoolPostClasses)}
-                        className={`shrink-0 rounded-md px-2 py-1 text-[11px] font-semibold ${
-                          active
-                            ? 'bg-indigo-600 text-white'
-                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                        }`}
-                      >
-                        {className}
-                      </button>
-                    )
-                  })
-                )}
-              </div>
-              <button
-                type="submit"
-                disabled={saving}
-                className="h-9 shrink-0 rounded-lg bg-indigo-600 px-3 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
-              >
-                {saving ? 'Saving...' : 'Save'}
-              </button>
-            </form>
-          ) : null}
-
-          {loading && !schoolCouncil ? (
-            <p className="text-sm text-slate-500">Loading school council...</p>
+            </Button>
+          }
+        >
+          {booting ? (
+            <div className="cb-table-state" role="status">
+              <span className="cb-spinner" aria-hidden="true" />
+              Loading school council…
+            </div>
           ) : schoolPosts.length === 0 ? (
-            <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 px-4 py-6 text-center text-sm text-slate-500">
-              No school council posts yet. Click Add post to create roles like Head Boy or Head Girl.
-            </p>
+            <EmptyState
+              compact
+              icon={Crown}
+              title="No school council posts yet"
+              body="Add roles like Head boy or Head girl, then open them for registration."
+              action={
+                <Button icon={Plus} onClick={() => setShowSchoolPostForm(true)}>
+                  Add post
+                </Button>
+              }
+            />
           ) : (
-            <div className="space-y-2">
+            <ul className="asc-posts">
               {schoolPosts.map((post) => (
-                <div key={post._id} className="space-y-2">
-                  <PostRow
-                    post={post}
-                    showEligibility
-                    active={String(post._id) === selectedPostId}
-                    onSelect={() => setSelectedPostId(String(post._id || ''))}
-                    onSetStatus={onSetPostStatus}
-                    onRemove={() => void onRemovePost(post, false)}
-                    onEditEligibility={() => onStartEditSchoolPost(post)}
-                  />
-                  {editingPostId === String(post._id) ? (
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                      <div className="grid gap-3 sm:grid-cols-2">
-                        <label className="text-xs">
-                          <span className="mb-1 block font-medium text-slate-600">Preferred gender</span>
-                          <select
-                            value={editGender}
-                            onChange={(event) => setEditGender(event.target.value)}
-                            className={fieldClass}
-                          >
-                            <option value="">Any gender</option>
-                            {GENDER_OPTIONS.map((gender) => (
-                              <option key={gender} value={gender}>{gender}</option>
-                            ))}
-                          </select>
-                        </label>
-                        <div className="text-xs">
-                          <span className="mb-1 block font-medium text-slate-600">Preferred class(es)</span>
-                          <div className="flex flex-wrap gap-1.5">
-                            {classOptions.map((className) => {
-                              const active = editClasses.includes(className)
-                              return (
-                                <button
-                                  key={className}
-                                  type="button"
-                                  onClick={() => toggleClassValue(className, editClasses, setEditClasses)}
-                                  className={`rounded-lg px-2.5 py-1 text-[11px] font-semibold ${
-                                    active
-                                      ? 'bg-indigo-600 text-white'
-                                      : 'border border-slate-200 bg-white text-slate-600'
-                                  }`}
-                                >
-                                  {className}
-                                </button>
-                              )
-                            })}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="mt-3 flex gap-2">
-                        <button
-                          type="button"
-                          disabled={saving}
-                          onClick={() => void onSaveSchoolPostEligibility(post)}
-                          className="h-9 rounded-xl bg-indigo-600 px-3 text-xs font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
-                        >
-                          Save eligibility
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setEditingPostId('')}
-                          className="h-9 rounded-xl border border-slate-200 px-3 text-xs font-semibold text-slate-600 hover:bg-white"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  ) : null}
-                </div>
+                <PostRow
+                  key={post._id}
+                  post={post}
+                  showEligibility
+                  active={String(post._id) === selectedPostId}
+                  onSelect={() => setSelectedPostId(String(post._id || ''))}
+                  onSetStatus={onSetPostStatus}
+                  onRemove={() => setRemoveTarget({ post, acrossAllHouses: false })}
+                  onEditEligibility={() => onStartEditSchoolPost(post)}
+                />
               ))}
-            </div>
+            </ul>
           )}
-        </section>
+        </Card>
 
-        <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <Home className="h-5 w-5 text-amber-600" />
-              <div>
-                <h2 className="text-lg font-semibold text-slate-900">House Councils</h2>
-                <p className="text-xs text-slate-500">
-                  Auto-created for each house · posts added here apply to all houses
-                </p>
-              </div>
+        <Card
+          title="House councils"
+          subtitle="Created for each house. A post added here is added to every house."
+          action={
+            houses.length ? (
+              <Button icon={Plus} onClick={openHousePostForm}>
+                Add house post
+              </Button>
+            ) : null
+          }
+        >
+          {booting ? (
+            <div className="cb-table-state" role="status">
+              <span className="cb-spinner" aria-hidden="true" />
+              Loading house councils…
             </div>
-            <button
-              type="button"
-              onClick={() => {
-                if (!houses.length) {
-                  toast.error('Add a house first to add posts to the house council.')
-                  return
-                }
-                setShowHousePostForm((prev) => !prev)
-              }}
-              className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-amber-600 px-4 text-sm font-semibold text-white hover:bg-amber-700"
-            >
-              <Plus className="h-4 w-4" />
-              Add post
-            </button>
-          </div>
-
-          {!houses.length ? (
-            <div className="rounded-2xl border border-dashed border-amber-200 bg-amber-50/60 px-4 py-8 text-center">
-              <p className="text-sm font-medium text-amber-900">Add a house first to add posts to the house council.</p>
-              <Link
-                to="/actvt/houses"
-                className="mt-4 inline-flex h-10 items-center rounded-xl bg-amber-600 px-4 text-sm font-semibold text-white hover:bg-amber-700"
-              >
-                Go to Houses
-              </Link>
-            </div>
+          ) : !houses.length ? (
+            <EmptyState
+              compact
+              icon={Home}
+              title="No houses yet"
+              body="House councils are created for each house. Add a house first, then add posts here."
+              action={
+                <Button icon={Home} onClick={() => navigate('/actvt/houses')}>
+                  Go to houses
+                </Button>
+              }
+            />
           ) : (
-            <>
-              {showHousePostForm ? (
-                <form onSubmit={onAddHousePost} className="mb-4 grid gap-2 sm:grid-cols-[1fr_100px_auto]">
-                  <input
-                    required
-                    value={housePostTitle}
-                    onChange={(event) => setHousePostTitle(event.target.value)}
-                    placeholder="Post title (e.g. House Captain) — added to all houses"
-                    className={fieldClass}
-                  />
-                  <input
-                    type="number"
-                    min={1}
-                    value={housePostSeats}
-                    onChange={(event) => setHousePostSeats(event.target.value)}
-                    className={fieldClass}
-                    title="Seats"
-                  />
-                  <button
-                    type="submit"
-                    disabled={saving}
-                    className="h-10 rounded-xl bg-amber-600 px-4 text-sm font-semibold text-white hover:bg-amber-700 disabled:opacity-60"
+            <ul className="asc-houses">
+              {houseCouncils.map((council, index) => {
+                const houseIndex = houses.findIndex((house) => String(house._id) === String(council.houseId))
+                const house = houseIndex >= 0 ? houses[houseIndex] : null
+                const posts = council.posts || []
+                return (
+                  <li
+                    key={council._id}
+                    className="asc-house actvt-tone-border"
+                    style={toneStyle(house?.color, houseIndex >= 0 ? houseIndex : index)}
                   >
-                    {saving ? 'Saving...' : 'Save'}
-                  </button>
-                </form>
-              ) : null}
-
-              <div className="grid gap-4 lg:grid-cols-2">
-                {houseCouncils.map((council) => (
-                  <div key={council._id} className="rounded-2xl border border-slate-100 bg-slate-50/50 p-4">
-                    <div className="mb-3 flex items-center gap-2">
-                      <span
-                        className="h-3 w-3 rounded-full"
-                        style={{
-                          backgroundColor:
-                            houses.find((house) => String(house._id) === String(council.houseId))?.color || '#94a3b8',
-                        }}
-                      />
-                      <h3 className="font-semibold text-slate-900">
-                        {council.houseName || council.name || 'House'} Council
-                      </h3>
+                    <div className="asc-house__head actvt-tone-soft">
+                      <span className="asc-house__swatch actvt-tone-fill" aria-hidden="true">
+                        <Icon icon={Home} size={14} />
+                      </span>
+                      <span className="asc-house__name">{council.houseName || council.name || 'House'} council</span>
+                      <span className="asc-house__count">
+                        {posts.length} {posts.length === 1 ? 'post' : 'posts'}
+                      </span>
                     </div>
-                    {(council.posts || []).length === 0 ? (
-                      <p className="text-xs text-slate-500">No posts yet for this house.</p>
+                    {posts.length === 0 ? (
+                      <p className="asc-house__empty">No posts yet. Use Add house post to add one to every house.</p>
                     ) : (
-                      <div className="space-y-2">
-                        {(council.posts || []).map((post) => (
+                      <ul className="asc-posts asc-posts--compact">
+                        {posts.map((post) => (
                           <PostRow
                             key={post._id}
                             post={post}
@@ -642,135 +624,353 @@ const ActvtStudentCouncil: React.FC = () => {
                             active={String(post._id) === selectedPostId}
                             onSelect={() => setSelectedPostId(String(post._id || ''))}
                             onSetStatus={onSetPostStatus}
-                            onRemove={() => void onRemovePost(post, true)}
+                            onRemove={() => setRemoveTarget({ post, acrossAllHouses: true })}
                           />
                         ))}
-                      </div>
+                      </ul>
                     )}
-                  </div>
-                ))}
-              </div>
-            </>
+                  </li>
+                )
+              })}
+            </ul>
           )}
-        </section>
+        </Card>
 
+        {!booting && allPosts.length > 0 ? (
+          <p className="asc-hint asc-hint--center">
+            <Icon icon={Users} size={14} />
+            Open a post to register students and choose council members.
+          </p>
+        ) : null}
+      </div>
+
+      {/* Add school post */}
+      <Sheet
+        open={showSchoolPostForm}
+        onClose={() => setShowSchoolPostForm(false)}
+        title="Add school council post"
+        description="Students who match the preferred gender and classes can register."
+        icon={Crown}
+        onSubmit={onAddSchoolPost}
+        footer={
+          <>
+            <Button variant="tertiary" onClick={() => setShowSchoolPostForm(false)}>
+              Cancel
+            </Button>
+            <Button variant="primary" type="submit" loading={saving}>
+              Add post
+            </Button>
+          </>
+        }
+      >
+        <TextField
+          label="Post title"
+          required
+          value={schoolPostTitle}
+          onChange={(event) => setSchoolPostTitle(event.target.value)}
+          placeholder="For example, Head boy"
+          autoFocus
+        />
+        <div className="cb-form-grid">
+          <TextField
+            label="Seats"
+            type="number"
+            min={1}
+            value={schoolPostSeats}
+            onChange={(event) => setSchoolPostSeats(event.target.value)}
+          />
+          <Select
+            label="Preferred gender"
+            value={schoolPostGender}
+            onChange={(event) => setSchoolPostGender(event.target.value)}
+            placeholder="Any gender"
+            options={[...GENDER_OPTIONS]}
+          />
+        </div>
+        <div className="asc-field">
+          <span className="asc-field__label">Preferred classes</span>
+          <ClassChips options={classOptions} value={schoolPostClasses} onChange={setSchoolPostClasses} />
+          <span className="asc-hint">Leave all unselected to allow any class.</span>
+        </div>
+      </Sheet>
+
+      {/* Add house post (applies to every house council) */}
+      <Dialog
+        open={showHousePostForm}
+        onClose={() => setShowHousePostForm(false)}
+        title="Add house council post"
+        description="The post is added to every house council."
+        size="sm"
+        footer={
+          <>
+            <Button variant="tertiary" onClick={() => setShowHousePostForm(false)}>
+              Cancel
+            </Button>
+            <Button variant="primary" type="submit" form="asc-house-post-form" loading={saving}>
+              Add to all houses
+            </Button>
+          </>
+        }
+      >
+        <form id="asc-house-post-form" className="asc-form" onSubmit={onAddHousePost}>
+          <TextField
+            label="Post title"
+            required
+            value={housePostTitle}
+            onChange={(event) => setHousePostTitle(event.target.value)}
+            placeholder="For example, House captain"
+            autoFocus
+          />
+          <TextField
+            label="Seats per house"
+            type="number"
+            min={1}
+            value={housePostSeats}
+            onChange={(event) => setHousePostSeats(event.target.value)}
+          />
+        </form>
+      </Dialog>
+
+      {/* Edit eligibility (school posts) */}
+      <Dialog
+        open={Boolean(editingPost)}
+        onClose={() => setEditingPostId('')}
+        title={`Edit eligibility${editingPost?.title ? ` · ${editingPost.title}` : ''}`}
+        description="Only students who match can register for this post."
+        footer={
+          <>
+            <Button variant="tertiary" onClick={() => setEditingPostId('')}>
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              loading={saving}
+              onClick={() => editingPost && void onSaveSchoolPostEligibility(editingPost)}
+            >
+              Save eligibility
+            </Button>
+          </>
+        }
+      >
+        <div className="asc-form">
+          <Select
+            label="Preferred gender"
+            value={editGender}
+            onChange={(event) => setEditGender(event.target.value)}
+            placeholder="Any gender"
+            options={[...GENDER_OPTIONS]}
+          />
+          <div className="asc-field">
+            <span className="asc-field__label">Preferred classes</span>
+            <ClassChips options={classOptions} value={editClasses} onChange={setEditClasses} />
+            <span className="asc-hint">Leave all unselected to allow any class.</span>
+          </div>
+        </div>
+      </Dialog>
+
+      {/* Remove post */}
+      <Dialog
+        open={Boolean(removeTarget)}
+        onClose={() => (removing ? undefined : setRemoveTarget(null))}
+        tone="danger"
+        size="sm"
+        title={removeTarget?.acrossAllHouses ? 'Remove post from all houses?' : 'Remove this post?'}
+        description={
+          removeTarget?.acrossAllHouses
+            ? `“${removeTarget?.post.title || 'This post'}” will be removed from every house council, with its registrations.`
+            : `“${removeTarget?.post.title || 'This post'}” will be removed from the school council, with its registrations.`
+        }
+        footer={
+          <>
+            <Button variant="tertiary" onClick={() => setRemoveTarget(null)} disabled={removing}>
+              Cancel
+            </Button>
+            <Button variant="danger" icon={Trash2} loading={removing} onClick={() => void onConfirmRemovePost()}>
+              Remove post
+            </Button>
+          </>
+        }
+      />
+
+      {/* Registrations for the selected post */}
+      <Sheet
+        open={Boolean(selectedPost)}
+        onClose={closeRegistrations}
+        size="lg"
+        icon={UserPlus}
+        title={selectedPost?.title || 'Registrations'}
+        description={
+          selectedPost
+            ? `${
+                selectedCouncil?.councilType === 'house'
+                  ? `${selectedCouncil.houseName || 'House'} council`
+                  : 'School council'
+              } · Preferred: ${formatEligibility(selectedPost)}`
+            : undefined
+        }
+        footer={
+          <Button variant="secondary" onClick={closeRegistrations}>
+            Done
+          </Button>
+        }
+      >
         {selectedPost ? (
-          <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h3 className="text-lg font-semibold text-slate-900">
-                  Registrations · {selectedPost.title}
-                </h3>
-                <p className="mt-1 text-sm text-slate-500">
-                  {selectedCouncil?.councilType === 'house'
-                    ? `${selectedCouncil.houseName || 'House'} council`
-                    : 'School council'}
-                  {' · '}Preferred: {formatEligibility(selectedPost)}
-                </p>
+          <>
+            <div
+              className={cx('asc-postsum', selectedHouseMatch && 'actvt-tone-bar')}
+              style={selectedHouseMatch ? toneStyle(selectedHouseMatch.color, selectedHouseMatch.index) : undefined}
+            >
+              <div className="asc-postsum__row">
+                {selectedHouseMatch ? (
+                  <span className="actvt-tone-dot" aria-hidden="true" />
+                ) : null}
+                <Badge tone={selectedStatus.tone}>{selectedStatus.label}</Badge>
+                <span className="asc-postsum__meta">
+                  {selectedPost.seats || 1} {(selectedPost.seats || 1) === 1 ? 'seat' : 'seats'} ·{' '}
+                  {selectedPost.pendingCount || 0} pending · {selectedPost.acceptedCount || 0} selected
+                </span>
               </div>
-              <span className={`rounded-full px-3 py-1 text-xs font-semibold ${tone[selectedPost.registrationStatus || 'closed']}`}>
-                {selectedPost.registrationStatus || 'closed'}
-              </span>
+              <Select
+                aria-label="Registration status"
+                size="sm"
+                className="asc-postsum__status"
+                value={selectedPost.registrationStatus || 'closed'}
+                onChange={(event) => void onSetPostStatus(selectedPost, event.target.value as PostStatus)}
+                options={STATUS_OPTIONS}
+              />
             </div>
 
-            <div className="mb-4">
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                <input
-                  value={studentQuery}
-                  onChange={(event) => setStudentQuery(event.target.value)}
-                  placeholder="Search students by name..."
-                  className={`${fieldClass} pl-9`}
-                  disabled={selectedPost.registrationStatus === 'closed'}
-                />
-              </div>
-              {searchingStudents ? <p className="mt-2 text-xs text-slate-500">Searching...</p> : null}
-              {studentHits.length > 0 ? (
-                <div className="mt-2 max-h-56 space-y-1 overflow-y-auto rounded-2xl border border-slate-100 p-2">
-                  {eligibleStudentHits.length === 0 ? (
-                    <p className="px-3 py-3 text-xs text-slate-500">
-                      No matching students for this post’s preferred gender/class.
-                    </p>
-                  ) : (
-                    eligibleStudentHits.map((student) => (
-                      <button
-                        key={student._id}
-                        type="button"
-                        onClick={() => void onRegisterStudent(student)}
-                        className="flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2 text-left hover:bg-slate-50"
-                      >
-                        <div>
-                          <p className="text-sm font-semibold text-slate-900">{student.name}</p>
-                          <p className="text-xs text-slate-500">
-                            {student.gender || 'Gender —'}
-                            {student.class ? ` · Class ${student.class}` : ''}
-                            {student.section ? `-${student.section}` : ''}
-                            {student.rollNumber ? ` · ${student.rollNumber}` : ''}
-                            {student.house ? ` · ${student.house}` : ''}
-                          </p>
-                        </div>
-                        <span className="text-xs font-semibold text-indigo-600">Register</span>
-                      </button>
-                    ))
-                  )}
+            <div className="asc-finder">
+              <TextField
+                label="Register a student"
+                icon={Search}
+                type="search"
+                value={studentQuery}
+                onChange={(event) => setStudentQuery(event.target.value)}
+                placeholder="Search students by name"
+                disabled={selectedClosed}
+                hint={
+                  selectedClosed
+                    ? 'Registrations are closed. Change the status to Open to register students.'
+                    : 'Type at least 2 letters. Only eligible students are listed.'
+                }
+              />
+              {searchingStudents ? (
+                <div className="cb-table-state asc-finder__state" role="status">
+                  <span className="cb-spinner" aria-hidden="true" />
+                  Searching students…
                 </div>
+              ) : null}
+              {!searchingStudents && studentHits.length > 0 ? (
+                eligibleStudentHits.length === 0 ? (
+                  <p className="asc-finder__none">
+                    No matching students for this post’s preferred gender or class. Try another name.
+                  </p>
+                ) : (
+                  <ul className="asc-hits" aria-label="Matching students">
+                    {eligibleStudentHits.map((student) => (
+                      <li key={student._id} className="asc-hit">
+                        <Avatar name={student.name || 'Student'} size="md" />
+                        <div className="asc-person">
+                          <span className="asc-person__name">{student.name}</span>
+                          <span className="asc-person__meta">
+                            {renderHouseDot(student.houseId, student.house)}
+                            {studentMeta({
+                              gender: student.gender,
+                              className: student.class,
+                              section: student.section,
+                              rollNumber: student.rollNumber,
+                            })}
+                            {student.house ? ` · ${student.house}` : ''}
+                          </span>
+                        </div>
+                        <Button size="sm" icon={UserPlus} onClick={() => void onRegisterStudent(student)}>
+                          Register
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                )
               ) : null}
             </div>
 
-            <div className="space-y-2">
+            <div className="asc-regs">
+              <h3 className="asc-regs__title">
+                Registrations <span className="asc-regs__count">{postRegistrations.length}</span>
+              </h3>
               {postRegistrations.length === 0 ? (
-                <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 px-4 py-6 text-center text-sm text-slate-500">
-                  No registrations for this post yet.
-                </p>
+                <EmptyState
+                  compact
+                  icon={Users}
+                  title="No registrations yet"
+                  body={
+                    selectedClosed
+                      ? 'Open the post for registration, then search for students above.'
+                      : 'Search for a student above to register them for this post.'
+                  }
+                />
               ) : (
-                postRegistrations.map((item) => (
-                  <div key={item._id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-100 px-4 py-3">
-                    <div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="font-semibold text-slate-900">{item.studentName}</p>
-                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${tone[item.status || 'pending']}`}>
-                          {item.status || 'pending'}
-                        </span>
-                      </div>
-                      <p className="mt-1 text-xs text-slate-500">
-                        {item.gender || 'Gender —'}
-                        {item.className ? ` · Class ${item.className}` : ''}
-                        {item.section ? `-${item.section}` : ''}
-                        {item.rollNumber ? ` · ${item.rollNumber}` : ''}
-                        {item.houseName ? ` · ${item.houseName}` : ''}
-                      </p>
-                    </div>
-                    <div className="flex gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => void onUpdateRegistration(item, 'accepted')}
-                        className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 px-2.5 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50"
-                      >
-                        <Check className="h-3.5 w-3.5" />
-                        Select
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void onUpdateRegistration(item, 'rejected')}
-                        className="inline-flex items-center gap-1 rounded-lg border border-rose-200 px-2.5 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-50"
-                      >
-                        <X className="h-3.5 w-3.5" />
-                        Reject
-                      </button>
-                    </div>
-                  </div>
-                ))
+                <ul className="asc-reglist">
+                  {postRegistrations.map((item) => {
+                    const status = REGISTRATION_STATUS[item.status || 'pending'] || REGISTRATION_STATUS.pending
+                    return (
+                      <li key={item._id} className="asc-reg">
+                        <Avatar name={item.studentName || 'Student'} size="md" />
+                        <div className="asc-person">
+                          <span className="asc-person__line">
+                            {item.studentId ? (
+                              <button
+                                type="button"
+                                className="asc-person__name asc-person__link"
+                                onClick={() => openStudentProfile(item.studentId)}
+                              >
+                                {item.studentName}
+                              </button>
+                            ) : (
+                              <span className="asc-person__name">{item.studentName}</span>
+                            )}
+                            <Badge tone={status.tone}>{status.label}</Badge>
+                          </span>
+                          <span className="asc-person__meta">
+                            {renderHouseDot(item.houseId, item.houseName)}
+                            {studentMeta({
+                              gender: item.gender,
+                              className: item.className,
+                              section: item.section,
+                              rollNumber: item.rollNumber,
+                            })}
+                            {item.houseName ? ` · ${item.houseName}` : ''}
+                          </span>
+                        </div>
+                        <div className="asc-reg__actions">
+                          <Button
+                            size="sm"
+                            icon={Check}
+                            onClick={() => void onUpdateRegistration(item, 'accepted')}
+                            disabled={item.status === 'accepted'}
+                          >
+                            Select
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="tertiary"
+                            icon={X}
+                            onClick={() => void onUpdateRegistration(item, 'rejected')}
+                            disabled={item.status === 'rejected'}
+                          >
+                            Reject
+                          </Button>
+                        </div>
+                      </li>
+                    )
+                  })}
+                </ul>
               )}
             </div>
-          </section>
-        ) : (
-          <section className="rounded-[28px] border border-dashed border-slate-200 bg-white p-6 text-center text-sm text-slate-500 shadow-sm">
-            <Users className="mx-auto mb-2 h-5 w-5 text-slate-400" />
-            Select a post above to register students and choose council members.
-          </section>
-        )}
-      </div>
-    </div>
+          </>
+        ) : null}
+      </Sheet>
+    </Page>
   )
 }
 
@@ -789,47 +989,61 @@ const PostRow = ({
   compact?: boolean
   showEligibility?: boolean
   onSelect: () => void
-  onSetStatus: (post: CouncilPost, status: 'closed' | 'open' | 'accepting') => void
+  onSetStatus: (post: CouncilPost, status: PostStatus) => void
   onRemove: () => void
   onEditEligibility?: () => void
-}) => (
-  <div
-    className={`flex flex-wrap items-center justify-between gap-3 rounded-2xl border px-3 py-2.5 ${
-      active ? 'border-indigo-300 bg-indigo-50/50' : 'border-slate-100 bg-white'
-    }`}
-  >
-    <button type="button" onClick={onSelect} className="min-w-0 flex-1 text-left">
-      <div className="flex flex-wrap items-center gap-2">
-        <p className={`font-semibold text-slate-900 ${compact ? 'text-sm' : ''}`}>{post.title}</p>
-        <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${tone[post.registrationStatus || 'closed']}`}>
-          {post.registrationStatus || 'closed'}
+}) => {
+  const status = postStatusOf(post)
+  const seats = post.seats || 1
+  const accepted = post.acceptedCount || 0
+  const current = (post.registrationStatus || 'closed') as PostStatus
+  return (
+    <li className={cx('asc-post', compact && 'asc-post--compact', active && 'is-active')}>
+      <button type="button" className="asc-post__open" onClick={onSelect}>
+        <span className="asc-post__line">
+          <span className="asc-post__title">{post.title}</span>
+          <Badge tone={status.tone}>{status.label}</Badge>
         </span>
-      </div>
-      <p className="mt-1 text-[11px] text-slate-500">
-        {post.seats || 1} seat{(post.seats || 1) === 1 ? '' : 's'}
-        {' · '}{post.pendingCount || 0} pending
-        {' · '}{post.acceptedCount || 0} selected
-        {showEligibility ? ` · ${formatEligibility(post)}` : ''}
-      </p>
-    </button>
-    <div className="flex flex-wrap gap-1.5">
-      {onEditEligibility ? (
-        <button
-          type="button"
-          onClick={onEditEligibility}
-          className="rounded-lg border border-indigo-200 px-2 py-1 text-[11px] font-semibold text-indigo-700 hover:bg-indigo-50"
-        >
-          Eligibility
-        </button>
-      ) : null}
-      <button type="button" onClick={() => onSetStatus(post, 'open')} className="rounded-lg border border-emerald-200 px-2 py-1 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-50">Open</button>
-      <button type="button" onClick={() => onSetStatus(post, 'accepting')} className="rounded-lg border border-amber-200 px-2 py-1 text-[11px] font-semibold text-amber-700 hover:bg-amber-50">Accepting</button>
-      <button type="button" onClick={() => onSetStatus(post, 'closed')} className="rounded-lg border border-slate-200 px-2 py-1 text-[11px] font-semibold text-slate-600 hover:bg-slate-50">Close</button>
-      <button type="button" onClick={onRemove} className="rounded-lg border border-rose-200 px-2 py-1 text-rose-600 hover:bg-rose-50">
-        <Trash2 className="h-3.5 w-3.5" />
+        <span className="asc-post__meta">
+          {accepted}/{seats} {seats === 1 ? 'seat' : 'seats'} filled · {post.pendingCount || 0} pending
+          {showEligibility ? ` · ${formatEligibility(post)}` : ''}
+        </span>
       </button>
-    </div>
-  </div>
-)
+      <div className="asc-post__actions">
+        <Button size="sm" variant="tertiary" icon={UserPlus} onClick={onSelect} className="asc-post__manage">
+          Registrations
+        </Button>
+        <Menu
+          label={`Actions for ${post.title || 'post'}`}
+          items={[
+            {
+              label: 'Open registrations',
+              icon: ListChecks,
+              disabled: current === 'open',
+              onSelect: () => onSetStatus(post, 'open'),
+            },
+            {
+              label: 'Mark as accepting',
+              icon: Check,
+              disabled: current === 'accepting',
+              onSelect: () => onSetStatus(post, 'accepting'),
+            },
+            {
+              label: 'Close registrations',
+              icon: X,
+              disabled: current === 'closed',
+              onSelect: () => onSetStatus(post, 'closed'),
+            },
+            ...(onEditEligibility
+              ? [{ divider: true as const }, { label: 'Edit eligibility', icon: SlidersHorizontal, onSelect: onEditEligibility }]
+              : []),
+            { divider: true as const },
+            { label: 'Remove post', icon: Trash2, tone: 'danger' as const, onSelect: onRemove },
+          ]}
+        />
+      </div>
+    </li>
+  )
+}
 
 export default ActvtStudentCouncil

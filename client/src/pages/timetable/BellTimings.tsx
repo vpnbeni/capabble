@@ -724,194 +724,196 @@ const BellTimings: React.FC = () => {
         />
       </div>
 
-      <div className="cb-grid-8-4">
-        {/* ── Bell schedule ── */}
-        <Card
-          flush
-          title="Bell schedule"
-          subtitle="Rows run in order from the start time. Change a duration to shift every row after it."
-          className="tbt-schedule"
-        >
-          {isLoadingSavedState ? (
-            <div className="cb-table-state" role="status">
-              <span className="cb-spinner" aria-hidden="true" />
-              Loading bell timings…
-            </div>
-          ) : (
-            <>
-              <div className="tbt-toolbar">
-                <div className="tbt-start">
-                  <TextField
-                    label="Start time"
-                    type="time"
-                    size="sm"
-                    value={startTime}
-                    onChange={e => setStartTime(e.target.value)}
-                    title="Bell timings start time"
-                  />
-                </div>
+      {/* ── Bell schedule (full width so every column fits) ── */}
+      <Card
+        flush
+        title="Bell schedule"
+        subtitle="Rows run in order from the start time. Change a duration to shift every row after it."
+        className="tbt-schedule"
+      >
+        {isLoadingSavedState ? (
+          <div className="cb-table-state" role="status">
+            <span className="cb-spinner" aria-hidden="true" />
+            Loading bell timings…
+          </div>
+        ) : (
+          <>
+            <div className="tbt-toolbar">
+              <div className="tbt-start">
+                <TextField
+                  label="Start time"
+                  type="time"
+                  size="sm"
+                  value={startTime}
+                  onChange={e => setStartTime(e.target.value)}
+                  title="Bell timings start time"
+                />
+              </div>
 
-                {timelineRows.length > 0 ? (
-                  <div className="tbt-timeline" aria-label="Day timeline">
-                    <div className="tbt-timeline__scroll">
-                      <ol className="tbt-timeline__track">
-                        {timelineRows.map(row => (
-                          <li
-                            key={row.id}
-                            className={cx('tbt-timeline__seg', row.type === 'break' && 'is-break')}
-                            style={{ flexGrow: row.duration }}
-                            title={`${row.label} (${row.type === 'break' ? 'Break' : 'Period'}): ${to12h(row.from)} – ${to12h(row.to)}, ${row.duration} min`}
-                          >
+              {timelineRows.length > 0 ? (
+                <div className="tbt-timeline" aria-label="Day timeline">
+                  <div className="tbt-timeline__scroll">
+                    <ol className="tbt-timeline__track">
+                      {timelineRows.map(row => (
+                        <li
+                          key={row.id}
+                          className={cx('tbt-timeline__seg', row.type === 'break' && 'is-break')}
+                          style={{ flexGrow: row.duration }}
+                          title={`${row.label} (${row.type === 'break' ? 'Break' : 'Period'}): ${to12h(row.from)} – ${to12h(row.to)}, ${row.duration} min`}
+                        >
+                          {row.duration / Math.max(totalMinutes, 1) >= 0.06 ? (
                             <span className="tbt-timeline__label">{row.label}</span>
-                          </li>
-                        ))}
-                      </ol>
-                      <div className="tbt-timeline__ends is-num">
-                        <span>{dayStart}</span>
-                        <span>{dayEnd}</span>
-                      </div>
-                    </div>
-                    <div className="tbt-timeline__legend">
-                      <span className="tbt-legend"><span className="tbt-legend__swatch" aria-hidden="true" />Period</span>
-                      <span className="tbt-legend"><span className="tbt-legend__swatch is-break" aria-hidden="true" />Break</span>
+                          ) : (
+                            <span className="cb-visually-hidden">{row.label}</span>
+                          )}
+                        </li>
+                      ))}
+                    </ol>
+                    <div className="tbt-timeline__ends is-num">
+                      <span>{dayStart}</span>
+                      <span>{dayEnd}</span>
                     </div>
                   </div>
-                ) : null}
-              </div>
+                  <div className="tbt-timeline__legend">
+                    <span className="tbt-legend"><span className="tbt-legend__swatch" aria-hidden="true" />Period</span>
+                    <span className="tbt-legend"><span className="tbt-legend__swatch is-break" aria-hidden="true" />Break</span>
+                  </div>
+                </div>
+              ) : null}
+            </div>
 
-              <DataTable
-                className="tbt-table"
-                caption="Bell schedule"
-                columns={scheduleColumns}
-                rows={scheduleRows}
-                getRowKey={row => row.id}
-                empty={
-                  <EmptyState
-                    icon={BellRing}
-                    title="No periods or breaks yet"
-                    body="The school day is empty. Add a period or a break to start building the bell schedule."
-                    action={
-                      <div className="tbt-add">
-                        <Button size="sm" icon={Plus} onClick={addPeriod}>Add period</Button>
-                        <Button size="sm" icon={Plus} onClick={addBreak}>Add break</Button>
-                      </div>
-                    }
-                  />
-                }
-                footer={
-                  rows.length > 0 ? (
-                    <>
-                      <div className="tbt-add">
-                        <Button size="sm" icon={Plus} onClick={addPeriod}>Add period</Button>
-                        <Button size="sm" icon={Plus} onClick={addBreak}>Add break</Button>
-                      </div>
-                      <span className="tbt-summary is-num">
-                        {periodCount} {periodCount === 1 ? 'period' : 'periods'} · {breakCount} {breakCount === 1 ? 'break' : 'breaks'} · {totalMinutes} min
-                        {dayStart && dayEnd ? ` · ${dayStart} – ${dayEnd}` : ''}
-                      </span>
-                    </>
-                  ) : undefined
-                }
-              />
-            </>
-          )}
+            <DataTable
+              className="tbt-table"
+              caption="Bell schedule"
+              columns={scheduleColumns}
+              rows={scheduleRows}
+              getRowKey={row => row.id}
+              empty={
+                <EmptyState
+                  icon={BellRing}
+                  title="No periods or breaks yet"
+                  body="The school day is empty. Add a period or a break to start building the bell schedule."
+                  action={
+                    <div className="tbt-add">
+                      <Button size="sm" icon={Plus} onClick={addPeriod}>Add period</Button>
+                      <Button size="sm" icon={Plus} onClick={addBreak}>Add break</Button>
+                    </div>
+                  }
+                />
+              }
+              footer={
+                rows.length > 0 ? (
+                  <>
+                    <div className="tbt-add">
+                      <Button size="sm" icon={Plus} onClick={addPeriod}>Add period</Button>
+                      <Button size="sm" icon={Plus} onClick={addBreak}>Add break</Button>
+                    </div>
+                    <span className="tbt-summary is-num">
+                      {periodCount} {periodCount === 1 ? 'period' : 'periods'} · {breakCount} {breakCount === 1 ? 'break' : 'breaks'} · {totalMinutes} min
+                      {dayStart && dayEnd ? ` · ${dayStart} – ${dayEnd}` : ''}
+                    </span>
+                  </>
+                ) : undefined
+              }
+            />
+          </>
+        )}
+      </Card>
+
+      <div className="cb-grid-6-6">
+        {/* ── PDF details ── */}
+        <Card title="PDF details" subtitle="Printed at the top of the bell timings sheet.">
+          <div className="tbt-fields">
+            <TextField
+              label="School name"
+              value={meta.schoolName}
+              onChange={e => setMeta(p => ({ ...p, schoolName: e.target.value }))}
+              placeholder="e.g. Delhi Public School, Jind Road, Rohtak"
+              disabled={isLoadingSavedState}
+            />
+            <TextField
+              label="Title"
+              value={meta.title}
+              onChange={e => setMeta(p => ({ ...p, title: e.target.value }))}
+              placeholder="e.g. SUMMER BELL TIMINGS 3.0"
+              disabled={isLoadingSavedState}
+            />
+            <TextField
+              label="Session"
+              value={meta.session}
+              readOnly
+              tabIndex={-1}
+              title="Academic session"
+              icon={Link2}
+              hint="Linked to the active academic session."
+            />
+            <TextField
+              label="Effective date (w.e.f.)"
+              type="date"
+              value={meta.effectiveDate}
+              onChange={e => setMeta(p => ({ ...p, effectiveDate: e.target.value }))}
+              title="Effective date"
+              disabled={isLoadingSavedState}
+            />
+          </div>
         </Card>
 
-        <div className="cb-stack">
-          {/* ── PDF details ── */}
-          <Card title="PDF details" subtitle="Printed at the top of the bell timings sheet.">
-            <div className="tbt-fields">
+        {/* ── Versions ── */}
+        <Card
+          title="Versions"
+          subtitle="Keep snapshots of the saved bell timings and switch between them."
+          action={<Badge tone={versions.length > 0 ? 'info' : 'neutral'}>{versions.length} saved</Badge>}
+        >
+          <div className="tbt-fields">
+            <div className="tbt-inline">
               <TextField
-                label="School name"
-                value={meta.schoolName}
-                onChange={e => setMeta(p => ({ ...p, schoolName: e.target.value }))}
-                placeholder="e.g. Delhi Public School, Jind Road, Rohtak"
+                label="Version name"
+                value={versionName}
+                onChange={(e) => setVersionName(e.target.value)}
+                placeholder="e.g. Winter timings"
+                hint="Optional."
+                className="tbt-inline__grow"
+              />
+              <Button
+                icon={History}
+                onClick={handleSaveVersion}
+                loading={isSavingVersion}
                 disabled={isLoadingSavedState}
-              />
-              <TextField
-                label="Title"
-                value={meta.title}
-                onChange={e => setMeta(p => ({ ...p, title: e.target.value }))}
-                placeholder="e.g. SUMMER BELL TIMINGS 3.0"
-                disabled={isLoadingSavedState}
-              />
-              <TextField
-                label="Session"
-                value={meta.session}
-                readOnly
-                tabIndex={-1}
-                title="Academic session"
-                icon={Link2}
-                hint="Linked to the active academic session."
-              />
-              <TextField
-                label="Effective date (w.e.f.)"
-                type="date"
-                value={meta.effectiveDate}
-                onChange={e => setMeta(p => ({ ...p, effectiveDate: e.target.value }))}
-                title="Effective date"
-                disabled={isLoadingSavedState}
-              />
+              >
+                {isSavingVersion ? 'Saving…' : 'Save version'}
+              </Button>
             </div>
-          </Card>
 
-          {/* ── Versions ── */}
-          <Card
-            title="Versions"
-            subtitle="Keep snapshots of the saved bell timings and switch between them."
-            action={<Badge tone={versions.length > 0 ? 'info' : 'neutral'}>{versions.length} saved</Badge>}
-          >
-            <div className="tbt-fields">
-              <div className="tbt-inline">
-                <TextField
-                  label="Version name"
-                  value={versionName}
-                  onChange={(e) => setVersionName(e.target.value)}
-                  placeholder="e.g. Winter timings"
-                  hint="Optional."
-                  className="tbt-inline__grow"
-                />
-                <Button
-                  icon={History}
-                  onClick={handleSaveVersion}
-                  loading={isSavingVersion}
-                  disabled={isLoadingSavedState}
-                >
-                  {isSavingVersion ? 'Saving…' : 'Save version'}
-                </Button>
-              </div>
+            <div className="tbt-divider" role="separator" />
 
-              <div className="tbt-divider" role="separator" />
-
-              <Select
-                label="Saved versions"
-                value={selectedVersionId}
-                onChange={(e) => setSelectedVersionId(e.target.value)}
-                placeholder={versions.length > 0 ? 'Select a version' : 'No saved versions yet'}
-                options={versions.map((version) => ({ value: version._id, label: version.name }))}
-                title="Select bell timing version"
-                hint={selectedVersion ? `Saved on ${formatDate(selectedVersion.createdAt)}` : 'Pick a version to apply or delete it.'}
-              />
-              <div className="tbt-add">
-                <Button
-                  onClick={handleApplyVersion}
-                  disabled={!selectedVersionId}
-                  loading={isApplyingVersion}
-                >
-                  {isApplyingVersion ? 'Applying…' : 'Apply version'}
-                </Button>
-                <Button
-                  variant="danger"
-                  icon={Trash2}
-                  onClick={() => setConfirmDeleteVersion(true)}
-                  disabled={!selectedVersionId || isDeletingVersion}
-                >
-                  Delete version
-                </Button>
-              </div>
+            <Select
+              label="Saved versions"
+              value={selectedVersionId}
+              onChange={(e) => setSelectedVersionId(e.target.value)}
+              placeholder={versions.length > 0 ? 'Select a version' : 'No saved versions yet'}
+              options={versions.map((version) => ({ value: version._id, label: version.name }))}
+              title="Select bell timing version"
+              hint={selectedVersion ? `Saved on ${formatDate(selectedVersion.createdAt)}` : 'Pick a version to apply or delete it.'}
+            />
+            <div className="tbt-add">
+              <Button
+                onClick={handleApplyVersion}
+                disabled={!selectedVersionId}
+                loading={isApplyingVersion}
+              >
+                {isApplyingVersion ? 'Applying…' : 'Apply version'}
+              </Button>
+              <Button
+                variant="danger"
+                icon={Trash2}
+                onClick={() => setConfirmDeleteVersion(true)}
+                disabled={!selectedVersionId || isDeletingVersion}
+              >
+                Delete version
+              </Button>
             </div>
-          </Card>
-        </div>
+          </div>
+        </Card>
       </div>
 
       {/* ── Delete version confirmation ── */}

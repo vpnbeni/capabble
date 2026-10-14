@@ -1,28 +1,52 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import toast from 'react-hot-toast'
-import { AlertTriangle, BadgePercent, ExternalLink, IndianRupee, Plus, Printer, Receipt, Trash2, XCircle } from 'lucide-react'
-import Modal from '@/components/common/Modal'
-import { useCapitalSettings, useFeeHeads, useFeeStructures, useInvalidateCpitl, useStudentAccount } from '@/hooks/useCpitl'
-import cpitlService, { ConcessionRule, FeePayment, StudentAccount } from '@/services/cpitlService'
-import CollectPaymentModal from './CollectPaymentModal'
 import {
-  CpitlBadge,
-  CpitlCard,
-  CpitlEmpty,
-  Field,
-  MODE_LABELS,
-  btnGhost,
-  btnPrimary,
-  btnSecondary,
-  errorMessage,
-  fmtDate,
-  inputClass,
-  inr,
-  tableHead,
-} from './CpitlUi'
+  AlertTriangle,
+  BadgePercent,
+  Ban,
+  CheckCircle2,
+  ExternalLink,
+  IndianRupee,
+  Plus,
+  Printer,
+  Receipt,
+  Trash2,
+  Wallet,
+} from 'lucide-react'
+import {
+  Avatar,
+  Badge,
+  Banner,
+  BulkBar,
+  BulkResultDialog,
+  Button,
+  Card,
+  Checkbox,
+  DataTable,
+  DetailList,
+  Dialog,
+  EmptyState,
+  Menu,
+  Select,
+  Sheet,
+  StatCard,
+  Tabs,
+  TextArea,
+  TextField,
+  useRowSelection,
+  type BulkResult,
+  type DataTableColumn,
+  type MenuItem,
+} from '@/components/ui'
+import { useCapitalSettings, useFeeHeads, useFeeStructures, useInvalidateCpitl, useStudentAccount } from '@/hooks/useCpitl'
+import cpitlService, { ConcessionRule, FeeDemand, FeePayment, StudentAccount } from '@/services/cpitlService'
+import cpitlBulkService from '@/services/cpitlBulkService'
+import CollectPaymentModal from './CollectPaymentModal'
+import { CpitlBadge, MODE_LABELS, errorMessage, fmtDate, inr } from './CpitlUi'
+import './collection.css'
 
-const AccountSettingsModal: React.FC<{ isOpen: boolean; onClose: () => void; data: StudentAccount; onSaved: () => void }> = ({
+const AccountSettingsSheet: React.FC<{ isOpen: boolean; onClose: () => void; data: StudentAccount; onSaved: () => void }> = ({
   isOpen,
   onClose,
   data,
@@ -48,6 +72,7 @@ const AccountSettingsModal: React.FC<{ isOpen: boolean; onClose: () => void; dat
   const selectedStructure = structures.find((s) => s._id === structureId)
   const optionalHeads = (selectedStructure?.components || []).filter((c) => c.isOptional)
   const headByCode = useMemo(() => new Map(heads.map((h) => [h.code, h])), [heads])
+  const headOptions = heads.map((h) => ({ value: h._id, label: h.name }))
 
   const addPreset = (presetName: string) => {
     const preset = settings?.concessionPresets.find((p) => p.name === presetName)
@@ -58,7 +83,8 @@ const AccountSettingsModal: React.FC<{ isOpen: boolean; onClose: () => void; dat
 
   const update = (i: number, patch: Partial<ConcessionRule>) => setConcessions((prev) => prev.map((c, idx) => (idx === i ? { ...c, ...patch } : c)))
 
-  const save = async () => {
+  const save = async (event?: React.FormEvent) => {
+    event?.preventDefault()
     setSaving(true)
     try {
       const res = await cpitlService.updateStudentAccount(data.student._id, {
@@ -78,137 +104,227 @@ const AccountSettingsModal: React.FC<{ isOpen: boolean; onClose: () => void; dat
   }
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={`Fee account — ${data.student.name}`} size="xl">
-      <div className="space-y-6">
-        <div className="grid gap-4 md:grid-cols-2">
-          <Field label="Fee structure">
-            <select className={inputClass} value={structureId} onChange={(e) => setStructureId(e.target.value)}>
-              <option value="">— None —</option>
-              {structures
-                .filter((s) => s.status !== 'archived' || s._id === structureId)
-                .map((s) => (
-                  <option key={s._id} value={s._id}>
-                    {s.name} (v{s.version})
-                  </option>
-                ))}
-            </select>
-          </Field>
-          <Field label="Previous session arrears (₹)" hint="Added as a 'Previous dues' installment">
-            <input type="number" min={0} className={inputClass} value={opening} onChange={(e) => setOpening(Number(e.target.value))} />
-          </Field>
-        </div>
-
-        {optionalHeads.length ? (
-          <div>
-            <h4 className="text-sm font-semibold text-slate-900 dark:text-white">Optional services</h4>
-            <div className="mt-2 flex flex-wrap gap-3">
-              {optionalHeads.map((c) => (
-                <label key={c.feeHead} className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm dark:border-slate-600">
-                  <input
-                    type="checkbox"
-                    className="h-4 w-4 rounded border-slate-300 text-indigo-600"
-                    checked={optional.includes(String(c.feeHead))}
-                    onChange={(e) =>
-                      setOptional((prev) => (e.target.checked ? [...prev, String(c.feeHead)] : prev.filter((x) => x !== String(c.feeHead))))
-                    }
-                  />
-                  {c.name} <span className="text-slate-400">{inr(c.amount)}</span>
-                </label>
-              ))}
-            </div>
-          </div>
-        ) : null}
-
-        <div>
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h4 className="text-sm font-semibold text-slate-900 dark:text-white">Concessions</h4>
-            <div className="flex flex-wrap gap-1.5">
-              {(settings?.concessionPresets || []).map((p) => (
-                <button key={p.name} type="button" className={btnGhost} onClick={() => addPreset(p.name)}>
-                  <Plus className="h-3 w-3" /> {p.name}
-                </button>
-              ))}
-              <button
-                type="button"
-                className={btnGhost}
-                onClick={() => setConcessions((prev) => [...prev, { name: 'Custom', type: 'percent', value: 0, feeHead: null, reason: '' }])}
-              >
-                <Plus className="h-3 w-3" /> Custom
-              </button>
-            </div>
-          </div>
-          {concessions.length ? (
-            <div className="mt-3 space-y-2">
-              {concessions.map((c, i) => (
-                <div key={i} className="grid grid-cols-12 items-end gap-2 rounded-xl border border-slate-200 p-3 dark:border-slate-700">
-                  <Field label="Name" className="col-span-6 md:col-span-2">
-                    <input className={inputClass} value={c.name || ''} onChange={(e) => update(i, { name: e.target.value })} />
-                  </Field>
-                  <Field label="Applies to" className="col-span-6 md:col-span-3">
-                    <select className={inputClass} value={c.feeHead || ''} onChange={(e) => update(i, { feeHead: e.target.value || null })}>
-                      <option value="">All fee heads</option>
-                      {heads.map((h) => (
-                        <option key={h._id} value={h._id}>
-                          {h.name}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-                  <Field label="Type" className="col-span-4 md:col-span-2">
-                    <select className={inputClass} value={c.type} onChange={(e) => update(i, { type: e.target.value as ConcessionRule['type'] })}>
-                      <option value="percent">Percent</option>
-                      <option value="flat">Flat ₹ / installment</option>
-                    </select>
-                  </Field>
-                  <Field label={c.type === 'percent' ? '%' : '₹'} className="col-span-3 md:col-span-1">
-                    <input type="number" min={0} className={inputClass} value={c.value} onChange={(e) => update(i, { value: Number(e.target.value) })} />
-                  </Field>
-                  <Field label="Reason / approval" className="col-span-4 md:col-span-3">
-                    <input className={inputClass} value={c.reason || ''} onChange={(e) => update(i, { reason: e.target.value })} />
-                  </Field>
-                  <div className="col-span-1 flex justify-end pb-1">
-                    <button type="button" className="text-slate-400 hover:text-rose-600" onClick={() => setConcessions((prev) => prev.filter((_, idx) => idx !== i))}>
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="mt-2 text-sm text-slate-500">No concessions.</p>
-          )}
-        </div>
-
-        <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-900/20 dark:text-amber-200">
-          Saving recalculates unpaid installments only. Installments with payments are not changed.
-        </p>
-        <div className="flex justify-end gap-2">
-          <button type="button" className={btnSecondary} onClick={onClose}>
-            Cancel
-          </button>
-          <button type="button" className={btnPrimary} disabled={saving} onClick={save}>
-            {saving ? 'Saving…' : 'Save & recalculate'}
-          </button>
+    <Sheet
+      open={isOpen}
+      onClose={onClose}
+      icon={BadgePercent}
+      size="lg"
+      title="Concessions and services"
+      description={data.student.name}
+      onSubmit={save}
+      footer={
+        <>
+          <Button onClick={onClose}>Cancel</Button>
+          <Button type="submit" variant="primary" loading={saving}>
+            Save and recalculate
+          </Button>
+        </>
+      }
+    >
+      <div className="cb-form-section">
+        <h3 className="cb-form-section__title">Fee plan</h3>
+        <div className="cb-form-grid">
+          <Select
+            label="Fee structure"
+            value={structureId}
+            onChange={(e) => setStructureId(e.target.value)}
+            placeholder="None"
+            options={structures
+              .filter((s) => s.status !== 'archived' || s._id === structureId)
+              .map((s) => ({ value: s._id, label: `${s.name} (v${s.version})` }))}
+          />
+          <TextField
+            label="Previous session arrears"
+            type="number"
+            min={0}
+            prefix="₹"
+            hint="Added as a “Previous dues” installment"
+            value={opening}
+            onChange={(e) => setOpening(Number(e.target.value))}
+          />
         </div>
       </div>
-    </Modal>
+
+      {optionalHeads.length ? (
+        <div className="cb-form-section">
+          <h3 className="cb-form-section__title">Optional services</h3>
+          <div className="cc-optionals">
+            {optionalHeads.map((c) => (
+              <Checkbox
+                key={c.feeHead}
+                label={c.name}
+                description={inr(c.amount)}
+                checked={optional.includes(String(c.feeHead))}
+                onChange={(checked) =>
+                  setOptional((prev) => (checked ? [...prev, String(c.feeHead)] : prev.filter((x) => x !== String(c.feeHead))))
+                }
+              />
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      <div className="cb-form-section">
+        <h3 className="cb-form-section__title">Concessions</h3>
+        <div className="cc-presets" role="group" aria-label="Add a concession">
+          {(settings?.concessionPresets || []).map((p) => (
+            <Button key={p.name} size="sm" variant="secondary" icon={Plus} onClick={() => addPreset(p.name)}>
+              {p.name}
+            </Button>
+          ))}
+          <Button
+            size="sm"
+            variant="secondary"
+            icon={Plus}
+            onClick={() => setConcessions((prev) => [...prev, { name: 'Custom', type: 'percent', value: 0, feeHead: null, reason: '' }])}
+          >
+            Custom
+          </Button>
+        </div>
+        {concessions.length ? (
+          concessions.map((c, i) => (
+            <div key={i} className="cc-concession">
+              <TextField className="cc-concession__name" label="Name" value={c.name || ''} onChange={(e) => update(i, { name: e.target.value })} />
+              <Select
+                className="cc-concession__head"
+                label="Applies to"
+                value={c.feeHead || ''}
+                placeholder="All fee heads"
+                options={headOptions}
+                onChange={(e) => update(i, { feeHead: e.target.value || null })}
+              />
+              <Select
+                className="cc-concession__type"
+                label="Type"
+                value={c.type}
+                options={[
+                  { value: 'percent', label: 'Percent' },
+                  { value: 'flat', label: 'Flat ₹ per installment' },
+                ]}
+                onChange={(e) => update(i, { type: e.target.value as ConcessionRule['type'] })}
+              />
+              <TextField
+                className="cc-concession__value"
+                label={c.type === 'percent' ? '%' : '₹'}
+                type="number"
+                min={0}
+                value={c.value}
+                onChange={(e) => update(i, { value: Number(e.target.value) })}
+              />
+              <TextField
+                className="cc-concession__reason"
+                label="Reason or approval"
+                value={c.reason || ''}
+                onChange={(e) => update(i, { reason: e.target.value })}
+              />
+              <div className="cc-concession__remove">
+                <Button size="sm" variant="tertiary" icon={Trash2} onClick={() => setConcessions((prev) => prev.filter((_, idx) => idx !== i))}>
+                  Remove
+                </Button>
+              </div>
+            </div>
+          ))
+        ) : (
+          <p className="cb-muted">No concessions. Add one from a preset or as a custom rule.</p>
+        )}
+      </div>
+
+      <Banner tone="warning">Saving recalculates unpaid installments only. Installments with payments are not changed.</Banner>
+    </Sheet>
   )
 }
 
+type Confirm =
+  | { kind: 'cancel'; payment: FeePayment }
+  | { kind: 'bounce'; payment: FeePayment }
+  | null
+
 const StudentLedgerPanel: React.FC<{ studentId: string; showProfileLink?: boolean }> = ({ studentId, showProfileLink }) => {
   const { data, isLoading, isError } = useStudentAccount(studentId)
+  const { data: heads = [] } = useFeeHeads()
   const invalidate = useInvalidateCpitl()
   const [collectOpen, setCollectOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
+  const [tab, setTab] = useState('installments')
+  const [confirm, setConfirm] = useState<Confirm>(null)
+  const [reason, setReason] = useState('')
 
-  if (isLoading) return <div className="h-96 animate-pulse rounded-2xl bg-slate-100 dark:bg-slate-800" />
-  if (isError || !data) return <CpitlEmpty message="Could not load this student's fee account." />
+  useEffect(() => {
+    setTab('installments')
+  }, [studentId])
+
+  // Bulk waive / restore on the Installments tab. Only installments without payments can
+  // be ticked (the server refuses the rest). Cleared when another student opens.
+  const ledgerDemands = useMemo(() => data?.demands || [], [data])
+  const getDemandId = useCallback((d: FeeDemand) => d._id, [])
+  const isUnpaid = useCallback((d: FeeDemand) => !(d.paid > 0), [])
+  const demandBulk = useRowSelection(ledgerDemands, getDemandId, {
+    resetKey: studentId,
+    isSelectable: isUnpaid,
+    rowLabel: (d) => `Select ${d.label}`,
+  })
+  const [bulkBusy, setBulkBusy] = useState<'' | 'waive' | 'restore'>('')
+  const [waiveConfirmOpen, setWaiveConfirmOpen] = useState(false)
+  const [bulkResult, setBulkResult] = useState<(BulkResult & { action: string; noun: string }) | null>(null)
+  const toWaive = demandBulk.selectedRows.filter((d) => d.status !== 'waived')
+  const toRestore = demandBulk.selectedRows.filter((d) => d.status === 'waived')
+  const waiveTotal = toWaive.reduce((sum, d) => sum + (d.balance || 0), 0)
+
+  const runBulkWaive = async (waive: boolean) => {
+    const rows = waive ? toWaive : toRestore
+    if (!rows.length) return
+    setBulkBusy(waive ? 'waive' : 'restore')
+    try {
+      const result = await cpitlBulkService.waiveDemands(
+        rows.map((d) => d._id),
+        waive
+      )
+      setWaiveConfirmOpen(false)
+      demandBulk.clear()
+      invalidate()
+      const noun = result.succeeded === 1 ? 'installment' : 'installments'
+      if (result.failed.length) setBulkResult({ ...result, action: waive ? 'Waive installments' : 'Restore installments', noun: 'installments' })
+      else toast.success(`${result.succeeded} ${noun} ${waive ? 'waived' : 'restored'}.`)
+    } catch (error) {
+      toast.error(await errorMessage(error))
+    } finally {
+      setBulkBusy('')
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <Card>
+        <div className="cb-table-state" role="status">
+          <span className="cb-spinner" aria-hidden="true" />
+          Loading fee account…
+        </div>
+      </Card>
+    )
+  }
+  if (isError || !data) {
+    return (
+      <Card>
+        <EmptyState icon={AlertTriangle} title="Could not load this student's fee account." body="Check your connection and try again." />
+      </Card>
+    )
+  }
 
   const { student, account, structure, demands, payments } = data
   const totals = account?.totals
   const overdue = demands.filter((d) => d.isOverdue && d.status !== 'waived').reduce((s, d) => s + d.balance, 0)
   const lateFeeDue = demands.reduce((s, d) => s + (d.lateFeeDue || 0), 0)
+  // "Due" means up to the end of this month; due dates are stored as UTC midnight.
+  const today = new Date()
+  const monthCutoff = Date.UTC(today.getFullYear(), today.getMonth() + 1, 1)
+  const monthEndLabel = new Date(today.getFullYear(), today.getMonth() + 1, 0).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+  const dueNow = demands
+    .filter((d) => d.status !== 'waived' && new Date(d.dueDate).getTime() < monthCutoff)
+    .reduce((s, d) => s + d.balance, 0)
+  const headName = (id?: string | null) => (id ? heads.find((h) => h._id === id)?.name || 'Fee head' : 'All fee heads')
+  const concessions = account?.concessions || []
+  const paidPct = totals?.demanded ? Math.round((totals.paid / totals.demanded) * 100) : 0
 
   const act = async (key: string, fn: () => Promise<unknown>) => {
     setBusy(key)
@@ -223,210 +339,470 @@ const StudentLedgerPanel: React.FC<{ studentId: string; showProfileLink?: boolea
     }
   }
 
-  const cancelReceipt = (payment: FeePayment) => {
-    const reason = window.prompt(`Cancel receipt ${payment.receiptNo}? Enter a reason:`)
-    if (!reason?.trim()) return
-    act(`cancel-${payment._id}`, () => cpitlService.cancelPayment(payment._id, reason))
+  const openConfirm = (next: Confirm) => {
+    setReason('')
+    setConfirm(next)
   }
 
+  const runConfirm = () => {
+    if (!confirm) return
+    const { payment } = confirm
+    if (confirm.kind === 'cancel') {
+      if (!reason.trim()) return
+      act(`cancel-${payment._id}`, () => cpitlService.cancelPayment(payment._id, reason.trim()))
+    } else {
+      act(`chq-${payment._id}`, () => cpitlService.updateChequeStatus(payment._id, 'bounced'))
+    }
+    setConfirm(null)
+  }
+
+  const accountStatus = !account ? (
+    <Badge tone="neutral">No fee plan</Badge>
+  ) : overdue > 0 ? (
+    <Badge tone="danger">Overdue</Badge>
+  ) : (totals?.balance || 0) > 0 ? (
+    <Badge tone="warning">Dues pending</Badge>
+  ) : (
+    <Badge tone="success">Paid up</Badge>
+  )
+
+  const demandColumns: DataTableColumn<FeeDemand>[] = [
+    {
+      key: 'label',
+      header: 'Installment',
+      mobile: 'title',
+      render: (d) => (
+        <div className="cc-cell">
+          <span className="cc-cell__primary">{d.label}</span>
+          <span className="cc-cell__secondary cc-clip" title={d.lines.map((l) => l.name).join(', ')}>
+            {d.lines.map((l) => `${l.name}${l.concession > 0 ? ` (−${inr(l.concession)})` : ''}`).join(', ')}
+          </span>
+        </div>
+      ),
+    },
+    {
+      key: 'dueDate',
+      header: 'Due date',
+      mobile: 'subtitle',
+      render: (d) => <span className={d.isOverdue && d.status !== 'waived' ? 'cc-cell__danger' : undefined}>{fmtDate(d.dueDate)}</span>,
+    },
+    { key: 'total', header: 'Amount', align: 'right', numeric: true, render: (d) => inr(d.total) },
+    {
+      key: 'paid',
+      header: 'Paid',
+      align: 'right',
+      numeric: true,
+      render: (d) => (d.paid > 0 ? <span className="cc-money cc-money--paid">{inr(d.paid)}</span> : '—'),
+    },
+    {
+      key: 'balance',
+      header: 'Balance',
+      align: 'right',
+      numeric: true,
+      render: (d) => (
+        <div className="cc-cell">
+          <span className="cc-money">{d.balance > 0 && d.status !== 'waived' ? inr(d.balance) : '—'}</span>
+          {d.lateFeeDue > 0 ? <span className="cc-cell__danger">+{inr(d.lateFeeDue)} late fee</span> : null}
+        </div>
+      ),
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      mobile: 'aside',
+      render: (d) => <CpitlBadge status={d.isOverdue && d.status !== 'waived' ? 'overdue' : d.status} />,
+    },
+    {
+      key: 'actions',
+      header: '',
+      headerLabel: 'Actions',
+      align: 'right',
+      interactive: true,
+      render: (d) =>
+        d.paid === 0 ? (
+          <div className="cc-actions">
+            <Button
+              size="sm"
+              variant="tertiary"
+              loading={busy === `waive-${d._id}`}
+              onClick={() => act(`waive-${d._id}`, () => cpitlService.waiveDemand(d._id, d.status !== 'waived'))}
+            >
+              {d.status === 'waived' ? 'Restore' : 'Waive'}
+            </Button>
+          </div>
+        ) : null,
+    },
+  ]
+
+  const paymentMenu = (p: FeePayment): MenuItem[] => {
+    const items: MenuItem[] = [{ label: 'Print receipt', icon: Printer, onSelect: () => act(`rcpt-${p._id}`, () => cpitlService.openReceipt(p)) }]
+    if (p.cheque?.status === 'pending' && p.status === 'valid') {
+      items.push({ label: 'Mark cheque cleared', icon: CheckCircle2, onSelect: () => act(`chq-${p._id}`, () => cpitlService.updateChequeStatus(p._id, 'cleared')) })
+      items.push({ label: 'Mark cheque bounced', icon: AlertTriangle, tone: 'danger', onSelect: () => openConfirm({ kind: 'bounce', payment: p }) })
+    }
+    if (p.status === 'valid') {
+      items.push({ divider: true })
+      items.push({ label: 'Cancel receipt', icon: Ban, tone: 'danger', disabled: busy === `cancel-${p._id}`, onSelect: () => openConfirm({ kind: 'cancel', payment: p }) })
+    }
+    return items
+  }
+
+  const paymentColumns: DataTableColumn<FeePayment>[] = [
+    {
+      key: 'receiptNo',
+      header: 'Receipt',
+      mobile: 'title',
+      render: (p) => (
+        <div className="cc-cell">
+          <span className="cc-cell__primary cc-code">{p.receiptNo}</span>
+          <span className="cc-cell__secondary">{p.collectedBy?.name ? `By ${p.collectedBy.name}` : fmtDate(p.date)}</span>
+        </div>
+      ),
+    },
+    { key: 'date', header: 'Date', mobile: 'subtitle', render: (p) => fmtDate(p.date) },
+    {
+      key: 'mode',
+      header: 'Mode',
+      render: (p) => (
+        <div className="cc-cell">
+          <span>{MODE_LABELS[p.mode]}</span>
+          {p.reference ? <span className="cc-cell__secondary">{p.reference}</span> : null}
+        </div>
+      ),
+    },
+    {
+      key: 'for',
+      header: 'For',
+      render: (p) => <span className="cc-clip">{[...new Set(p.allocations.map((a) => a.periodLabel))].join(', ') || '—'}</span>,
+    },
+    {
+      key: 'total',
+      header: 'Amount',
+      align: 'right',
+      numeric: true,
+      render: (p) => <span className={p.status === 'cancelled' ? 'cc-money cc-is-void' : 'cc-money'}>{inr(p.total, { decimals: true })}</span>,
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      mobile: 'aside',
+      render: (p) => (
+        <div className="cc-cell">
+          <div className="cc-status">
+            <CpitlBadge status={p.status} />
+            {p.cheque?.status ? <CpitlBadge status={p.cheque.status} label={`Cheque ${p.cheque.status}`} /> : null}
+          </div>
+          {p.status === 'cancelled' && p.cancellation?.reason ? (
+            <span className="cc-cell__secondary" title={p.cancellation.reason}>
+              {p.cancellation.reason}
+            </span>
+          ) : null}
+        </div>
+      ),
+    },
+    {
+      key: 'actions',
+      header: '',
+      headerLabel: 'Actions',
+      align: 'right',
+      interactive: true,
+      render: (p) => (
+        <div className="cc-actions">
+          <Menu items={paymentMenu(p)} label={`Actions for receipt ${p.receiptNo}`} />
+        </div>
+      ),
+    },
+  ]
+
+  const concessionColumns: DataTableColumn<ConcessionRule>[] = [
+    { key: 'name', header: 'Concession', mobile: 'title', render: (c) => <span className="cc-cell__primary">{c.name || 'Concession'}</span> },
+    { key: 'feeHead', header: 'Applies to', mobile: 'subtitle', render: (c) => headName(c.feeHead) },
+    {
+      key: 'value',
+      header: 'Value',
+      align: 'right',
+      numeric: true,
+      mobile: 'aside',
+      render: (c) => (c.type === 'percent' ? `${c.value}%` : `${inr(c.value)} per installment`),
+    },
+    { key: 'reason', header: 'Reason or approval', render: (c) => c.reason || '—' },
+  ]
+
   return (
-    <div className="space-y-5">
-      <CpitlCard>
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <div className="flex items-center gap-2">
-              <h3 className="text-lg font-semibold text-slate-900 dark:text-white">{student.name}</h3>
-              {showProfileLink ? (
-                <Link to={`/cpitl/students/${student._id}`} className="text-slate-400 hover:text-indigo-600" title="Open full ledger">
-                  <ExternalLink className="h-4 w-4" />
-                </Link>
-              ) : null}
+    <div className="cc-ledger">
+      <Card>
+        <div className="cc-hero">
+          <Avatar name={student.name} size="lg" square />
+          <div className="cc-hero__main">
+            <div className="cc-hero__name">
+              <h2>{student.name}</h2>
+              {accountStatus}
             </div>
-            <p className="text-sm text-slate-500">
-              Class {student.class}
-              {student.section ? `-${student.section}` : ''} · Roll {student.rollNumber} · {student.fatherName}
-              {student.guardianPhone ? ` · ${student.guardianPhone}` : ''}
+            <p className="cc-hero__facts">
+              <span>
+                Class{' '}
+                <strong>
+                  {student.class}
+                  {student.section ? `-${student.section}` : ''}
+                </strong>
+              </span>
+              <span>
+                Roll <strong className="is-num">{student.rollNumber || '—'}</strong>
+              </span>
+              {student.fatherName ? <span>{student.fatherName}</span> : null}
+              {student.guardianPhone ? <span className="is-num">{student.guardianPhone}</span> : null}
             </p>
-            <p className="mt-1 text-xs text-slate-500">
+            <p className="cc-hero__plan">
               {structure ? (
                 <>
-                  <Link to={`/cpitl/fee-structures/${structure._id}`} className="font-medium text-indigo-600 hover:underline">
+                  <Link to={`/cpitl/fee-structures/${structure._id}`} className="cb-link">
                     {structure.name}
                   </Link>{' '}
                   v{account?.structureVersion}
-                  {structure.isOutdated ? <span className="ml-1 text-amber-600">(structure updated to v{structure.version})</span> : null}
+                  {structure.isOutdated ? ` · structure updated to v${structure.version}` : ''}
                 </>
               ) : (
                 'No fee structure assigned'
               )}
-              {account?.concessions?.length ? ` · ${account.concessions.length} concession(s)` : ''}
+              {concessions.length ? ` · ${concessions.length} ${concessions.length === 1 ? 'concession' : 'concessions'}` : ''}
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <button type="button" className={btnSecondary} onClick={() => setSettingsOpen(true)}>
-              <BadgePercent className="h-4 w-4" /> Concessions & services
-            </button>
-            <button
-              type="button"
-              className={btnSecondary}
-              disabled={busy === 'slip' || !totals?.balance}
+          <div className="cc-hero__actions">
+            {showProfileLink ? (
+              <Link to={`/cpitl/students/${student._id}`} className="cb-btn cb-btn--tertiary cb-btn--md" title="Open full ledger">
+                <ExternalLink size={16} strokeWidth={1.75} aria-hidden="true" className="cb-icon" />
+                <span className="cb-btn__label">Full ledger</span>
+              </Link>
+            ) : null}
+            <Button icon={BadgePercent} onClick={() => setSettingsOpen(true)}>
+              Concessions
+            </Button>
+            <Button
+              icon={Printer}
+              loading={busy === 'slip'}
+              disabled={!totals?.balance}
               onClick={() => act('slip', () => cpitlService.openStudentSlip(student._id))}
             >
-              <Printer className="h-4 w-4" /> Fee slip
-            </button>
-            <button type="button" className={btnPrimary} disabled={!totals?.balance} onClick={() => setCollectOpen(true)}>
-              <IndianRupee className="h-4 w-4" /> Collect
-            </button>
+              Fee slip
+            </Button>
+            <Button variant="primary" icon={IndianRupee} disabled={!totals?.balance} onClick={() => setCollectOpen(true)}>
+              Collect fee
+            </Button>
           </div>
         </div>
+      </Card>
 
-        {totals ? (
-          <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {[
-              { label: 'Session fee', value: totals.demanded, hint: totals.concession > 0 ? `after ${inr(totals.concession)} concession` : undefined },
-              { label: 'Paid', value: totals.paid, tone: 'text-emerald-600 dark:text-emerald-400' },
-              { label: 'Balance', value: totals.balance },
-              { label: 'Overdue', value: overdue, tone: overdue > 0 ? 'text-rose-600 dark:text-rose-400' : '', hint: lateFeeDue > 0 ? `+ ${inr(lateFeeDue)} late fee` : undefined },
-            ].map((s) => (
-              <div key={s.label} className="rounded-xl bg-slate-50 px-4 py-3 dark:bg-slate-900/40">
-                <p className="text-xs text-slate-500">{s.label}</p>
-                <p className={`text-lg font-semibold tabular-nums text-slate-900 dark:text-white ${s.tone || ''}`}>{inr(s.value)}</p>
-                {s.hint ? <p className="text-[11px] text-slate-400">{s.hint}</p> : null}
-              </div>
-            ))}
+      {totals ? (
+        <section className="cb-stats cc-stats" aria-label="Fee totals">
+          <StatCard
+            label="Expected"
+            value={inr(totals.demanded)}
+            hint={totals.concession > 0 ? `After ${inr(totals.concession)} concession` : 'Session fee'}
+          />
+          <StatCard
+            label="Paid"
+            value={inr(totals.paid)}
+            hint={`${paidPct}% of session fee`}
+            progress={paidPct}
+            progressTone={paidPct >= 85 ? 'success' : paidPct >= 50 ? 'warning' : 'danger'}
+          />
+          <StatCard
+            label={`Due by ${monthEndLabel}`}
+            value={inr(dueNow)}
+            hint={
+              totals.balance - dueNow > 0
+                ? `${inr(totals.balance - dueNow)} more later in the session`
+                : totals.balance > 0
+                  ? 'Nothing else this session'
+                  : 'Nothing pending'
+            }
+          />
+          <StatCard
+            label="Overdue"
+            value={inr(overdue)}
+            hint={lateFeeDue > 0 ? `+ ${inr(lateFeeDue)} late fee` : overdue > 0 ? 'Past due date' : 'Nothing overdue'}
+          />
+        </section>
+      ) : null}
+
+      <Tabs
+        label="Ledger sections"
+        value={tab}
+        onChange={setTab}
+        items={[
+          { id: 'installments', label: 'Installments', count: demands.length },
+          { id: 'payments', label: 'Payments', count: payments.length },
+          { id: 'concessions', label: 'Concessions', count: concessions.length },
+        ]}
+      />
+
+      {tab === 'installments' ? (
+        <Card flush className="cc-card">
+          {demandBulk.count > 0 ? (
+            <div className="cc-bulk cc-bulk--ledger">
+              <BulkBar count={demandBulk.count} noun="installment" onClear={demandBulk.clear} busy={Boolean(bulkBusy)}>
+                {toWaive.length > 0 ? (
+                  <Button size="sm" variant="danger" disabled={Boolean(bulkBusy)} onClick={() => setWaiveConfirmOpen(true)}>
+                    Waive {toWaive.length}
+                  </Button>
+                ) : null}
+                {toRestore.length > 0 ? (
+                  <Button size="sm" loading={bulkBusy === 'restore'} disabled={Boolean(bulkBusy)} onClick={() => runBulkWaive(false)}>
+                    Restore {toRestore.length}
+                  </Button>
+                ) : null}
+              </BulkBar>
+            </div>
+          ) : null}
+          <DataTable
+            caption="Installments"
+            columns={demandColumns}
+            rows={demands}
+            selection={demandBulk.selection}
+            getRowKey={(d) => d._id}
+            empty={
+              <EmptyState
+                icon={Wallet}
+                title={account ? 'No installments yet.' : 'This student has no fee account.'}
+                body={account ? 'Installments appear once a fee structure is applied.' : 'Assign a fee structure from Fee structures, or pick one under Concessions.'}
+                action={
+                  account ? undefined : (
+                    <Button icon={BadgePercent} onClick={() => setSettingsOpen(true)}>
+                      Set fee plan
+                    </Button>
+                  )
+                }
+              />
+            }
+          />
+        </Card>
+      ) : null}
+
+      {tab === 'payments' ? (
+        <Card flush className="cc-card">
+          <DataTable
+            caption="Payments"
+            columns={paymentColumns}
+            rows={payments}
+            getRowKey={(p) => p._id}
+            onRowClick={(p) => act(`rcpt-${p._id}`, () => cpitlService.openReceipt(p))}
+            empty={
+              <EmptyState
+                icon={Receipt}
+                title="No payments yet."
+                body={totals?.balance ? 'Collect a fee to create the first receipt.' : undefined}
+                action={
+                  totals?.balance ? (
+                    <Button variant="primary" icon={IndianRupee} onClick={() => setCollectOpen(true)}>
+                      Collect fee
+                    </Button>
+                  ) : undefined
+                }
+              />
+            }
+          />
+        </Card>
+      ) : null}
+
+      {tab === 'concessions' ? (
+        <Card
+          flush
+          className="cc-card"
+          title="Concessions and services"
+          action={
+            <Button size="sm" icon={BadgePercent} onClick={() => setSettingsOpen(true)}>
+              Edit
+            </Button>
+          }
+        >
+          <div className="cc-card__intro">
+            <DetailList
+              columns={3}
+              items={[
+                { label: 'Fee structure', value: structure ? `${structure.name} (v${account?.structureVersion})` : 'None' },
+                { label: 'Previous session arrears', value: inr(account?.openingBalance || 0) },
+                { label: 'Optional services', value: account?.optedOptionalHeads?.length ? `${account.optedOptionalHeads.length} opted` : 'None' },
+              ]}
+            />
           </div>
-        ) : null}
-      </CpitlCard>
-
-      <CpitlCard title="Installments">
-        {demands.length ? (
-          <div className="-mx-5 overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead className={tableHead}>
-                <tr>
-                  <th className="px-5 py-2.5">Installment</th>
-                  <th className="px-3 py-2.5">Due date</th>
-                  <th className="px-3 py-2.5">Heads</th>
-                  <th className="px-3 py-2.5 text-right">Amount</th>
-                  <th className="px-3 py-2.5 text-right">Paid</th>
-                  <th className="px-3 py-2.5 text-right">Balance</th>
-                  <th className="px-3 py-2.5">Status</th>
-                  <th className="px-5 py-2.5" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-                {demands.map((d) => (
-                  <tr key={d._id} className={d.status === 'waived' ? 'opacity-50' : ''}>
-                    <td className="px-5 py-2.5 font-medium text-slate-900 dark:text-white">{d.label}</td>
-                    <td className={`px-3 py-2.5 ${d.isOverdue ? 'text-rose-600' : ''}`}>{fmtDate(d.dueDate)}</td>
-                    <td className="max-w-xs px-3 py-2.5 text-xs text-slate-500">
-                      {d.lines.map((l) => `${l.name}${l.concession > 0 ? ` (−${inr(l.concession)})` : ''}`).join(', ')}
-                    </td>
-                    <td className="px-3 py-2.5 text-right tabular-nums">{inr(d.total)}</td>
-                    <td className="px-3 py-2.5 text-right tabular-nums text-emerald-700 dark:text-emerald-400">{d.paid > 0 ? inr(d.paid) : '—'}</td>
-                    <td className="px-3 py-2.5 text-right tabular-nums">
-                      {d.balance > 0 && d.status !== 'waived' ? inr(d.balance) : '—'}
-                      {d.lateFeeDue > 0 ? <div className="text-[11px] text-rose-500">+{inr(d.lateFeeDue)} late</div> : null}
-                    </td>
-                    <td className="px-3 py-2.5">
-                      <CpitlBadge status={d.isOverdue && d.status !== 'waived' ? 'overdue' : d.status} />
-                    </td>
-                    <td className="px-5 py-2.5 text-right">
-                      {d.paid === 0 ? (
-                        <button
-                          type="button"
-                          className={btnGhost}
-                          disabled={busy === `waive-${d._id}`}
-                          onClick={() => act(`waive-${d._id}`, () => cpitlService.waiveDemand(d._id, d.status !== 'waived'))}
-                        >
-                          {d.status === 'waived' ? 'Restore' : 'Waive'}
-                        </button>
-                      ) : null}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <CpitlEmpty message={account ? 'No installments yet.' : 'This student has no fee account. Assign a fee structure from Fee Structures, or set one via “Concessions & services”.'} />
-        )}
-      </CpitlCard>
-
-      <CpitlCard title="Payments">
-        {payments.length ? (
-          <ul className="divide-y divide-slate-100 dark:divide-slate-700">
-            {payments.map((p) => (
-              <li key={p._id} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-start gap-3">
-                  <span
-                    className={`mt-0.5 flex h-9 w-9 items-center justify-center rounded-xl ${
-                      p.status === 'cancelled' ? 'bg-rose-50 text-rose-500 dark:bg-rose-900/30' : 'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30'
-                    }`}
-                  >
-                    {p.status === 'cancelled' ? <XCircle className="h-4 w-4" /> : <Receipt className="h-4 w-4" />}
-                  </span>
-                  <div>
-                    <div className={`font-semibold tabular-nums ${p.status === 'cancelled' ? 'text-slate-400 line-through' : 'text-slate-900 dark:text-white'}`}>
-                      {inr(p.total, { decimals: true })}
-                      <span className="ml-2 font-mono text-xs font-normal text-slate-500 no-underline">{p.receiptNo}</span>
-                    </div>
-                    <div className="text-xs text-slate-500">
-                      {fmtDate(p.date)} · {MODE_LABELS[p.mode]}
-                      {p.reference ? ` · ${p.reference}` : ''}
-                      {p.collectedBy?.name ? ` · by ${p.collectedBy.name}` : ''}
-                    </div>
-                    <div className="text-xs text-slate-400">{[...new Set(p.allocations.map((a) => a.periodLabel))].join(', ')}</div>
-                    {p.status === 'cancelled' ? (
-                      <div className="mt-0.5 flex items-center gap-1 text-xs text-rose-600">
-                        <AlertTriangle className="h-3 w-3" /> Cancelled: {p.cancellation?.reason}
-                      </div>
-                    ) : null}
-                    {p.cheque?.status ? (
-                      <div className="mt-1 flex items-center gap-1.5 text-xs">
-                        <CpitlBadge status={p.cheque.status} label={`Cheque ${p.cheque.status}`} />
-                        {p.cheque.status === 'pending' && p.status === 'valid' ? (
-                          <>
-                            <button type="button" className={btnGhost} onClick={() => act(`chq-${p._id}`, () => cpitlService.updateChequeStatus(p._id, 'cleared'))}>
-                              Mark cleared
-                            </button>
-                            <button
-                              type="button"
-                              className={btnGhost}
-                              onClick={() => {
-                                if (window.confirm('Mark as bounced? The receipt will be cancelled and dues restored.')) {
-                                  act(`chq-${p._id}`, () => cpitlService.updateChequeStatus(p._id, 'bounced'))
-                                }
-                              }}
-                            >
-                              Bounced
-                            </button>
-                          </>
-                        ) : null}
-                      </div>
-                    ) : null}
-                  </div>
-                </div>
-                <div className="flex gap-1">
-                  <button type="button" className={btnGhost} onClick={() => act(`rcpt-${p._id}`, () => cpitlService.openReceipt(p))}>
-                    <Printer className="h-3.5 w-3.5" /> Receipt
-                  </button>
-                  {p.status === 'valid' ? (
-                    <button type="button" className={`${btnGhost} text-rose-600`} disabled={busy === `cancel-${p._id}`} onClick={() => cancelReceipt(p)}>
-                      Cancel
-                    </button>
-                  ) : null}
-                </div>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <CpitlEmpty message="No payments yet." />
-        )}
-      </CpitlCard>
+          <DataTable
+            caption="Concessions"
+            columns={concessionColumns}
+            rows={concessions}
+            getRowKey={(c) => c._id || `${c.name}-${c.feeHead}-${c.value}`}
+            empty={
+              <EmptyState
+                icon={BadgePercent}
+                title="No concessions on this account."
+                body="Add a scholarship, sibling or staff concession to reduce future installments."
+                action={
+                  <Button icon={Plus} onClick={() => setSettingsOpen(true)}>
+                    Add concession
+                  </Button>
+                }
+              />
+            }
+          />
+        </Card>
+      ) : null}
 
       <CollectPaymentModal isOpen={collectOpen} onClose={() => setCollectOpen(false)} data={data} onCollected={invalidate} />
-      <AccountSettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} data={data} onSaved={invalidate} />
+      <AccountSettingsSheet isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} data={data} onSaved={invalidate} />
+
+      <Dialog
+        open={confirm !== null}
+        onClose={() => setConfirm(null)}
+        tone="danger"
+        size="sm"
+        title={confirm?.kind === 'bounce' ? 'Mark cheque as bounced?' : `Cancel receipt ${confirm?.payment.receiptNo || ''}?`}
+        description={
+          confirm?.kind === 'bounce'
+            ? 'The receipt will be cancelled and the dues restored on this ledger.'
+            : 'The amount goes back to the student’s dues. The receipt stays on record as cancelled.'
+        }
+        footer={
+          <>
+            <Button onClick={() => setConfirm(null)}>Keep receipt</Button>
+            <Button variant="danger" disabled={confirm?.kind === 'cancel' && !reason.trim()} onClick={runConfirm}>
+              {confirm?.kind === 'bounce' ? 'Mark bounced' : 'Cancel receipt'}
+            </Button>
+          </>
+        }
+      >
+        {confirm?.kind === 'cancel' ? (
+          <TextArea label="Reason" required rows={3} value={reason} autoFocus onChange={(e) => setReason(e.target.value)} />
+        ) : null}
+      </Dialog>
+
+      <Dialog
+        open={waiveConfirmOpen}
+        onClose={() => (bulkBusy === 'waive' ? undefined : setWaiveConfirmOpen(false))}
+        tone="danger"
+        size="sm"
+        title={`Waive ${toWaive.length} ${toWaive.length === 1 ? 'installment' : 'installments'}?`}
+        description={`${inr(waiveTotal)} will no longer be due from ${student.name}. You can restore waived installments later.`}
+        footer={
+          <>
+            <Button onClick={() => setWaiveConfirmOpen(false)} disabled={bulkBusy === 'waive'}>
+              Keep dues
+            </Button>
+            <Button variant="danger" loading={bulkBusy === 'waive'} onClick={() => runBulkWaive(true)}>
+              Waive {inr(waiveTotal)}
+            </Button>
+          </>
+        }
+      >
+        <ul className="cc-bulk-list">
+          {toWaive.map((d) => (
+            <li key={d._id}>
+              <span>{d.label}</span>
+              <span className="cc-money">{inr(d.balance)}</span>
+            </li>
+          ))}
+        </ul>
+      </Dialog>
+
+      <BulkResultDialog result={bulkResult} onClose={() => setBulkResult(null)} />
     </div>
   )
 }

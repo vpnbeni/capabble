@@ -1,0 +1,32 @@
+/* Form 66 records (pages/Form66.tsx). Tokens only; scoped inside .cb-app. */
+
+/* One row per exam date; opening it shows that date's papers in a DataTable. */
+.cb-app .cx-f66-dates { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--border); }
+.cb-app .cx-f66-date + .cx-f66-date { border-top: 1px solid var(--border); }
+.cb-app .cx-f66-date__head {
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: var(--space-2) var(--space-5) var(--space-2) var(--space-3);
+  min-height: var(--row-comfortable); cursor: pointer;
+}
+.cb-app .cx-f66-date__head:hover { background: var(--surface-hover); }
+.cb-app .cx-f66-date__title { flex: 1; min-width: 0; }
+.cb-app .cx-f66-date__count { font-size: 13px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cb-app .cx-f66-date__body { background: var(--surface-sunken); border-top: 1px solid var(--border); padding: var(--space-3) var(--space-5) var(--space-4) var(--space-12); }
+.cb-app .cx-f66-date__body .cb-table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); overflow: hidden; }
+@media (max-width: 640px) {
+  .cb-app .cx-f66-date__head { flex-wrap: wrap; padding: var(--space-2) var(--space-4) var(--space-2) var(--space-2); }
+  .cb-app .cx-f66-date__count { order: 3; padding-left: calc(var(--control-sm) + var(--space-3)); flex: 1; }
+  /* Date and weekday get the first line; the count and Preview button share the second. */
+  .cb-app .cx-f66-date__title { flex-basis: calc(100% - var(--control-sm) - var(--space-3)); }
+  .cb-app .cx-f66-date__head > .cb-btn:last-child { order: 4; margin-left: calc(var(--control-sm) + var(--space-3)); }
+  .cb-app .cx-f66-date__body { padding: var(--space-3) var(--space-4); }
+}
+
+/* Previews fill the sheet body. */
+.cb-app .cx-f66-preview { display: flex; flex-direction: column; gap: var(--space-3); flex: 1; min-height: 0; }
+.cb-app .cx-f66-txt {
+  margin: 0; flex: 1; min-height: 60vh; overflow: auto; padding: var(--space-5);
+  border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface);
+  color: var(--ink); font: 13px/20px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  white-space: pre-wrap; overflow-wrap: anywhere;
+}
