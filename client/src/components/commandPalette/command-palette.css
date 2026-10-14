@@ -33,6 +33,8 @@
 @keyframes cb-cmdk-spin { to { transform: rotate(360deg); } }
 .cb-app .cb-cmdk__input { flex: 1; min-width: 0; height: 100%; border: 0; outline: 0; background: transparent; color: var(--ink); font: 400 15px/22px var(--font-sans); padding: 0; }
 .cb-app .cb-cmdk__input::placeholder { color: var(--ink-subtle); }
+/* @tailwindcss/forms paints a blue focus ring on text inputs; the palette's input row is the focus affordance. */
+.cb-app .cb-cmdk__input:focus, .cb-app .cb-cmdk__input:focus-visible { outline: 0; border: 0; box-shadow: none; }
 .cb-app .cb-cmdk__clear { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--ink-subtle); cursor: pointer; }
 .cb-app .cb-cmdk__clear:hover { background: var(--surface-hover); color: var(--ink); }
 
@@ -50,6 +52,8 @@
 .cb-app .cb-cmdk__list { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: var(--space-2); }
 .cb-app .cb-cmdk__section + .cb-cmdk__section { margin-top: var(--space-2); }
 .cb-app .cb-cmdk__sectionhead { display: flex; align-items: center; justify-content: space-between; padding: 6px var(--space-2) 4px; font: 600 12px/16px var(--font-sans); color: var(--ink-subtle); }
+.cb-app .cb-cmdk__sectionlabel { display: inline-flex; align-items: center; gap: 6px; }
+.cb-app .cb-cmdk__sectiontag { padding: 1px 6px; border-radius: var(--radius-full); background: var(--warning-soft); color: var(--warning-ink); font: 500 11px/16px var(--font-sans); }
 .cb-app .cb-cmdk__sectionaction { border: 0; background: transparent; color: var(--accent-strong); font: 500 12px/16px var(--font-sans); cursor: pointer; padding: 0; }
 .cb-app .cb-cmdk__sectionaction:hover { text-decoration: underline; }
 

@@ -1661,6 +1661,19 @@ const Sidebar: React.FC<SidebarProps> = ({
       style={{ width: currentSidebarWidth }}
     >
       <nav className={`cb-sidenav${isCollapsed ? ' is-collapsed' : ''}`} aria-label="Main">
+        {/* School OS: the main Home dashboard, above every module */}
+        <div className="cb-shellnav__homewrap">
+          <NavLink
+            to="/home"
+            className={navItemClass(location.pathname === '/home', 'cb-shellnav__home')}
+            aria-current={location.pathname === '/home' ? 'page' : undefined}
+            title={isCollapsed ? 'School OS' : undefined}
+          >
+            {renderIcon('School OS', '/home', null)}
+            {!isCollapsed ? <span className="cb-navitem__label truncate">School OS</span> : null}
+          </NavLink>
+        </div>
+
         {/* Module switcher */}
         <div className="cb-shellnav__modulewrap" data-sidebar-fit ref={moduleMenuRef}>
           <button

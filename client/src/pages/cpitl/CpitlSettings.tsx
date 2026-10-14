@@ -1,31 +1,38 @@
 import React, { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
-import { Pencil, Plus, Save, Trash2 } from 'lucide-react'
-import Modal from '@/components/common/Modal'
+import { Layers, Pencil, Plus, Save, Tag, Trash2 } from 'lucide-react'
 import { useCapitalSettings, useFeeHeads, useInvalidateCpitl, useSaveFeeHead } from '@/hooks/useCpitl'
 import cpitlService, { CapitalSettings, FeeFrequency, FeeHead } from '@/services/cpitlService'
 import {
-  CpitlCard,
-  CpitlPageShell,
-  FREQUENCY_LABELS,
-  Field,
-  btnGhost,
-  btnPrimary,
-  btnSecondary,
-  errorMessage,
-  inputClass,
-  tableHead,
-} from '@/components/cpitl/CpitlUi'
+  Badge,
+  Button,
+  Card,
+  Checkbox,
+  DataTable,
+  Dialog,
+  EmptyState,
+  Page,
+  Select,
+  Sheet,
+  TextArea,
+  TextField,
+  type DataTableColumn,
+} from '@/components/ui'
+import { FREQUENCY_LABELS, errorMessage } from '@/components/cpitl/CpitlUi'
+import '@/components/cpitl/overview.css'
 
 const CATEGORIES = ['academic', 'admission', 'transport', 'activity', 'examination', 'facility', 'misc']
+const CATEGORY_OPTIONS = CATEGORIES.map((c) => ({ value: c, label: c.charAt(0).toUpperCase() + c.slice(1) }))
+const FREQUENCY_OPTIONS = Object.entries(FREQUENCY_LABELS).map(([value, label]) => ({ value, label }))
 const EMPTY_HEAD: Partial<FeeHead> = { name: '', code: '', category: 'academic', frequency: 'monthly', isOptional: false, isRefundable: false }
 
-const FeeHeadModal: React.FC<{ head: Partial<FeeHead> | null; onClose: () => void }> = ({ head, onClose }) => {
+const FeeHeadSheet: React.FC<{ head: Partial<FeeHead> | null; onClose: () => void }> = ({ head, onClose }) => {
   const [form, setForm] = useState<Partial<FeeHead>>(EMPTY_HEAD)
   const save = useSaveFeeHead()
   useEffect(() => setForm(head || EMPTY_HEAD), [head])
 
-  const submit = async () => {
+  const submit = async (event?: React.FormEvent) => {
+    event?.preventDefault()
     if (!form.name?.trim() || !form.code?.trim()) {
       toast.error('Name and code are required.')
       return
@@ -40,64 +47,83 @@ const FeeHeadModal: React.FC<{ head: Partial<FeeHead> | null; onClose: () => voi
   }
 
   return (
-    <Modal isOpen={Boolean(head)} onClose={onClose} title={form._id ? 'Edit fee head' : 'New fee head'}>
-      <div className="grid grid-cols-2 gap-4">
-        <Field label="Name" className="col-span-2">
-          <input className={inputClass} value={form.name || ''} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-        </Field>
-        <Field label="Code" hint="Short unique code, e.g. TUITION">
-          <input
-            className={`${inputClass} uppercase`}
+    <Sheet
+      open={Boolean(head)}
+      onClose={onClose}
+      icon={Tag}
+      title={form._id ? 'Edit fee head' : 'New fee head'}
+      description="Fee heads are the line items used in fee structures and receipts."
+      onSubmit={submit}
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button variant="primary" type="submit" loading={save.isPending}>
+            Save fee head
+          </Button>
+        </>
+      }
+    >
+      <div className="cb-form-section">
+        <div className="cb-form-grid">
+          <TextField
+            className="is-wide"
+            label="Name"
+            required
+            value={form.name || ''}
+            onChange={(e) => setForm({ ...form, name: e.target.value })}
+          />
+          <TextField
+            label="Code"
+            required
+            hint="Short unique code, e.g. TUITION"
             value={form.code || ''}
             onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase().replace(/\s+/g, '_') })}
           />
-        </Field>
-        <Field label="Category">
-          <select className={`${inputClass} capitalize`} value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
-            {CATEGORIES.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label="Default frequency">
-          <select className={inputClass} value={form.frequency} onChange={(e) => setForm({ ...form, frequency: e.target.value as FeeFrequency })}>
-            {Object.entries(FREQUENCY_LABELS).map(([k, v]) => (
-              <option key={k} value={k}>
-                {v}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <div className="flex flex-col justify-end gap-2 pb-1 text-sm text-slate-700 dark:text-slate-200">
-          <label className="flex items-center gap-2">
-            <input type="checkbox" className="h-4 w-4 rounded" checked={Boolean(form.isOptional)} onChange={(e) => setForm({ ...form, isOptional: e.target.checked })} />
-            Optional (opt-in per student)
-          </label>
-          <label className="flex items-center gap-2">
-            <input type="checkbox" className="h-4 w-4 rounded" checked={Boolean(form.isRefundable)} onChange={(e) => setForm({ ...form, isRefundable: e.target.checked })} />
-            Refundable
-          </label>
+          <Select
+            label="Category"
+            options={CATEGORY_OPTIONS}
+            value={form.category}
+            onChange={(e) => setForm({ ...form, category: e.target.value })}
+          />
+          <Select
+            className="is-wide"
+            label="Default frequency"
+            options={FREQUENCY_OPTIONS}
+            value={form.frequency}
+            onChange={(e) => setForm({ ...form, frequency: e.target.value as FeeFrequency })}
+          />
         </div>
       </div>
-      <div className="mt-6 flex justify-end gap-2">
-        <button type="button" className={btnSecondary} onClick={onClose}>
-          Cancel
-        </button>
-        <button type="button" className={btnPrimary} disabled={save.isPending} onClick={submit}>
-          Save
-        </button>
+      <div className="cb-form-section">
+        <h3 className="cb-form-section__title">Options</h3>
+        <div className="co-checks">
+          <Checkbox
+            label="Optional"
+            description="Students opt in to this fee individually."
+            checked={Boolean(form.isOptional)}
+            onChange={(checked) => setForm({ ...form, isOptional: checked })}
+          />
+          <Checkbox
+            label="Refundable"
+            description="The amount can be returned, like a caution deposit."
+            checked={Boolean(form.isRefundable)}
+            onChange={(checked) => setForm({ ...form, isRefundable: checked })}
+          />
+        </div>
       </div>
-    </Modal>
+    </Sheet>
   )
 }
 
 const CpitlSettings: React.FC = () => {
-  const { data: heads = [] } = useFeeHeads()
-  const { data: settings } = useCapitalSettings()
+  const { data: heads = [], isLoading: headsLoading } = useFeeHeads()
+  const { data: settings, isLoading: settingsLoading } = useCapitalSettings()
   const invalidate = useInvalidateCpitl()
   const [editing, setEditing] = useState<Partial<FeeHead> | null>(null)
+  const [removing, setRemoving] = useState<FeeHead | null>(null)
+  const [removeBusy, setRemoveBusy] = useState(false)
   const [form, setForm] = useState<CapitalSettings | null>(null)
   const [saving, setSaving] = useState(false)
 
@@ -105,14 +131,18 @@ const CpitlSettings: React.FC = () => {
     if (settings) setForm(settings)
   }, [settings])
 
-  const removeHead = async (head: FeeHead) => {
-    if (!window.confirm(`Remove fee head "${head.name}"?`)) return
+  const removeHead = async () => {
+    if (!removing) return
+    setRemoveBusy(true)
     try {
-      await cpitlService.deleteFeeHead(head._id)
+      await cpitlService.deleteFeeHead(removing._id)
       toast.success('Fee head removed.')
       invalidate()
+      setRemoving(null)
     } catch (error) {
       toast.error(await errorMessage(error))
+    } finally {
+      setRemoveBusy(false)
     }
   }
 
@@ -133,146 +163,223 @@ const CpitlSettings: React.FC = () => {
   const updatePreset = (i: number, patch: Partial<CapitalSettings['concessionPresets'][number]>) =>
     form && setForm({ ...form, concessionPresets: form.concessionPresets.map((p, idx) => (idx === i ? { ...p, ...patch } : p)) })
 
+  const headColumns: DataTableColumn<FeeHead>[] = [
+    { key: 'name', header: 'Name', mobile: 'title', render: (h) => <span className="cb-strong">{h.name}</span> },
+    { key: 'code', header: 'Code', mobile: 'subtitle', render: (h) => <span className="co-code">{h.code}</span> },
+    { key: 'category', header: 'Category', render: (h) => <span style={{ textTransform: 'capitalize' }}>{h.category}</span> },
+    { key: 'frequency', header: 'Default frequency', render: (h) => FREQUENCY_LABELS[h.frequency] || h.frequency },
+    {
+      key: 'flags',
+      header: 'Options',
+      render: (h) =>
+        h.isOptional || h.isRefundable ? (
+          <span className="co-flags">
+            {h.isOptional ? <Badge tone="info">Optional</Badge> : null}
+            {h.isRefundable ? <Badge tone="neutral">Refundable</Badge> : null}
+          </span>
+        ) : (
+          '—'
+        ),
+    },
+    {
+      key: 'actions',
+      header: <span className="cb-visually-hidden">Actions</span>,
+      headerLabel: 'Actions',
+      align: 'right',
+      interactive: true,
+      mobile: 'aside',
+      render: (h) => (
+        <span className="co-rowactions">
+          <Button variant="tertiary" size="sm" icon={Pencil} aria-label={`Edit ${h.name}`} onClick={() => setEditing(h)} />
+          <Button variant="tertiary" size="sm" icon={Trash2} aria-label={`Remove ${h.name}`} onClick={() => setRemoving(h)} />
+        </span>
+      ),
+    },
+  ]
+
+  const headOptions = [{ value: '', label: 'All fee heads' }, ...heads.map((h) => ({ value: h.code, label: h.name }))]
+  const prefix = form?.receiptPrefix || 'RCPT'
+
   return (
-    <CpitlPageShell title="Fee Settings" subtitle="Fee heads, receipt numbering and concession presets">
-      <CpitlCard
+    <Page>
+      <Card
         title="Fee heads"
-        actions={
-          <button type="button" className={btnSecondary} onClick={() => setEditing({ ...EMPTY_HEAD })}>
-            <Plus className="h-4 w-4" /> Add fee head
-          </button>
+        subtitle="Line items such as tuition or transport, used in fee structures and receipts."
+        flush
+        action={
+          <Button variant="secondary" size="sm" icon={Plus} onClick={() => setEditing({ ...EMPTY_HEAD })}>
+            Add fee head
+          </Button>
         }
       >
-        <div className="-mx-5 overflow-x-auto">
-          <table className="min-w-full text-sm">
-            <thead className={tableHead}>
-              <tr>
-                <th className="px-5 py-2.5">Name</th>
-                <th className="px-3 py-2.5">Code</th>
-                <th className="px-3 py-2.5">Category</th>
-                <th className="px-3 py-2.5">Default frequency</th>
-                <th className="px-3 py-2.5">Flags</th>
-                <th className="px-5 py-2.5" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-              {heads.map((h) => (
-                <tr key={h._id}>
-                  <td className="px-5 py-2.5 font-medium text-slate-900 dark:text-white">{h.name}</td>
-                  <td className="px-3 py-2.5 font-mono text-xs">{h.code}</td>
-                  <td className="px-3 py-2.5 capitalize">{h.category}</td>
-                  <td className="px-3 py-2.5">{FREQUENCY_LABELS[h.frequency]}</td>
-                  <td className="px-3 py-2.5 text-xs text-slate-500">{[h.isOptional && 'Optional', h.isRefundable && 'Refundable'].filter(Boolean).join(', ') || '—'}</td>
-                  <td className="px-5 py-2.5 text-right">
-                    <button type="button" className={btnGhost} onClick={() => setEditing(h)}>
-                      <Pencil className="h-3.5 w-3.5" />
-                    </button>
-                    <button type="button" className={`${btnGhost} text-rose-600`} onClick={() => removeHead(h)}>
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </CpitlCard>
+        <DataTable
+          columns={headColumns}
+          rows={heads}
+          getRowKey={(h) => h._id}
+          onRowClick={(h) => setEditing(h)}
+          loading={headsLoading}
+          loadingLabel="Loading fee heads"
+          caption="Fee heads"
+          empty={
+            <EmptyState
+              compact
+              icon={Layers}
+              title="No fee heads yet"
+              body="Add a fee head such as Tuition before building fee structures."
+            />
+          }
+        />
+      </Card>
 
       {form ? (
         <>
-          <CpitlCard title="Receipts & fee slips">
-            <div className="grid gap-4 md:grid-cols-3">
-              <Field label="Receipt prefix" hint={`Receipts look like ${form.receiptPrefix || 'RCPT'}/25-26/00001`}>
-                <input className={inputClass} value={form.receiptPrefix} onChange={(e) => setForm({ ...form, receiptPrefix: e.target.value.toUpperCase() })} />
-              </Field>
-              <Field label="GSTIN (optional)">
-                <input className={inputClass} value={form.gstin} onChange={(e) => setForm({ ...form, gstin: e.target.value.toUpperCase() })} />
-              </Field>
-              <Field label="Default due day for new structures">
-                <input
+          <Card title="Receipts and fee slips" subtitle="How receipts are numbered and what prints on fee slips.">
+            <div className="cb-form-section">
+              <h3 className="cb-form-section__title">Receipt numbering</h3>
+              <div className="cb-form-grid cb-form-grid--3">
+                <TextField
+                  label="Receipt prefix"
+                  hint={`Receipts look like ${prefix}/25-26/00001`}
+                  value={form.receiptPrefix}
+                  onChange={(e) => setForm({ ...form, receiptPrefix: e.target.value.toUpperCase() })}
+                />
+                <TextField
+                  label="GSTIN"
+                  hint="Optional. Printed on receipts."
+                  value={form.gstin}
+                  onChange={(e) => setForm({ ...form, gstin: e.target.value.toUpperCase() })}
+                />
+                <TextField
+                  label="Default due day"
+                  hint="Day of the month (1–28) for new fee structures."
                   type="number"
                   min={1}
                   max={28}
-                  className={inputClass}
                   value={form.defaultDueDay}
                   onChange={(e) => setForm({ ...form, defaultDueDay: Number(e.target.value) })}
                 />
-              </Field>
-              <Field label="Bank details printed on fee slip" className="md:col-span-3">
-                <input
-                  className={inputClass}
-                  value={form.bankDetails}
+              </div>
+            </div>
+            <div className="cb-form-section">
+              <h3 className="cb-form-section__title">Fee slip</h3>
+              <div className="cb-form-grid">
+                <TextField
+                  className="is-wide"
+                  label="Bank details"
+                  hint="Printed on every fee slip."
                   placeholder="e.g. SBI A/C 1234567890, IFSC SBIN0001234"
+                  value={form.bankDetails}
                   onChange={(e) => setForm({ ...form, bankDetails: e.target.value })}
                 />
-              </Field>
-              <Field label="Footer note" className="md:col-span-3">
-                <textarea className={inputClass} rows={2} value={form.slipFooterNote} onChange={(e) => setForm({ ...form, slipFooterNote: e.target.value })} />
-              </Field>
+                <TextArea
+                  className="is-wide"
+                  label="Footer note"
+                  rows={2}
+                  value={form.slipFooterNote}
+                  onChange={(e) => setForm({ ...form, slipFooterNote: e.target.value })}
+                />
+              </div>
             </div>
-          </CpitlCard>
+          </Card>
 
-          <CpitlCard
+          <Card
             title="Concession presets"
-            actions={
-              <button
-                type="button"
-                className={btnGhost}
-                onClick={() => setForm({ ...form, concessionPresets: [...form.concessionPresets, { name: '', type: 'percent', value: 0, feeHeadCode: '' }] })}
+            subtitle="Ready-made concessions you can apply when assigning fees to a student."
+            action={
+              <Button
+                variant="secondary"
+                size="sm"
+                icon={Plus}
+                onClick={() =>
+                  setForm({ ...form, concessionPresets: [...form.concessionPresets, { name: '', type: 'percent', value: 0, feeHeadCode: '' }] })
+                }
               >
-                <Plus className="h-3.5 w-3.5" /> Add preset
-              </button>
+                Add preset
+              </Button>
             }
           >
-            <div className="space-y-2">
-              {form.concessionPresets.map((p, i) => (
-                <div key={p._id || i} className="grid grid-cols-12 items-end gap-2">
-                  <Field label="Name" className="col-span-12 sm:col-span-4">
-                    <input className={inputClass} value={p.name} onChange={(e) => updatePreset(i, { name: e.target.value })} />
-                  </Field>
-                  <Field label="Applies to" className="col-span-5 sm:col-span-3">
-                    <select className={inputClass} value={p.feeHeadCode} onChange={(e) => updatePreset(i, { feeHeadCode: e.target.value })}>
-                      <option value="">All fee heads</option>
-                      {heads.map((h) => (
-                        <option key={h._id} value={h.code}>
-                          {h.name}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-                  <Field label="Type" className="col-span-3 sm:col-span-2">
-                    <select className={inputClass} value={p.type} onChange={(e) => updatePreset(i, { type: e.target.value as 'percent' | 'flat' })}>
-                      <option value="percent">%</option>
-                      <option value="flat">₹ flat</option>
-                    </select>
-                  </Field>
-                  <Field label="Value" className="col-span-3 sm:col-span-2">
-                    <input type="number" min={0} className={inputClass} value={p.value} onChange={(e) => updatePreset(i, { value: Number(e.target.value) })} />
-                  </Field>
-                  <div className="col-span-1 flex justify-end pb-2">
-                    <button
-                      type="button"
-                      className="text-slate-400 hover:text-rose-600"
-                      onClick={() => setForm({ ...form, concessionPresets: form.concessionPresets.filter((_, idx) => idx !== i) })}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CpitlCard>
+            {form.concessionPresets.length ? (
+              <ul className="co-presets">
+                {form.concessionPresets.map((p, i) => (
+                  <li key={p._id || i} className="co-preset">
+                    <TextField label="Name" value={p.name} onChange={(e) => updatePreset(i, { name: e.target.value })} />
+                    <Select
+                      label="Applies to"
+                      options={headOptions}
+                      value={p.feeHeadCode}
+                      onChange={(e) => updatePreset(i, { feeHeadCode: e.target.value })}
+                    />
+                    <Select
+                      label="Type"
+                      options={[
+                        { value: 'percent', label: '% of fee' },
+                        { value: 'flat', label: '₹ flat' },
+                      ]}
+                      value={p.type}
+                      onChange={(e) => updatePreset(i, { type: e.target.value as 'percent' | 'flat' })}
+                    />
+                    <TextField
+                      label="Value"
+                      type="number"
+                      min={0}
+                      value={p.value}
+                      onChange={(e) => updatePreset(i, { value: Number(e.target.value) })}
+                    />
+                    <div className="co-preset__remove">
+                      <Button
+                        variant="tertiary"
+                        icon={Trash2}
+                        aria-label={`Remove preset ${p.name || i + 1}`}
+                        onClick={() => setForm({ ...form, concessionPresets: form.concessionPresets.filter((_, idx) => idx !== i) })}
+                      />
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <EmptyState
+                compact
+                icon={Tag}
+                title="No concession presets"
+                body="Add a preset such as a sibling discount to apply it in one click."
+              />
+            )}
+          </Card>
 
-          <div className="flex justify-end">
-            <button type="button" className={btnPrimary} disabled={saving} onClick={saveSettings}>
-              <Save className="h-4 w-4" /> {saving ? 'Saving…' : 'Save settings'}
-            </button>
+          <div className="co-savebar">
+            <Button variant="primary" icon={Save} loading={saving} onClick={saveSettings}>
+              Save settings
+            </Button>
           </div>
         </>
+      ) : settingsLoading ? (
+        <div className="cb-table-state" role="status">
+          <span className="cb-spinner" aria-hidden="true" />
+          Loading settings
+        </div>
       ) : null}
 
-      <FeeHeadModal head={editing} onClose={() => setEditing(null)} />
-    </CpitlPageShell>
+      <FeeHeadSheet head={editing} onClose={() => setEditing(null)} />
+
+      <Dialog
+        open={Boolean(removing)}
+        onClose={() => (removeBusy ? undefined : setRemoving(null))}
+        tone="danger"
+        size="sm"
+        title={`Remove fee head "${removing?.name || ''}"?`}
+        description="It will no longer be offered for new fee structures. A fee head used in an active fee structure can't be removed until it is taken out of that structure."
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setRemoving(null)} disabled={removeBusy}>
+              Cancel
+            </Button>
+            <Button variant="danger" icon={Trash2} loading={removeBusy} onClick={removeHead}>
+              Remove fee head
+            </Button>
+          </>
+        }
+      />
+    </Page>
   )
 }
 

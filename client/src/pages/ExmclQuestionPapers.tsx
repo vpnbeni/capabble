@@ -1,18 +1,16 @@
 import React from 'react'
+import { FileText } from 'lucide-react'
+import { Page } from '@/components/ui'
+import { ComingSoon } from '@/components/exmcl/ExmclUi'
 
-const ExmclQuestionPapers: React.FC = () => {
-  return (
-    <div className="p-6">
-      <div className="max-w-6xl mx-auto space-y-6">
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Question Papers</h2>
-          <p className="text-sm text-gray-600 dark:text-gray-300">
-            Maintain records of question papers for internal exams.
-          </p>
-        </div>
-      </div>
-    </div>
-  )
-}
+const ExmclQuestionPapers: React.FC = () => (
+  <Page>
+    <ComingSoon
+      icon={FileText}
+      title="Question paper records aren’t set up yet"
+      body="This is where question papers for internal exams will be kept. It isn’t available yet."
+    />
+  </Page>
+)
 
 export default ExmclQuestionPapers

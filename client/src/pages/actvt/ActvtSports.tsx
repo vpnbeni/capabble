@@ -1,7 +1,27 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
-import { CalendarDays, MapPin, Pencil, Search, Trash2, Users } from 'lucide-react'
+import { CalendarDays, CalendarRange, Dumbbell, MapPin, Pencil, Plus, Trash2, Trophy, Users } from 'lucide-react'
 import api from '@/services/api'
+import {
+  Badge,
+  Banner,
+  Button,
+  Card,
+  Dialog,
+  EmptyState,
+  FilterBar,
+  Icon,
+  Menu,
+  Page,
+  Select,
+  Sheet,
+  StatCard,
+  TextArea,
+  TextField,
+} from '@/components/ui'
+import { isLikelyColor, toneOf, toneStyle } from '@/components/actvt/entityTone'
+import '@/components/actvt/actvt.css'
+import '@/components/actvt/sports.css'
 
 type FacilityRecord = {
   _id?: string
@@ -73,9 +93,12 @@ const DEFAULT_FACILITIES = [
   { name: 'Swimming', facilityType: 'Pool', color: '#0369a1' },
 ] as const
 
-const FACILITY_TONES = ['#0f766e', '#1d4ed8', '#b45309', '#be123c', '#0369a1', '#7c3aed', '#15803d']
-
-const isLikelyColor = (value = '') => /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(value.trim())
+type ConfirmState = {
+  title: string
+  body: string
+  actionLabel: string
+  run: () => Promise<void>
+}
 
 const initialsOf = (name = '') => {
   const parts = String(name).trim().split(/\s+/).filter(Boolean)
@@ -113,9 +136,6 @@ const emptyActivityForm = (): ActivityForm => ({
   results: '',
 })
 
-const inputClass =
-  'h-9 w-full rounded-lg border border-slate-200 px-3 text-sm text-slate-900 outline-none focus:border-indigo-400'
-
 const ActvtSports: React.FC = () => {
   const [facilities, setFacilities] = useState<FacilityRecord[]>([])
   const [activityDetails, setActivityDetails] = useState<ActivityRecord[]>([])
@@ -129,6 +149,9 @@ const ActvtSports: React.FC = () => {
   const [loading, setLoading] = useState(false)
   const [savingFacility, setSavingFacility] = useState(false)
   const [savingActivity, setSavingActivity] = useState(false)
+  const [facilityDialogOpen, setFacilityDialogOpen] = useState(false)
+  const [confirm, setConfirm] = useState<ConfirmState | null>(null)
+  const [confirming, setConfirming] = useState(false)
 
   const load = async () => {
     setLoading(true)
@@ -187,14 +210,14 @@ const ActvtSports: React.FC = () => {
     )
   }, [facilities, facilityQuery])
 
-  const visibleActivities = useMemo(() => {
+  const sportsActivities = useMemo<SportsActivityItem[]>(() => {
     const detailByEventId = new Map<string, ActivityRecord>()
     activityDetails.forEach((item) => {
       const eventId = String(item.eventId || '').trim()
       if (eventId) detailByEventId.set(eventId, item)
     })
 
-    const sportsActivities = calendarEvents
+    return calendarEvents
       .filter((item) => String(item.activityType || '').trim().toLowerCase() === 'sports')
       .filter((item) => String(item.status || 'planned').trim().toLowerCase() === 'planned')
       .map((item) => {
@@ -215,7 +238,9 @@ const ActvtSports: React.FC = () => {
         }
       })
       .sort((a, b) => String(a.plannedDate || '').localeCompare(String(b.plannedDate || '')))
+  }, [activityDetails, calendarEvents])
 
+  const visibleActivities = useMemo(() => {
     const needle = activityQuery.trim().toLowerCase()
     if (!needle) return sportsActivities
     return sportsActivities.filter((item) =>
@@ -223,11 +248,18 @@ const ActvtSports: React.FC = () => {
         .toLowerCase()
         .includes(needle)
     )
-  }, [activityDetails, activityQuery, calendarEvents])
+  }, [activityQuery, sportsActivities])
 
   const resetFacilityForm = () => {
     setFacilityForm(emptyFacilityForm())
     setEditingFacility(null)
+    setFacilityDialogOpen(false)
+  }
+
+  const startAddFacility = () => {
+    setFacilityForm(emptyFacilityForm())
+    setEditingFacility(null)
+    setFacilityDialogOpen(true)
   }
 
   const resetActivityForm = () => {
@@ -241,6 +273,7 @@ const ActvtSports: React.FC = () => {
       name: String(item.name || ''),
       color: isLikelyColor(item.color || '') ? String(item.color) : '#0f766e',
     })
+    setFacilityDialogOpen(true)
   }
 
   const startEditActivity = (item: SportsActivityItem) => {
@@ -295,7 +328,7 @@ const ActvtSports: React.FC = () => {
   }
 
   const handleRemoveFacility = async (item: FacilityRecord) => {
-    if (!item._id || !window.confirm(`Remove facility "${item.name || 'Untitled'}"?`)) return
+    if (!item._id) return
     try {
       await api.delete(`/actvt/sports/facilities/${item._id}`)
       toast.success('Facility removed.')
@@ -347,7 +380,7 @@ const ActvtSports: React.FC = () => {
   }
 
   const handleRemoveActivity = async (item: ActivityRecord) => {
-    if (!item._id || !window.confirm(`Clear saved details for "${item.title || 'Untitled'}"?`)) return
+    if (!item._id) return
     try {
       await api.delete(`/actvt/sports/${item._id}`)
       toast.success('Sports details cleared.')
@@ -358,386 +391,424 @@ const ActvtSports: React.FC = () => {
     }
   }
 
-  const facilityCountLabel = `${visibleFacilities.length} Facilit${visibleFacilities.length === 1 ? 'y' : 'ies'}`
-  const activityCountLabel = `${visibleActivities.length} Activit${visibleActivities.length === 1 ? 'y' : 'ies'}`
+  const askRemoveFacility = (item: FacilityRecord) => {
+    if (!item._id) return
+    setConfirm({
+      title: `Remove ${item.name || 'this facility'}?`,
+      body: 'The facility is removed from the list. Sports activities that used it keep their saved venue.',
+      actionLabel: 'Remove facility',
+      run: () => handleRemoveFacility(item),
+    })
+  }
+
+  const askClearActivity = (item: ActivityRecord) => {
+    if (!item._id) return
+    setConfirm({
+      title: `Clear details for ${item.title || 'this activity'}?`,
+      body: 'The facility, dates, plan and results saved here are removed. The activity stays on the Activity Board calendar.',
+      actionLabel: 'Clear details',
+      run: () => handleRemoveActivity(item),
+    })
+  }
+
+  const runConfirm = async () => {
+    if (!confirm) return
+    setConfirming(true)
+    try {
+      await confirm.run()
+    } finally {
+      setConfirming(false)
+      setConfirm(null)
+    }
+  }
+
+  const facilityById = useMemo(() => {
+    const map = new Map<string, { facility: FacilityRecord; index: number }>()
+    facilities.forEach((facility, index) => {
+      if (facility._id) map.set(String(facility._id), { facility, index })
+    })
+    return map
+  }, [facilities])
+
+  const detailsSavedCount = sportsActivities.filter((item) => item.detail?._id).length
+
+  const facilityCountLabel = `${visibleFacilities.length} ${visibleFacilities.length === 1 ? 'facility' : 'facilities'}`
+  const activityCountLabel = `${visibleActivities.length} planned ${visibleActivities.length === 1 ? 'activity' : 'activities'}`
+  const activityDateLabel = (activity: SportsActivityItem) =>
+    activity.detail?.startDate || activity.detail?.endDate
+      ? `${activity.detail?.startDate || '—'} to ${activity.detail?.endDate || '—'}`
+      : activity.plannedDate || 'Dates not set'
 
   return (
-    <div className="p-6">
-      <div className="mx-auto max-w-[1400px] space-y-6">
-        <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
-          <form
-            onSubmit={handleSaveFacility}
-            className="mb-4 flex flex-wrap items-center gap-x-2 gap-y-2"
-          >
-            <h3 className="shrink-0 text-lg font-semibold text-slate-900">{facilityCountLabel}</h3>
+    <Page>
+      <div className="cb-stats">
+        <StatCard label="Facilities" value={facilities.length} icon={Dumbbell} hint="Courts, pools and grounds" />
+        <StatCard label="Planned sports activities" value={sportsActivities.length} icon={CalendarRange} hint="From the Activity Board" />
+        <StatCard label="Details saved" value={detailsSavedCount} icon={Trophy} hint={`of ${sportsActivities.length} planned`} />
+        <StatCard
+          label="Needs details"
+          value={Math.max(sportsActivities.length - detailsSavedCount, 0)}
+          icon={Pencil}
+          hint="No facility or plan yet"
+        />
+      </div>
 
-            <div className="relative shrink-0">
-              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
-              <input
-                value={facilityQuery}
-                onChange={(event) => setFacilityQuery(event.target.value)}
-                placeholder="Search facilities"
-                className="h-9 w-[160px] rounded-lg border border-slate-200 py-1.5 pl-8 pr-2.5 text-sm outline-none focus:border-indigo-400 sm:w-[180px]"
-              />
-            </div>
+      <Card title="Facilities" subtitle={facilityCountLabel}>
+        <div className="asp-toolbar">
+          <FilterBar
+            search={{ placeholder: 'Search facilities', value: facilityQuery, onChange: setFacilityQuery }}
+            actions={
+              <Button variant="primary" icon={Plus} onClick={startAddFacility}>
+                Add facility
+              </Button>
+            }
+          />
+        </div>
 
-            <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
-              <input
-                required
-                value={facilityForm.name}
-                onChange={(event) => setFacilityForm({ ...facilityForm, name: event.target.value })}
-                placeholder="Facility name"
-                className={`${inputClass} min-w-[120px] max-w-[180px] flex-1`}
-              />
-
-              <div className="flex shrink-0 items-center gap-1.5">
-                <input
-                  type="color"
-                  value={isLikelyColor(facilityForm.color) ? facilityForm.color : '#0f766e'}
-                  onChange={(event) => setFacilityForm({ ...facilityForm, color: event.target.value })}
-                  className="h-9 w-9 cursor-pointer rounded-lg border border-slate-200 bg-white p-1"
-                  aria-label="Pick facility colour"
-                />
-                <input
-                  value={facilityForm.color}
-                  onChange={(event) => setFacilityForm({ ...facilityForm, color: event.target.value })}
-                  placeholder="#0f766e"
-                  className={`${inputClass} w-[88px]`}
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={savingFacility}
-                className="h-9 shrink-0 rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
-              >
-                {savingFacility ? 'Saving...' : editingFacility ? 'Update' : 'Add'}
-              </button>
-              {editingFacility ? (
-                <button
-                  type="button"
-                  onClick={resetFacilityForm}
-                  className="h-9 shrink-0 rounded-lg border border-slate-200 px-3 text-sm font-semibold text-slate-600 hover:bg-slate-50"
-                >
-                  Cancel
-                </button>
-              ) : null}
-            </div>
-          </form>
-
-          {loading ? <p className="text-sm text-slate-500">Loading facilities...</p> : null}
-
-          {!loading && visibleFacilities.length === 0 ? (
-            <div className="flex min-h-[160px] flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 px-6 text-center">
-              <p className="text-sm font-medium text-slate-700">No sports facilities yet</p>
-              <p className="mt-1 max-w-sm text-sm text-slate-500">
-                Add facilities like Badminton, Table Tennis, Basketball, and Swimming.
-              </p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
-              {visibleFacilities.map((facility, index) => {
-                const tone = isLikelyColor(facility.color || '')
-                  ? facility.color!
-                  : FACILITY_TONES[index % FACILITY_TONES.length]
-                return (
-                  <article
-                    key={facility._id || facility.name}
-                    className="flex flex-col overflow-hidden rounded-[22px] border border-slate-100 bg-white shadow-[0_16px_36px_-24px_rgba(15,23,42,0.45)]"
-                  >
-                    <div className="h-20 shrink-0" style={{ backgroundColor: tone }} />
-                    <div className="relative z-[1] -mt-10 flex justify-center px-4">
-                      <div className="flex h-16 w-16 items-center justify-center rounded-2xl border-4 border-white bg-white shadow-md">
-                        <div
-                          className="flex h-full w-full items-center justify-center rounded-xl text-sm font-bold text-white"
-                          style={{ backgroundColor: tone }}
-                        >
-                          {initialsOf(facility.name)}
-                        </div>
-                      </div>
+        {loading && facilities.length === 0 ? (
+          <div className="cb-table-state" role="status">
+            <span className="cb-spinner" aria-hidden="true" />
+            Loading facilities…
+          </div>
+        ) : visibleFacilities.length === 0 ? (
+          <EmptyState
+            icon={Dumbbell}
+            title={facilityQuery.trim() ? 'No facilities match your search' : 'No sports facilities yet'}
+            body={
+              facilityQuery.trim()
+                ? 'Try a different name or clear the search.'
+                : 'Add facilities like badminton, table tennis, basketball and swimming to assign them to activities.'
+            }
+            action={
+              facilityQuery.trim() ? (
+                <Button onClick={() => setFacilityQuery('')}>Clear search</Button>
+              ) : (
+                <Button icon={Plus} onClick={startAddFacility}>
+                  Add facility
+                </Button>
+              )
+            }
+          />
+        ) : (
+          <ul className="actvt-grid">
+            {visibleFacilities.map((facility, index) => {
+              const name = facility.name || 'Untitled facility'
+              return (
+                <li key={facility._id || facility.name}>
+                  <article className="actvt-card" style={toneStyle(facility.color, index)}>
+                    <div className="actvt-card__band" aria-hidden="true" />
+                    <div className="actvt-card__logo" aria-hidden="true">
+                      <span className="actvt-card__initials">{initialsOf(facility.name)}</span>
                     </div>
-                    <div className="flex flex-1 flex-col px-3 pb-3 pt-2 text-center">
-                      <p className="line-clamp-2 text-sm font-semibold text-slate-900">
-                        {facility.name || 'Untitled facility'}
-                      </p>
-                      <p className="mt-1 text-[11px] font-medium text-indigo-600">
-                        {facility.facilityType || 'Facility'}
-                      </p>
-                      <p className="mt-2 line-clamp-2 min-h-[32px] text-xs text-slate-500">
-                        {facility.location || 'No location set'}
-                      </p>
-                      {facility.capacity ? (
-                        <p className="mt-1 inline-flex items-center justify-center gap-1 text-[11px] font-semibold text-slate-600">
-                          <Users className="h-3 w-3" />
-                          {facility.capacity}
-                        </p>
-                      ) : null}
-                      <div className="mt-3 flex items-center justify-center gap-3 border-t border-slate-100 pt-3">
-                        <button
-                          type="button"
-                          onClick={() => startEditFacility(facility)}
-                          className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-600"
-                        >
-                          <Pencil className="h-3 w-3" />
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => void handleRemoveFacility(facility)}
-                          className="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-600"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                          Remove
-                        </button>
+                    <div className="actvt-card__body">
+                      <h3 className="actvt-card__name">{name}</h3>
+                      <div className="actvt-card__meta">
+                        <Badge tone="neutral" dot={false}>
+                          {facility.facilityType || 'Facility'}
+                        </Badge>
                       </div>
+                      <p className="asp-facility__loc">{facility.location || 'No location set'}</p>
+                      {facility.capacity ? (
+                        <span className="asp-facility__cap">
+                          <Icon icon={Users} size={12} />
+                          {facility.capacity}
+                        </span>
+                      ) : null}
+                    </div>
+                    <div className="actvt-card__foot">
+                      <span className="actvt-card__swatch">
+                        <span className="actvt-tone-dot" aria-hidden="true" />
+                        {toneOf(facility.color, index).toUpperCase()}
+                      </span>
+                      <span className="actvt-card__actions">
+                        <Button
+                          variant="tertiary"
+                          size="sm"
+                          icon={Pencil}
+                          aria-label={`Edit ${name}`}
+                          onClick={() => startEditFacility(facility)}
+                        />
+                        <Button
+                          variant="tertiary"
+                          size="sm"
+                          icon={Trash2}
+                          aria-label={`Remove ${name}`}
+                          onClick={() => askRemoveFacility(facility)}
+                        />
+                      </span>
                     </div>
                   </article>
-                )
-              })}
-            </div>
-          )}
-        </section>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </Card>
 
-        <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="mb-4 flex flex-wrap items-center gap-x-2 gap-y-2">
-            <h3 className="shrink-0 text-lg font-semibold text-slate-900">{activityCountLabel}</h3>
+      <Card title="Planned sports activities" subtitle={activityCountLabel}>
+        <div className="asp-toolbar">
+          <Banner tone="info">
+            Sports activities planned on the Activity Board calendar appear here automatically. Add details to assign a
+            facility, refine dates and record the plan and results.
+          </Banner>
+          <FilterBar search={{ placeholder: 'Search activities', value: activityQuery, onChange: setActivityQuery }} />
+        </div>
 
-            <div className="relative shrink-0">
-              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+        {loading && calendarEvents.length === 0 ? (
+          <div className="cb-table-state" role="status">
+            <span className="cb-spinner" aria-hidden="true" />
+            Loading activities…
+          </div>
+        ) : visibleActivities.length === 0 ? (
+          <EmptyState
+            icon={CalendarRange}
+            title={activityQuery.trim() ? 'No activities match your search' : 'No planned sports activities yet'}
+            body={
+              activityQuery.trim()
+                ? 'Try a different title, date or venue.'
+                : 'Plan a sports activity on the Activity Board calendar. It will appear here automatically.'
+            }
+            action={activityQuery.trim() ? <Button onClick={() => setActivityQuery('')}>Clear search</Button> : undefined}
+          />
+        ) : (
+          <ul className="asp-activities">
+            {visibleActivities.map((activity) => {
+              const facilityEntry = activity.detail?.facilityId
+                ? facilityById.get(String(activity.detail.facilityId))
+                : undefined
+              const facilityName = facilityEntry?.facility.name || activity.detail?.facilityName || ''
+              const hasDetail = Boolean(activity.detail?._id)
+              return (
+                <li key={activity.eventId || activity.title}>
+                  <article className="asp-activity">
+                    <div className="asp-activity__head">
+                      <div className="asp-activity__titles">
+                        <h3 className="asp-activity__title">{activity.title || 'Untitled activity'}</h3>
+                        <span className="asp-activity__sub">
+                          {activity.plannedDate || 'No calendar date'}
+                          {activity.detail?.year ? ` · ${activity.detail.year}` : ''}
+                        </span>
+                      </div>
+                      <Badge tone={hasDetail ? 'success' : 'warning'}>{hasDetail ? 'Details saved' : 'Needs details'}</Badge>
+                    </div>
+
+                    <ul className="asp-activity__facts">
+                      <li>
+                        <Icon icon={MapPin} size={14} />
+                        <span>{activity.detail?.venue || activity.venue || activity.detail?.facilityName || 'No venue'}</span>
+                      </li>
+                      <li>
+                        <Icon icon={CalendarDays} size={14} />
+                        <span className="asp-num">{activityDateLabel(activity)}</span>
+                      </li>
+                      {facilityName ? (
+                        <li>
+                          <span
+                            className="asp-swatchname"
+                            style={facilityEntry ? toneStyle(facilityEntry.facility.color, facilityEntry.index) : undefined}
+                          >
+                            {facilityEntry ? <span className="actvt-tone-dot" aria-hidden="true" /> : <Icon icon={Dumbbell} size={14} />}
+                            <span>{facilityName}</span>
+                          </span>
+                        </li>
+                      ) : null}
+                    </ul>
+
+                    {activity.detail?.events ? <p className="asp-activity__plan">{activity.detail.events}</p> : null}
+
+                    <div className="asp-activity__foot">
+                      <Button size="sm" icon={Pencil} onClick={() => startEditActivity(activity)}>
+                        {hasDetail ? 'Edit details' : 'Add details'}
+                      </Button>
+                      {hasDetail ? (
+                        <Menu
+                          label={`More actions for ${activity.title}`}
+                          items={[
+                            {
+                              label: 'Clear details',
+                              icon: Trash2,
+                              tone: 'danger',
+                              onSelect: () => {
+                                if (activity.detail) askClearActivity(activity.detail)
+                              },
+                            },
+                          ]}
+                        />
+                      ) : null}
+                    </div>
+                  </article>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </Card>
+
+      <Dialog
+        open={facilityDialogOpen}
+        onClose={resetFacilityForm}
+        title={editingFacility ? `Edit ${editingFacility.name || 'facility'}` : 'Add facility'}
+        description="The colour marks this facility on cards and activities."
+        size="sm"
+        footer={
+          <>
+            <Button onClick={resetFacilityForm}>Cancel</Button>
+            <Button variant="primary" type="submit" form="asp-facility-form" loading={savingFacility}>
+              {editingFacility ? 'Save facility' : 'Add facility'}
+            </Button>
+          </>
+        }
+      >
+        <form id="asp-facility-form" className="asp-form" onSubmit={handleSaveFacility} noValidate>
+          <TextField
+            label="Facility name"
+            required
+            autoFocus
+            value={facilityForm.name}
+            onChange={(event) => setFacilityForm({ ...facilityForm, name: event.target.value })}
+            placeholder="e.g. Badminton"
+          />
+          <div className="cb-field">
+            <label className="cb-field__label" htmlFor="asp-facility-color-hex">
+              Colour
+            </label>
+            <div className="actvt-colorfield">
               <input
-                value={activityQuery}
-                onChange={(event) => setActivityQuery(event.target.value)}
-                placeholder="Search activities"
-                className="h-9 w-[160px] rounded-lg border border-slate-200 py-1.5 pl-8 pr-2.5 text-sm outline-none focus:border-indigo-400 sm:w-[180px]"
+                type="color"
+                value={isLikelyColor(facilityForm.color) ? facilityForm.color : '#0f766e'}
+                onChange={(event) => setFacilityForm({ ...facilityForm, color: event.target.value })}
+                aria-label="Pick facility colour"
+              />
+              <TextField
+                id="asp-facility-color-hex"
+                value={facilityForm.color}
+                onChange={(event) => setFacilityForm({ ...facilityForm, color: event.target.value })}
+                placeholder="#0f766e"
+                error={facilityForm.color.trim() && !isLikelyColor(facilityForm.color) ? 'Use a hex colour like #0f766e.' : undefined}
               />
             </div>
           </div>
+        </form>
+      </Dialog>
 
-          <div className="mb-4 rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
-            <p className="text-sm text-slate-600">
-              Planned sports activities from the Activity Board calendar appear here automatically. Select one below to assign
-              facility, refine scheduling, and capture plan details.
-            </p>
+      <Sheet
+        open={Boolean(editingActivity)}
+        onClose={resetActivityForm}
+        title={editingActivity?.detail?._id ? 'Edit sports details' : 'Add sports details'}
+        description={editingActivity ? `${editingActivity.title}${editingActivity.plannedDate ? ` · ${editingActivity.plannedDate}` : ''}` : undefined}
+        icon={Trophy}
+        size="lg"
+        onSubmit={handleSaveActivity}
+        footer={
+          <>
+            {editingActivity?.detail?._id ? (
+              <Button
+                variant="tertiary"
+                icon={Trash2}
+                onClick={() => {
+                  if (editingActivity.detail) askClearActivity(editingActivity.detail)
+                }}
+              >
+                Clear details
+              </Button>
+            ) : null}
+            <Button onClick={resetActivityForm}>Cancel</Button>
+            <Button variant="primary" type="submit" loading={savingActivity} disabled={!activityForm.eventId}>
+              {editingActivity?.detail?._id ? 'Save changes' : 'Save details'}
+            </Button>
+          </>
+        }
+      >
+        <div className="asp-form">
+          <div className="cb-form-grid">
+            <Select
+              label="Planned sports activity"
+              value={activityForm.eventId}
+              onChange={(event) => {
+                const selected = sportsActivities.find((item) => item.eventId === event.target.value) || null
+                if (selected) startEditActivity(selected)
+                else resetActivityForm()
+              }}
+              options={sportsActivities.map((item) => ({
+                value: item.eventId,
+                label: `${item.title}${item.plannedDate ? ` · ${item.plannedDate}` : ''}`,
+              }))}
+            />
+            <TextField label="Calendar date" value={activityForm.plannedDate} readOnly hint="Set on the Activity Board" />
+            <TextField className="is-wide" label="Title" value={activityForm.title} readOnly />
+            <TextField
+              label="Year"
+              value={activityForm.year}
+              onChange={(event) => setActivityForm({ ...activityForm, year: event.target.value })}
+              placeholder="Year"
+              inputMode="numeric"
+            />
+            <Select
+              label="Facility"
+              value={activityForm.facilityId}
+              onChange={(event) => setActivityForm({ ...activityForm, facilityId: event.target.value })}
+              placeholder="No facility"
+              options={facilities
+                .filter((facility) => facility._id)
+                .map((facility) => ({ value: String(facility._id), label: facility.name || 'Untitled facility' }))}
+            />
+            <TextField
+              className="is-wide"
+              label="Venue"
+              value={activityForm.venue}
+              onChange={(event) => setActivityForm({ ...activityForm, venue: event.target.value })}
+              placeholder="Venue"
+              hint="Leave blank to use the facility name."
+            />
+            <TextField
+              label="Start date"
+              type="date"
+              value={activityForm.startDate}
+              onChange={(event) => setActivityForm({ ...activityForm, startDate: event.target.value })}
+            />
+            <TextField
+              label="End date"
+              type="date"
+              value={activityForm.endDate}
+              onChange={(event) => setActivityForm({ ...activityForm, endDate: event.target.value })}
+            />
           </div>
+          <TextArea
+            label="Activity plan"
+            rows={4}
+            value={activityForm.events}
+            onChange={(event) => setActivityForm({ ...activityForm, events: event.target.value })}
+            placeholder="Describe fixtures, rounds, team flow or event plan"
+          />
+          <TextArea
+            label="Results and notes"
+            rows={4}
+            value={activityForm.results}
+            onChange={(event) => setActivityForm({ ...activityForm, results: event.target.value })}
+            placeholder="Capture outcomes, winners or execution notes"
+          />
+        </div>
+      </Sheet>
 
-          {visibleActivities.length > 0 ? (
-            <form
-              onSubmit={handleSaveActivity}
-              className="mb-4 grid gap-3 rounded-2xl border border-slate-100 bg-white p-4"
-            >
-              <div className="grid gap-3 md:grid-cols-2">
-                <label className="text-xs">
-                  <span className="mb-1 block font-medium text-slate-500">Planned sports activity</span>
-                  <select
-                    value={activityForm.eventId}
-                    onChange={(event) => {
-                      const selected = visibleActivities.find((item) => item.eventId === event.target.value) || null
-                      if (selected) startEditActivity(selected)
-                      else resetActivityForm()
-                    }}
-                    className={inputClass}
-                  >
-                    <option value="">Select an activity</option>
-                    {visibleActivities.map((item) => (
-                      <option key={item.eventId} value={item.eventId}>
-                        {item.title} {item.plannedDate ? `· ${item.plannedDate}` : ''}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="text-xs">
-                  <span className="mb-1 block font-medium text-slate-500">Calendar date</span>
-                  <input value={activityForm.plannedDate} readOnly className={inputClass} placeholder="Select an activity" />
-                </label>
-              </div>
-
-              <div className="grid gap-3 md:grid-cols-3">
-                <label className="text-xs md:col-span-2">
-                  <span className="mb-1 block font-medium text-slate-500">Title</span>
-                  <input value={activityForm.title} readOnly className={inputClass} placeholder="Select an activity" />
-                </label>
-                <label className="text-xs">
-                  <span className="mb-1 block font-medium text-slate-500">Year</span>
-                  <input
-                    value={activityForm.year}
-                    onChange={(event) => setActivityForm({ ...activityForm, year: event.target.value })}
-                    placeholder="Year"
-                    className={inputClass}
-                  />
-                </label>
-              </div>
-
-              <div className="grid gap-3 md:grid-cols-4">
-                <label className="text-xs">
-                  <span className="mb-1 block font-medium text-slate-500">Facility</span>
-                  <select
-                    value={activityForm.facilityId}
-                    onChange={(event) => setActivityForm({ ...activityForm, facilityId: event.target.value })}
-                    className={inputClass}
-                  >
-                    <option value="">Facility (optional)</option>
-                    {facilities.map((facility) => (
-                      <option key={facility._id} value={facility._id}>
-                        {facility.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="text-xs">
-                  <span className="mb-1 block font-medium text-slate-500">Venue</span>
-                  <input
-                    value={activityForm.venue}
-                    onChange={(event) => setActivityForm({ ...activityForm, venue: event.target.value })}
-                    placeholder="Venue"
-                    className={inputClass}
-                  />
-                </label>
-                <label className="text-xs">
-                  <span className="mb-1 block font-medium text-slate-500">Start date</span>
-                  <input
-                    type="date"
-                    value={activityForm.startDate}
-                    onChange={(event) => setActivityForm({ ...activityForm, startDate: event.target.value })}
-                    className={inputClass}
-                  />
-                </label>
-                <label className="text-xs">
-                  <span className="mb-1 block font-medium text-slate-500">End date</span>
-                  <input
-                    type="date"
-                    value={activityForm.endDate}
-                    onChange={(event) => setActivityForm({ ...activityForm, endDate: event.target.value })}
-                    className={inputClass}
-                  />
-                </label>
-              </div>
-
-              <div className="grid gap-3 md:grid-cols-2">
-                <label className="text-xs">
-                  <span className="mb-1 block font-medium text-slate-500">Activity plan</span>
-                  <textarea
-                    rows={4}
-                    value={activityForm.events}
-                    onChange={(event) => setActivityForm({ ...activityForm, events: event.target.value })}
-                    placeholder="Describe fixtures, rounds, team flow, or event plan"
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none focus:border-indigo-400"
-                  />
-                </label>
-                <label className="text-xs">
-                  <span className="mb-1 block font-medium text-slate-500">Results / notes</span>
-                  <textarea
-                    rows={4}
-                    value={activityForm.results}
-                    onChange={(event) => setActivityForm({ ...activityForm, results: event.target.value })}
-                    placeholder="Capture outcomes, winners, or execution notes"
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none focus:border-indigo-400"
-                  />
-                </label>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="submit"
-                  disabled={savingActivity || !activityForm.eventId}
-                  className="h-9 shrink-0 rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
-                >
-                  {savingActivity ? 'Saving...' : editingActivity?.detail?._id ? 'Update details' : 'Save details'}
-                </button>
-                {editingActivity ? (
-                  <button
-                    type="button"
-                    onClick={resetActivityForm}
-                    className="h-9 shrink-0 rounded-lg border border-slate-200 px-3 text-sm font-semibold text-slate-600 hover:bg-slate-50"
-                  >
-                    Cancel
-                  </button>
-                ) : null}
-                {editingActivity?.detail?._id ? (
-                  <button
-                    type="button"
-                    onClick={() => void handleRemoveActivity(editingActivity.detail!)}
-                    className="h-9 shrink-0 rounded-lg border border-rose-200 px-3 text-sm font-semibold text-rose-600 hover:bg-rose-50"
-                  >
-                    Clear details
-                  </button>
-                ) : null}
-              </div>
-            </form>
-          ) : null}
-
-          {loading ? <p className="text-sm text-slate-500">Loading activities...</p> : null}
-
-          {!loading && visibleActivities.length === 0 ? (
-            <div className="flex min-h-[160px] flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 px-6 text-center">
-              <p className="text-sm font-medium text-slate-700">No planned sports activities yet</p>
-              <p className="mt-1 max-w-sm text-sm text-slate-500">
-                Plan sports activities from the Activity Board calendar first. They will appear here automatically.
-              </p>
-            </div>
-          ) : (
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-              {visibleActivities.map((activity) => (
-                <article
-                  key={activity.eventId || activity.title}
-                  className="rounded-2xl border border-slate-100 bg-white p-4 shadow-[0_12px_28px_-22px_rgba(15,23,42,0.45)]"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-slate-900">
-                        {activity.title || 'Untitled activity'}
-                      </p>
-                      {activity.detail?.year ? (
-                        <p className="mt-1 text-[11px] font-medium text-indigo-600">{activity.detail.year}</p>
-                      ) : null}
-                    </div>
-                    <div className="flex shrink-0 gap-2">
-                      <button
-                        type="button"
-                        onClick={() => startEditActivity(activity)}
-                        className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-600"
-                      >
-                        <Pencil className="h-3 w-3" />
-                        Edit details
-                      </button>
-                      {activity.detail?._id ? (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (activity.detail) void handleRemoveActivity(activity.detail)
-                          }}
-                          className="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-600"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                          Clear
-                        </button>
-                      ) : null}
-                    </div>
-                  </div>
-
-                  <div className="mt-3 space-y-1.5 text-xs text-slate-600">
-                    <p className="inline-flex items-center gap-1.5">
-                      <MapPin className="h-3.5 w-3.5 text-slate-400" />
-                      {activity.detail?.venue || activity.venue || activity.detail?.facilityName || 'No venue'}
-                    </p>
-                    <p className="inline-flex items-center gap-1.5">
-                      <CalendarDays className="h-3.5 w-3.5 text-slate-400" />
-                      {activity.detail?.startDate || activity.detail?.endDate
-                        ? `${activity.detail?.startDate || '—'} to ${activity.detail?.endDate || '—'}`
-                        : activity.plannedDate || 'Dates not set'}
-                    </p>
-                    {activity.detail?.events ? (
-                      <p className="line-clamp-3 rounded-xl bg-slate-50 px-2.5 py-2 text-slate-600">
-                        {activity.detail.events}
-                      </p>
-                    ) : null}
-                  </div>
-                </article>
-              ))}
-            </div>
-          )}
-        </section>
-      </div>
-    </div>
+      <Dialog
+        open={Boolean(confirm)}
+        onClose={() => (confirming ? undefined : setConfirm(null))}
+        tone="danger"
+        size="sm"
+        title={confirm?.title || ''}
+        description={confirm?.body}
+        footer={
+          <>
+            <Button onClick={() => setConfirm(null)} disabled={confirming}>
+              Cancel
+            </Button>
+            <Button variant="danger" loading={confirming} onClick={() => void runConfirm()}>
+              {confirm?.actionLabel || 'Confirm'}
+            </Button>
+          </>
+        }
+      />
+    </Page>
   )
 }
 

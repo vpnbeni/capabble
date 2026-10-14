@@ -1,12 +1,31 @@
 import React, { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
+import { ExternalLink, Megaphone, Plus, Trash2 } from 'lucide-react'
 import cbseCircularService, { CBSECircular } from '../services/cbseCircularService'
+import {
+  Button,
+  Card,
+  DataTable,
+  Dialog,
+  EmptyState,
+  Entity,
+  Icon,
+  Page,
+  Sheet,
+  TextArea,
+  TextField,
+  formatDate,
+  orDash,
+  type DataTableColumn,
+} from '@/components/ui'
 
 const CBSECirculars: React.FC = () => {
   const [circulars, setCirculars] = useState<CBSECircular[]>([])
   const [loading, setLoading] = useState(true)
   const [showAddModal, setShowAddModal] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [pendingDelete, setPendingDelete] = useState<CBSECircular | null>(null)
+  const [deleting, setDeleting] = useState(false)
   const [form, setForm] = useState({
     title: '',
     circularNumber: '',
@@ -64,146 +83,179 @@ const CBSECirculars: React.FC = () => {
   }
 
   const handleDelete = async (id: string) => {
-    const confirmed = window.confirm('Delete this circular?')
-    if (!confirmed) return
-
     try {
+      setDeleting(true)
       await cbseCircularService.deleteById(id)
       setCirculars((prev) => prev.filter((item) => item._id !== id))
       toast.success('Circular deleted')
+      setPendingDelete(null)
     } catch (error: any) {
       toast.error(error?.response?.data?.message || 'Failed to delete circular')
+    } finally {
+      setDeleting(false)
     }
   }
 
-  return (
-    <div className="p-8 max-w-[1600px] mx-auto min-h-screen bg-gray-50/50 dark:bg-gray-900">
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-4 py-3 bg-gray-50/50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700">
-          <div>
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">CBSE Circulars</h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              Examination circulars sorted by publish date
-            </p>
-          </div>
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
-          >
-            Add Circular
-          </button>
-        </div>
-
-        {loading ? (
-          <div className="p-12 text-center text-gray-500 dark:text-gray-400">Loading circulars...</div>
-        ) : circulars.length === 0 ? (
-          <div className="p-12 text-center text-gray-500 dark:text-gray-400">
-            No circulars added yet.
-          </div>
+  const columns: DataTableColumn<CBSECircular>[] = [
+    {
+      key: 'title',
+      header: 'Circular',
+      mobile: 'title',
+      wrap: true,
+      render: (item) => <Entity primary={item.title} secondary={item.summary || undefined} />,
+    },
+    {
+      key: 'circularNumber',
+      header: 'Number',
+      mobile: 'hidden',
+      render: (item) => orDash(item.circularNumber),
+    },
+    {
+      key: 'publishDate',
+      header: 'Published',
+      mobile: 'subtitle',
+      render: (item) => formatDate(item.publishDate),
+    },
+    {
+      key: 'source',
+      header: 'Source',
+      interactive: true,
+      render: (item) =>
+        item.sourceUrl ? (
+          <a className="cb-link" href={item.sourceUrl} target="_blank" rel="noreferrer">
+            Open circular <Icon icon={ExternalLink} size={14} />
+          </a>
         ) : (
-          <div className="divide-y divide-gray-200 dark:divide-gray-700">
-            {circulars.map((item) => (
-              <div key={item._id} className="p-5 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="min-w-0">
-                    <h3 className="text-base font-semibold text-gray-900 dark:text-white">{item.title}</h3>
-                    <div className="mt-1 text-sm text-gray-500 dark:text-gray-400 flex flex-wrap gap-3">
-                      <span>
-                        {new Date(item.publishDate).toLocaleDateString('en-GB', {
-                          day: '2-digit',
-                          month: 'short',
-                          year: 'numeric',
-                        })}
-                      </span>
-                      {item.circularNumber ? <span>No: {item.circularNumber}</span> : null}
-                    </div>
-                    {item.summary ? (
-                      <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">{item.summary}</p>
-                    ) : null}
-                    {item.sourceUrl ? (
-                      <a
-                        href={item.sourceUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex mt-3 text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
-                      >
-                        Open Circular
-                      </a>
-                    ) : null}
-                  </div>
-                  <button
-                    onClick={() => handleDelete(item._id)}
-                    className="text-sm text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
-                  >
-                    Delete
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+          '—'
+        ),
+    },
+    {
+      key: 'actions',
+      header: '',
+      align: 'right',
+      interactive: true,
+      render: (item) => (
+        <Button
+          size="sm"
+          variant="tertiary"
+          icon={Trash2}
+          aria-label={`Delete ${item.title}`}
+          onClick={() => setPendingDelete(item)}
+        />
+      ),
+    },
+  ]
 
-      {showAddModal && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
-          <div className="w-full max-w-xl bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700">
-            <div className="px-5 py-4 border-b border-gray-200 dark:border-gray-700">
-              <h3 className="text-base font-semibold text-gray-900 dark:text-white">Add CBSE Circular</h3>
-            </div>
-            <div className="p-5 space-y-4">
-              <input
-                value={form.title}
-                onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))}
-                placeholder="Title *"
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
-              />
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <input
-                  value={form.circularNumber}
-                  onChange={(e) => setForm((prev) => ({ ...prev, circularNumber: e.target.value }))}
-                  placeholder="Circular Number"
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
-                />
-                <input
-                  type="date"
-                  value={form.publishDate}
-                  onChange={(e) => setForm((prev) => ({ ...prev, publishDate: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
-                />
-              </div>
-              <input
-                value={form.sourceUrl}
-                onChange={(e) => setForm((prev) => ({ ...prev, sourceUrl: e.target.value }))}
-                placeholder="Source URL (optional)"
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
-              />
-              <textarea
-                value={form.summary}
-                onChange={(e) => setForm((prev) => ({ ...prev, summary: e.target.value }))}
-                placeholder="Summary (optional)"
-                rows={4}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
-              />
-            </div>
-            <div className="px-5 py-4 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-3">
-              <button
-                onClick={() => setShowAddModal(false)}
-                className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-700 dark:text-gray-300"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleCreate}
-                disabled={saving}
-                className="px-4 py-2 rounded-lg text-sm text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
-              >
-                {saving ? 'Saving...' : 'Save'}
-              </button>
-            </div>
-          </div>
+  return (
+    <Page>
+      <Card
+        flush
+        title="Circulars"
+        subtitle="Examination circulars, sorted by publish date"
+        action={
+          <Button variant="primary" icon={Plus} onClick={() => setShowAddModal(true)}>
+            Add circular
+          </Button>
+        }
+      >
+        <DataTable
+          caption="CBSE circulars"
+          columns={columns}
+          rows={loading ? [] : circulars}
+          getRowKey={(item) => item._id}
+          loading={loading}
+          loadingLabel="Loading circulars…"
+          empty={
+            <EmptyState
+              icon={Megaphone}
+              title="No circulars added yet"
+              body="Add a CBSE circular to keep its number, date and link in one place."
+              action={
+                <Button icon={Plus} onClick={() => setShowAddModal(true)}>
+                  Add circular
+                </Button>
+              }
+            />
+          }
+        />
+      </Card>
+
+      <Sheet
+        open={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        icon={Megaphone}
+        title="Add CBSE circular"
+        description="Title and publish date are required."
+        onSubmit={(event) => {
+          event.preventDefault()
+          handleCreate()
+        }}
+        footer={
+          <>
+            <Button onClick={() => setShowAddModal(false)}>Cancel</Button>
+            <Button type="submit" variant="primary" loading={saving}>
+              Save circular
+            </Button>
+          </>
+        }
+      >
+        <TextField
+          label="Title"
+          required
+          value={form.title}
+          onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))}
+        />
+        <div className="cb-form-grid">
+          <TextField
+            label="Circular number"
+            value={form.circularNumber}
+            onChange={(e) => setForm((prev) => ({ ...prev, circularNumber: e.target.value }))}
+          />
+          <TextField
+            label="Publish date"
+            type="date"
+            required
+            value={form.publishDate}
+            onChange={(e) => setForm((prev) => ({ ...prev, publishDate: e.target.value }))}
+          />
         </div>
-      )}
-    </div>
+        <TextField
+          label="Source URL"
+          type="url"
+          hint="Optional"
+          value={form.sourceUrl}
+          onChange={(e) => setForm((prev) => ({ ...prev, sourceUrl: e.target.value }))}
+        />
+        <TextArea
+          label="Summary"
+          hint="Optional"
+          rows={4}
+          value={form.summary}
+          onChange={(e) => setForm((prev) => ({ ...prev, summary: e.target.value }))}
+        />
+      </Sheet>
+
+      <Dialog
+        open={Boolean(pendingDelete)}
+        onClose={() => setPendingDelete(null)}
+        tone="danger"
+        size="sm"
+        title="Delete this circular?"
+        description={pendingDelete ? `${pendingDelete.title} will be removed from the list.` : undefined}
+        footer={
+          <>
+            <Button onClick={() => setPendingDelete(null)}>Cancel</Button>
+            <Button
+              variant="danger"
+              loading={deleting}
+              onClick={() => pendingDelete && handleDelete(pendingDelete._id)}
+            >
+              Delete circular
+            </Button>
+          </>
+        }
+      />
+    </Page>
   )
 }
 

@@ -1,11 +1,12 @@
-import React, { useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import React, { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
-import { HardHat, MapPin, Plus } from 'lucide-react'
-import Modal from '@/components/common/Modal'
+import { CheckCircle2, HardHat, IndianRupee, Plus, Wallet } from 'lucide-react'
 import { useAssetLocations, useInfraProjects, useInvalidateCpitl } from '@/hooks/useCpitl'
 import cpitlService, { InfraProject } from '@/services/cpitlService'
-import { CpitlBadge, CpitlEmpty, CpitlPageShell, Field, UsageBar, btnPrimary, btnSecondary, errorMessage, fmtDate, inputClass, inr, inrShort } from '@/components/cpitl/CpitlUi'
+import { Button, Card, DataTable, EmptyState, FilterBar, Page, Select, Sheet, StatCard, TextArea, TextField, orDash, type DataTableColumn } from '@/components/ui'
+import { CpitlBadge, UsageBar, errorMessage, fmtDate, inr, inrShort } from '@/components/cpitl/CpitlUi'
+import '@/components/cpitl/expenses.css'
 
 export const INFRA_TYPES: Record<InfraProject['type'], string> = {
   construction: 'New construction',
@@ -25,6 +26,25 @@ export const INFRA_STATUS: Record<InfraProject['status'], { label: string; badge
   cancelled: { label: 'Cancelled', badge: 'cancelled' },
 }
 
+export const InfraStatusBadge: React.FC<{ status: InfraProject['status'] }> = ({ status }) => (
+  <CpitlBadge status={INFRA_STATUS[status]?.badge} label={INFRA_STATUS[status]?.label || status} />
+)
+
+/** Budget used: "₹x of ₹y" over a usage bar, with words when over. */
+export const InfraUsage: React.FC<{ spent: number; budget: number }> = ({ spent, budget }) => {
+  const pct = budget > 0 ? (spent / budget) * 100 : null
+  return (
+    <div className="ce-usage">
+      <div className="ce-usage__text">
+        <strong>{inr(spent)}</strong>
+        <span>{budget ? (pct !== null && pct > 100 ? `Over ${inr(budget)}` : `of ${inr(budget)}`) : 'No budget set'}</span>
+      </div>
+      {pct !== null ? <UsageBar pct={pct} /> : null}
+    </div>
+  )
+}
+
+/** Add or edit an infrastructure project. Name kept for existing imports; renders a kit Sheet. */
 export const ProjectFormModal: React.FC<{ isOpen: boolean; onClose: () => void; project?: Partial<InfraProject> | null; onSaved: (id: string) => void }> = ({
   isOpen,
   onClose,
@@ -33,15 +53,22 @@ export const ProjectFormModal: React.FC<{ isOpen: boolean; onClose: () => void; 
 }) => {
   const { data: locations = [] } = useAssetLocations()
   const [form, setForm] = useState<Partial<InfraProject>>({})
+  const [saving, setSaving] = useState(false)
+  const [tried, setTried] = useState(false)
   useEffect(() => {
-    if (isOpen) setForm(project || { title: '', type: 'construction', status: 'planned', sanctionedBudget: 0, vendor: '', locationText: '', description: '' })
+    if (isOpen) {
+      setForm(project || { title: '', type: 'construction', status: 'planned', sanctionedBudget: 0, vendor: '', locationText: '', description: '' })
+      setTried(false)
+    }
   }, [isOpen, project])
   const set = (patch: Partial<InfraProject>) => setForm((p) => ({ ...p, ...patch }))
   const save = async () => {
+    setTried(true)
     if (!form.title?.trim()) {
       toast.error('Give the project a title.')
       return
     }
+    setSaving(true)
     try {
       const res = await cpitlService.saveInfraProject({
         _id: form._id,
@@ -61,165 +88,233 @@ export const ProjectFormModal: React.FC<{ isOpen: boolean; onClose: () => void; 
       onClose()
     } catch (error) {
       toast.error(await errorMessage(error))
+    } finally {
+      setSaving(false)
     }
   }
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={form._id ? 'Edit project' : 'New infrastructure project'} size="lg">
-      <div className="grid grid-cols-2 gap-4">
-        <Field label="Title" className="col-span-2">
-          <input className={inputClass} value={form.title || ''} placeholder="e.g. New science lab block" onChange={(e) => set({ title: e.target.value })} />
-        </Field>
-        <Field label="Type">
-          <select className={inputClass} value={form.type} onChange={(e) => set({ type: e.target.value as InfraProject['type'] })}>
-            {Object.entries(INFRA_TYPES).map(([k, v]) => (
-              <option key={k} value={k}>
-                {v}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label="Status">
-          <select className={inputClass} value={form.status} onChange={(e) => set({ status: e.target.value as InfraProject['status'] })}>
-            {Object.entries(INFRA_STATUS).map(([k, v]) => (
-              <option key={k} value={k}>
-                {v.label}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label="Sanctioned budget (₹)">
-          <input type="number" min={0} className={inputClass} value={form.sanctionedBudget || ''} onChange={(e) => set({ sanctionedBudget: Number(e.target.value) })} />
-        </Field>
-        <Field label="Contractor / vendor">
-          <input className={inputClass} value={form.vendor || ''} onChange={(e) => set({ vendor: e.target.value })} />
-        </Field>
-        <Field label="Start date">
-          <input type="date" className={inputClass} value={form.startDate?.slice(0, 10) || ''} onChange={(e) => set({ startDate: e.target.value || null })} />
-        </Field>
-        <Field label="Target completion">
-          <input type="date" className={inputClass} value={form.targetDate?.slice(0, 10) || ''} onChange={(e) => set({ targetDate: e.target.value || null })} />
-        </Field>
+    <Sheet
+      open={isOpen}
+      onClose={onClose}
+      title={form._id ? 'Edit project' : 'Add project'}
+      description="Budget, contractor, dates and where the work is happening."
+      icon={HardHat}
+      size="lg"
+      onSubmit={(event) => {
+        event.preventDefault()
+        if (!saving) void save()
+      }}
+      footer={
+        <>
+          <Button onClick={onClose} disabled={saving}>
+            Cancel
+          </Button>
+          <Button type="submit" variant="primary" loading={saving}>
+            Save project
+          </Button>
+        </>
+      }
+    >
+      <div className="cb-form-grid">
+        <TextField
+          className="is-wide"
+          label="Title"
+          required
+          autoFocus
+          value={form.title || ''}
+          placeholder="e.g. New science lab block"
+          onChange={(e) => set({ title: e.target.value })}
+          error={tried && !form.title?.trim() ? 'Give the project a title.' : undefined}
+        />
+        <Select
+          label="Type"
+          value={form.type || 'construction'}
+          onChange={(e) => set({ type: e.target.value as InfraProject['type'] })}
+          options={Object.entries(INFRA_TYPES).map(([value, label]) => ({ value, label }))}
+        />
+        <Select
+          label="Status"
+          value={form.status || 'planned'}
+          onChange={(e) => set({ status: e.target.value as InfraProject['status'] })}
+          options={Object.entries(INFRA_STATUS).map(([value, v]) => ({ value, label: v.label }))}
+        />
+        <TextField
+          label="Sanctioned budget"
+          type="number"
+          inputMode="decimal"
+          min={0}
+          prefix="₹"
+          value={form.sanctionedBudget || ''}
+          onChange={(e) => set({ sanctionedBudget: Number(e.target.value) })}
+        />
+        <TextField label="Contractor or vendor" value={form.vendor || ''} onChange={(e) => set({ vendor: e.target.value })} />
+        <TextField label="Start date" type="date" value={form.startDate?.slice(0, 10) || ''} onChange={(e) => set({ startDate: e.target.value || null })} />
+        <TextField label="Target completion" type="date" value={form.targetDate?.slice(0, 10) || ''} onChange={(e) => set({ targetDate: e.target.value || null })} />
         {locations.length ? (
-          <Field label="Location (from Assets)" className="col-span-2">
-            <select className={inputClass} value={form.locationId || ''} onChange={(e) => set({ locationId: e.target.value || null })}>
-              <option value="">— Not linked —</option>
-              {locations.map((l) => (
-                <option key={l._id} value={l._id}>
-                  {l.path || l.name} ({l.type})
-                </option>
-              ))}
-            </select>
-          </Field>
+          <Select
+            className="is-wide"
+            label="Location from Assets"
+            value={form.locationId || ''}
+            onChange={(e) => set({ locationId: e.target.value || null })}
+            placeholder="Not linked"
+            options={locations.map((l) => ({ value: l._id, label: `${l.path || l.name} (${l.type})` }))}
+          />
         ) : null}
-        <Field label="Location / area" className="col-span-2">
-          <input className={inputClass} value={form.locationText || ''} placeholder="e.g. Behind Block B" onChange={(e) => set({ locationText: e.target.value })} />
-        </Field>
-        <Field label="Scope / description" className="col-span-2">
-          <textarea rows={3} className={inputClass} value={form.description || ''} onChange={(e) => set({ description: e.target.value })} />
-        </Field>
+        <TextField
+          className="is-wide"
+          label="Location or area"
+          value={form.locationText || ''}
+          placeholder="e.g. Behind Block B"
+          onChange={(e) => set({ locationText: e.target.value })}
+        />
+        <TextArea className="is-wide" label="Scope" rows={3} value={form.description || ''} onChange={(e) => set({ description: e.target.value })} />
       </div>
-      <div className="mt-6 flex justify-end gap-2">
-        <button type="button" className={btnSecondary} onClick={onClose}>
-          Cancel
-        </button>
-        <button type="button" className={btnPrimary} onClick={save}>
-          Save project
-        </button>
-      </div>
-    </Modal>
+    </Sheet>
   )
 }
+
+const CLOSED: InfraProject['status'][] = ['completed', 'cancelled']
 
 const CpitlInfra: React.FC = () => {
   const navigate = useNavigate()
   const invalidate = useInvalidateCpitl()
   const { data: projects = [], isLoading } = useInfraProjects()
   const [open, setOpen] = useState(false)
+  const [search, setSearch] = useState('')
+  const [view, setView] = useState<'open' | 'closed' | 'all'>('all')
+  const [type, setType] = useState('')
 
-  const active = projects.filter((p) => !['completed', 'cancelled'].includes(p.status))
-  const closed = projects.filter((p) => ['completed', 'cancelled'].includes(p.status))
+  const active = projects.filter((p) => !CLOSED.includes(p.status))
+  const closed = projects.filter((p) => CLOSED.includes(p.status))
   const totalBudget = active.reduce((s, p) => s + p.sanctionedBudget, 0)
   const totalSpent = projects.reduce((s, p) => s + (p.spent || 0), 0)
+  const completed = projects.filter((p) => p.status === 'completed').length
 
-  const Card = ({ p }: { p: InfraProject }) => {
-    const pct = p.sanctionedBudget > 0 ? (p.spent / p.sanctionedBudget) * 100 : null
-    const done = p.milestones?.filter((m) => m.done).length || 0
-    return (
-      <Link
-        to={`/cpitl/infra/${p._id}`}
-        className="flex flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-indigo-300 hover:shadow-md dark:border-slate-700 dark:bg-slate-800"
-      >
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h3 className="truncate font-semibold text-slate-900 dark:text-white">{p.title}</h3>
-            <p className="text-xs text-slate-500">{INFRA_TYPES[p.type]}</p>
-          </div>
-          <CpitlBadge status={INFRA_STATUS[p.status].badge} label={INFRA_STATUS[p.status].label} />
+  const rows = useMemo(() => {
+    const needle = search.trim().toLowerCase()
+    // Open projects first, then completed and cancelled — as the old two-section layout did.
+    const ordered = [...active, ...closed]
+    return ordered.filter((p) => {
+      if (view === 'open' && CLOSED.includes(p.status)) return false
+      if (view === 'closed' && !CLOSED.includes(p.status)) return false
+      if (type && p.type !== type) return false
+      if (!needle) return true
+      return [p.title, p.vendor, p.locationText].some((v) => String(v || '').toLowerCase().includes(needle))
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projects, search, view, type])
+
+  const columns: DataTableColumn<InfraProject>[] = [
+    {
+      key: 'title',
+      header: 'Project',
+      mobile: 'title',
+      render: (p) => (
+        <div className="ce-entity">
+          <span className="ce-entity__primary">{p.title}</span>
+          <span className="ce-entity__secondary">{[INFRA_TYPES[p.type], p.vendor].filter(Boolean).join(' · ')}</span>
         </div>
-        {p.locationText ? (
-          <p className="mt-2 flex items-center gap-1 text-xs text-slate-500">
-            <MapPin className="h-3 w-3" /> {p.locationText}
-          </p>
-        ) : null}
-        <div className="mt-4">
-          <div className="flex items-baseline justify-between text-sm">
-            <span className="font-semibold tabular-nums text-slate-900 dark:text-white">{inr(p.spent)}</span>
-            <span className="text-xs text-slate-500">{p.sanctionedBudget ? `of ${inr(p.sanctionedBudget)}` : 'No budget set'}</span>
-          </div>
-          {pct !== null ? <UsageBar pct={pct} className="mt-1.5" /> : null}
-        </div>
-        <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3 text-xs text-slate-500 dark:border-slate-700">
-          <span>{p.milestones?.length ? `${done}/${p.milestones.length} milestones` : `${p.payments || 0} payment(s)`}</span>
-          <span>{p.targetDate ? `Target ${fmtDate(p.targetDate)}` : p.vendor || ''}</span>
-        </div>
-      </Link>
-    )
-  }
+      ),
+    },
+    { key: 'status', header: 'Status', mobile: 'aside', render: (p) => <InfraStatusBadge status={p.status} /> },
+    { key: 'location', header: 'Location', render: (p) => orDash(p.locationText) },
+    { key: 'spent', header: 'Budget used', headerLabel: 'Budget used', render: (p) => <InfraUsage spent={p.spent || 0} budget={p.sanctionedBudget} /> },
+    {
+      key: 'progress',
+      header: 'Progress',
+      render: (p) => {
+        const done = p.milestones?.filter((m) => m.done).length || 0
+        return p.milestones?.length ? `${done} of ${p.milestones.length} milestones` : `${typeof p.payments === 'number' ? p.payments : 0} payment(s)`
+      },
+    },
+    { key: 'target', header: 'Target', numeric: true, render: (p) => fmtDate(p.targetDate) },
+  ]
+
+  const filtered = Boolean(search.trim() || type || view !== 'all')
 
   return (
-    <CpitlPageShell
-      title="Infrastructure Development"
-      subtitle={`${active.length} open project(s) · ${inrShort(totalSpent)} spent against ${inrShort(totalBudget)} sanctioned`}
-      actions={
-        <button type="button" className={btnPrimary} onClick={() => setOpen(true)}>
-          <Plus className="h-4 w-4" /> New project
-        </button>
-      }
-    >
-      {isLoading ? (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="h-48 animate-pulse rounded-2xl bg-slate-100 dark:bg-slate-800" />
-          ))}
+    <Page>
+      <div className="cb-stats">
+        <StatCard label="Open projects" value={active.length} icon={HardHat} hint={closed.length ? `${closed.length} closed` : undefined} />
+        <StatCard label="Sanctioned (open)" value={inrShort(totalBudget)} icon={IndianRupee} />
+        <StatCard
+          label="Spent to date"
+          value={inrShort(totalSpent)}
+          icon={Wallet}
+          hint="Across all projects"
+        />
+        <StatCard label="Completed" value={completed} icon={CheckCircle2} />
+      </div>
+
+      <Card flush className="ce-records">
+        <div className="ce-records__toolbar">
+          <FilterBar
+            search={{ placeholder: 'Search title, contractor or location', value: search, onChange: setSearch, label: 'Search projects' }}
+            chips={[
+              { id: 'all', label: 'All', count: projects.length, active: view === 'all' },
+              { id: 'open', label: 'Open', count: active.length, active: view === 'open' },
+              { id: 'closed', label: 'Completed & cancelled', count: closed.length, active: view === 'closed' },
+            ]}
+            onChipClick={(id) => setView(id as typeof view)}
+            chipsLabel="Project status"
+            filters={
+              <Select
+                size="sm"
+                aria-label="Project type"
+                value={type}
+                onChange={(e) => setType(e.target.value)}
+                placeholder="All types"
+                options={Object.entries(INFRA_TYPES).map(([value, label]) => ({ value, label }))}
+              />
+            }
+            actions={
+              <Button variant="primary" icon={Plus} onClick={() => setOpen(true)}>
+                Add project
+              </Button>
+            }
+          />
         </div>
-      ) : projects.length ? (
-        <>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {active.map((p) => (
-              <Card key={p._id} p={p} />
-            ))}
-          </div>
-          {closed.length ? (
-            <div>
-              <h3 className="mb-3 text-sm font-semibold text-slate-500">Completed & cancelled</h3>
-              <div className="grid gap-4 opacity-80 md:grid-cols-2 xl:grid-cols-3">
-                {closed.map((p) => (
-                  <Card key={p._id} p={p} />
-                ))}
-              </div>
-            </div>
-          ) : null}
-        </>
-      ) : (
-        <CpitlEmpty
-          message="Track every construction, renovation or major repair as a project: its budget, contractor, milestones and every payment made."
-          action={
-            <button type="button" className={btnPrimary} onClick={() => setOpen(true)}>
-              <HardHat className="h-4 w-4" /> Create first project
-            </button>
+        <DataTable
+          caption="Infrastructure projects"
+          columns={columns}
+          rows={rows}
+          getRowKey={(p) => p._id}
+          onRowClick={(p) => navigate(`/cpitl/infra/${p._id}`)}
+          loading={isLoading}
+          loadingLabel="Loading projects…"
+          empty={
+            projects.length === 0 ? (
+              <EmptyState
+                icon={HardHat}
+                title="No infrastructure projects yet"
+                body="Track each construction, renovation or major repair as a project: its budget, contractor, milestones and every payment. Use Add project to start."
+              />
+            ) : (
+              <EmptyState
+                compact
+                icon={HardHat}
+                title="No projects match these filters"
+                body="Try another search or status."
+                action={
+                  filtered ? (
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        setSearch('')
+                        setType('')
+                        setView('all')
+                      }}
+                    >
+                      Clear filters
+                    </Button>
+                  ) : undefined
+                }
+              />
+            )
           }
         />
-      )}
+      </Card>
+
       <ProjectFormModal
         isOpen={open}
         onClose={() => setOpen(false)}
@@ -228,7 +323,7 @@ const CpitlInfra: React.FC = () => {
           if (id) navigate(`/cpitl/infra/${id}`)
         }}
       />
-    </CpitlPageShell>
+    </Page>
   )
 }
 

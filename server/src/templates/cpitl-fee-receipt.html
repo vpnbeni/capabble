@@ -7,10 +7,14 @@
       @page { size: A4; margin: 0; }
       * { box-sizing: border-box; }
       body { margin: 0; font-family: Arial, Helvetica, sans-serif; color: #111; font-size: 11px; }
-      .page { width: 210mm; height: 297mm; }
-      .copy { height: 148.5mm; padding: 9mm 12mm; position: relative; }
+      .page { width: 210mm; }
+      /* Each copy fills half an A4 page, but grows when a receipt has many lines.
+         Its border and padding repeat on every page it spans (box-decoration-break). */
+      .copy { min-height: 148.5mm; padding: 9mm 12mm; position: relative; display: flex; flex-direction: column;
+        box-decoration-break: clone; -webkit-box-decoration-break: clone; }
       .copy + .copy { border-top: 1px dashed #999; }
-      .frame { border: 1.2px solid #222; height: 100%; padding: 5mm 6mm; display: flex; flex-direction: column; }
+      .frame { border: 1.2px solid #222; flex: 1; padding: 5mm 6mm; display: flex; flex-direction: column;
+        box-decoration-break: clone; -webkit-box-decoration-break: clone; }
       .head { display: flex; align-items: center; gap: 10px; border-bottom: 1.2px solid #222; padding-bottom: 3mm; }
       .head img { width: 15mm; height: 15mm; object-fit: contain; }
       .school { flex: 1; text-align: center; }
@@ -22,6 +26,9 @@
       .meta div span { color: #555; display: inline-block; min-width: 26mm; }
       table { width: 100%; border-collapse: collapse; }
       th, td { border: 1px solid #444; padding: 1.6mm 2mm; text-align: left; }
+      thead { display: table-header-group; }
+      tr { break-inside: avoid; page-break-inside: avoid; }
+      .head, .meta, .words, .foot { break-inside: avoid; }
       th { background: #f0f0f0; font-size: 10px; text-transform: uppercase; }
       td.amt, th.amt { text-align: right; width: 32mm; }
       tr.group td { background: #fafafa; font-weight: bold; font-size: 10px; }

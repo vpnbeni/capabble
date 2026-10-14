@@ -2,6 +2,7 @@ const ExcelJS = require('exceljs');
 const asyncHandler = require('../../middleware/asyncHandler');
 const { httpError, getModel, auditUser } = require('../../modules/cpitl/feeService');
 const { upsertForSource, voidForSource } = require('../../modules/cpitl/expenseLedger');
+const { parseIds, runBulk, sendBulk, labelled } = require('../../modules/cpitl/bulk');
 const { vehicleStats, projectNextYear, sessionMonthsElapsed, monthsCovered } = require('../../modules/cpitl/fuelAnalytics');
 
 const ok = (res, data, extra = {}) => res.json({ success: true, data, ...extra });
@@ -114,6 +115,48 @@ const removeLog = asyncHandler(async (req, res) => {
   return ok(res, null, { message: 'Fuel entry removed.' });
 });
 
+const fmtDay = (date) => {
+  const d = new Date(date);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' });
+};
+const logLabel = (log) => {
+  const v = log.vehicleSnapshot || {};
+  const vehicle = [v.busNo && `Bus ${v.busNo}`, v.registrationNumber].filter(Boolean).join(' · ') || 'Vehicle';
+  return [vehicle, fmtDay(log.date)].filter(Boolean).join(' · ');
+};
+
+/**
+ * POST /cpitl/fuel-logs/bulk-remove { ids, reason } — removes each entry and voids its
+ * ledger expense, as removeLog does. Entries already removed are skipped.
+ */
+const bulkRemoveLogs = asyncHandler(async (req, res) => {
+  const ids = parseIds(req.body?.ids);
+  const reason = String(req.body?.reason || '').trim();
+  if (!reason) throw httpError('A reason is required to remove fuel entries.');
+  const FuelLog = getModel(req.models, 'FuelLog');
+  const user = auditUser(req);
+  const result = await runBulk(ids, async (id) => {
+    const existing = await FuelLog.findById(id).select('vehicleSnapshot date isActive').lean();
+    if (!existing) throw httpError('Fuel entry not found.', 404);
+    const label = logLabel(existing);
+    try {
+      // Conditional update so a concurrent removal is reported, not repeated.
+      const log = await FuelLog.findOneAndUpdate(
+        { _id: id, isActive: { $ne: false } },
+        { isActive: false },
+        { new: true }
+      );
+      if (!log) throw httpError('This fuel entry is already removed.', 400);
+      await voidForSource(req.models, log._id, reason, user);
+    } catch (error) {
+      throw labelled(error, label);
+    }
+    return label;
+  });
+  return sendBulk(res, result);
+});
+
 const analytics = async (req) => {
   const FuelLog = getModel(req.models, 'FuelLog');
   const logs = await FuelLog.find({ isActive: { $ne: false } }).sort({ date: 1 }).lean();
@@ -181,4 +224,4 @@ const projectionXlsx = asyncHandler(async (req, res) => {
   return res.end();
 });
 
-module.exports = { listVehicles, listLogs, createLog, updateLog, removeLog, getAnalytics, projectionXlsx };
+module.exports = { listVehicles, listLogs, createLog, updateLog, removeLog, bulkRemoveLogs, getAnalytics, projectionXlsx };

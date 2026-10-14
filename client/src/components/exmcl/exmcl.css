@@ -1,0 +1,43 @@
+/* Exams (EXMCL) pages. Tokens only; everything sits inside .cb-app (a <Page> or a kit overlay portal). */
+
+/* Short exam codes (UT1, PT2). */
+.cb-app .ex-code { font-weight: 600; font-variant-numeric: tabular-nums; color: var(--ink); }
+
+/* Exam × subject matrix: sticky header row and subject column, scrolls sideways like the attendance register. */
+.cb-app .ex-matrix { overflow: auto; max-height: 70vh; border-top: 1px solid var(--border); }
+.cb-app .ex-matrix table { border-collapse: separate; border-spacing: 0; font-size: 13px; line-height: 18px; min-width: 100%; }
+.cb-app .ex-matrix th, .cb-app .ex-matrix td { border-bottom: 1px solid var(--border); padding: 0 var(--space-2); height: 40px; text-align: center; background: var(--surface); }
+.cb-app .ex-matrix thead th { position: sticky; top: 0; z-index: 2; background: var(--surface-sunken); font: 500 12px/16px var(--font-sans); color: var(--ink-muted); height: 52px; }
+.cb-app .ex-matrix th.ex-matrix__subject, .cb-app .ex-matrix td.ex-matrix__subject { position: sticky; left: 0; z-index: 1; text-align: left; min-width: 200px; max-width: 240px; padding: 0 var(--space-4); border-right: 1px solid var(--border); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cb-app .ex-matrix thead th.ex-matrix__subject { z-index: 3; }
+.cb-app .ex-matrix tbody th.ex-matrix__subject { color: var(--ink); font: 500 13px/18px var(--font-sans); }
+.cb-app .ex-matrix tbody tr:hover > * { background: var(--surface-hover); }
+.cb-app .ex-matrix__exam { display: inline-flex; flex-direction: column; align-items: center; gap: 4px; min-width: 56px; }
+.cb-app .ex-matrix__exam > span { color: var(--ink); font-weight: 600; }
+.cb-app .ex-matrix .cb-check { justify-content: center; }
+.cb-app .ex-matrix td.ex-matrix__all, .cb-app .ex-matrix th.ex-matrix__all { border-left: 1px solid var(--border); }
+
+/* Rendered circular text. */
+.cb-app .ex-richtext { font-size: 14px; line-height: 22px; color: var(--ink); overflow-wrap: anywhere; }
+.cb-app .ex-richtext p, .cb-app .ex-richtext ul, .cb-app .ex-richtext ol { margin: 0 0 var(--space-3); }
+.cb-app .ex-richtext ul, .cb-app .ex-richtext ol { padding-left: var(--space-5); }
+.cb-app .ex-richtext table { border-collapse: collapse; }
+.cb-app .ex-richtext td, .cb-app .ex-richtext th { border: 1px solid var(--border); padding: var(--space-1) var(--space-2); }
+
+/* Circular editor: kit controls in a toolbar over a contenteditable area with the control outline. */
+.cb-app .ex-editor { display: flex; flex-direction: column; gap: 6px; }
+.cb-app .ex-editor__label { font: 500 13px/18px var(--font-sans); color: var(--ink); }
+.cb-app .ex-editor__frame { border: 1px solid var(--border-control); border-radius: var(--radius-sm); background: var(--surface); overflow: hidden; }
+.cb-app .ex-editor.is-invalid .ex-editor__frame { border-color: var(--danger-solid); }
+.cb-app .ex-editor__frame:focus-within { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.cb-app .ex-editor__toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1); padding: var(--space-1) var(--space-2); border-bottom: 1px solid var(--border); background: var(--surface-sunken); }
+.cb-app .ex-editor__toolbar .cb-field { width: 112px; }
+.cb-app .ex-editor__sep { width: 1px; height: 20px; margin: 0 var(--space-1); background: var(--border); }
+.cb-app .ex-editor__area { min-height: 240px; padding: var(--space-3); outline: 0; }
+.cb-app .ex-editor__area:empty::before { content: attr(data-placeholder); color: var(--ink-subtle); }
+.cb-app .ex-richtext h1 { font: 600 20px/28px var(--font-sans); margin: 0 0 var(--space-3); }
+.cb-app .ex-richtext h2 { font: 600 18px/26px var(--font-sans); margin: 0 0 var(--space-3); }
+.cb-app .ex-richtext h3 { font: 600 15px/22px var(--font-sans); margin: 0 0 var(--space-2); }
+@media (max-width: 640px) {
+  .cb-app .ex-matrix th.ex-matrix__subject, .cb-app .ex-matrix td.ex-matrix__subject { min-width: 128px; max-width: 160px; padding: 0 var(--space-3); }
+}

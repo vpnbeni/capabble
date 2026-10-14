@@ -38,6 +38,8 @@ router.put('/fee-structures/:id', fees, can(P.MANAGE_STRUCTURES), fee.updateStru
 router.post('/fee-structures/:id/duplicate', fees, can(P.MANAGE_STRUCTURES), fee.duplicateStructure);
 router.post('/fee-structures/:id/archive', fees, can(P.MANAGE_STRUCTURES), fee.archiveStructure);
 router.post('/fee-structures/:id/restore', fees, can(P.MANAGE_STRUCTURES), fee.restoreStructure);
+router.post('/fee-structures/bulk-archive', fees, can(P.MANAGE_STRUCTURES), fee.bulkArchiveStructures);
+router.post('/fee-structures/bulk-restore', fees, can(P.MANAGE_STRUCTURES), fee.bulkRestoreStructures);
 router.post('/fee-structures/:id/assign', fees, can(P.MANAGE_STRUCTURES), fee.assignStructureHandler);
 router.post('/fee-structures/:id/reapply', fees, can(P.MANAGE_STRUCTURES), fee.reapplyStructure);
 router.get('/fee-structures/:id/revisions', fees, fee.listRevisions);
@@ -50,11 +52,15 @@ router.put('/students/:studentId/account', fees, can(P.MANAGE_ACCOUNTS), collect
 router.post('/students/:studentId/payments', fees, can(P.COLLECT), collection.createPayment);
 router.get('/students/:studentId/fee-slip.pdf', fees, collection.studentFeeSlipPdf);
 router.post('/demands/:demandId/waive', fees, can(P.MANAGE_ACCOUNTS), collection.waiveDemand);
+router.post('/demands/bulk-waive', fees, can(P.MANAGE_ACCOUNTS), collection.bulkWaiveDemands);
 router.get('/payments', fees, collection.listPayments);
 router.get('/payments/:id/receipt.pdf', fees, collection.receiptPdf);
 router.post('/payments/:id/cancel', fees, can(P.CANCEL_RECEIPT), collection.cancelPaymentHandler);
+router.post('/payments/bulk-cancel', fees, can(P.CANCEL_RECEIPT), collection.bulkCancelPayments);
+router.post('/payments/receipts.pdf', fees, collection.bulkReceiptsPdf);
 router.post('/payments/:id/cheque-status', fees, can(P.MANAGE_ACCOUNTS), collection.updateChequeStatus);
 router.get('/fee-slips.pdf', fees, collection.bulkFeeSlipsPdf);
+router.post('/fee-slips/students.pdf', fees, collection.studentSlipsPdf);
 
 // Settings
 router.get('/settings', fees, fee.getSettingsHandler);
@@ -74,6 +80,7 @@ router.get('/expenses', expenses, expense.listExpenses);
 router.post('/expenses', expenses, can(P.EXPENSE_LOG), expense.createExpense);
 router.put('/expenses/:id', expenses, can(P.EXPENSE_LOG), expense.updateExpense);
 router.post('/expenses/:id/void', expenses, can(P.EXPENSE_VOID), expense.voidExpense);
+router.post('/expenses/bulk-void', expenses, can(P.EXPENSE_VOID), expense.bulkVoidExpenses);
 
 router.get('/budgets', expenses, expense.getBudgets);
 router.put('/budgets', expenses, can(P.BUDGETS), expense.saveBudgets);
@@ -86,6 +93,7 @@ router.get('/fuel-logs', expenses, fuel.listLogs);
 router.post('/fuel-logs', expenses, can(P.EXPENSE_LOG), fuel.createLog);
 router.put('/fuel-logs/:id', expenses, can(P.EXPENSE_LOG), fuel.updateLog);
 router.post('/fuel-logs/:id/remove', expenses, can(P.EXPENSE_VOID), fuel.removeLog);
+router.post('/fuel-logs/bulk-remove', expenses, can(P.EXPENSE_VOID), fuel.bulkRemoveLogs);
 
 router.get('/electricity/connections', expenses, facility.listConnections);
 router.post('/electricity/connections', expenses, can(P.EXPENSE_LOG), facility.saveConnection);
@@ -97,6 +105,8 @@ router.post('/electricity/bills', expenses, can(P.EXPENSE_LOG), facility.createB
 router.put('/electricity/bills/:id', expenses, can(P.EXPENSE_LOG), facility.updateBill);
 router.post('/electricity/bills/:id/pay', expenses, can(P.EXPENSE_LOG), facility.payBill);
 router.post('/electricity/bills/:id/remove', expenses, can(P.EXPENSE_VOID), facility.removeBill);
+router.post('/electricity/bills/bulk-pay', expenses, can(P.EXPENSE_LOG), facility.bulkPayBills);
+router.post('/electricity/bills/bulk-remove', expenses, can(P.EXPENSE_VOID), facility.bulkRemoveBills);
 
 router.get('/infra/projects', expenses, facility.listProjects);
 router.post('/infra/projects', expenses, can(P.EXPENSE_LOG), facility.saveProject);
@@ -116,6 +126,7 @@ router.post('/salary/preview', payrollFeature, payroll.previewSalary);
 router.get('/salary/staff', payrollFeature, can(P.PAYROLL), payroll.listStaffSalaries);
 router.get('/salary/staff/:teacherId', payrollFeature, can(P.PAYROLL), payroll.getStaffSalary);
 router.put('/salary/staff/:teacherId', payrollFeature, can(P.PAYROLL), payroll.saveStaffSalary);
+router.post('/salary/staff/bulk-revise', payrollFeature, can(P.PAYROLL), payroll.bulkReviseSalaries);
 
 router.get('/payroll/runs', payrollFeature, can(P.PAYROLL), payroll.listRuns);
 router.post('/payroll/runs', payrollFeature, can(P.PAYROLL), payroll.createRun);
@@ -126,6 +137,7 @@ router.post('/payroll/runs/:month/finalize', payrollFeature, can(P.PAYROLL), pay
 router.post('/payroll/runs/:month/pay', payrollFeature, can(P.PAYROLL), payroll.payRun);
 router.post('/payroll/runs/:month/reopen', payrollFeature, can(P.PAYROLL), payroll.reopenRun);
 router.get('/payroll/runs/:month/payslips.pdf', payrollFeature, can(P.PAYROLL), payroll.payslipsPdf);
+router.post('/payroll/runs/:month/payslips.pdf', payrollFeature, can(P.PAYROLL), payroll.payslipsPdf);
 router.get('/payroll/runs/:month/bank-sheet.xlsx', payrollFeature, can(P.PAYROLL), payroll.bankSheetXlsx);
 
 module.exports = router;

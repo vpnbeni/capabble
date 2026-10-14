@@ -1,8 +1,13 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useId, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import toast from 'react-hot-toast'
-import { ImagePlus, Trash2, X } from 'lucide-react'
+import { ImagePlus, Pencil, Trash2 } from 'lucide-react'
 import api from '@/services/api'
 import { ImageCropModal } from '@/components/common/ImageCropModal'
+import { Button, Sheet, TextArea, TextField } from '@/components/ui'
+import { isLikelyColor, toneStyle } from '@/components/actvt/entityTone'
+import '@/components/actvt/actvt.css'
+import '@/components/actvt/clubs.css'
 
 export type ClubEditRecord = {
   _id?: string
@@ -28,20 +33,80 @@ type ClubEditForm = {
   description: string
 }
 
-const isLikelyColor = (value = '') => /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(value.trim())
+/** Colour a new club starts with until the school picks one. */
+export const DEFAULT_CLUB_COLOR = '#4f46e5'
 
-const initialsOf = (name = '') => {
+export const clubInitials = (name = '') => {
   const parts = String(name).trim().split(/\s+/).filter(Boolean)
   if (parts.length === 0) return 'C'
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
   return `${parts[0][0] || ''}${parts[1][0] || ''}`.toUpperCase()
 }
 
-const inputClass =
-  'h-10 w-full rounded-xl border border-slate-200 px-3 text-sm text-slate-800 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100'
+/**
+ * The shared crop modal is an inline `fixed z-[80]` overlay; kit Sheets and Dialogs sit at
+ * z-index 100 in a body portal. Portal the cropper into its own layer above them.
+ */
+export const ClubLogoCropper: React.FC<{
+  imageSrc: string
+  onCancel: () => void
+  onCropped: (file: File, previewUrl: string) => void
+}> = ({ imageSrc, onCancel, onCropped }) => {
+  if (!imageSrc || typeof document === 'undefined') return null
+  return createPortal(
+    <div style={{ position: 'relative', zIndex: 120 }}>
+      <ImageCropModal
+        open
+        imageSrc={imageSrc}
+        title="Crop club logo"
+        aspect={1}
+        onCancel={onCancel}
+        onCropped={onCropped}
+      />
+    </div>,
+    document.body
+  )
+}
 
-const textareaClass =
-  'w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100'
+/** Logo tile: the uploaded image, or initials on the club's own colour. */
+export const ClubLogoTile: React.FC<{ logo?: string; name?: string; className?: string }> = ({ logo, name, className }) => (
+  <span className={className ? `ac-logo-tile ${className}` : 'ac-logo-tile'}>
+    {logo ? (
+      <img src={logo} alt={name ? `${name} logo` : 'Club logo'} />
+    ) : (
+      <span className="ac-logo-tile__initials actvt-tone-fill" aria-hidden="true">
+        {clubInitials(name)}
+      </span>
+    )}
+  </span>
+)
+
+/** Colour picker + hex field, used by the add and edit sheets. */
+export const ClubColorField: React.FC<{ value: string; onChange: (value: string) => void }> = ({ value, onChange }) => {
+  const labelId = useId()
+  return (
+  <div className="cb-field">
+    <span className="cb-field__label" id={labelId}>
+      Colour
+    </span>
+    <div className="actvt-colorfield">
+      <input
+        type="color"
+        value={isLikelyColor(value) ? value : DEFAULT_CLUB_COLOR}
+        onChange={(event) => onChange(event.target.value)}
+        aria-label="Pick club colour"
+      />
+      <TextField
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={DEFAULT_CLUB_COLOR}
+        aria-labelledby={labelId}
+      />
+    </div>
+    <div className="cb-field__hint">Match the club logo. Shown on its card and profile.</div>
+  </div>
+  )
+}
 
 type ClubEditModalProps = {
   open: boolean
@@ -50,17 +115,12 @@ type ClubEditModalProps = {
   onSaved: (club: ClubEditRecord) => void
 }
 
-export const ClubEditModal: React.FC<ClubEditModalProps> = ({
-  open,
-  club,
-  onClose,
-  onSaved,
-}) => {
+export const ClubEditModal: React.FC<ClubEditModalProps> = ({ open, club, onClose, onSaved }) => {
   const [form, setForm] = useState<ClubEditForm>({
     name: '',
     tagline: '',
     motto: '',
-    color: '#4f46e5',
+    color: DEFAULT_CLUB_COLOR,
     incharge: '',
     meetingDay: '',
     description: '',
@@ -79,7 +139,7 @@ export const ClubEditModal: React.FC<ClubEditModalProps> = ({
       name: String(club.name || ''),
       tagline: String(club.tagline || ''),
       motto: String(club.motto || ''),
-      color: String(club.color || '#4f46e5'),
+      color: String(club.color || DEFAULT_CLUB_COLOR),
       incharge: String(club.incharge || ''),
       meetingDay: String(club.meetingDay || ''),
       description: String(club.description || ''),
@@ -95,30 +155,25 @@ export const ClubEditModal: React.FC<ClubEditModalProps> = ({
     cropSourceRef.current = cropSource
   }, [cropSource])
 
-  useEffect(() => () => {
-    if (cropSourceRef.current.startsWith('blob:')) {
-      URL.revokeObjectURL(cropSourceRef.current)
-    }
-  }, [])
+  useEffect(
+    () => () => {
+      if (cropSourceRef.current.startsWith('blob:')) {
+        URL.revokeObjectURL(cropSourceRef.current)
+      }
+    },
+    []
+  )
 
-  useEffect(() => {
-    if (!open) return
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !cropSource) onClose()
-    }
-    document.addEventListener('keydown', onKey)
-    document.body.style.overflow = 'hidden'
-    return () => {
-      document.removeEventListener('keydown', onKey)
-      document.body.style.overflow = ''
-    }
-  }, [open, cropSource, onClose])
-
-  if (!open || !club?._id) return null
+  const visible = open && Boolean(club?._id)
 
   const clearCropSource = () => {
     if (cropSource.startsWith('blob:')) URL.revokeObjectURL(cropSource)
     setCropSource('')
+  }
+
+  const requestClose = () => {
+    if (saving || cropSource) return
+    onClose()
   }
 
   const handleLogoSelected = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -152,6 +207,7 @@ export const ClubEditModal: React.FC<ClubEditModalProps> = ({
 
   const handleSave = async (event: React.FormEvent) => {
     event.preventDefault()
+    if (!club?._id) return
     if (!form.name.trim()) {
       toast.error('Club name is required.')
       return
@@ -185,179 +241,103 @@ export const ClubEditModal: React.FC<ClubEditModalProps> = ({
     }
   }
 
-  const tone = isLikelyColor(form.color) ? form.color : '#4f46e5'
-
   return (
     <>
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
-        <div
-          className="absolute inset-0"
-          onClick={() => !saving && onClose()}
-        />
-        <div className="relative z-[1] flex max-h-[calc(100vh-2rem)] w-full max-w-xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl">
-          <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3">
-            <h3 className="text-sm font-semibold text-slate-900">Edit club</h3>
-            <button
-              type="button"
-              onClick={() => !saving && onClose()}
-              className="rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-              aria-label="Close"
-            >
-              <X className="h-4 w-4" />
-            </button>
+      <Sheet
+        open={visible}
+        onClose={requestClose}
+        title="Edit club"
+        description={club?.name ? `Update ${club.name}'s identity and details.` : undefined}
+        icon={Pencil}
+        size="md"
+        onSubmit={handleSave}
+        footer={
+          <>
+            <Button variant="secondary" onClick={requestClose} disabled={saving}>
+              Cancel
+            </Button>
+            <Button variant="primary" type="submit" loading={saving}>
+              Save changes
+            </Button>
+          </>
+        }
+      >
+        <div className="cb-form-section">
+          <p className="cb-form-section__title">Identity</p>
+          <div className="ac-logo-field" style={toneStyle(form.color)}>
+            <ClubLogoTile logo={logoPreview} name={form.name} className="ac-logo-tile--lg" />
+            <div className="ac-logo-field__body">
+              <p className="ac-logo-field__label">Club logo</p>
+              <p className="ac-logo-field__hint">Square image. You can crop it after choosing.</p>
+              <div className="ac-logo-field__actions">
+                <Button size="sm" icon={ImagePlus} onClick={() => logoInputRef.current?.click()}>
+                  {logoPreview ? 'Replace logo' : 'Upload logo'}
+                </Button>
+                {logoPreview ? (
+                  <Button size="sm" variant="tertiary" icon={Trash2} onClick={handleRemoveLogo}>
+                    Remove
+                  </Button>
+                ) : null}
+              </div>
+              <input
+                ref={logoInputRef}
+                type="file"
+                accept="image/*"
+                className="ac-file-input"
+                tabIndex={-1}
+                aria-hidden="true"
+                onChange={handleLogoSelected}
+              />
+            </div>
           </div>
-
-          <form onSubmit={handleSave} className="flex min-h-0 flex-1 flex-col">
-            <div className="flex-1 space-y-4 overflow-y-auto px-5 py-5">
-              <div className="flex flex-col items-center gap-3 sm:flex-row sm:items-start">
-                <div className="flex h-28 w-28 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 p-2">
-                  {logoPreview ? (
-                    <img src={logoPreview} alt={form.name || 'Club logo'} className="h-full w-full rounded-xl object-contain" />
-                  ) : (
-                    <div
-                      className="flex h-full w-full items-center justify-center rounded-xl text-2xl font-bold text-white"
-                      style={{ backgroundColor: tone }}
-                    >
-                      {initialsOf(form.name)}
-                    </div>
-                  )}
-                </div>
-                <div className="flex flex-1 flex-col gap-2">
-                  <p className="text-xs font-medium text-slate-500">Club logo</p>
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={() => logoInputRef.current?.click()}
-                      className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3 py-2 text-xs font-semibold text-white hover:bg-indigo-700"
-                    >
-                      <ImagePlus className="h-3.5 w-3.5" />
-                      {logoPreview ? 'Replace / Change' : 'Upload logo'}
-                    </button>
-                    {logoPreview ? (
-                      <button
-                        type="button"
-                        onClick={handleRemoveLogo}
-                        className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-100"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                        Remove
-                      </button>
-                    ) : null}
-                  </div>
-                  <input
-                    ref={logoInputRef}
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={handleLogoSelected}
-                  />
-                </div>
-              </div>
-
-              <label className="block text-xs">
-                <span className="mb-1 block font-medium text-slate-500">Club name</span>
-                <input
-                  required
-                  value={form.name}
-                  onChange={(event) => setForm({ ...form, name: event.target.value })}
-                  className={inputClass}
-                />
-              </label>
-
-              <div className="grid gap-3 sm:grid-cols-2">
-                <label className="block text-xs">
-                  <span className="mb-1 block font-medium text-slate-500">Tagline</span>
-                  <input
-                    value={form.tagline}
-                    onChange={(event) => setForm({ ...form, tagline: event.target.value })}
-                    className={inputClass}
-                  />
-                </label>
-                <label className="block text-xs">
-                  <span className="mb-1 block font-medium text-slate-500">Motto</span>
-                  <input
-                    value={form.motto}
-                    onChange={(event) => setForm({ ...form, motto: event.target.value })}
-                    className={inputClass}
-                  />
-                </label>
-              </div>
-
-              <label className="block text-xs">
-                <span className="mb-1 block font-medium text-slate-500">Colour</span>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="color"
-                    value={isLikelyColor(form.color) ? form.color : '#4f46e5'}
-                    onChange={(event) => setForm({ ...form, color: event.target.value })}
-                    className="h-10 w-10 cursor-pointer rounded-lg border border-slate-200 bg-white p-1"
-                  />
-                  <input
-                    value={form.color}
-                    onChange={(event) => setForm({ ...form, color: event.target.value })}
-                    className={inputClass}
-                  />
-                </div>
-              </label>
-
-              <div className="grid gap-3 sm:grid-cols-2">
-                <label className="block text-xs">
-                  <span className="mb-1 block font-medium text-slate-500">Teacher incharge</span>
-                  <input
-                    value={form.incharge}
-                    onChange={(event) => setForm({ ...form, incharge: event.target.value })}
-                    placeholder="Teacher name"
-                    className={inputClass}
-                  />
-                </label>
-                <label className="block text-xs">
-                  <span className="mb-1 block font-medium text-slate-500">Meeting day</span>
-                  <input
-                    value={form.meetingDay}
-                    onChange={(event) => setForm({ ...form, meetingDay: event.target.value })}
-                    placeholder="e.g. Friday"
-                    className={inputClass}
-                  />
-                </label>
-              </div>
-
-              <label className="block text-xs">
-                <span className="mb-1 block font-medium text-slate-500">Description</span>
-                <textarea
-                  rows={3}
-                  value={form.description}
-                  onChange={(event) => setForm({ ...form, description: event.target.value })}
-                  className={textareaClass}
-                />
-              </label>
-            </div>
-
-            <div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-3">
-              <button
-                type="button"
-                onClick={onClose}
-                disabled={saving}
-                className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 disabled:opacity-60"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={saving}
-                className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
-              >
-                {saving ? 'Saving...' : 'Save changes'}
-              </button>
-            </div>
-          </form>
+          <TextField
+            label="Club name"
+            required
+            value={form.name}
+            onChange={(event) => setForm({ ...form, name: event.target.value })}
+          />
+          <ClubColorField value={form.color} onChange={(color) => setForm({ ...form, color })} />
+          <div className="cb-form-grid">
+            <TextField
+              label="Tagline"
+              value={form.tagline}
+              onChange={(event) => setForm({ ...form, tagline: event.target.value })}
+            />
+            <TextField
+              label="Motto"
+              value={form.motto}
+              onChange={(event) => setForm({ ...form, motto: event.target.value })}
+            />
+          </div>
         </div>
-      </div>
 
-      <ImageCropModal
-        open={Boolean(cropSource)}
+        <div className="cb-form-section">
+          <p className="cb-form-section__title">Running the club</p>
+          <div className="cb-form-grid">
+            <TextField
+              label="Teacher incharge"
+              value={form.incharge}
+              onChange={(event) => setForm({ ...form, incharge: event.target.value })}
+              placeholder="Teacher name"
+            />
+            <TextField
+              label="Meeting day"
+              value={form.meetingDay}
+              onChange={(event) => setForm({ ...form, meetingDay: event.target.value })}
+              placeholder="e.g. Friday"
+            />
+          </div>
+          <TextArea
+            label="Description"
+            rows={3}
+            value={form.description}
+            onChange={(event) => setForm({ ...form, description: event.target.value })}
+          />
+        </div>
+      </Sheet>
+
+      <ClubLogoCropper
         imageSrc={cropSource}
-        title="Crop club logo"
-        aspect={1}
         onCancel={() => {
           clearCropSource()
           if (logoInputRef.current) logoInputRef.current.value = ''

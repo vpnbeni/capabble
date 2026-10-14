@@ -4,6 +4,7 @@ const { ensureExpenseCategories, assertEditableExpense } = require('../../module
 const { projectNextYear, sessionMonthsElapsed, monthsCovered } = require('../../modules/cpitl/fuelAnalytics');
 const { EXPENSE_KINDS, PAYMENT_MODES } = require('../../modules/cpitl/constants');
 const { uploadDocumentToCloudinary } = require('../../config/cloudinary');
+const { parseIds, runBulk, sendBulk, labelled } = require('../../modules/cpitl/bulk');
 
 const ok = (res, data, extra = {}) => res.json({ success: true, data, ...extra });
 const round = (v) => Math.round((Number(v) || 0) * 100) / 100;
@@ -138,6 +139,32 @@ const voidExpense = asyncHandler(async (req, res) => {
   expense.set({ status: 'void', voidReason: reason, voidedAt: new Date(), updatedBy: auditUser(req) });
   await expense.save();
   return ok(res, expense, { message: 'Expense voided.' });
+});
+
+/**
+ * POST /cpitl/expenses/bulk-void { ids, reason } — voids each expense with one shared
+ * reason, applying the same checks as voidExpense (not found / already void / managed
+ * from the fuel, electricity or payroll page become skips).
+ */
+const bulkVoidExpenses = asyncHandler(async (req, res) => {
+  const ids = parseIds(req.body?.ids);
+  const reason = String(req.body?.reason || '').trim();
+  if (!reason) throw httpError('A reason is required to void an expense.');
+  const CapitalExpense = getModel(req.models, 'CapitalExpense');
+  const user = auditUser(req);
+  const result = await runBulk(ids, async (id) => {
+    const expense = await CapitalExpense.findById(id);
+    const label = expense ? expense.title || 'Expense' : undefined;
+    try {
+      assertEditableExpense(expense);
+      expense.set({ status: 'void', voidReason: reason, voidedAt: new Date(), updatedBy: user });
+      await expense.save();
+    } catch (error) {
+      throw labelled(error, label);
+    }
+    return label;
+  });
+  return sendBulk(res, result);
 });
 
 // ── Summary ─────────────────────────────────────────────────────────
@@ -372,6 +399,7 @@ module.exports = {
   createExpense,
   updateExpense,
   voidExpense,
+  bulkVoidExpenses,
   getSummary,
   uploadAttachment,
   getBudgets,

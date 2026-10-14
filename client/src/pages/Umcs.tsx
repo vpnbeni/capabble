@@ -7,8 +7,6 @@ const Umcs: React.FC = () => {
       title="UMC's"
       description="Handle unfair means cases reported at the centre and prepare the forwarding paperwork needed to escalate each case with the right supporting details."
       summaryLabel="Case handling, documentation, and forwarding workflow"
-      summaryValue="UMC"
-      accentClasses="bg-[linear-gradient(135deg,#fff7ed_0%,#fffdf4_46%,#fff1f2_100%)]"
       overview={[
         'Register each UMC with candidate, date, subject, and room details.',
         'Track evidence, remarks, and stage-wise case handling progress.',
@@ -16,19 +14,19 @@ const Umcs: React.FC = () => {
       ]}
       workflows={[
         {
-          title: 'Case Intake',
+          title: 'Case intake',
           description: 'Create and maintain a structured record of each reported incident, including invigilator remarks and candidate identifiers.',
         },
         {
-          title: 'Evidence Checklist',
+          title: 'Evidence checklist',
           description: 'Keep track of seized material, statements, and any supporting documents needed before forwarding.',
         },
         {
-          title: 'Forwarding Performa Generation',
+          title: 'Forwarding performa generation',
           description: 'Prepare the forwarding document with the centre details, case summary, and candidate particulars already arranged.',
         },
         {
-          title: 'Case Status Monitoring',
+          title: 'Case status monitoring',
           description: 'Mark a case as pending, reviewed, or forwarded so the centre team knows what remains to be done.',
         },
       ]}

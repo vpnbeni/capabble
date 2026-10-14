@@ -61,11 +61,29 @@ export const getFirstEnabledPath = (toggles: TenantFeatureToggles): string | nul
   return firstEnabled || null
 }
 
+// Pages a module owns that have no feature key of their own (e.g. /time-table/generate)
+// still belong to that module, judged by the start of the path.
+const MODULE_PATH_ROOTS: Array<[prefix: string, module: string]> = [
+  ['/time-table', 'timetable'],
+  ['/stdnt', 'stdnt'],
+  ['/almni', 'stdnt'],
+  ['/staaf', 'staaf'],
+  ['/attnd', 'attnd'],
+  ['/acdmc', 'acdmc'],
+  ['/actvt', 'actvt'],
+  ['/mdcl', 'mdcl'],
+  ['/asets', 'asets'],
+  ['/cpitl', 'cpitl'],
+  ['/trnst', 'trnst'],
+  ['/exmcl', 'exmcl'],
+]
+
 export const getModuleForPath = (pathname: string): string | null => {
   const featureKey = resolveFeatureKeyFromPath(pathname)
-  if (!featureKey) return null
-  const entry = FEATURE_CATALOG.find((e) => e.key === featureKey)
-  return entry?.module ?? null
+  const entry = featureKey ? FEATURE_CATALOG.find((e) => e.key === featureKey) : undefined
+  if (entry && entry.module !== 'core') return entry.module
+  const root = MODULE_PATH_ROOTS.find(([prefix]) => matchesPrefix(pathname, prefix))
+  return root?.[1] ?? entry?.module ?? null
 }
 
 export const getAccessibleModules = (toggles: TenantFeatureToggles): Set<string> => {
@@ -87,6 +105,7 @@ export const getFirstEnabledPathForModule = (module: string, toggles: TenantFeat
 
 const CORE_ALLOWED_PREFIXES = [
   '/',
+  '/home',
   '/dashboard',
   '/candidate-details',
   '/candidates',

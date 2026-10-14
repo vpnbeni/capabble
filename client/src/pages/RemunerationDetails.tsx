@@ -1,8 +1,22 @@
 import React, { useMemo } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useQueries, useQuery } from '@tanstack/react-query'
-import { ArrowLeft } from 'lucide-react'
-import Loader from '../components/common/Loader'
+import { UserX } from 'lucide-react'
+import {
+  Badge,
+  Banner,
+  Card,
+  DataTable,
+  EmptyState,
+  Page,
+  PageHeader,
+  StatCard,
+  formatDate,
+  formatINR,
+  orDash,
+  type DataTableColumn,
+} from '@/components/ui'
+import { CardLoading } from '@/components/exmcl/ExmclUi'
 import dutiesService from '../services/dutiesService'
 import teacherService, { type Teacher } from '../services/teacherService'
 import { useRemunerationRates } from '../hooks/useRemunerationRates'
@@ -19,7 +33,8 @@ const DUTY_TABS = [
   { key: 'CL4', dutyType: 'Class IV' },
 ] as const
 
-const formatMoney = (value: number) => (value ? value.toLocaleString('en-IN') : '—')
+/** Zero amounts show "—", as before. */
+const money = (value: number) => (value ? formatINR(value) : '—')
 
 const toDateKey = (value: string) => String(value || '').trim().slice(0, 10)
 
@@ -172,154 +187,99 @@ const RemunerationDetails: React.FC = () => {
   }, [sections])
 
   const teacher = teacherQuery.data
+  const back = { label: 'Remuneration', onClick: () => navigate('/remuneration') }
+
+  const columns: DataTableColumn<DayRow>[] = [
+    { key: 'date', header: 'Date', mobile: 'title', render: (row) => formatDate(row.dateKey) },
+    { key: 'day', header: 'Day', mobile: 'subtitle', render: (row) => row.dayLabel },
+    { key: 'remuneration', header: 'Remuneration', numeric: true, align: 'right', mobile: 'hidden', render: (row) => money(row.remuneration) },
+    { key: 'conveyance', header: 'Conveyance', numeric: true, align: 'right', mobile: 'hidden', render: (row) => money(row.conveyance) },
+    { key: 'refreshment', header: 'Refreshment', numeric: true, align: 'right', mobile: 'hidden', render: (row) => money(row.refreshment) },
+    {
+      key: 'total',
+      header: 'Total',
+      numeric: true,
+      align: 'right',
+      mobile: 'aside',
+      render: (row) => <span className="cb-strong">{money(row.remuneration + row.conveyance + row.refreshment)}</span>,
+    },
+  ]
+
+  if (isLoading) {
+    return (
+      <Page>
+        <PageHeader back={back} title="Remuneration details" />
+        <Card>
+          <CardLoading label="Loading remuneration…" />
+        </Card>
+      </Page>
+    )
+  }
+
+  if (error || !teacher) {
+    return (
+      <Page>
+        <PageHeader back={back} title="Remuneration details" />
+        {error ? (
+          <Banner tone="danger" title="Couldn't load remuneration details">
+            Refresh the page to try again.
+          </Banner>
+        ) : (
+          <Card>
+            <EmptyState
+              icon={UserX}
+              title="Functionary not found"
+              body="They may have been removed. Go back to remuneration and pick someone else."
+            />
+          </Card>
+        )}
+      </Page>
+    )
+  }
+
+  const oasisId = String(teacher.oasisId || '').trim()
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <button
-          type="button"
-          onClick={() => navigate('/remuneration')}
-          className="inline-flex items-center gap-2 text-sm font-semibold text-gray-700 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Back
-        </button>
+    <Page>
+      <PageHeader back={back} title={orDash(teacher.name)} subtitle={`Oasis ID ${oasisId || '—'}`} />
+
+      <div className="cb-stats">
+        <StatCard label="Remuneration" value={money(overallTotals.remuneration)} />
+        <StatCard label="Conveyance" value={money(overallTotals.conveyance)} />
+        <StatCard label="Refreshment" value={money(overallTotals.refreshment)} />
+        <StatCard label="Grand total" value={money(overallTotals.total)} />
       </div>
 
-      {isLoading ? (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden px-6 py-10 flex items-center justify-center">
-          <Loader />
-        </div>
-      ) : error ? (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden px-6 py-10 text-center text-sm text-red-600 dark:text-red-400">
-          Failed to load remuneration details.
-        </div>
-      ) : !teacher ? (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden px-6 py-10 text-center text-sm text-gray-500 dark:text-gray-400">
-          Functionary not found.
-        </div>
+      {sections.length === 0 ? (
+        <Card>
+          <EmptyState
+            title="No saved duties for this functionary"
+            body="Assign and save their duties on the Duties page to see remuneration here."
+          />
+        </Card>
       ) : (
-        <>
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm ring-1 ring-gray-200/70 dark:ring-gray-700/60 overflow-hidden">
-            <div className="px-6 py-5 bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-800">
-              <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-                <div className="min-w-0">
-                  <div className="text-lg font-semibold text-gray-900 dark:text-white truncate">
-                    {teacher.name || '—'}
-                  </div>
-                  <div className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                    Oasis ID:{' '}
-                    <span className="font-mono text-gray-900 dark:text-white">
-                      {String(teacher.oasisId || '').trim() || '—'}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="shrink-0 grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  {[
-                    { label: 'Remuneration', value: overallTotals.remuneration },
-                    { label: 'Conveyance', value: overallTotals.conveyance },
-                    { label: 'Refreshment', value: overallTotals.refreshment },
-                    { label: 'Grand Total', value: overallTotals.total, emphasis: true },
-                  ].map((item) => (
-                    <div
-                      key={item.label}
-                      className={`rounded-xl border border-gray-200/70 dark:border-gray-700/60 px-3 py-2 ${
-                        item.emphasis ? 'bg-indigo-50/70 dark:bg-indigo-900/20' : 'bg-white/70 dark:bg-gray-800/40'
-                      }`}
-                    >
-                      <div className="text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                        {item.label}
-                      </div>
-                      <div className={`mt-0.5 text-sm font-semibold ${item.emphasis ? 'text-indigo-700 dark:text-indigo-300' : 'text-gray-900 dark:text-white'}`}>
-                        {formatMoney(item.value)}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {sections.length === 0 ? (
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden px-6 py-10 text-center text-sm text-gray-500 dark:text-gray-400">
-              No saved duties found for this functionary.
-            </div>
-          ) : (
-            <div className="space-y-6">
-              {sections.map((section) => (
-                <div key={section.dutyType} className="bg-white dark:bg-gray-800 rounded-xl shadow-sm ring-1 ring-gray-200/70 dark:ring-gray-700/60 overflow-hidden">
-                  <div className="px-6 py-4 border-b border-gray-200/70 dark:border-gray-700/60 bg-gray-50/70 dark:bg-gray-700/30 flex items-center justify-between">
-                    <h3 className="text-base font-semibold text-gray-900 dark:text-white">
-                      {section.dutyType}
-                    </h3>
-                    <span className="inline-flex items-center rounded-full bg-gray-100 text-gray-700 dark:bg-gray-700/60 dark:text-gray-200 px-2.5 py-1 text-xs font-semibold">
-                      {section.days.length} day{section.days.length !== 1 ? 's' : ''}
-                    </span>
-                  </div>
-
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                      <thead className="bg-gray-50/80 dark:bg-gray-700/70 sticky top-0 backdrop-blur">
-                        <tr>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                            Date
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                            Day
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                            Remuneration
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                            Conveyance
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                            Refreshment
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                            Total
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                        {section.days.map((row, idx) => (
-                          <tr
-                            key={row.dateKey}
-                            className={`${idx % 2 === 0 ? 'bg-white dark:bg-gray-800' : 'bg-gray-50/60 dark:bg-gray-700/30'} hover:bg-indigo-50/60 dark:hover:bg-indigo-900/15`}
-                          >
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                              {row.dateLabel}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">
-                              {row.dayLabel}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                              {formatMoney(row.remuneration)}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                              {formatMoney(row.conveyance)}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                              {formatMoney(row.refreshment)}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                              {formatMoney(row.remuneration + row.conveyance + row.refreshment)}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </>
+        sections.map((section) => (
+          <Card
+            key={section.dutyType}
+            flush
+            title={section.dutyType}
+            action={
+              <Badge dot={false}>
+                {section.days.length} day{section.days.length !== 1 ? 's' : ''}
+              </Badge>
+            }
+          >
+            <DataTable
+              caption={section.dutyType}
+              columns={columns}
+              rows={section.days}
+              getRowKey={(row) => row.dateKey}
+            />
+          </Card>
+        ))
       )}
-    </div>
+    </Page>
   )
 }
 
 export default RemunerationDetails
-

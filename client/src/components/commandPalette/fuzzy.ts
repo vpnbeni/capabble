@@ -8,6 +8,44 @@ export type FieldMatch = { score: number; ranges: MatchRange[] }
 
 const isBoundary = (text: string, index: number) => index === 0 || /[\s\-_/&(]/.test(text[index - 1])
 
+/** Optimal-string-alignment distance (Levenshtein + adjacent swaps), capped at `max + 1`. */
+export const editDistance = (a: string, b: string, max = Infinity): number => {
+  if (a === b) return 0
+  if (Math.abs(a.length - b.length) > max) return max + 1
+  const rows: number[][] = [Array.from({ length: b.length + 1 }, (_, j) => j)]
+  for (let i = 1; i <= a.length; i += 1) {
+    rows[i] = [i]
+    let rowMin = i
+    for (let j = 1; j <= b.length; j += 1) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1
+      let value = Math.min(rows[i - 1][j] + 1, rows[i][j - 1] + 1, rows[i - 1][j - 1] + cost)
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) value = Math.min(value, rows[i - 2][j - 2] + 1)
+      rows[i][j] = value
+      if (value < rowMin) rowMin = value
+    }
+    if (rowMin > max) return max + 1
+  }
+  return rows[a.length][b.length]
+}
+
+/** Typo fallback ("studnets" → "Students"): the closest word within 1 edit (2 for 6+ letters). */
+const typoMatch = (needle: string, text: string): FieldMatch | null => {
+  if (needle.length < 4) return null
+  const max = needle.length >= 6 ? 2 : 1
+  const hay = text.toLowerCase()
+  let best: FieldMatch | null = null
+  const wordPattern = /[a-z0-9]+/g
+  let word: RegExpExecArray | null
+  while ((word = wordPattern.exec(hay))) {
+    const distance = editDistance(needle, word[0], max)
+    if (distance <= max) {
+      const score = 300 - distance * 80
+      if (!best || score > best.score) best = { score, ranges: [[word.index, word.index + word[0].length]] }
+    }
+  }
+  return best
+}
+
 export const matchField = (needle: string, text: string): FieldMatch | null => {
   if (!needle || !text) return null
   const hay = text.toLowerCase()
@@ -59,7 +97,7 @@ export const matchField = (needle: string, text: string): FieldMatch | null => {
     bonus += consecutive * 4 + (isBoundary(hay, i) ? 10 : 0)
     n += 1
   }
-  if (n < len) return null
+  if (n < len) return typoMatch(needle, text)
   return { score: Math.min(100 + bonus, 450), ranges }
 }
 

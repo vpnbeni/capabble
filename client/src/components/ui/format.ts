@@ -28,6 +28,14 @@ export const formatDate = (d: Date | string | number | null | undefined, opts: {
   return s
 }
 
+/** 24-hour "09:45" or "14:30" → "9:45 am" / "2:30 pm". Unparseable values come back as given ("—" when empty). */
+export const formatTime = (value: string | null | undefined) => {
+  const [h, m] = String(value || '').split(':').map(Number)
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return value || '—'
+  const suffix = h >= 12 ? 'pm' : 'am'
+  return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${suffix}`
+}
+
 /** Shows "—" for empty values, as the design system asks. */
 export const orDash = (value: unknown) => {
   if (value == null) return '—'

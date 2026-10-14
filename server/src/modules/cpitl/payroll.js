@@ -126,6 +126,55 @@ const computePayslip = (structure = {}, period = {}, settings = {}) => {
   };
 };
 
+/** Limits for a bulk salary revision (percent of gross, or ₹ change to monthly gross). */
+const REVISION_LIMITS = Object.freeze({ percent: { min: -50, max: 100 }, amount: { min: -1000000, max: 1000000 } });
+
+const grossOf = (components) => resolveEarnings(components).reduce((s, e) => s + e.amount, 0);
+
+/**
+ * Revise a salary structure's earnings by a % or a ₹ change to the full monthly gross.
+ *
+ * Rule: the new gross target is `gross × (1 + value/100)` (percent) or `gross + value`
+ * (amount), rounded to the rupee. Every FIXED earning is scaled by target/gross, so the
+ * salary mix (Basic vs allowances, and therefore the PF wage share) stays the same;
+ * % of Basic and % of other earnings lines follow automatically. The few rupees lost to
+ * per-line rounding are then put on the largest fixed earning other than Basic (Basic
+ * when there is none) so the new gross lands exactly on the target. Deductions, options
+ * and component calculations are untouched.
+ *
+ * Returns { components, beforeGross, afterGross }. Throws Error with a user-facing message.
+ */
+const reviseComponents = (components = [], { mode, value } = {}) => {
+  const change = Number(value);
+  if (!['percent', 'amount'].includes(mode)) throw new Error('Choose a % or ₹ change.');
+  if (!Number.isFinite(change) || change === 0) throw new Error('Enter a change other than zero.');
+  const beforeGross = grossOf(components);
+  if (beforeGross <= 0) throw new Error('Current gross is zero.');
+  const target = rupee(mode === 'percent' ? beforeGross * (1 + change / 100) : beforeGross + change);
+  if (target <= 0) throw new Error('New gross would be zero or less.');
+
+  const factor = target / beforeGross;
+  const next = components.map((c) => (c.type === 'earning' && c.calc === 'fixed' ? { ...c, value: rupee((Number(c.value) || 0) * factor) } : { ...c }));
+
+  const fixed = next.filter((c) => c.type === 'earning' && c.calc === 'fixed');
+  const basic = fixed.find((c) => String(c.code).toUpperCase() === 'BASIC');
+  const others = fixed.filter((c) => c !== basic && c.value > 0).sort((a, b) => b.value - a.value);
+  const adjuster = others[0] || basic;
+  if (adjuster) {
+    // How much gross moves per ₹1 on the adjuster (percent lines can amplify it).
+    const probe = grossOf(next.map((c) => (c === adjuster ? { ...c, value: c.value + 1000 } : c)));
+    const slope = (probe - grossOf(next)) / 1000 || 1;
+    for (let i = 0; i < 5; i += 1) {
+      const diff = target - grossOf(next);
+      const step = Math.round(diff / slope);
+      if (!diff || !step || adjuster.value + step < 0) break;
+      adjuster.value += step;
+    }
+  }
+  if (!basic || basic.value <= 0) throw new Error('Basic pay would be zero.');
+  return { components: next, beforeGross, afterGross: grossOf(next) };
+};
+
 /** LOP days per staff from attendance rows: A = 1, HD = 0.5. */
 const attendanceLop = (records = []) => records.reduce((acc, r) => {
   const key = String(r.staffId);
@@ -141,4 +190,6 @@ module.exports = {
   professionalTax,
   computePayslip,
   attendanceLop,
+  REVISION_LIMITS,
+  reviseComponents,
 };

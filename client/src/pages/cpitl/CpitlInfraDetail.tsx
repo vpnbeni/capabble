@@ -1,31 +1,19 @@
 import React, { useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import toast from 'react-hot-toast'
-import { Check, MapPin, Pencil, Plus, Trash2 } from 'lucide-react'
-import Modal from '@/components/common/Modal'
+import { Ban, FileText, HardHat, MapPin, Paperclip, Pencil, Plus, Receipt, Trash2 } from 'lucide-react'
 import { useInfraProject, useInvalidateCpitl } from '@/hooks/useCpitl'
-import cpitlService, { Attachment, InfraProject, PaymentMode } from '@/services/cpitlService'
+import cpitlService, { Attachment, CapitalExpense, InfraProject, PaymentMode } from '@/services/cpitlService'
+import { Badge, Button, Card, Checkbox, Dialog, EmptyState, Icon, Page, Progress, Select, Sheet, TextField } from '@/components/ui'
 import AttachmentInput from '@/components/cpitl/AttachmentInput'
 import { todayIso } from '@/components/cpitl/QuickExpenseSheet'
-import { INFRA_STATUS, INFRA_TYPES, ProjectFormModal } from './CpitlInfra'
-import {
-  CpitlBadge,
-  CpitlCard,
-  CpitlEmpty,
-  CpitlPageShell,
-  Field,
-  MODE_LABELS,
-  UsageBar,
-  btnGhost,
-  btnPrimary,
-  btnSecondary,
-  errorMessage,
-  fmtDate,
-  inputClass,
-  inr,
-} from '@/components/cpitl/CpitlUi'
+import { INFRA_TYPES, InfraStatusBadge, ProjectFormModal } from './CpitlInfra'
+import { MODE_LABELS, errorMessage, fmtDate, inr } from '@/components/cpitl/CpitlUi'
+import '@/components/cpitl/expenses.css'
 
-const PaymentModal: React.FC<{ isOpen: boolean; onClose: () => void; project: InfraProject; onSaved: () => void }> = ({ isOpen, onClose, project, onSaved }) => {
+const PAYMENT_MODES: PaymentMode[] = ['bank_transfer', 'cheque', 'upi', 'cash', 'dd']
+
+const PaymentSheet: React.FC<{ isOpen: boolean; onClose: () => void; project: InfraProject; onSaved: () => void }> = ({ isOpen, onClose, project, onSaved }) => {
   const [amount, setAmount] = useState('')
   const [date, setDate] = useState(todayIso())
   const [mode, setMode] = useState<PaymentMode>('bank_transfer')
@@ -34,7 +22,9 @@ const PaymentModal: React.FC<{ isOpen: boolean; onClose: () => void; project: In
   const [notes, setNotes] = useState('')
   const [attachments, setAttachments] = useState<Attachment[]>([])
   const [saving, setSaving] = useState(false)
+  const valid = Number(amount) > 0
   const save = async () => {
+    if (!valid) return
     setSaving(true)
     try {
       await cpitlService.addInfraPayment(project._id, { amount: Number(amount), date, mode, payee, reference, notes, attachments })
@@ -52,62 +42,107 @@ const PaymentModal: React.FC<{ isOpen: boolean; onClose: () => void; project: In
     }
   }
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={`Payment — ${project.title}`}>
-      <div className="grid grid-cols-2 gap-4">
-        <Field label="Amount (₹)">
-          <input type="number" min={0} autoFocus className={inputClass} value={amount} onChange={(e) => setAmount(e.target.value)} />
-        </Field>
-        <Field label="Date">
-          <input type="date" className={inputClass} value={date} max={todayIso()} onChange={(e) => setDate(e.target.value)} />
-        </Field>
-        <Field label="Paid to">
-          <input className={inputClass} value={payee} onChange={(e) => setPayee(e.target.value)} />
-        </Field>
-        <Field label="Mode">
-          <select className={inputClass} value={mode} onChange={(e) => setMode(e.target.value as PaymentMode)}>
-            {(['bank_transfer', 'cheque', 'upi', 'cash', 'dd'] as PaymentMode[]).map((m) => (
-              <option key={m} value={m}>
-                {MODE_LABELS[m]}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label="Reference / cheque no." className="col-span-2">
-          <input className={inputClass} value={reference} onChange={(e) => setReference(e.target.value)} />
-        </Field>
-        <Field label="What was this for?" className="col-span-2">
-          <input className={inputClass} value={notes} placeholder="e.g. 2nd running bill — plinth work" onChange={(e) => setNotes(e.target.value)} />
-        </Field>
-        <div className="col-span-2">
-          <AttachmentInput value={attachments} onChange={setAttachments} label="Attach invoice / RA bill" />
+    <Sheet
+      open={isOpen}
+      onClose={onClose}
+      title="Record payment"
+      description={project.title}
+      icon={Receipt}
+      onSubmit={(event) => {
+        event.preventDefault()
+        if (!saving) void save()
+      }}
+      footer={
+        <>
+          <Button onClick={onClose} disabled={saving}>
+            Cancel
+          </Button>
+          <Button type="submit" variant="primary" loading={saving} disabled={!valid}>
+            Record payment
+          </Button>
+        </>
+      }
+    >
+      <div className="cb-form-grid">
+        <TextField
+          label="Amount"
+          required
+          type="number"
+          inputMode="decimal"
+          min={0}
+          prefix="₹"
+          autoFocus
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+        />
+        <TextField label="Date" type="date" value={date} max={todayIso()} onChange={(e) => setDate(e.target.value)} />
+        <TextField label="Paid to" value={payee} onChange={(e) => setPayee(e.target.value)} />
+        <Select label="Mode" value={mode} onChange={(e) => setMode(e.target.value as PaymentMode)} options={PAYMENT_MODES.map((m) => ({ value: m, label: MODE_LABELS[m] }))} />
+        <TextField className="is-wide" label="Reference or cheque no." value={reference} onChange={(e) => setReference(e.target.value)} />
+        <TextField
+          className="is-wide"
+          label="What was this for?"
+          value={notes}
+          placeholder="e.g. 2nd running bill — plinth work"
+          onChange={(e) => setNotes(e.target.value)}
+        />
+        <div className="is-wide">
+          <AttachmentInput value={attachments} onChange={setAttachments} label="Attach invoice or RA bill" />
         </div>
       </div>
-      <div className="mt-6 flex justify-end gap-2">
-        <button type="button" className={btnSecondary} onClick={onClose}>
-          Cancel
-        </button>
-        <button type="button" className={btnPrimary} disabled={saving || !(Number(amount) > 0)} onClick={save}>
-          Record payment
-        </button>
-      </div>
-    </Modal>
+    </Sheet>
   )
 }
 
 const CpitlInfraDetail: React.FC = () => {
   const { id } = useParams()
+  const navigate = useNavigate()
   const invalidate = useInvalidateCpitl()
   const { data: project, isLoading } = useInfraProject(id)
   const [editOpen, setEditOpen] = useState(false)
   const [payOpen, setPayOpen] = useState(false)
   const [milestone, setMilestone] = useState('')
   const [milestoneDue, setMilestoneDue] = useState('')
+  const [voiding, setVoiding] = useState<CapitalExpense | null>(null)
+  const [voidReason, setVoidReason] = useState('')
+  const [voidTried, setVoidTried] = useState(false)
+  const [voidBusy, setVoidBusy] = useState(false)
 
-  if (isLoading) return <CpitlPageShell><div className="h-80 animate-pulse rounded-2xl bg-slate-100 dark:bg-slate-800" /></CpitlPageShell>
-  if (!project) return <CpitlPageShell><CpitlEmpty message="Project not found." /></CpitlPageShell>
+  if (isLoading) {
+    return (
+      <Page>
+        <Card>
+          <div className="cb-table-state" role="status">
+            <span className="cb-spinner" aria-hidden="true" />
+            Loading project…
+          </div>
+        </Card>
+      </Page>
+    )
+  }
+  if (!project) {
+    return (
+      <Page>
+        <Card>
+          <EmptyState
+            icon={HardHat}
+            title="This project isn’t available"
+            body="It may have been removed, or the link is wrong. Find it in the projects list instead."
+            action={
+              <Button variant="primary" onClick={() => navigate('/cpitl/infra')}>
+                Open projects
+              </Button>
+            }
+          />
+        </Card>
+      </Page>
+    )
+  }
 
-  const payments = project.payments || []
+  const payments: CapitalExpense[] = Array.isArray(project.payments) ? project.payments : []
   const pct = project.sanctionedBudget > 0 ? (project.spent / project.sanctionedBudget) * 100 : null
+  const over = Boolean(project.sanctionedBudget) && project.spent > project.sanctionedBudget
+  const doneCount = project.milestones.filter((m) => m.done).length
 
   const patch = async (payload: Partial<InfraProject>, message = 'Saved.') => {
     try {
@@ -126,149 +161,240 @@ const CpitlInfraDetail: React.FC = () => {
     setMilestoneDue('')
   }
 
-  const voidPayment = async (paymentId: string) => {
-    const reason = window.prompt('Void this payment? Reason:')
-    if (!reason?.trim()) return
+  const openVoid = (p: CapitalExpense) => {
+    setVoidReason('')
+    setVoidTried(false)
+    setVoiding(p)
+  }
+
+  const voidPayment = async () => {
+    if (!voiding) return
+    setVoidTried(true)
+    if (!voidReason.trim()) return
+    setVoidBusy(true)
     try {
-      await cpitlService.voidExpense(paymentId, reason)
+      await cpitlService.voidExpense(voiding._id, voidReason.trim())
       toast.success('Payment voided.')
+      setVoiding(null)
       invalidate()
     } catch (error) {
       toast.error(await errorMessage(error))
+    } finally {
+      setVoidBusy(false)
     }
   }
 
   return (
-    <CpitlPageShell
-      title={project.title}
-      subtitle={`${INFRA_TYPES[project.type]}${project.vendor ? ` · ${project.vendor}` : ''}`}
-      actions={
-        <>
-          <CpitlBadge status={INFRA_STATUS[project.status].badge} label={INFRA_STATUS[project.status].label} />
-          <button type="button" className={btnSecondary} onClick={() => setEditOpen(true)}>
-            <Pencil className="h-4 w-4" /> Edit
-          </button>
-          <button type="button" className={btnPrimary} onClick={() => setPayOpen(true)}>
-            <Plus className="h-4 w-4" /> Payment
-          </button>
-        </>
-      }
-    >
-      <div className="grid gap-6 lg:grid-cols-3">
-        <CpitlCard className="lg:col-span-2">
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-            <div>
-              <p className="text-xs text-slate-500">Sanctioned</p>
-              <p className="text-lg font-semibold tabular-nums text-slate-900 dark:text-white">{project.sanctionedBudget ? inr(project.sanctionedBudget) : '—'}</p>
+    <Page>
+      <Card className="ce-hero-card">
+        <div className="ce-hero">
+          <span className="ce-hero__tile" aria-hidden="true">
+            <Icon icon={HardHat} size={24} />
+          </span>
+          <div className="ce-hero__main">
+            <div className="ce-hero__name">
+              <h2>{project.title}</h2>
+              <InfraStatusBadge status={project.status} />
+              {over ? <Badge tone="danger">Over budget</Badge> : null}
             </div>
-            <div>
-              <p className="text-xs text-slate-500">Spent</p>
-              <p className="text-lg font-semibold tabular-nums text-slate-900 dark:text-white">{inr(project.spent)}</p>
-            </div>
-            <div>
-              <p className="text-xs text-slate-500">Remaining</p>
-              <p className={`text-lg font-semibold tabular-nums ${project.spent > project.sanctionedBudget && project.sanctionedBudget ? 'text-rose-600' : 'text-slate-900 dark:text-white'}`}>
-                {project.sanctionedBudget ? inr(project.sanctionedBudget - project.spent) : '—'}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-slate-500">Timeline</p>
-              <p className="text-sm text-slate-900 dark:text-white">
-                {fmtDate(project.startDate)} → {fmtDate(project.completedDate || project.targetDate)}
-              </p>
+            <div className="ce-hero__tags">
+              <span>{INFRA_TYPES[project.type]}</span>
+              {project.vendor ? (
+                <>
+                  <span className="ce-hero__sep" aria-hidden="true">·</span>
+                  <span>{project.vendor}</span>
+                </>
+              ) : null}
+              {project.locationText ? (
+                <>
+                  <span className="ce-hero__sep" aria-hidden="true">·</span>
+                  <span className="ce-inline">
+                    <Icon icon={MapPin} size={14} />
+                    {project.locationText}
+                  </span>
+                </>
+              ) : null}
             </div>
           </div>
-          {pct !== null ? <UsageBar pct={pct} className="mt-4" /> : null}
-          {project.locationText ? (
-            <p className="mt-4 flex items-center gap-1 text-sm text-slate-600 dark:text-slate-300">
-              <MapPin className="h-4 w-4" /> {project.locationText}
-            </p>
-          ) : null}
-          {project.description ? <p className="mt-2 whitespace-pre-line text-sm text-slate-600 dark:text-slate-300">{project.description}</p> : null}
-        </CpitlCard>
-
-        <CpitlCard title="Milestones">
-          <ul className="space-y-2">
-            {project.milestones.map((m, i) => (
-              <li key={m._id || i} className="flex items-center gap-2">
-                <button
-                  type="button"
-                  aria-label={m.done ? 'Mark not done' : 'Mark done'}
-                  onClick={() => patch({ milestones: project.milestones.map((x, idx) => (idx === i ? { ...x, done: !x.done } : x)) })}
-                  className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${m.done ? 'border-emerald-500 bg-emerald-500 text-white' : 'border-slate-300 dark:border-slate-500'}`}
-                >
-                  {m.done ? <Check className="h-3.5 w-3.5" /> : null}
-                </button>
-                <span className={`flex-1 text-sm ${m.done ? 'text-slate-400 line-through' : 'text-slate-800 dark:text-slate-100'}`}>{m.title}</span>
-                {m.dueDate ? <span className="text-xs text-slate-400">{fmtDate(m.dueDate)}</span> : null}
-                <button
-                  type="button"
-                  aria-label="Remove milestone"
-                  className="text-slate-300 hover:text-rose-600"
-                  onClick={() => patch({ milestones: project.milestones.filter((_, idx) => idx !== i) })}
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </button>
-              </li>
-            ))}
-          </ul>
-          <div className="mt-3 space-y-2">
-            <input className={`${inputClass} mt-0`} placeholder="Add milestone" value={milestone} onChange={(e) => setMilestone(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addMilestone()} />
-            <div className="flex gap-2">
-              <input type="date" aria-label="Milestone due date" className={`${inputClass} mt-0 min-w-0 flex-1`} value={milestoneDue} onChange={(e) => setMilestoneDue(e.target.value)} />
-              <button type="button" className={btnSecondary} onClick={addMilestone} disabled={!milestone.trim()}>
-                <Plus className="h-4 w-4" /> Add
-              </button>
-            </div>
+          <div className="ce-hero__actions">
+            <Button icon={Pencil} onClick={() => setEditOpen(true)}>
+              Edit project
+            </Button>
+            <Button variant="primary" icon={Plus} onClick={() => setPayOpen(true)}>
+              Record payment
+            </Button>
           </div>
-        </CpitlCard>
-      </div>
+        </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <CpitlCard title="Payments" className="lg:col-span-2">
+        <div className="ce-facts">
+          <div className="ce-fact">
+            <span className="ce-fact__label">Sanctioned</span>
+            <span className="ce-fact__value">{project.sanctionedBudget ? inr(project.sanctionedBudget) : '—'}</span>
+          </div>
+          <div className="ce-fact">
+            <span className="ce-fact__label">Spent</span>
+            <span className="ce-fact__value">{inr(project.spent)}</span>
+          </div>
+          <div className="ce-fact">
+            <span className="ce-fact__label">{over ? 'Over by' : 'Remaining'}</span>
+            <span className={`ce-fact__value${over ? ' ce-neg' : ''}`}>
+              {project.sanctionedBudget ? inr(Math.abs(project.sanctionedBudget - project.spent)) : '—'}
+            </span>
+          </div>
+          <div className="ce-fact">
+            <span className="ce-fact__label">Timeline</span>
+            <span className="ce-fact__value ce-fact__value--sm">
+              {fmtDate(project.startDate)} → {fmtDate(project.completedDate || project.targetDate)}
+            </span>
+          </div>
+        </div>
+
+        {pct !== null ? (
+          <Progress
+            label="Budget used"
+            value={Math.min(100, pct)}
+            valueLabel={`${Math.round(pct)}%${pct > 100 ? ' · over budget' : ''}`}
+            tone={pct > 100 ? 'danger' : pct >= 85 ? 'warning' : 'success'}
+          />
+        ) : null}
+        {project.description ? <p className="ce-hero__desc">{project.description}</p> : null}
+      </Card>
+
+      <div className="cb-grid-8-4">
+        <Card title="Payments" subtitle={payments.length ? `${payments.length} recorded` : undefined}>
           {payments.length ? (
-            <ol className="relative ml-2 border-l border-slate-200 dark:border-slate-700">
-              {payments.map((p) => (
-                <li key={p._id} className={`mb-5 ml-5 ${p.status === 'void' ? 'opacity-50' : ''}`}>
-                  <span className="absolute -left-1.5 mt-1.5 h-3 w-3 rounded-full border-2 border-white bg-indigo-500 dark:border-slate-800" />
-                  <div className="flex flex-wrap items-baseline justify-between gap-2">
-                    <span className={`font-semibold tabular-nums text-slate-900 dark:text-white ${p.status === 'void' ? 'line-through' : ''}`}>{inr(p.amount)}</span>
-                    <span className="text-xs text-slate-500">{fmtDate(p.date)}</span>
-                  </div>
-                  <p className="text-sm text-slate-600 dark:text-slate-300">{p.notes || 'Payment'}</p>
-                  <p className="text-xs text-slate-400">
-                    {[p.payee, MODE_LABELS[p.mode] || p.mode, p.reference].filter(Boolean).join(' · ')}
-                    {p.status === 'void' ? ` · Void: ${p.voidReason}` : ''}
-                  </p>
-                  <div className="mt-1 flex gap-1">
-                    {p.attachments?.map((a) => (
-                      <a key={a.url} href={a.url} target="_blank" rel="noreferrer" className={btnGhost}>
-                        {a.name}
-                      </a>
-                    ))}
-                    {p.status === 'valid' ? (
-                      <button type="button" className={`${btnGhost} text-rose-600`} onClick={() => voidPayment(p._id)}>
-                        Void
-                      </button>
-                    ) : null}
-                  </div>
-                </li>
-              ))}
+            <ol className="ce-timeline">
+              {payments.map((p) => {
+                const isVoid = p.status === 'void'
+                return (
+                  <li key={p._id} className={isVoid ? 'is-void' : undefined}>
+                    <span className="ce-timeline__dot" aria-hidden="true" />
+                    <div className="ce-timeline__body">
+                      <div className="ce-timeline__top">
+                        <span className="ce-inline">
+                          <span className="ce-timeline__amt">{inr(p.amount)}</span>
+                          {isVoid ? <Badge tone="neutral">Void</Badge> : null}
+                        </span>
+                        <span className="ce-hint">{fmtDate(p.date)}</span>
+                      </div>
+                      <p className="ce-timeline__what">{p.notes || 'Payment'}</p>
+                      <p className="ce-timeline__meta">
+                        {[p.payee, MODE_LABELS[p.mode] || p.mode, p.reference].filter(Boolean).join(' · ')}
+                        {isVoid && p.voidReason ? ` · Reason: ${p.voidReason}` : ''}
+                      </p>
+                      {p.attachments?.length || p.status === 'valid' ? (
+                        <div className="ce-timeline__links">
+                          {p.attachments?.map((a) => (
+                            <a key={a.url} href={a.url} target="_blank" rel="noreferrer" title={a.name}>
+                              <Icon icon={Paperclip} size={12} />
+                              {a.name}
+                            </a>
+                          ))}
+                          {p.status === 'valid' ? (
+                            <Button variant="tertiary" size="sm" icon={Ban} onClick={() => openVoid(p)}>
+                              Void
+                            </Button>
+                          ) : null}
+                        </div>
+                      ) : null}
+                    </div>
+                  </li>
+                )
+              })}
             </ol>
           ) : (
-            <CpitlEmpty message="No payments yet." />
+            <EmptyState compact icon={Receipt} title="No payments yet" body="Use Record payment each time a bill is paid to the contractor." />
           )}
-        </CpitlCard>
+        </Card>
 
-        <CpitlCard title="Documents">
-          <p className="mb-3 text-xs text-slate-500">Sanction letter, drawings, estimates, completion certificate…</p>
-          <AttachmentInput value={project.documents || []} onChange={(documents) => patch({ documents }, 'Documents updated.')} label="Add document" />
-        </CpitlCard>
+        <div className="cb-stack">
+          <Card title="Milestones" subtitle={project.milestones.length ? `${doneCount} of ${project.milestones.length} done` : undefined}>
+            {project.milestones.length ? (
+              <ul className="ce-milestones">
+                {project.milestones.map((m, i) => (
+                  <li key={m._id || i} className={`ce-ms${m.done ? ' is-done' : ''}`}>
+                    <Checkbox
+                      label={m.title}
+                      checked={m.done}
+                      onChange={() => patch({ milestones: project.milestones.map((x, idx) => (idx === i ? { ...x, done: !x.done } : x)) })}
+                    />
+                    {m.dueDate ? <span className="ce-ms__due">{fmtDate(m.dueDate)}</span> : null}
+                    <Button
+                      variant="tertiary"
+                      size="sm"
+                      icon={Trash2}
+                      aria-label={`Remove milestone ${m.title}`}
+                      onClick={() => patch({ milestones: project.milestones.filter((_, idx) => idx !== i) })}
+                    />
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="ce-hint">No milestones yet. Add the stages you want to tick off.</p>
+            )}
+            <form
+              className="ce-ms-add"
+              onSubmit={(e) => {
+                e.preventDefault()
+                addMilestone()
+              }}
+            >
+              <TextField label="New milestone" size="sm" placeholder="e.g. Plinth complete" value={milestone} onChange={(e) => setMilestone(e.target.value)} />
+              <div className="ce-ms-add__row">
+                <TextField label="Due" size="sm" type="date" value={milestoneDue} onChange={(e) => setMilestoneDue(e.target.value)} />
+                <Button type="submit" size="sm" icon={Plus} disabled={!milestone.trim()}>
+                  Add milestone
+                </Button>
+              </div>
+            </form>
+          </Card>
+
+          <Card title="Documents" subtitle="Sanction letter, drawings, estimates, completion certificate">
+            <AttachmentInput value={project.documents || []} onChange={(documents) => patch({ documents }, 'Documents updated.')} label="Add document" />
+            {!project.documents?.length ? (
+              <p className="ce-hint ce-inline">
+                <Icon icon={FileText} size={14} />
+                No documents yet.
+              </p>
+            ) : null}
+          </Card>
+        </div>
       </div>
 
       <ProjectFormModal isOpen={editOpen} onClose={() => setEditOpen(false)} project={project} onSaved={invalidate} />
-      <PaymentModal isOpen={payOpen} onClose={() => setPayOpen(false)} project={project} onSaved={invalidate} />
-    </CpitlPageShell>
+      <PaymentSheet isOpen={payOpen} onClose={() => setPayOpen(false)} project={project} onSaved={invalidate} />
+
+      <Dialog
+        open={Boolean(voiding)}
+        onClose={() => !voidBusy && setVoiding(null)}
+        tone="danger"
+        size="sm"
+        title="Void this payment?"
+        description={voiding ? `${inr(voiding.amount)} paid on ${fmtDate(voiding.date)} stops counting towards the project spend. The record is kept with your reason.` : undefined}
+        footer={
+          <>
+            <Button onClick={() => setVoiding(null)} disabled={voidBusy}>
+              Cancel
+            </Button>
+            <Button variant="danger" icon={Ban} loading={voidBusy} onClick={() => void voidPayment()}>
+              Void payment
+            </Button>
+          </>
+        }
+      >
+        <TextField
+          label="Reason"
+          required
+          autoFocus
+          value={voidReason}
+          onChange={(e) => setVoidReason(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') void voidPayment()
+          }}
+          error={voidTried && !voidReason.trim() ? 'Say why it is being voided.' : undefined}
+        />
+      </Dialog>
+    </Page>
   )
 }
 

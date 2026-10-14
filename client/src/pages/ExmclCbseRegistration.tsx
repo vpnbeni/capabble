@@ -1,8 +1,24 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import toast from 'react-hot-toast'
-import { Plus, X } from 'lucide-react'
-import { Dropdown } from '@/components/common/Dropdown'
-import type { DropdownOption, DropdownValue } from '@/components/common/Dropdown'
+import { BookOpen, Plus, Save, Users, X } from 'lucide-react'
+import {
+  Badge,
+  Button,
+  Card,
+  CardToolbar,
+  Checkbox,
+  Combobox,
+  EmptyState,
+  Entity,
+  FilterBar,
+  Page,
+  Select,
+  cx,
+  type ComboboxOption,
+} from '@/components/ui'
+import { CardLoading, errorMessage } from '@/components/exmcl/ExmclUi'
+import '@/components/exmcl/exmcl.css'
+import '@/components/exmcl/cbse-registration.css'
 import api from '@/services/api'
 import cbseRegistrationService, {
   type CbseRegistrationMatrix,
@@ -134,6 +150,9 @@ const getMirrorTargetIds = (source: ClassSubjectRow | undefined, allRows: ClassS
   return []
 }
 
+const classSectionLabel = (className: string, section?: string) =>
+  section ? `${className}-${section}` : className
+
 const ExmclCbseRegistration: React.FC = () => {
   const { subjects: timetableSubjects } = useTimetable()
   const [loadingStats, setLoadingStats] = useState(true)
@@ -186,9 +205,9 @@ const ExmclCbseRegistration: React.FC = () => {
         )
         setClassRows(rows)
         setSubjectCatalog(classPayload.catalog)
-      } catch (error: any) {
+      } catch (error) {
         if (cancelled) return
-        toast.error(String(error?.response?.data?.message || error?.message || 'Failed to load data.'))
+        toast.error(errorMessage(error, 'Classes and subjects didn’t load. Check your connection and try again.'))
       } finally {
         if (!cancelled) {
           setLoadingStats(false)
@@ -202,7 +221,7 @@ const ExmclCbseRegistration: React.FC = () => {
     }
   }, [])
 
-  const catalogOptions = useMemo((): DropdownOption[] => {
+  const catalogOptions = useMemo((): ComboboxOption[] => {
     const byKey = new Map<string, ClassSubjectSlot>()
     subjectCatalog.forEach((row) => {
       const key = subjectKey(row.key || row.name)
@@ -219,7 +238,9 @@ const ExmclCbseRegistration: React.FC = () => {
       .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
       .map((row) => ({
         value: row.key,
-        label: formatSubjectLabel(row),
+        label: row.name,
+        meta: row.code ? `Code ${row.code}` : undefined,
+        keywords: row.code,
       }))
   }, [subjectCatalog, timetableSubjects])
 
@@ -319,8 +340,8 @@ const ExmclCbseRegistration: React.FC = () => {
       setStudentMatrix(payload.matrix || {})
       setAdditionalByStudent(payload.additionalByStudent || {})
       setStudentSubjects(payload.subjects)
-    } catch (error: any) {
-      toast.error(String(error?.response?.data?.message || error?.message || 'Failed to load student matrix.'))
+    } catch (error) {
+      toast.error(errorMessage(error, 'Students for this section didn’t load. Try again.'))
       setStudents([])
       setStudentSubjects([])
       setStudentMatrix({})
@@ -384,7 +405,7 @@ const ExmclCbseRegistration: React.FC = () => {
         (slot, i) => i !== index && slot.key && slot.key === subjectKeyValue
       )
       if (duplicate) {
-        toast.error('This subject is already selected for this class/section.')
+        toast.error('That subject is already in this class. Pick a different one.')
         return
       }
     }
@@ -404,7 +425,7 @@ const ExmclCbseRegistration: React.FC = () => {
     })
   }
 
-  const optionsForSlot = (rowSubjects: ClassSubjectSlot[], index: number): DropdownOption[] => {
+  const optionsForSlot = (rowSubjects: ClassSubjectSlot[], index: number): ComboboxOption[] => {
     const used = new Set(
       (rowSubjects || [])
         .map((slot, i) => (i === index ? '' : slot.key))
@@ -442,9 +463,9 @@ const ExmclCbseRegistration: React.FC = () => {
         )
       )
       setSubjectCatalog(saved.catalog)
-      toast.success('Class subject matrix saved.')
-    } catch (error: any) {
-      toast.error(String(error?.response?.data?.message || error?.message || 'Failed to save class subject matrix.'))
+      toast.success('Class subjects saved.')
+    } catch (error) {
+      toast.error(errorMessage(error, 'Class subjects weren’t saved. Try again.'))
     } finally {
       setSavingClassMatrix(false)
     }
@@ -489,7 +510,7 @@ const ExmclCbseRegistration: React.FC = () => {
         toast.success('Additional subject cleared.')
         return next
       }
-      toast.success('Marked as additional subject (double-click again to clear).')
+      toast.success('Marked as the additional subject. Double-click again to clear it.')
       return { ...prev, [studentId]: key }
     })
   }
@@ -601,7 +622,7 @@ const ExmclCbseRegistration: React.FC = () => {
 
   const handleSaveStudentMatrix = async () => {
     if (!selectedClass || !selectedSection) {
-      toast.error('Select class and section first.')
+      toast.error('Choose a class and section first.')
       return
     }
     setSavingStudentMatrix(true)
@@ -614,9 +635,9 @@ const ExmclCbseRegistration: React.FC = () => {
       )
       setStudentMatrix(saved.matrix)
       setAdditionalByStudent(saved.additionalByStudent)
-      toast.success('Student subject matrix saved.')
-    } catch (error: any) {
-      toast.error(String(error?.response?.data?.message || error?.message || 'Failed to save student matrix.'))
+      toast.success('Student subjects saved.')
+    } catch (error) {
+      toast.error(errorMessage(error, 'Student subjects weren’t saved. Try again.'))
     } finally {
       setSavingStudentMatrix(false)
     }
@@ -627,358 +648,327 @@ const ExmclCbseRegistration: React.FC = () => {
     () => Object.values(studentMatrix).reduce((sum, keys) => sum + (Array.isArray(keys) ? keys.length : 0), 0),
     [studentMatrix]
   )
+  const selectedLabel = classSectionLabel(selectedClass, selectedSection)
+  const subjectScopeLabel = isSeniorClass(selectedClass) ? selectedLabel : selectedClass
 
-  return (
-    <div className="p-4 sm:p-6">
-      <div className="mx-auto max-w-[1400px] space-y-4">
-        <section className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
-          <div className="flex flex-col gap-2 border-b border-gray-200 px-3 py-2.5 dark:border-gray-700 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Class subject matrix</h2>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                Subjects stack 3 per row for each class/section. Add subjects per class. Double-click in the student
-                matrix to mark an additional subject.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={handleSaveClassMatrix}
-              disabled={savingClassMatrix || loadingClassMatrix}
-              className="shrink-0 rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {savingClassMatrix ? 'Saving…' : 'Save Class Matrix'}
-            </button>
-          </div>
-
-          {loadingClassMatrix ? (
-            <div className="p-6 text-center text-sm text-gray-500 dark:text-gray-400">Loading class subject matrix…</div>
-          ) : (
-            <div className="max-h-[420px] space-y-3 overflow-auto p-3">
-              {classRows.map((row) => {
-                const id = rowId(row.className, row.section)
-                const subjects = ensureMinSlots(row.subjects || [])
-                return (
-                  <div
-                    key={id}
-                    className="rounded-lg border border-gray-200 bg-gray-50/60 p-3 dark:border-gray-700 dark:bg-gray-900/40"
-                  >
-                    <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                      <div className="flex items-center gap-2 text-sm">
-                        <span className="font-semibold text-gray-900 dark:text-white">{row.className}</span>
-                        <span className="text-gray-400">·</span>
-                        <span className="text-gray-600 dark:text-gray-300">{row.section || '—'}</span>
-                        <span className="text-xs text-gray-400">
-                          ({compactSubjects(subjects).length} subjects)
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => addSubjectToRow(id)}
-                        className="inline-flex items-center gap-1 rounded-md border border-gray-300 bg-white px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
-                      >
-                        <Plus className="h-3.5 w-3.5" />
-                        Add subject
-                      </button>
-                    </div>
-
-                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                      {subjects.map((slot, index) => (
-                        <div key={`${id}-${index}`} className="flex items-center gap-1">
-                          <div className="min-w-0 flex-1">
-                            <Dropdown
-                              options={optionsForSlot(subjects, index)}
-                              value={slot.key || ''}
-                              onChange={(value: DropdownValue) =>
-                                setRowSubjectAt(id, index, String(value || ''))
-                              }
-                              searchable
-                              clearable
-                              portal
-                              size="sm"
-                              placeholder={`Subject ${index + 1}`}
-                              emptyMessage="No subjects"
-                              maxHeight={260}
-                              className="w-full"
-                              filterFn={(option, query) => {
-                                const q = query.trim().toLowerCase()
-                                if (!q) return true
-                                return String(option.label).toLowerCase().includes(q)
-                              }}
-                            />
-                          </div>
-                          {subjects.length > SUBJECTS_PER_STACK && (
-                            <button
-                              type="button"
-                              onClick={() => removeSubjectFromRow(id, index)}
-                              className="shrink-0 rounded p-1 text-gray-400 hover:bg-gray-200 hover:text-gray-700 dark:hover:bg-gray-700"
-                              title="Remove subject"
-                              aria-label="Remove subject"
-                            >
-                              <X className="h-3.5 w-3.5" />
-                            </button>
-                          )}
-                        </div>
-                      ))}
-                    </div>
+  let classBody: React.ReactNode
+  if (loadingClassMatrix) classBody = <CardLoading label="Loading class subjects…" />
+  else if (classRows.length === 0)
+    classBody = (
+      <EmptyState
+        icon={BookOpen}
+        title="Class subjects didn’t load"
+        body="Classes 9 to 12 appear here. Reload the page to try again."
+      />
+    )
+  else
+    classBody = (
+      <ul className="ex-reg-classes" aria-label="Subjects by class">
+        {classRows.map((row) => {
+          const id = rowId(row.className, row.section)
+          const subjects = ensureMinSlots(row.subjects || [])
+          const filled = compactSubjects(subjects).length
+          const name = classSectionLabel(row.className, row.section)
+          return (
+            <li key={id} className="ex-reg-class">
+              <div className="ex-reg-class__head">
+                <div className="ex-reg-class__titles">
+                  <span className="cb-strong">{row.className}</span>
+                  {row.section ? <Badge dot={false}>{row.section}</Badge> : null}
+                  <span className="cb-muted">
+                    {filled === 1 ? '1 subject' : `${filled} subjects`}
+                  </span>
+                </div>
+                <Button size="sm" variant="tertiary" icon={Plus} onClick={() => addSubjectToRow(id)}>
+                  Add subject
+                </Button>
+              </div>
+              <div className="ex-reg-slots">
+                {subjects.map((slot, index) => (
+                  <div key={`${id}-${index}`} className="ex-reg-slot">
+                    <Combobox
+                      className="ex-reg-combo"
+                      size="sm"
+                      emptyText="No subjects match"
+                      aria-label={`${name} subject ${index + 1}`}
+                      placeholder={`Subject ${index + 1}`}
+                      value={slot.key || ''}
+                      selectedLabel={slot.key ? slot.name || slot.key : ''}
+                      clearable={false}
+                      options={optionsForSlot(subjects, index)}
+                      onChange={(value) => setRowSubjectAt(id, index, value)}
+                    />
+                    {subjects.length > SUBJECTS_PER_STACK ? (
+                      <Button
+                        size="sm"
+                        variant="tertiary"
+                        icon={X}
+                        aria-label={`Remove ${name} subject ${index + 1}`}
+                        title="Remove subject"
+                        onClick={() => removeSubjectFromRow(id, index)}
+                      />
+                    ) : null}
                   </div>
-                )
-              })}
-            </div>
-          )}
-        </section>
-
-        <section className="space-y-3">
-          <div className="flex flex-col gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2.5 shadow-sm dark:border-gray-700 dark:bg-gray-800 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex flex-1 flex-wrap items-center gap-2">
-              <span className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                Student matrix
-              </span>
-              <select
-                value={selectedClass}
-                onChange={(e) => setSelectedClass(e.target.value)}
-                disabled={loadingStats}
-                aria-label="Select class"
-                className="rounded-lg border border-gray-300 bg-white px-2.5 py-1.5 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
-              >
-                <option value="">Class</option>
-                {classOptions.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
                 ))}
-              </select>
-              <select
-                value={selectedSection}
-                onChange={(e) => setSelectedSection(e.target.value)}
-                disabled={!selectedClass}
-                aria-label="Select section"
-                className="rounded-lg border border-gray-300 bg-white px-2.5 py-1.5 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
-              >
-                <option value="">{selectedClass ? 'Section' : 'Select class first'}</option>
-                {sectionOptions.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
-              <input
-                type="search"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search students"
-                aria-label="Search students"
-                disabled={!filtersReady}
-                className="w-[180px] shrink-0 rounded-lg border border-gray-300 bg-white px-2.5 py-1.5 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
-              />
-              <span className="text-xs text-gray-500 dark:text-gray-400">
-                {filtersReady
-                  ? `${filteredStudents.length} students · ${studentSubjects.length} subjects · ${selectedCount} selected · header dbl-click = additional for all`
-                  : 'Select class & section'}
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={handleSaveStudentMatrix}
-              disabled={savingStudentMatrix || loadingStudentMatrix || !filtersReady || studentSubjects.length === 0}
-              className="shrink-0 rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {savingStudentMatrix ? 'Saving…' : 'Save Student Matrix'}
-            </button>
-          </div>
+              </div>
+            </li>
+          )
+        })}
+      </ul>
+    )
 
-          <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
-            {loadingStudentMatrix ? (
-              <div className="p-8 text-center text-sm text-gray-500 dark:text-gray-400">Loading student matrix…</div>
-            ) : !filtersReady ? (
-              <div className="p-8 text-center text-sm text-gray-500 dark:text-gray-400">
-                Select a class and section to mark subjects per student.
-              </div>
-            ) : studentSubjects.length === 0 ? (
-              <div className="p-8 text-center text-sm text-gray-500 dark:text-gray-400">
-                No subjects set for {selectedClass}
-                {isSeniorClass(selectedClass) ? ` / ${selectedSection}` : ''} in the class matrix above.
-              </div>
-            ) : filteredStudents.length === 0 ? (
-              <div className="p-8 text-center text-sm text-gray-500 dark:text-gray-400">
-                No students found for {selectedClass}-{selectedSection}.
-              </div>
-            ) : (
-              <div className="max-h-[60vh] overflow-auto">
-                <table className="w-full table-fixed border-collapse text-sm">
-                  <colgroup>
-                    <col className="w-[44px]" />
-                    <col className="w-[160px]" />
-                    {studentSubjects.map((subject) => (
-                      <col key={subject.key} />
-                    ))}
-                    <col className="w-[44px]" />
-                  </colgroup>
-                  <thead className="sticky top-0 z-20 bg-gray-50 dark:bg-gray-900">
-                    <tr>
-                      <th className="sticky left-0 z-30 border-b border-r border-gray-200 bg-gray-50 px-1.5 py-1.5 text-center text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400">
-                        Roll
-                      </th>
-                      <th className="sticky left-[44px] z-30 border-b border-r border-gray-200 bg-gray-50 px-2 py-1.5 text-left text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400">
-                        Student
-                      </th>
-                      {studentSubjects.map((subject) => {
-                        const allSelected =
-                          filteredStudents.length > 0 &&
-                          filteredStudents.every((student) => isStudentChecked(student._id, subject.key))
-                        const someSelected =
-                          !allSelected &&
-                          filteredStudents.some((student) => isStudentChecked(student._id, subject.key))
-                        const allAdditional =
-                          filteredStudents.length > 0 &&
-                          filteredStudents.every((student) => isAdditionalSubject(student._id, subject.key))
-                        return (
-                          <th
-                            key={subject.key}
-                            className={`border-b border-gray-200 px-1 py-1.5 text-center text-[10px] font-semibold uppercase tracking-normal text-gray-500 dark:border-gray-700 dark:text-gray-400 ${
-                              allAdditional ? 'bg-indigo-50 dark:bg-indigo-950/40' : ''
-                            }`}
-                            title={`${formatSubjectLabel(subject)} — click checkbox: all students; double-click: additional for all`}
-                            onDoubleClick={() => markAdditionalSubjectForAll(subject.key)}
-                          >
-                            <div className="flex flex-col items-center gap-0.5">
-                              <span className="max-w-full truncate px-0.5 leading-tight">{subject.name}</span>
-                              {subject.code ? (
-                                <span className="text-[9px] font-normal normal-case text-gray-400">{subject.code}</span>
-                              ) : null}
-                              <input
-                                type="checkbox"
-                                checked={allSelected}
-                                ref={(el) => {
-                                  if (el) el.indeterminate = someSelected
-                                }}
-                                onChange={() => undefined}
-                                onClick={(e) => {
-                                  e.preventDefault()
-                                  handleSubjectColumnHeaderClick(subject.key, allSelected)
-                                }}
-                                onDoubleClick={(e) => {
-                                  e.preventDefault()
-                                  e.stopPropagation()
-                                }}
-                                aria-label={`Toggle ${subject.name} for all students. Double-click to mark as additional for all.`}
-                                className="h-3.5 w-3.5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                              />
-                              {allAdditional ? (
-                                <span className="text-[9px] font-semibold uppercase tracking-wide text-indigo-600 dark:text-indigo-400">
-                                  Add
-                                </span>
-                              ) : null}
-                            </div>
-                          </th>
-                        )
-                      })}
-                      {(() => {
-                        const allKeys = studentSubjects.map((s) => s.key)
-                        const allSelected =
-                          filteredStudents.length > 0 &&
-                          allKeys.length > 0 &&
-                          filteredStudents.every((student) =>
-                            allKeys.every((key) => isStudentChecked(student._id, key))
-                          )
-                        const someSelected =
-                          !allSelected &&
-                          filteredStudents.some((student) =>
-                            allKeys.some((key) => isStudentChecked(student._id, key))
-                          )
-                        return (
-                          <th className="border-b border-gray-200 px-1 py-1.5 text-center text-[10px] font-semibold uppercase text-gray-500 dark:border-gray-700 dark:text-gray-400">
-                            <div className="flex flex-col items-center gap-0.5">
-                              <span>All</span>
-                              <input
-                                type="checkbox"
-                                checked={allSelected}
-                                ref={(el) => {
-                                  if (el) el.indeterminate = someSelected
-                                }}
-                                onChange={(e) => toggleAllStudentsAllSubjects(e.target.checked)}
-                                aria-label="Toggle all subjects for all students"
-                                title="Mark all subjects for all students"
-                                className="h-3.5 w-3.5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                              />
-                            </div>
-                          </th>
-                        )
-                      })()}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredStudents.map((student) => {
-                      const allSelected =
-                        studentSubjects.length > 0 &&
-                        studentSubjects.every((subject) => isStudentChecked(student._id, subject.key))
-                      const someSelected =
-                        !allSelected &&
-                        studentSubjects.some((subject) => isStudentChecked(student._id, subject.key))
-                      const roll = student.classRollNo ?? student.rollNumber ?? '—'
+  let studentBody: React.ReactNode
+  if (loadingStudentMatrix) studentBody = <CardLoading label="Loading students…" />
+  else if (!filtersReady)
+    studentBody = (
+      <EmptyState
+        icon={Users}
+        title="Choose a class and section"
+        body="Pick a class and section above to tick the subjects each student is registering for."
+      />
+    )
+  else if (studentSubjects.length === 0)
+    studentBody = (
+      <EmptyState
+        icon={BookOpen}
+        title={`No subjects set for ${subjectScopeLabel}`}
+        body={`Add ${subjectScopeLabel}’s subjects under Subjects by class, then tick them for each student here.`}
+      />
+    )
+  else if (filteredStudents.length === 0)
+    studentBody = search.trim() ? (
+      <EmptyState
+        compact
+        icon={Users}
+        title="No students match this search"
+        action={
+          <Button size="sm" onClick={() => setSearch('')}>
+            Clear search
+          </Button>
+        }
+      />
+    ) : (
+      <EmptyState
+        icon={Users}
+        title={`No students in ${selectedLabel}`}
+        body="Students appear here once they are added to this section in Students."
+      />
+    )
+  else {
+    const allKeys = studentSubjects.map((s) => s.key)
+    const everythingSelected =
+      filteredStudents.length > 0 &&
+      allKeys.length > 0 &&
+      filteredStudents.every((student) => allKeys.every((key) => isStudentChecked(student._id, key)))
+    const somethingSelected =
+      !everythingSelected &&
+      filteredStudents.some((student) => allKeys.some((key) => isStudentChecked(student._id, key)))
+
+    studentBody = (
+      <>
+        <div className="ex-matrix ex-reg-matrix">
+          <table aria-label={`Subjects for each student in ${selectedLabel}`}>
+            <thead>
+              <tr>
+                <th scope="col" className="ex-matrix__subject">
+                  Student
+                </th>
+                {studentSubjects.map((subject) => {
+                  const allSelected =
+                    filteredStudents.length > 0 &&
+                    filteredStudents.every((student) => isStudentChecked(student._id, subject.key))
+                  const someSelected =
+                    !allSelected && filteredStudents.some((student) => isStudentChecked(student._id, subject.key))
+                  const allAdditional =
+                    filteredStudents.length > 0 &&
+                    filteredStudents.every((student) => isAdditionalSubject(student._id, subject.key))
+                  return (
+                    <th
+                      key={subject.key}
+                      scope="col"
+                      title={`${formatSubjectLabel(subject)}. Tick for every student; double-click to make it everyone’s additional subject.`}
+                      onDoubleClick={() => markAdditionalSubjectForAll(subject.key)}
+                    >
+                      <span className="ex-reg-head">
+                        <span className="ex-reg-head__name">{subject.name}</span>
+                        <span className="ex-reg-head__code">{subject.code || '—'}</span>
+                        {/* Single click toggles the column; a double click marks it additional for all. */}
+                        <span
+                          onClickCapture={(event) => {
+                            event.preventDefault()
+                            event.stopPropagation()
+                            handleSubjectColumnHeaderClick(subject.key, allSelected)
+                          }}
+                          onDoubleClick={(event) => {
+                            event.preventDefault()
+                            event.stopPropagation()
+                          }}
+                        >
+                          <Checkbox
+                            checked={allSelected}
+                            indeterminate={someSelected}
+                            onChange={() => undefined}
+                            aria-label={`${subject.name} for every student. Double-click to make it everyone’s additional subject.`}
+                          />
+                        </span>
+                        {allAdditional ? (
+                          <Badge tone="info" dot={false}>
+                            Additional
+                          </Badge>
+                        ) : null}
+                      </span>
+                    </th>
+                  )
+                })}
+                <th scope="col" className="ex-matrix__all">
+                  <span className="ex-reg-head">
+                    <span className="ex-reg-head__name">All subjects</span>
+                    <Checkbox
+                      checked={everythingSelected}
+                      indeterminate={somethingSelected}
+                      onChange={(checked) => toggleAllStudentsAllSubjects(checked)}
+                      aria-label="Every subject for every student"
+                    />
+                  </span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredStudents.map((student) => {
+                const allSelected =
+                  studentSubjects.length > 0 &&
+                  studentSubjects.every((subject) => isStudentChecked(student._id, subject.key))
+                const someSelected =
+                  !allSelected && studentSubjects.some((subject) => isStudentChecked(student._id, subject.key))
+                const roll = student.classRollNo ?? student.rollNumber
+                return (
+                  <tr key={student._id}>
+                    <th scope="row" className="ex-matrix__subject" title={student.name}>
+                      <Entity primary={student.name} secondary={`Roll no. ${roll ?? '—'}`} />
+                    </th>
+                    {studentSubjects.map((subject) => {
+                      const isAdditional = isAdditionalSubject(student._id, subject.key)
                       return (
-                        <tr key={student._id} className="hover:bg-gray-50/80 dark:hover:bg-gray-900/40">
-                          <td className="sticky left-0 z-10 border-b border-r border-gray-100 bg-white px-1.5 py-1 text-center text-xs tabular-nums text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
-                            {roll}
-                          </td>
-                          <td className="sticky left-[44px] z-10 truncate border-b border-r border-gray-100 bg-white px-2 py-1 text-xs font-medium text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100">
-                            <span title={student.name}>{student.name}</span>
-                          </td>
-                          {studentSubjects.map((subject) => {
-                            const checked = isStudentChecked(student._id, subject.key)
-                            const isAdditional = isAdditionalSubject(student._id, subject.key)
-                            return (
-                              <td
-                                key={subject.key}
-                                className={`border-b border-gray-100 px-1 py-1 text-center dark:border-gray-700 ${
-                                  isAdditional ? 'bg-indigo-50 dark:bg-indigo-950/40' : ''
-                                }`}
-                                onDoubleClick={() => markAdditionalSubject(student._id, subject.key)}
-                                title={
-                                  isAdditional
-                                    ? 'Additional subject — double-click to clear'
-                                    : 'Double-click to mark as additional subject'
-                                }
-                              >
-                                <div className="flex flex-col items-center gap-0.5">
-                                  <input
-                                    type="checkbox"
-                                    checked={checked}
-                                    onChange={() => toggleStudentCell(student._id, subject.key)}
-                                    aria-label={`${student.name} — ${subject.name}`}
-                                    className="h-3.5 w-3.5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                                  />
-                                  {isAdditional ? (
-                                    <span className="text-[9px] font-semibold uppercase tracking-wide text-indigo-600 dark:text-indigo-400">
-                                      Add
-                                    </span>
-                                  ) : null}
-                                </div>
-                              </td>
-                            )
-                          })}
-                          <td className="border-b border-gray-100 px-1 py-1 text-center dark:border-gray-700">
-                            <input
-                              type="checkbox"
-                              checked={allSelected}
-                              ref={(el) => {
-                                if (el) el.indeterminate = someSelected
-                              }}
-                              onChange={(e) => toggleStudentRow(student._id, e.target.checked)}
-                              aria-label={`Toggle all subjects for ${student.name}`}
-                              className="h-3.5 w-3.5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                        <td
+                          key={subject.key}
+                          className={cx(isAdditional && 'is-additional')}
+                          onDoubleClick={() => markAdditionalSubject(student._id, subject.key)}
+                          title={
+                            isAdditional
+                              ? 'Additional subject. Double-click to clear.'
+                              : 'Double-click to mark as the additional subject.'
+                          }
+                        >
+                          <span className="ex-reg-cell">
+                            <Checkbox
+                              checked={isStudentChecked(student._id, subject.key)}
+                              onChange={() => toggleStudentCell(student._id, subject.key)}
+                              aria-label={`${student.name}: ${subject.name}`}
                             />
-                          </td>
-                        </tr>
+                            {isAdditional ? (
+                              <Badge tone="info" dot={false}>
+                                Additional
+                              </Badge>
+                            ) : null}
+                          </span>
+                        </td>
                       )
                     })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        </section>
-      </div>
-    </div>
+                    <td className="ex-matrix__all">
+                      <Checkbox
+                        checked={allSelected}
+                        indeterminate={someSelected}
+                        onChange={(checked) => toggleStudentRow(student._id, checked)}
+                        aria-label={`Every subject for ${student.name}`}
+                      />
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+        <div className="cb-table-foot">
+          <span className="is-num">
+            {filteredStudents.length === 1 ? '1 student' : `${filteredStudents.length} students`} ·{' '}
+            {studentSubjects.length === 1 ? '1 subject' : `${studentSubjects.length} subjects`} · {selectedCount} ticked
+          </span>
+        </div>
+      </>
+    )
+  }
+
+  return (
+    <Page>
+      <Card
+        flush
+        title="Subjects by class"
+        subtitle="The subjects each class registers with CBSE. Class 9 subjects carry over to Class 10, and Class 11 to Class 12, until you change them."
+        action={
+          <Button
+            size="sm"
+            icon={Save}
+            loading={savingClassMatrix}
+            disabled={loadingClassMatrix}
+            onClick={() => void handleSaveClassMatrix()}
+          >
+            Save class subjects
+          </Button>
+        }
+      >
+        {classBody}
+      </Card>
+
+      <Card
+        flush
+        title="Subjects for each student"
+        subtitle="Tick the subjects each student is registering for. Double-click a tick to mark it as that student’s additional subject, or double-click a column heading to mark it for everyone."
+      >
+        <CardToolbar>
+          <FilterBar
+            search={
+              filtersReady
+                ? { placeholder: 'Search name or roll no.', value: search, onChange: setSearch, label: 'Search students' }
+                : undefined
+            }
+            filters={
+              <>
+                <Select
+                  size="sm"
+                  aria-label="Class"
+                  placeholder="Choose class"
+                  value={selectedClass}
+                  onChange={(event) => setSelectedClass(event.target.value)}
+                  disabled={loadingStats}
+                  options={classOptions}
+                />
+                <Select
+                  size="sm"
+                  aria-label="Section"
+                  placeholder={selectedClass ? 'Choose section' : 'Choose class first'}
+                  value={selectedSection}
+                  onChange={(event) => setSelectedSection(event.target.value)}
+                  disabled={!selectedClass}
+                  options={sectionOptions}
+                />
+              </>
+            }
+            actions={
+              <Button
+                variant="primary"
+                icon={Save}
+                loading={savingStudentMatrix}
+                disabled={loadingStudentMatrix || !filtersReady || studentSubjects.length === 0}
+                onClick={() => void handleSaveStudentMatrix()}
+              >
+                Save student subjects
+              </Button>
+            }
+          />
+        </CardToolbar>
+        {studentBody}
+      </Card>
+    </Page>
   )
 }
 

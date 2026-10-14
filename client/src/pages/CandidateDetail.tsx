@@ -2,8 +2,26 @@ import React, { useState, useEffect, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import candidateService from '../services/candidateService'
-import Loader from '../components/common/Loader'
-import { Dialog } from '../components/common/Dialog'
+import { ExternalLink, Pencil, Plus, Search, Trash2, UserX } from 'lucide-react'
+import {
+  Badge,
+  Banner,
+  Button,
+  Card,
+  DataTable,
+  DetailList,
+  Dialog,
+  EmptyState,
+  Entity,
+  Icon,
+  Page,
+  PageHeader,
+  TextField,
+  formatDate as formatShortDate,
+  type DataTableColumn,
+} from '@/components/ui'
+import { CardLoading } from '@/components/exmcl/ExmclUi'
+import '@/components/exmcl/centre-candidates.css'
 import { useSubjectList } from '../hooks/useSubjects'
 import { useUpdateCandidateMutation } from '../hooks/useCandidates'
 
@@ -152,41 +170,41 @@ const CandidateDetail: React.FC = () => {
     }
   }
 
-  const getStatusBadge = (status: string) => {
-    const statusConfig = {
-      active: 'bg-green-50 text-green-700 ring-green-600/20 dark:bg-green-400/10 dark:text-green-400 dark:ring-green-400/20',
-      inactive: 'bg-yellow-50 text-yellow-700 ring-yellow-600/20 dark:bg-yellow-400/10 dark:text-yellow-400 dark:ring-yellow-400/20',
-      graduated: 'bg-blue-50 text-blue-700 ring-blue-600/20 dark:bg-blue-400/10 dark:text-blue-400 dark:ring-blue-400/20',
-      suspended: 'bg-red-50 text-red-700 ring-red-600/20 dark:bg-red-400/10 dark:text-red-400 dark:ring-red-400/20'
-    }
+  const STATUS: Record<string, { tone: 'success' | 'neutral' | 'info' | 'danger'; label: string }> = {
+    active: { tone: 'success', label: 'Active' },
+    inactive: { tone: 'neutral', label: 'Inactive' },
+    graduated: { tone: 'info', label: 'Graduated' },
+    suspended: { tone: 'danger', label: 'Suspended' },
+  }
 
-    return (
-      <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset ${statusConfig[status as keyof typeof statusConfig]}`}>
-        {status.charAt(0).toUpperCase() + status.slice(1)}
-      </span>
-    )
+  const getStatusBadge = (status: string) => {
+    const s = STATUS[status] || { tone: 'neutral' as const, label: status.charAt(0).toUpperCase() + status.slice(1) }
+    return <Badge tone={s.tone}>{s.label}</Badge>
   }
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    })
+    const d = new Date(dateString)
+    if (Number.isNaN(d.getTime())) return '—'
+    return `${formatShortDate(d)}, ${d.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' })}`
   }
 
   const formatExamDate = (dateString?: string | null) => {
     if (!dateString) return 'TBD'
     const date = new Date(dateString)
     if (Number.isNaN(date.getTime())) return 'TBD'
-    return date.toLocaleDateString('en-IN', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric'
-    })
+    return formatShortDate(date)
   }
+
+  // CBSE lists arrive in capitals; show people and school names the way they're written.
+  const displayName = (value?: string) =>
+    value && value === value.toUpperCase()
+      ? value.toLowerCase().replace(/(^|[\s.'-])([a-z])/g, (_m, sep: string, ch: string) => sep + ch.toUpperCase())
+      : value
+
+  const SEX: Record<string, string> = { F: 'Female', M: 'Male', T: 'Transgender' }
+  const CATEGORY: Record<string, string> = { G: 'General', GEN: 'General', OBC: 'OBC', SC: 'SC', ST: 'ST' }
+  const expand = (map: Record<string, string>, value?: string) =>
+    value ? map[value.trim().toUpperCase()] ?? value : undefined
 
   const sortedSubjects = useMemo(() => {
     if (!candidate?.subjects || candidate.subjects.length === 0) return []
@@ -208,630 +226,364 @@ const CandidateDetail: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-96">
-        <Loader size="lg" />
-      </div>
+      <Page>
+        <Card>
+          <CardLoading label="Loading candidate…" />
+        </Card>
+      </Page>
     )
   }
 
   if (!candidate) {
     return (
-      <div className="p-6">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
-            Candidate Not Found
-          </h1>
-          <button
-            onClick={() => navigate('/candidate-details')}
-            className="btn btn-primary"
-          >
-            Back to Candidate Details
-          </button>
-        </div>
-      </div>
+      <Page>
+        <Card>
+          <EmptyState
+            icon={UserX}
+            title="Candidate not found"
+            body="The candidate may have been removed, or the link is out of date."
+            action={
+              <Button size="sm" onClick={() => navigate('/candidate-details')}>
+                Back to candidates
+              </Button>
+            }
+          />
+        </Card>
+      </Page>
     )
   }
 
+  type EnrolledSubject = NonNullable<Candidate['subjects']>[number]
+
+  const invigilator = (person?: { name: string; oasisId?: string } | null) =>
+    person ? <Entity primary={person.name} secondary={person.oasisId ? `OASIS ${person.oasisId}` : undefined} /> : '—'
+
+  const subjectColumns: DataTableColumn<EnrolledSubject>[] = [
+    {
+      key: 'subject',
+      header: 'Subject',
+      mobile: 'title',
+      render: (subject) => <Entity primary={subject.name} secondary={`Code ${subject.code}`} />,
+    },
+    { key: 'examDate', header: 'Exam date', mobile: 'subtitle', render: (subject) => formatExamDate(subject.examDate) },
+    { key: 'answerSheetType', header: 'Answer sheet', render: (subject) => subject.answerSheetType ?? '—' },
+    {
+      key: 'serial',
+      header: 'Serial no.',
+      numeric: true,
+      render: (subject) =>
+        subjectSerials[subject._id] ? (
+          subjectSerials[subject._id]
+        ) : serialsLoading ? (
+          <span className="cb-spinner" role="status" aria-label="Loading serial number" />
+        ) : (
+          subject.serialNumber ?? '—'
+        ),
+    },
+    { key: 'roomNo', header: 'Room no.', render: (subject) => subject.roomNo ?? '—' },
+    {
+      key: 'invigilators',
+      header: 'Invigilators',
+      render: (subject) =>
+        subject.invigilator1 || subject.invigilator2 ? (
+          <div className="cx-cand-invigilators">
+            {subject.invigilator1 ? invigilator(subject.invigilator1) : null}
+            {subject.invigilator2 ? invigilator(subject.invigilator2) : null}
+          </div>
+        ) : (
+          '—'
+        ),
+    },
+    {
+      key: 'actions',
+      header: '',
+      headerLabel: 'Actions',
+      align: 'right',
+      width: 48,
+      interactive: true,
+      mobile: 'aside',
+      render: (subject) =>
+        !importedSubjectCodes.has(subject.code) ? (
+          <Button
+            size="sm"
+            variant="tertiary"
+            icon={Trash2}
+            aria-label={`Remove ${subject.code}`}
+            title="Remove manually assigned subject"
+            onClick={() => setSubjectToRemove({ _id: subject._id, name: subject.name, code: subject.code })}
+          />
+        ) : null,
+    },
+  ]
+
+  const present = <T extends { value: React.ReactNode }>(items: Array<T | false | null | undefined | '' | 0>) =>
+    items.filter(Boolean) as T[]
+
+  const personalItems = present([
+    candidate.dateOfBirth && { label: 'Date of birth', value: formatShortDate(candidate.dateOfBirth) },
+    candidate.sex && { label: 'Sex', value: expand(SEX, candidate.sex) },
+    candidate.category && { label: 'Category', value: expand(CATEGORY, candidate.category) },
+    candidate.pwd && { label: 'PwD', value: candidate.pwd },
+    candidate.consession && { label: 'Concession', value: candidate.consession },
+    candidate.flc && { label: 'FLC', value: candidate.flc },
+  ])
+
+  const familyItems = present([
+    candidate.motherName && { label: 'Mother’s name', value: displayName(candidate.motherName) },
+    candidate.fatherName && { label: 'Father’s name', value: displayName(candidate.fatherName) },
+  ])
+
+  const schoolItems = present([
+    candidate.schoolCode && { label: 'School code', value: candidate.schoolCode },
+    candidate.schoolName && { label: 'School name', value: displayName(candidate.schoolName), wide: !candidate.schoolCode },
+  ])
+
+  const contactItems = present([
+    candidate.email && {
+      label: 'Email',
+      value: (
+        <a className="cb-link" href={`mailto:${candidate.email}`}>
+          {candidate.email}
+        </a>
+      ),
+    },
+    candidate.phone && {
+      label: 'Phone',
+      value: (
+        <a className="cb-link" href={`tel:${candidate.phone}`}>
+          {candidate.phone}
+        </a>
+      ),
+    },
+  ])
+
+  const detailSections = [
+    { title: 'Personal', items: personalItems, columns: 3 as const },
+    { title: 'Family', items: familyItems, columns: 3 as const },
+    { title: 'School', items: schoolItems, columns: 3 as const },
+    { title: 'Contact', items: contactItems, columns: 3 as const },
+  ].filter((section) => section.items.length > 0)
+
+  const subtitleParts = [
+    `Roll no. ${candidate.rollNumber}`,
+    candidate.class ? `Class ${candidate.class}` : '',
+    displayName(candidate.schoolName) || '',
+  ].filter(Boolean)
+
+  const enrolledIds = new Set(candidate.subjects?.map((s) => s._id) ?? [])
+  const allSubjects: any[] = subjectListData?.data ?? []
+  const availableSubjects = allSubjects.filter((s) => {
+    if (enrolledIds.has(s._id)) return false
+    if (!assignSearch.trim()) return true
+    const q = assignSearch.trim().toLowerCase()
+    return (s.name ?? '').toLowerCase().includes(q) || (s.code ?? '').toLowerCase().includes(q)
+  })
+
+  const closeAssign = () => {
+    setAssignSubjectOpen(false)
+    setAssignSearch('')
+  }
+
   return (
-    <div className="p-5 max-w-[1600px] mx-auto space-y-4">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-      <div className="flex items-center gap-3">
-      {candidate.photoUrl ? (
-        <img
-          src={candidate.photoUrl}
-          alt={candidate.name}
-          className="w-11 h-11 rounded-full object-cover border border-secondary-200 dark:border-secondary-700 flex-shrink-0"
-        />
-      ) : (
-        <div className="w-11 h-11 rounded-full bg-secondary-100 dark:bg-secondary-800 border border-secondary-200 dark:border-secondary-700 flex items-center justify-center flex-shrink-0">
-          <svg className="w-5 h-5 text-secondary-400 dark:text-secondary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-          </svg>
+    <Page>
+      <PageHeader
+        title={
+          <span className="cx-cand-title">
+            {displayName(candidate.name)}
+            {getStatusBadge(candidate.status)}
+          </span>
+        }
+        subtitle={subtitleParts.join(' · ')}
+        actions={
+          <Button icon={Pencil} onClick={() => navigate(`/candidate-details/${candidate._id}/edit`)}>
+            Edit candidate
+          </Button>
+        }
+      />
+
+      <div className="cb-grid-8-4">
+        <div className="cb-stack">
+          <Card
+            flush
+            title="Exam schedule"
+            subtitle={
+              sortedSubjects.length
+                ? `${sortedSubjects.length} ${sortedSubjects.length === 1 ? 'subject' : 'subjects'}, in exam date order`
+                : undefined
+            }
+            action={
+              <Button size="sm" icon={Plus} onClick={() => setAssignSubjectOpen(true)}>
+                Assign subject
+              </Button>
+            }
+          >
+            <DataTable
+              caption="Exam schedule"
+              columns={subjectColumns}
+              rows={sortedSubjects}
+              getRowKey={(subject) => subject._id}
+              empty={<EmptyState compact title="No subjects enrolled yet" body="Assign the subjects this candidate sits." />}
+            />
+          </Card>
+
+          {detailSections.length ? (
+            <Card title="Candidate details">
+              <div className="cx-cand-sections">
+                {detailSections.map((section) => (
+                  <section key={section.title} className="cx-cand-section">
+                    <h3 className="cb-subhead">{section.title}</h3>
+                    <DetailList columns={section.columns} items={section.items} />
+                  </section>
+                ))}
+              </div>
+            </Card>
+          ) : null}
         </div>
-      )}
-      <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <h1 className="text-lg font-semibold text-secondary-900 dark:text-white truncate">
-                {candidate.name}
-              </h1>
-              {getStatusBadge(candidate.status)}
-            </div>
-            <p className="text-sm text-secondary-500 dark:text-secondary-400 tabular-nums">
-              Roll number: {candidate.rollNumber}
-            </p>
-          </div>
-        </div>
-        <button
-          onClick={() => navigate(`/candidate-details/${candidate._id}/edit`)}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-secondary-300 dark:border-secondary-600 text-sm font-medium rounded-md text-secondary-700 dark:text-secondary-200 bg-white dark:bg-secondary-800 hover:bg-secondary-50 dark:hover:bg-secondary-700 transition-colors flex-shrink-0"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-          </svg>
-          Edit candidate
-        </button>
-      </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Main Information */}
-        <div className="lg:col-span-2 space-y-4">
-          {/* Basic Information */}
-          <div className="p-5 rounded-lg border border-secondary-200 dark:border-secondary-700 bg-white dark:bg-secondary-900">
-            <h2 className="text-sm font-semibold text-secondary-900 dark:text-white mb-3">
-              Basic information
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-              <div>
-                <label className="block text-xs font-medium text-secondary-500 dark:text-secondary-400 mb-0.5">
-                  Full name
-                </label>
-                <p className="text-sm text-secondary-900 dark:text-white">{candidate.name}</p>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-secondary-500 dark:text-secondary-400 mb-0.5">
-                  Roll number
-                </label>
-                <p className="text-sm text-secondary-900 dark:text-white tabular-nums">{candidate.rollNumber}</p>
-              </div>
-              {candidate.flc && (
-                <div>
-                  <label className="block text-xs font-medium text-secondary-500 dark:text-secondary-400 mb-0.5">
-                    FLC
-                  </label>
-                  <p className="text-sm text-secondary-900 dark:text-white">{candidate.flc}</p>
-                </div>
-              )}
-              {candidate.sex && (
-                <div>
-                  <label className="block text-xs font-medium text-secondary-500 dark:text-secondary-400 mb-0.5">
-                    Sex
-                  </label>
-                  <p className="text-sm text-secondary-900 dark:text-white">{candidate.sex}</p>
-                </div>
-              )}
-              {candidate.dateOfBirth && (
-                <div>
-                  <label className="block text-xs font-medium text-secondary-500 dark:text-secondary-400 mb-0.5">
-                    Date of birth
-                  </label>
-                  <p className="text-sm text-secondary-900 dark:text-white">
-                    {new Date(candidate.dateOfBirth).toLocaleDateString('en-US', {
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric'
-                    })}
-                  </p>
-                </div>
-              )}
-              {candidate.category && (
-                <div>
-                  <label className="block text-xs font-medium text-secondary-500 dark:text-secondary-400 mb-0.5">
-                    Category
-                  </label>
-                  <p className="text-sm text-secondary-900 dark:text-white">{candidate.category}</p>
-                </div>
-              )}
-              {candidate.pwd && (
-                <div>
-                  <label className="block text-xs font-medium text-secondary-500 dark:text-secondary-400 mb-0.5">
-                    PwD
-                  </label>
-                  <p className="text-sm text-secondary-900 dark:text-white">{candidate.pwd}</p>
-                </div>
-              )}
-              {candidate.consession && (
-                <div>
-                  <label className="block text-xs font-medium text-secondary-500 dark:text-secondary-400 mb-0.5">
-                    Consession
-                  </label>
-                  <p className="text-sm text-secondary-900 dark:text-white">{candidate.consession}</p>
-                </div>
-              )}
-            </div>
-          </div>
+        <div className="cb-stack">
+          {candidate.photoUrl ? (
+            <Card title="Photo">
+              <img src={candidate.photoUrl} alt={displayName(candidate.name)} className="cx-cand-photo" />
+            </Card>
+          ) : null}
 
-          {/* Family Information */}
-          {(candidate.motherName || candidate.fatherName) && (
-            <div className="p-5 rounded-lg border border-secondary-200 dark:border-secondary-700 bg-white dark:bg-secondary-900">
-              <h2 className="text-sm font-semibold text-secondary-900 dark:text-white mb-3">
-                Family information
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-                {candidate.motherName && (
-                  <div>
-                    <label className="block text-xs font-medium text-secondary-500 dark:text-secondary-400 mb-0.5">
-                      Mother's name
-                    </label>
-                    <p className="text-sm text-secondary-900 dark:text-white">{candidate.motherName}</p>
-                  </div>
-                )}
-                {candidate.fatherName && (
-                  <div>
-                    <label className="block text-xs font-medium text-secondary-500 dark:text-secondary-400 mb-0.5">
-                      Father's name
-                    </label>
-                    <p className="text-sm text-secondary-900 dark:text-white">{candidate.fatherName}</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Contact Information */}
-          {(candidate.email || candidate.phone) && (
-            <div className="p-5 rounded-lg border border-secondary-200 dark:border-secondary-700 bg-white dark:bg-secondary-900">
-              <h2 className="text-sm font-semibold text-secondary-900 dark:text-white mb-3">
-                Contact information
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-                <div>
-                  <label className="block text-xs font-medium text-secondary-500 dark:text-secondary-400 mb-0.5">
-                    Email
-                  </label>
-                  <p className="text-sm text-secondary-900 dark:text-white">
-                    {candidate.email ? (
-                      <a href={`mailto:${candidate.email}`} className="text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300">
-                        {candidate.email}
-                      </a>
-                    ) : (
-                      'Not provided'
-                    )}
-                  </p>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-secondary-500 dark:text-secondary-400 mb-0.5">
-                    Phone
-                  </label>
-                  <p className="text-sm text-secondary-900 dark:text-white">
-                    {candidate.phone ? (
-                      <a href={`tel:${candidate.phone}`} className="text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300">
-                        {candidate.phone}
-                      </a>
-                    ) : (
-                      'Not provided'
-                    )}
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* School Information */}
-          {(candidate.schoolCode || candidate.schoolName || candidate.class) && (
-            <div className="p-5 rounded-lg border border-secondary-200 dark:border-secondary-700 bg-white dark:bg-secondary-900">
-              <h2 className="text-sm font-semibold text-secondary-900 dark:text-white mb-3">
-                School information
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-                {candidate.schoolCode && (
-                  <div>
-                    <label className="block text-xs font-medium text-secondary-500 dark:text-secondary-400 mb-0.5">
-                      School code
-                    </label>
-                    <p className="text-sm font-semibold text-secondary-900 dark:text-white tabular-nums">
-                      {candidate.schoolCode}
-                    </p>
-                  </div>
-                )}
-                {candidate.schoolName && (
-                  <div className={candidate.schoolCode ? 'md:col-span-1' : 'md:col-span-2'}>
-                    <label className="block text-xs font-medium text-secondary-500 dark:text-secondary-400 mb-0.5">
-                      School name
-                    </label>
-                    <p className="text-sm text-secondary-900 dark:text-white">
-                      {candidate.schoolName}
-                    </p>
-                  </div>
-                )}
-                {candidate.class && (
-                  <div>
-                    <label className="block text-xs font-medium text-secondary-500 dark:text-secondary-400 mb-0.5">
-                      Class
-                    </label>
-                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${
-                      candidate.class === '12th'
-                        ? 'bg-purple-50 text-purple-700 ring-purple-600/20 dark:bg-purple-400/10 dark:text-purple-400 dark:ring-purple-400/20'
-                        : 'bg-green-50 text-green-700 ring-green-600/20 dark:bg-green-400/10 dark:text-green-400 dark:ring-green-400/20'
-                    }`}>
-                      {candidate.class}
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Subject Codes */}
-          {candidate.subjectCodes && candidate.subjectCodes.length > 0 && (
-            <div className="p-5 rounded-lg border border-secondary-200 dark:border-secondary-700 bg-white dark:bg-secondary-900">
-              <h2 className="text-sm font-semibold text-secondary-900 dark:text-white mb-3">
-                Subject codes
-              </h2>
-              <div className="flex flex-wrap gap-1.5">
+          {candidate.subjectCodes && candidate.subjectCodes.length > 0 ? (
+            <Card title="Subject codes" subtitle="As read from the CBSE list">
+              <div className="cx-cand-codes">
                 {candidate.subjectCodes.map((item, index) => {
-                  const code = typeof item === 'string' ? item : item.code;
-                  const medium = typeof item === 'object' && item.medium ? item.medium : '';
-                  const isHindi = medium === '2';
-                  const isEnglish = medium === '1';
-                  const mediumLabel = isHindi ? 'Hindi' : isEnglish ? 'English' : '';
-
+                  const code = typeof item === 'string' ? item : item.code
+                  const medium = typeof item === 'object' && item.medium ? item.medium : ''
+                  const mediumLabel = medium === '2' ? 'Hindi' : medium === '1' ? 'English' : ''
                   return (
-                    <span
-                      key={index}
-                      className={`inline-flex items-center rounded px-2 py-1 text-xs font-medium ring-1 ring-inset ${
-                        isHindi
-                          ? 'bg-orange-50 text-orange-700 ring-orange-600/20 dark:bg-orange-400/10 dark:text-orange-400 dark:ring-orange-400/20'
-                          : 'bg-blue-50 text-blue-700 ring-blue-600/20 dark:bg-blue-400/10 dark:text-blue-400 dark:ring-blue-400/20'
-                      }`}
-                    >
+                    <Badge key={`${code}-${index}`} dot={false}>
                       {code}
-                      {mediumLabel && <span className="ml-1 opacity-70">({mediumLabel})</span>}
-                    </span>
-                  );
+                      {mediumLabel ? ` · ${mediumLabel}` : ''}
+                    </Badge>
+                  )
                 })}
               </div>
-            </div>
-          )}
+            </Card>
+          ) : null}
 
-          {/* Enrolled Subjects (sorted by exam date) */}
-          <div className="rounded-lg border border-secondary-200 dark:border-secondary-700 bg-white dark:bg-secondary-900 overflow-hidden">
-              <div className="flex items-center justify-between px-5 py-3.5 border-b border-secondary-200 dark:border-secondary-700">
-                <h2 className="text-sm font-semibold text-secondary-900 dark:text-white">
-                  Enrolled subjects
-                </h2>
-                <button
-                  type="button"
-                  onClick={() => setAssignSubjectOpen(true)}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 border border-secondary-300 dark:border-secondary-600 text-xs font-medium rounded-md text-secondary-700 dark:text-secondary-200 bg-white dark:bg-secondary-800 hover:bg-secondary-50 dark:hover:bg-secondary-700 transition-colors"
-                >
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                  </svg>
-                  Assign subject
-                </button>
-              </div>
-              {(!candidate.subjects || candidate.subjects.length === 0) ? (
-                <p className="text-sm text-secondary-500 dark:text-secondary-400 px-5 py-4">No subjects enrolled yet.</p>
-              ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-full">
-                  <thead>
-                    <tr className="border-b border-secondary-200 dark:border-secondary-700">
-                      <th className="px-4 py-2.5 text-left text-xs font-medium text-secondary-600 dark:text-secondary-400">
-                        Subject
-                      </th>
-                      <th className="px-4 py-2.5 text-left text-xs font-medium text-secondary-600 dark:text-secondary-400">
-                        Exam date
-                      </th>
-                      <th className="px-4 py-2.5 text-left text-xs font-medium text-secondary-600 dark:text-secondary-400">
-                        Answer sheet
-                      </th>
-                      <th className="px-4 py-2.5 text-left text-xs font-medium text-secondary-600 dark:text-secondary-400">
-                        Serial no.
-                      </th>
-                      <th className="px-4 py-2.5 text-left text-xs font-medium text-secondary-600 dark:text-secondary-400">
-                        Room no.
-                      </th>
-                      <th className="px-4 py-2.5 text-left text-xs font-medium text-secondary-600 dark:text-secondary-400">
-                        Invigilator 1
-                      </th>
-                      <th className="px-4 py-2.5 text-left text-xs font-medium text-secondary-600 dark:text-secondary-400">
-                        Invigilator 2
-                      </th>
-                      <th className="px-4 py-2.5" />
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-secondary-100 dark:divide-secondary-800">
-                    {sortedSubjects.map((subject) => (
-                      <tr key={subject._id} className="hover:bg-secondary-50 dark:hover:bg-secondary-800/60 transition-colors">
-                        <td className="px-4 py-2.5">
-                          <div className="text-sm font-medium text-secondary-900 dark:text-white">{subject.name}</div>
-                          <div className="text-xs text-secondary-500 dark:text-secondary-400">Code: {subject.code}</div>
-                        </td>
-                        <td className="px-4 py-2.5 text-sm text-secondary-700 dark:text-secondary-300">
-                          {formatExamDate(subject.examDate)}
-                        </td>
-                        <td className="px-4 py-2.5 text-sm text-secondary-700 dark:text-secondary-300">
-                          {subject.answerSheetType ?? '—'}
-                        </td>
-                        <td className="px-4 py-2.5 text-sm text-secondary-700 dark:text-secondary-300">
-                          {subjectSerials[subject._id]
-                            ? subjectSerials[subject._id]
-                            : serialsLoading
-                              ? <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent text-secondary-400" />
-                              : (subject.serialNumber ?? '—')}
-                        </td>
-                        <td className="px-4 py-2.5 text-sm text-secondary-700 dark:text-secondary-300">
-                          {subject.roomNo ?? '—'}
-                        </td>
-                        <td className="px-4 py-2.5 text-sm text-secondary-700 dark:text-secondary-300">
-                          {subject.invigilator1 ? (
-                            <div>
-                              <div>{subject.invigilator1.name}</div>
-                              {subject.invigilator1.oasisId && (
-                                <div className="text-xs text-secondary-500 dark:text-secondary-400">OASIS: {subject.invigilator1.oasisId}</div>
-                              )}
-                            </div>
-                          ) : (
-                            '—'
-                          )}
-                        </td>
-                        <td className="px-4 py-2.5 text-sm text-secondary-700 dark:text-secondary-300">
-                          {subject.invigilator2 ? (
-                            <div>
-                              <div>{subject.invigilator2.name}</div>
-                              {subject.invigilator2.oasisId && (
-                                <div className="text-xs text-secondary-500 dark:text-secondary-400">OASIS: {subject.invigilator2.oasisId}</div>
-                              )}
-                            </div>
-                          ) : (
-                            '—'
-                          )}
-                        </td>
-                        <td className="px-4 py-2.5">
-                          {!importedSubjectCodes.has(subject.code) && (
-                            <button
-                              type="button"
-                              onClick={() => setSubjectToRemove({ _id: subject._id, name: subject.name, code: subject.code })}
-                              className="p-1.5 rounded hover:bg-red-50 dark:hover:bg-red-900/20 text-red-500 dark:text-red-400 transition-colors"
-                              title="Remove manually assigned subject"
-                            >
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                              </svg>
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              )}
-            </div>
-        </div>
-
-        {/* Sidebar */}
-        <div className="space-y-4">
-          {/* Candidate Photo */}
-          {candidate.photoUrl && (
-            <div className="p-5 rounded-lg border border-secondary-200 dark:border-secondary-700 bg-white dark:bg-secondary-900">
-              <h2 className="text-sm font-semibold text-secondary-900 dark:text-white mb-3">
-                Candidate photo
-              </h2>
-              <div className="flex justify-center">
-                <img
-                  src={candidate.photoUrl}
-                  alt={candidate.name}
-                  className="w-40 h-auto rounded-md border border-secondary-200 dark:border-secondary-700 object-contain"
-                />
-              </div>
-            </div>
-          )}
-
-          {/* Metadata: import + record info, sectioned in one compact card */}
-          <div className="rounded-lg border border-secondary-200 dark:border-secondary-700 bg-white dark:bg-secondary-900 divide-y divide-secondary-200 dark:divide-secondary-700">
-            {candidate.importedFrom && (
-              <div className="p-5">
-                <h2 className="text-sm font-semibold text-secondary-900 dark:text-white mb-3">
-                  Import information
-                </h2>
-                <div className="space-y-2.5">
-                  <div>
-                    <label className="block text-xs font-medium text-secondary-500 dark:text-secondary-400 mb-0.5">
-                      Source file
-                    </label>
-                    <p className="text-sm text-secondary-900 dark:text-white truncate">
-                      {candidate.importedFrom.fileName}
-                    </p>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-secondary-500 dark:text-secondary-400 mb-0.5">
-                      Import date
-                    </label>
-                    <p className="text-sm text-secondary-900 dark:text-white">
-                      {formatDate(candidate.importedFrom.uploadDate)}
-                    </p>
-                  </div>
-                  <a
-                    href={candidate.importedFrom.cloudinaryUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-sm text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300"
-                  >
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                    </svg>
-                    View original PDF
-                  </a>
-                </div>
-              </div>
-            )}
-
-            <div className="p-5">
-              <h2 className="text-sm font-semibold text-secondary-900 dark:text-white mb-3">
-                Record information
-              </h2>
-              <div className="space-y-2.5">
-                <div>
-                  <label className="block text-xs font-medium text-secondary-500 dark:text-secondary-400 mb-0.5">
-                    Created
-                  </label>
-                  <p className="text-sm text-secondary-900 dark:text-white">
-                    {formatDate(candidate.createdAt)}
-                  </p>
-                  {candidate.createdBy && (
-                    <p className="text-xs text-secondary-500 dark:text-secondary-400">
-                      by {candidate.createdBy.name}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-secondary-500 dark:text-secondary-400 mb-0.5">
-                    Last updated
-                  </label>
-                  <p className="text-sm text-secondary-900 dark:text-white">
-                    {formatDate(candidate.updatedAt)}
-                  </p>
-                  {candidate.updatedBy && (
-                    <p className="text-xs text-secondary-500 dark:text-secondary-400">
-                      by {candidate.updatedBy.name}
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
+          <Card title="Record">
+            <DetailList
+              columns={1}
+              items={present([
+                candidate.importedFrom && {
+                  label: 'Imported from',
+                  value: (
+                    <Entity
+                      primary={
+                        <a
+                          className="cb-link cx-cand-file"
+                          href={candidate.importedFrom.cloudinaryUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          {candidate.importedFrom.fileName}
+                          <Icon icon={ExternalLink} size={14} />
+                        </a>
+                      }
+                      secondary={formatDate(candidate.importedFrom.uploadDate)}
+                    />
+                  ),
+                },
+                {
+                  label: 'Created',
+                  value: (
+                    <Entity
+                      primary={formatDate(candidate.createdAt)}
+                      secondary={candidate.createdBy?.name ? `by ${candidate.createdBy.name}` : undefined}
+                    />
+                  ),
+                },
+                {
+                  label: 'Last updated',
+                  value: (
+                    <Entity
+                      primary={formatDate(candidate.updatedAt)}
+                      secondary={candidate.updatedBy?.name ? `by ${candidate.updatedBy.name}` : undefined}
+                    />
+                  ),
+                },
+              ])}
+            />
+          </Card>
         </div>
       </div>
 
-      {/* Assign Subject Dialog */}
       <Dialog
-        isOpen={assignSubjectOpen}
-        onClose={() => { setAssignSubjectOpen(false); setAssignSearch('') }}
-        size="sm"
-        maxHeight="80vh"
+        open={assignSubjectOpen}
+        onClose={closeAssign}
+        title="Assign subject"
+        description={candidate.class ? `Subjects for class ${candidate.class} that this candidate isn’t enrolled in.` : 'Subjects this candidate isn’t enrolled in.'}
+        footer={<Button onClick={closeAssign}>Done</Button>}
       >
-        <Dialog.Header>Assign Subject</Dialog.Header>
-        <Dialog.Body className="flex flex-col gap-0 p-0">
-          {/* Search */}
-          <div className="px-6 py-3 border-b border-secondary-200 dark:border-secondary-700">
-            <input
-              type="text"
-              value={assignSearch}
-              onChange={(e) => setAssignSearch(e.target.value)}
-              placeholder="Search by name or code…"
-              className="w-full px-3 py-2 rounded-lg border border-secondary-300 dark:border-secondary-600 bg-white dark:bg-secondary-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-              autoFocus
-            />
-          </div>
-          {/* Subject list */}
-          <div className="overflow-y-auto px-2 py-2" style={{ maxHeight: '50vh' }}>
-            {(() => {
-              const enrolledIds = new Set(candidate.subjects?.map((s) => s._id) ?? [])
-              const allSubjects: any[] = subjectListData?.data ?? []
-              const available = allSubjects.filter((s) => {
-                if (enrolledIds.has(s._id)) return false
-                if (!assignSearch.trim()) return true
-                const q = assignSearch.trim().toLowerCase()
-                return (
-                  (s.name ?? '').toLowerCase().includes(q) ||
-                  (s.code ?? '').toLowerCase().includes(q)
-                )
-              })
-              if (subjectsLoading) return (
-                <div className="flex justify-center py-8">
-                  <span className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-primary-500 border-t-transparent" />
-                </div>
-              )
-              if (available.length === 0) return (
-                <p className="text-center text-sm text-gray-500 dark:text-gray-400 py-8">
-                  {assignSearch ? 'No subjects match your search.' : 'All available subjects are already enrolled.'}
-                </p>
-              )
-              return available.map((subject) => (
+        <TextField
+          size="sm"
+          icon={Search}
+          aria-label="Search subjects"
+          placeholder="Search by name or code"
+          value={assignSearch}
+          onChange={(e) => setAssignSearch(e.target.value)}
+          autoFocus
+        />
+        {subjectsLoading ? (
+          <CardLoading label="Loading subjects…" />
+        ) : availableSubjects.length === 0 ? (
+          <EmptyState
+            compact
+            title={assignSearch ? 'No subjects match this search' : 'All available subjects are already enrolled'}
+          />
+        ) : (
+          <ul className="cx-cand-picklist">
+            {availableSubjects.map((subject) => (
+              <li key={subject._id}>
                 <button
-                  key={subject._id}
                   type="button"
+                  className="cx-cand-pick"
                   disabled={updateCandidateMutation.isPending}
                   onClick={() => handleAssignSubject(subject._id)}
-                  className="w-full text-left px-4 py-3 rounded-lg hover:bg-secondary-50 dark:hover:bg-secondary-800 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-900 dark:text-white">{subject.name}</p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">Code: {subject.code}{subject.class ? ` · Class ${subject.class}` : ''}</p>
-                    </div>
-                    {updateCandidateMutation.isPending && (
-                      <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-primary-500 border-t-transparent" />
-                    )}
-                  </div>
+                  <Entity
+                    primary={subject.name}
+                    secondary={`Code ${subject.code}${subject.class ? ` · Class ${subject.class}` : ''}`}
+                  />
+                  {updateCandidateMutation.isPending ? <span className="cb-spinner" aria-hidden="true" /> : null}
                 </button>
-              ))
-            })()}
-          </div>
-        </Dialog.Body>
+              </li>
+            ))}
+          </ul>
+        )}
       </Dialog>
 
-      {/* Remove Subject Confirmation Dialog */}
       <Dialog
-        isOpen={!!subjectToRemove}
+        open={!!subjectToRemove}
         onClose={() => setSubjectToRemove(null)}
-        variant="warning"
-        size="sm"
+        tone="danger"
+        size="md"
+        title={`Remove ${subjectToRemove?.code || 'this subject'}?`}
+        description={subjectToRemove ? `${subjectToRemove.name} (code ${subjectToRemove.code}) is taken off this candidate.` : undefined}
+        footer={
+          <>
+            <Button onClick={() => setSubjectToRemove(null)} disabled={updateCandidateMutation.isPending}>
+              Keep subject
+            </Button>
+            <Button variant="danger" loading={updateCandidateMutation.isPending} onClick={() => void handleRemoveSubject()}>
+              Remove subject
+            </Button>
+          </>
+        }
       >
-        <Dialog.Header variant="warning">Remove Subject</Dialog.Header>
-        <Dialog.Body className="space-y-4">
-          <p className="text-sm text-gray-700 dark:text-gray-300">
-            You are about to remove the following subject from this candidate:
-          </p>
-          {subjectToRemove && (
-            <div className="p-3 rounded-lg bg-secondary-50 dark:bg-secondary-800 border border-secondary-200 dark:border-secondary-700">
-              <p className="text-sm font-medium text-gray-900 dark:text-white">{subjectToRemove.name}</p>
-              <p className="text-xs text-gray-500 dark:text-gray-400">Code: {subjectToRemove.code}</p>
-            </div>
-          )}
-          <div className="flex gap-3 p-4 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700">
-            <svg className="w-5 h-5 text-amber-500 dark:text-amber-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
-            <div className="space-y-1">
-              <p className="text-sm font-medium text-amber-800 dark:text-amber-300">Potential downstream effects</p>
-              <ul className="text-xs text-amber-700 dark:text-amber-400 space-y-1 list-disc list-inside">
-                <li>If a seating plan has already been generated for this subject, the existing room allocations for this candidate will remain. You may need to regenerate the seating plan.</li>
-                <li>Answer sheet frequency counts for this subject may become inaccurate.</li>
-                <li>Dashboard exam filters may be affected if no other candidates are enrolled in this subject.</li>
-              </ul>
-            </div>
-          </div>
-        </Dialog.Body>
-        <Dialog.Footer>
-          <button
-            type="button"
-            onClick={() => setSubjectToRemove(null)}
-            disabled={updateCandidateMutation.isPending}
-            className="btn btn-secondary"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={handleRemoveSubject}
-            disabled={updateCandidateMutation.isPending}
-            className="btn btn-error"
-          >
-            {updateCandidateMutation.isPending && (
-              <svg className="w-4 h-4 mr-2 animate-spin" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-              </svg>
-            )}
-            Remove Subject
-          </button>
-        </Dialog.Footer>
+        <Banner tone="warning" title="Check what else uses this subject">
+          <ul className="cx-cand-help">
+            <li>If a seating plan is already generated for this subject, this candidate’s room allocation stays. You may need to regenerate the seating plan.</li>
+            <li>Answer sheet counts for this subject may become inaccurate.</li>
+            <li>Dashboard exam filters may change if no other candidate is enrolled in this subject.</li>
+          </ul>
+        </Banner>
       </Dialog>
-    </div>
+    </Page>
   )
 }
 

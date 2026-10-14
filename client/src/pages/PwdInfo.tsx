@@ -4,11 +4,9 @@ import CentreRecordsUtilityPage from '../components/centre-records/CentreRecords
 const PwdInfo: React.FC = () => {
   return (
     <CentreRecordsUtilityPage
-      title="PwD Info"
+      title="PwD info"
       description="Track the PwD candidates appearing at the centre along with scribe support, extra time approvals, and other exam-day accommodations that need attention."
       summaryLabel="PwD candidate support, scribe planning, and accommodation readiness"
-      summaryValue="PwD"
-      accentClasses="bg-[linear-gradient(135deg,#eef6ff_0%,#f7fbff_48%,#eefaf6_100%)]"
       overview={[
         'Review candidate-wise PwD details and approved support requirements.',
         'Manage scribe assignment status before the exam date.',
@@ -16,19 +14,19 @@ const PwdInfo: React.FC = () => {
       ]}
       workflows={[
         {
-          title: 'Candidate Accommodation Register',
+          title: 'Candidate accommodation register',
           description: 'Surface PwD candidate details, category notes, and room-facing instructions so the centre team can prepare before reporting time.',
         },
         {
-          title: 'Scribe Assignment Tracking',
+          title: 'Scribe assignment tracking',
           description: 'Capture assigned scribes, pending approvals, and last-mile updates for candidates who need writing assistance.',
         },
         {
-          title: 'Extra Time Planning',
+          title: 'Extra time planning',
           description: 'Show the approved extra time duration and any linked subject-specific accommodations for each exam day.',
         },
         {
-          title: 'Readiness Checklist',
+          title: 'Readiness checklist',
           description: 'Use the page as an operational checklist for rooms, documentation, and support staff coordination.',
         },
       ]}

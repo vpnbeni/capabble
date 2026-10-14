@@ -1,15 +1,2 @@
-.answer-sheet-dot--32-pages {
-  background-color: #3b82f6;
-}
-
-.answer-sheet-dot--20-pages {
-  background-color: #10b981;
-}
-
-.answer-sheet-dot--40-graph {
-  background-color: #f59e0b;
-}
-
-.answer-sheet-dot--none {
-  background-color: #9ca3af;
-}
+/* Datesheet page: date cell with Today / Next badges. */
+.cb-app .cx-ds-date { display: inline-flex; align-items: center; gap: var(--space-2); white-space: nowrap; }

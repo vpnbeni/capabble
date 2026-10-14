@@ -1,16 +1,19 @@
 import { useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
+import { Download, FileText } from 'lucide-react'
 import undertakingService, { type UndertakingRecord } from '../services/undertakingService'
+import { Button, Card, DetailList, EmptyState, Page, formatDate, formatTime } from '@/components/ui'
+import { CardLoading } from '@/components/exmcl/ExmclUi'
 
 const formatDateTime = (value?: string) => {
-  if (!value) return '-'
+  if (!value) return '—'
   const parsed = new Date(value)
-  if (Number.isNaN(parsed.getTime())) return '-'
-  return parsed.toLocaleString('en-IN')
+  if (Number.isNaN(parsed.getTime())) return '—'
+  return `${formatDate(parsed)}, ${formatTime(`${parsed.getHours()}:${parsed.getMinutes()}`)}`
 }
 
 const formatBytes = (value?: number) => {
-  if (!value || value <= 0) return '-'
+  if (!value || value <= 0) return '—'
   const units = ['B', 'KB', 'MB', 'GB']
   let size = value
   let unitIndex = 0
@@ -60,56 +63,39 @@ const UndertakingForm: React.FC = () => {
   }
 
   return (
-    <div className="p-6">
-      <div className="glass p-6 rounded-xl border border-secondary-200 dark:border-secondary-700 max-w-4xl">
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-          Undertaking Form
-        </h2>
-        <p className="text-sm text-gray-600 dark:text-gray-300 mb-6">
-          Download the latest undertaking form rolled out by the super admin for all exam functionaries.
-        </p>
+    <Page>
 
+      <Card
+        title="Current form"
+        subtitle="The latest undertaking form rolled out for all exam functionaries."
+        action={
+          record ? (
+            <Button size="sm" variant="primary" icon={Download} onClick={handleDownload} loading={downloading}>
+              {downloading ? 'Downloading…' : 'Download undertaking'}
+            </Button>
+          ) : undefined
+        }
+      >
         {loading ? (
-          <div className="text-gray-600 dark:text-gray-400">Loading undertaking file...</div>
+          <CardLoading label="Loading undertaking file…" />
         ) : !record ? (
-          <div className="rounded-lg border border-amber-200 bg-amber-50 text-amber-800 px-4 py-3 text-sm">
-            No undertaking file has been rolled out yet.
-          </div>
+          <EmptyState
+            icon={FileText}
+            title="No undertaking form has been rolled out yet"
+            body="It appears here as soon as the super admin rolls one out."
+          />
         ) : (
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="rounded-lg bg-gray-50 dark:bg-gray-800/60 p-4">
-                <div className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Title</div>
-                <div className="mt-1 font-medium text-gray-900 dark:text-white">{record.title || '-'}</div>
-              </div>
-              <div className="rounded-lg bg-gray-50 dark:bg-gray-800/60 p-4">
-                <div className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Academic Year</div>
-                <div className="mt-1 font-medium text-gray-900 dark:text-white">{record.academicYear || '-'}</div>
-              </div>
-              <div className="rounded-lg bg-gray-50 dark:bg-gray-800/60 p-4">
-                <div className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">File Size</div>
-                <div className="mt-1 font-medium text-gray-900 dark:text-white">{formatBytes(record.metadata?.fileSize)}</div>
-              </div>
-              <div className="rounded-lg bg-gray-50 dark:bg-gray-800/60 p-4">
-                <div className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Rolled Out</div>
-                <div className="mt-1 font-medium text-gray-900 dark:text-white">{uploadedAt}</div>
-              </div>
-            </div>
-
-            <div>
-              <button
-                type="button"
-                className="btn btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
-                onClick={handleDownload}
-                disabled={downloading}
-              >
-                {downloading ? 'Downloading...' : 'Download Undertaking'}
-              </button>
-            </div>
-          </div>
+          <DetailList
+            items={[
+              { label: 'Title', value: record.title },
+              { label: 'Academic year', value: record.academicYear },
+              { label: 'File size', value: formatBytes(record.metadata?.fileSize) },
+              { label: 'Rolled out', value: uploadedAt },
+            ]}
+          />
         )}
-      </div>
-    </div>
+      </Card>
+    </Page>
   )
 }
 

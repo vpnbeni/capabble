@@ -1,30 +1,31 @@
-import React, { useMemo, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import React, { useCallback, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import { AlertTriangle, CalendarClock, ChevronDown, ChevronRight, IndianRupee, Printer, Users, Wallet } from 'lucide-react'
+import { Link, useNavigate } from 'react-router-dom'
+import {
+  AlertTriangle,
+  ArrowRight,
+  FileText,
+  IndianRupee,
+  Layers,
+  Printer,
+  Receipt,
+  Wallet,
+} from 'lucide-react'
 import { useSelector } from 'react-redux'
 import { useCpitlDashboard, useExpenseSummary } from '@/hooks/useCpitl'
 import { selectUser } from '@/redux/slices/authSlice'
 import { isFeatureEnabledForPath } from '@/constants/featureAccess'
-import { IncomeExpenseChart } from './CpitlExpenses'
-import cpitlService from '@/services/cpitlService'
-import {
-  CpitlCard,
-  CpitlEmpty,
-  CpitlPageShell,
-  MODE_LABELS,
-  MONTHS,
-  ProgressBar,
-  StatCard,
-  btnGhost,
-  btnPrimary,
-  errorMessage,
-  fmtDate,
-  inr,
-  inrShort,
-  tableHead,
-} from '@/components/cpitl/CpitlUi'
+import type { ClassRow, CpitlDashboard as DashboardData } from '@/services/cpitlService'
+import { Banner, BulkBar, Button, Card, DataTable, EmptyState, Page, Progress, StatCard, cx, useRowSelection, type DataTableColumn } from '@/components/ui'
+import { MODE_LABELS, MONTHS, errorMessage, fmtDate, inr, inrShort } from '@/components/cpitl/CpitlUi'
+import cpitlBulkService from '@/services/cpitlBulkService'
+import '@/components/cpitl/overview.css'
+
+/** Bands for "collected against what has fallen due" — same thresholds as the home fees widget. */
+const BAND_GOOD = 90
+const BAND_WATCH = 70
+
+type Band = 'good' | 'watch' | 'concern' | 'none'
 
 const pct = (value?: number) => {
   const v = Number(value || 0)
@@ -36,332 +37,438 @@ const monthLabel = (key: string) => {
   return `${MONTHS[(m || 1) - 1]} ${String(y).slice(2)}`
 }
 
+const plural = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString('en-IN')} ${n === 1 ? one : many}`
+
+/** Share of dues-to-date that has been collected (capped at 100), and its band. */
+/**
+ * Share of what has fallen due up to the end of this month that is already paid.
+ * Uses the server's month figures; falls back to "due by today" from older servers.
+ */
+const dueRate = (row: Pick<ClassRow, 'collected' | 'dueSoFar' | 'demandedThisMonth' | 'dueThisMonth'>): { rate: number; band: Band } => {
+  const demanded = row.demandedThisMonth ?? row.dueSoFar
+  if (!demanded || demanded <= 0) return { rate: 0, band: 'none' }
+  const paid = row.demandedThisMonth != null ? demanded - (row.dueThisMonth || 0) : row.collected
+  const rate = Math.max(0, Math.min(100, (paid / demanded) * 100))
+  return { rate, band: rate >= BAND_GOOD ? 'good' : rate >= BAND_WATCH ? 'watch' : 'concern' }
+}
+
+const monthEndLabel = () => {
+  const d = new Date()
+  return new Date(d.getFullYear(), d.getMonth() + 1, 0).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+}
+
+type Defaulter = DashboardData['defaulters'][number]
+
 const CpitlDashboard: React.FC = () => {
   const navigate = useNavigate()
-  const { data, isLoading, isError } = useCpitlDashboard()
+  const { data, isLoading, isError, refetch } = useCpitlDashboard()
   const user = useSelector(selectUser)
   const expensesEnabled = isFeatureEnabledForPath('/cpitl/expenses', user?.featureToggles)
   const { data: summary } = useExpenseSummary({}, expensesEnabled)
-  const [expanded, setExpanded] = useState<Set<string>>(new Set())
-  const [printing, setPrinting] = useState<string | null>(null)
 
-  const chartData = useMemo(() => (data?.byMonth || []).map((m) => ({ ...m, label: monthLabel(m.month) })), [data])
-  const modeMax = useMemo(() => Math.max(1, ...(data?.byMode || []).map((m) => m.amount)), [data])
-
-  const toggle = (cls: string) =>
-    setExpanded((prev) => {
-      const next = new Set(prev)
-      if (next.has(cls)) next.delete(cls)
-      else next.add(cls)
-      return next
+  // A fixed 12-month window ending this month, so one month of data doesn't float alone in the chart.
+  const months = useMemo(() => {
+    const byKey = new Map((data?.byMonth || []).map((m) => [m.month, m]))
+    const now = new Date()
+    return Array.from({ length: 12 }, (_, i) => {
+      const d = new Date(now.getFullYear(), now.getMonth() - (11 - i), 1)
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+      const hit = byKey.get(key)
+      return { month: key, amount: hit?.amount || 0, count: hit?.count || 0, label: monthLabel(key) }
     })
+  }, [data])
+  const monthMax = useMemo(() => Math.max(1, ...months.map((m) => m.amount)), [months])
+  const modeTotal = useMemo(() => (data?.byMode || []).reduce((s, m) => s + m.amount, 0), [data])
+  const bandCounts = useMemo(() => {
+    const counts = { good: 0, watch: 0, concern: 0, none: 0 }
+    ;(data?.byClass || []).forEach((row) => {
+      counts[dueRate(row).band] += 1
+    })
+    return counts
+  }, [data])
+  const ieMonths = useMemo(() => (summary?.byMonth || []).map((m) => ({ ...m, label: monthLabel(m.month) })), [summary])
+  const ieMax = useMemo(() => Math.max(1, ...ieMonths.map((m) => Math.max(m.income, m.expense))), [ieMonths])
 
-  const printSlips = async (cls: string, section?: string) => {
-    const key = `${cls}-${section || ''}`
-    setPrinting(key)
+  // Top defaulters: tick students to print their fee slips in one PDF.
+  const defaulters = useMemo(() => data?.defaulters || [], [data])
+  const getDefaulterId = useCallback((d: Defaulter) => d.studentId, [])
+  const hasStudentId = useCallback((d: Defaulter) => Boolean(d.studentId), [])
+  const defaulterSelection = useRowSelection(defaulters, getDefaulterId, {
+    isSelectable: hasStudentId,
+    rowLabel: (d) => `Select ${d.name}`,
+  })
+  const [printingSlips, setPrintingSlips] = useState(false)
+  const printSelectedSlips = async () => {
+    setPrintingSlips(true)
     try {
-      await cpitlService.openClassSlips({ class: cls, section })
+      await cpitlBulkService.printStudentSlips(defaulterSelection.selectedIds)
     } catch (error) {
-      toast.error(await errorMessage(error, 'Could not generate fee slips.'))
+      toast.error(await errorMessage(error))
     } finally {
-      setPrinting(null)
+      setPrintingSlips(false)
     }
   }
 
   if (isLoading) {
     return (
-      <CpitlPageShell>
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="h-24 animate-pulse rounded-2xl bg-slate-100 dark:bg-slate-800" />
-          ))}
+      <Page>
+        <div className="cb-table-state" role="status">
+          <span className="cb-spinner" aria-hidden="true" />
+          Loading the fee dashboard
         </div>
-        <div className="h-72 animate-pulse rounded-2xl bg-slate-100 dark:bg-slate-800" />
-      </CpitlPageShell>
+      </Page>
     )
   }
 
   if (isError || !data) {
     return (
-      <CpitlPageShell>
-        <CpitlEmpty message="Could not load the finance dashboard." />
-      </CpitlPageShell>
+      <Page>
+        <Card>
+          <EmptyState
+            icon={AlertTriangle}
+            title="Couldn't load the fee dashboard"
+            body="Check your connection, then try again."
+            action={
+              <Button variant="secondary" onClick={() => void refetch()}>
+                Try again
+              </Button>
+            }
+          />
+        </Card>
+      </Page>
     )
   }
 
   const { totals, payments, coverage } = data
   const hasData = totals.expected > 0 || payments.count > 0
+  const uncovered = Math.max(0, coverage.activeStudents - coverage.studentsWithStructure)
 
   if (!hasData) {
     return (
-      <CpitlPageShell title="Fee Dashboard" subtitle="Collection and pending dues for the selected session">
-        <CpitlEmpty
-          message="No fees have been set up for this session yet. Create a fee structure and assign it to classes to start tracking collection."
-          action={
-            <Link to="/cpitl/fee-structures" className={btnPrimary}>
-              Set up fee structures
-            </Link>
-          }
-        />
-      </CpitlPageShell>
+      <Page>
+        <Card>
+          <EmptyState
+            icon={Layers}
+            title="No fees set up for this session"
+            body="Create a fee structure and assign it to classes to start tracking collection."
+            action={
+              <Button variant="primary" icon={Layers} onClick={() => navigate('/cpitl/fee-structures')}>
+                Set up fee structures
+              </Button>
+            }
+          />
+        </Card>
+      </Page>
     )
   }
 
-  return (
-    <CpitlPageShell
-      title="Fee Dashboard"
-      subtitle={`${coverage.studentsWithStructure} of ${coverage.activeStudents} active students have a fee structure`}
-      actions={
-        <Link to="/cpitl/collection" className={btnPrimary}>
-          <IndianRupee className="h-4 w-4" /> Collect fee
-        </Link>
-      }
-    >
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
-        <StatCard label="Session demand" value={inrShort(totals.expected)} hint={`${inr(totals.concession)} concession given`} icon={Wallet} tone="indigo" />
-        <StatCard
-          label="Collected"
-          value={inrShort(totals.collected)}
-          hint={`${pct(totals.collectionRate)} of session demand`}
+  const totalDue = dueRate({ collected: totals.collected, dueSoFar: totals.dueSoFar, demandedThisMonth: totals.demandedThisMonth, dueThisMonth: totals.dueThisMonth })
+  const dueNow = totals.dueThisMonth ?? totals.dueSoFar
+  const monthEnd = monthEndLabel()
+
+  const defaulterColumns: DataTableColumn<Defaulter>[] = [
+    {
+      key: 'name',
+      header: 'Student',
+      mobile: 'title',
+      render: (d) => (
+        <span className="co-person">
+          <span className="co-person__name">{d.name}</span>
+          {d.rollNumber ? <span className="co-person__sub">{d.rollNumber}</span> : null}
+        </span>
+      ),
+    },
+    { key: 'class', header: 'Class', mobile: 'subtitle', render: (d) => `${d.class || '—'}${d.section ? `-${d.section}` : ''}` },
+    { key: 'phone', header: 'Guardian phone', render: (d) => <span className="is-num">{d.guardianPhone || '—'}</span> },
+    { key: 'since', header: 'Overdue since', render: (d) => fmtDate(d.oldestDue) },
+    { key: 'installments', header: 'Instalments', align: 'right', numeric: true, render: (d) => d.installments },
+    { key: 'overdue', header: 'Overdue', align: 'right', mobile: 'aside', render: (d) => <span className="co-overdue">{inr(d.overdue)}</span> },
+    {
+      key: 'collect',
+      header: <span className="cb-visually-hidden">Actions</span>,
+      headerLabel: 'Actions',
+      align: 'right',
+      interactive: true,
+      render: (d) => (
+        <Button
+          variant="secondary"
+          size="sm"
           icon={IndianRupee}
-          tone="emerald"
+          onClick={() => navigate(d.studentId ? `/cpitl/students/${d.studentId}` : '/cpitl/collection')}
+          aria-label={`Collect fee from ${d.name}`}
+        >
+          Collect
+        </Button>
+      ),
+    },
+  ]
+
+  const showIncomeExpense = expensesEnabled && summary && (summary.totals.expense > 0 || summary.totals.income > 0)
+  const bandTone = (band: Band) => (band === 'good' ? 'success' : band === 'watch' ? 'warning' : band === 'concern' ? 'danger' : 'accent')
+  // Lowest first, so the classes that need a call appear at the top.
+  const classRows = [...data.byClass].sort((x, y) => dueRate(x).rate - dueRate(y).rate)
+  const behind = bandCounts.concern + bandCounts.watch
+
+  return (
+    <Page>
+      <div className="co-toolbar">
+        <p className="co-toolbar__lede">
+          {coverage.studentsWithStructure.toLocaleString('en-IN')} of {plural(coverage.activeStudents, 'active student')} have a fee
+          structure this session.
+        </p>
+        <div className="cb-card-actions">
+          <Button icon={Printer} onClick={() => navigate('/cpitl/fee-slips')}>
+            Print fee slips
+          </Button>
+          <Button variant="primary" icon={IndianRupee} onClick={() => navigate('/cpitl/collection')}>
+            Collect fee
+          </Button>
+        </div>
+      </div>
+
+      {uncovered > 0 ? (
+        <Banner tone="warning" title={`${plural(uncovered, 'active student')} ${uncovered === 1 ? 'has' : 'have'} no fee structure`}>
+          Their fees aren't counted below. <Link to="/cpitl/fee-structures" className="cb-link">Assign a fee structure</Link> to their
+          class to start billing them.
+        </Banner>
+      ) : null}
+
+      <section className="co-stats" aria-label="Fee collection this session">
+        <StatCard
+          label="Collected this session"
+          value={inrShort(totals.collected)}
+          hint={`${pct(totals.collectionRate)} of ${inrShort(totals.expected)} demand${totals.concession > 0 ? ` · ${inrShort(totals.concession)} concession` : ''}`}
+          progress={Math.min(100, totals.collectionRate || 0)}
+          progressTone="success"
         />
-        <StatCard label="Pending" value={inrShort(totals.pending)} hint="Includes future installments" icon={CalendarClock} tone="amber" />
+        <StatCard
+          label={`Due by ${monthEnd}`}
+          value={inrShort(dueNow)}
+          hint={
+            totalDue.band === 'none'
+              ? 'Nothing has fallen due yet'
+              : `${pct(totalDue.rate)} of ${inrShort(totals.demandedThisMonth ?? totals.dueSoFar)} collected`
+          }
+          progress={totalDue.rate}
+          progressTone={bandTone(totalDue.band)}
+        />
         <StatCard
           label="Overdue"
           value={inrShort(totals.overdue)}
-          hint={`${pct(totals.dueSoFarRate)} of dues-to-date collected`}
-          icon={AlertTriangle}
-          tone="rose"
+          hint={totals.overdue > 0 ? `${plural(data.defaulters.length, 'student')} behind on payments` : 'Nothing overdue'}
         />
-        <StatCard label="Today" value={inrShort(payments.today)} hint={`${payments.todayCount} receipt(s)`} icon={Users} tone="sky" />
-      </div>
+        <StatCard label="Collected today" value={inrShort(payments.today)} hint={plural(payments.todayCount, 'receipt')} />
+      </section>
 
-      <CpitlCard title="Class-wise collection">
-        <div className="-mx-5 overflow-x-auto">
-          <table className="min-w-full text-sm">
-            <thead className={tableHead}>
-              <tr>
-                <th className="px-5 py-2.5">Class</th>
-                <th className="px-3 py-2.5 text-right">Students</th>
-                <th className="px-3 py-2.5 text-right">Demand</th>
-                <th className="px-3 py-2.5 text-right">Received</th>
-                <th className="px-3 py-2.5 text-right">Pending</th>
-                <th className="px-3 py-2.5 text-right">Overdue</th>
-                <th className="w-48 px-3 py-2.5">Collected</th>
-                <th className="px-5 py-2.5 text-right">Slips</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-              {data.byClass.map((row) => {
-                const open = expanded.has(row.class)
-                return (
-                  <React.Fragment key={row.class}>
-                    <tr className="hover:bg-slate-50 dark:hover:bg-slate-700/40">
-                      <td className="px-5 py-2.5">
-                        <button type="button" onClick={() => toggle(row.class)} className="inline-flex items-center gap-1 font-semibold text-slate-900 dark:text-white">
-                          {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                          Class {row.class}
-                        </button>
-                      </td>
-                      <td className="px-3 py-2.5 text-right tabular-nums">{row.students}</td>
-                      <td className="px-3 py-2.5 text-right tabular-nums">{inr(row.expected)}</td>
-                      <td className="px-3 py-2.5 text-right tabular-nums text-emerald-700 dark:text-emerald-400">{inr(row.collected)}</td>
-                      <td className="px-3 py-2.5 text-right tabular-nums">{inr(row.pending)}</td>
-                      <td className="px-3 py-2.5 text-right tabular-nums">
-                        {row.overdue > 0 ? (
-                          <span className="text-rose-600 dark:text-rose-400">
-                            {inr(row.overdue)} <span className="text-xs text-slate-400">({row.defaulters})</span>
-                          </span>
-                        ) : (
-                          '—'
-                        )}
-                      </td>
-                      <td className="px-3 py-2.5">
-                        <div className="flex items-center gap-2">
-                          <ProgressBar value={row.collectionRate || 0} />
-                          <span className="w-12 text-right text-xs tabular-nums text-slate-500">{pct(row.collectionRate)}</span>
-                        </div>
-                      </td>
-                      <td className="px-5 py-2.5 text-right">
-                        <button type="button" className={btnGhost} disabled={printing === `${row.class}-`} onClick={() => printSlips(row.class)}>
-                          <Printer className="h-3.5 w-3.5" /> {printing === `${row.class}-` ? 'Preparing…' : 'Print'}
-                        </button>
-                      </td>
-                    </tr>
-                    {open &&
-                      (row.sections || []).map((sec) => {
-                        const rate = sec.expected > 0 ? (sec.collected / sec.expected) * 100 : 0
-                        return (
-                          <tr key={`${row.class}-${sec.section}`} className="bg-slate-50/60 text-slate-600 dark:bg-slate-900/20 dark:text-slate-300">
-                            <td className="px-5 py-2 pl-12">Section {sec.section || '—'}</td>
-                            <td className="px-3 py-2 text-right tabular-nums">{sec.students}</td>
-                            <td className="px-3 py-2 text-right tabular-nums">{inr(sec.expected)}</td>
-                            <td className="px-3 py-2 text-right tabular-nums">{inr(sec.collected)}</td>
-                            <td className="px-3 py-2 text-right tabular-nums">{inr(sec.pending)}</td>
-                            <td className="px-3 py-2 text-right tabular-nums">{sec.overdue > 0 ? `${inr(sec.overdue)} (${sec.defaulters})` : '—'}</td>
-                            <td className="px-3 py-2">
-                              <div className="flex items-center gap-2">
-                                <ProgressBar value={rate} />
-                                <span className="w-12 text-right text-xs tabular-nums">{pct(rate)}</span>
-                              </div>
-                            </td>
-                            <td className="px-5 py-2 text-right">
-                              <button
-                                type="button"
-                                className={btnGhost}
-                                disabled={printing === `${row.class}-${sec.section}`}
-                                onClick={() => printSlips(row.class, sec.section)}
-                              >
-                                <Printer className="h-3.5 w-3.5" /> Print
-                              </button>
-                            </td>
-                          </tr>
-                        )
-                      })}
-                  </React.Fragment>
-                )
-              })}
-            </tbody>
-            <tfoot className="border-t-2 border-slate-200 font-semibold dark:border-slate-600">
-              <tr>
-                <td className="px-5 py-2.5">Total</td>
-                <td className="px-3 py-2.5 text-right tabular-nums">{data.byClass.reduce((s, r) => s + r.students, 0)}</td>
-                <td className="px-3 py-2.5 text-right tabular-nums">{inr(totals.expected)}</td>
-                <td className="px-3 py-2.5 text-right tabular-nums">{inr(totals.collected)}</td>
-                <td className="px-3 py-2.5 text-right tabular-nums">{inr(totals.pending)}</td>
-                <td className="px-3 py-2.5 text-right tabular-nums">{inr(totals.overdue)}</td>
-                <td className="px-3 py-2.5 text-xs text-slate-500">{pct(totals.collectionRate)}</td>
-                <td />
-              </tr>
-            </tfoot>
-          </table>
-        </div>
-      </CpitlCard>
-
-      <div className="grid gap-6 lg:grid-cols-3">
-        <CpitlCard title="Monthly collection" className="lg:col-span-2">
-          {chartData.length ? (
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                  <CartesianGrid vertical={false} strokeOpacity={0.15} />
-                  <XAxis dataKey="label" tickLine={false} axisLine={false} fontSize={12} />
-                  <YAxis tickFormatter={(v) => inrShort(v)} tickLine={false} axisLine={false} fontSize={12} width={64} />
-                  <Tooltip
-                    cursor={{ fillOpacity: 0.06 }}
-                    formatter={(value: number, _name, item) => [`${inr(value)} · ${item?.payload?.count} receipts`, 'Collected']}
-                  />
-                  <Bar dataKey="amount" fill="#4f46e5" radius={[4, 4, 0, 0]} maxBarSize={36} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          ) : (
-            <CpitlEmpty message="No payments recorded yet." />
-          )}
-        </CpitlCard>
-
-        <CpitlCard title="By payment mode">
-          {data.byMode.length ? (
-            <ul className="space-y-3">
-              {data.byMode.map((m) => (
-                <li key={m.mode}>
-                  <div className="flex items-baseline justify-between text-sm">
-                    <span className="font-medium text-slate-700 dark:text-slate-200">{MODE_LABELS[m.mode] || m.mode}</span>
-                    <span className="tabular-nums text-slate-900 dark:text-white">{inr(m.amount)}</span>
-                  </div>
-                  <div className="mt-1 h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-700">
-                    <div className="h-full rounded-full bg-indigo-500" style={{ width: `${(m.amount / modeMax) * 100}%` }} />
-                  </div>
-                  <p className="mt-0.5 text-xs text-slate-400">{m.count} receipt(s)</p>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <CpitlEmpty message="No payments recorded yet." />
-          )}
-        </CpitlCard>
-      </div>
-
-      {expensesEnabled && summary && (summary.totals.expense > 0 || summary.totals.income > 0) ? (
-        <CpitlCard
-          title="Income vs expenses"
-          actions={
-            <Link to="/cpitl/expenses" className={btnGhost}>
-              Expense overview
-            </Link>
+      <div className="cb-grid-8-4 co-row">
+        <Card
+          title="Collection by class"
+          subtitle={
+            classRows.length === 0
+              ? 'Collected against what has fallen due so far.'
+              : behind === 0
+                ? `Every class has collected ${BAND_GOOD}% or more of what is due by ${monthEnd}.`
+                : `${plural(behind, 'class', 'classes')} below ${BAND_GOOD}% of what is due by ${monthEnd}. Lowest first; select a class to collect.`
+          }
+          fill
+          footer={
+            classRows.length
+              ? `${inr(totals.pending)} still to collect this session, including instalments not yet due.`
+              : undefined
           }
         >
-          <div className="mb-4 grid grid-cols-3 gap-3 text-sm">
-            <div className="rounded-xl bg-slate-50 px-4 py-3 dark:bg-slate-900/40">
-              <p className="text-xs text-slate-500">Fee income</p>
-              <p className="text-lg font-semibold tabular-nums">{inr(summary.totals.income)}</p>
-            </div>
-            <div className="rounded-xl bg-slate-50 px-4 py-3 dark:bg-slate-900/40">
-              <p className="text-xs text-slate-500">Expenses</p>
-              <p className="text-lg font-semibold tabular-nums">{inr(summary.totals.expense)}</p>
-            </div>
-            <div className="rounded-xl bg-slate-50 px-4 py-3 dark:bg-slate-900/40">
-              <p className="text-xs text-slate-500">{summary.totals.net >= 0 ? 'Surplus' : 'Deficit'}</p>
-              <p className={`text-lg font-semibold tabular-nums ${summary.totals.net >= 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
-                {inr(Math.abs(summary.totals.net))}
-              </p>
-            </div>
-          </div>
-          <IncomeExpenseChart data={summary.byMonth} />
-        </CpitlCard>
-      ) : null}
-
-      <CpitlCard
-        title="Top defaulters"
-        actions={
-          <Link to="/cpitl/fee-slips" className={btnGhost}>
-            <Printer className="h-3.5 w-3.5" /> Fee slips
-          </Link>
-        }
-      >
-        {data.defaulters.length ? (
-          <div className="-mx-5 overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead className={tableHead}>
-                <tr>
-                  <th className="px-5 py-2.5">Student</th>
-                  <th className="px-3 py-2.5">Class</th>
-                  <th className="px-3 py-2.5">Guardian phone</th>
-                  <th className="px-3 py-2.5">Overdue since</th>
-                  <th className="px-3 py-2.5 text-right">Installments</th>
-                  <th className="px-5 py-2.5 text-right">Overdue</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-                {data.defaulters.map((d) => (
-                  <tr
-                    key={d.accountId}
-                    className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/40"
-                    onClick={() => d.studentId && navigate(`/cpitl/students/${d.studentId}`)}
+          {classRows.length === 0 ? (
+            <EmptyState
+              compact
+              icon={Layers}
+              title="No classes billed yet"
+              body="Assign a fee structure to a class to see its collection here."
+            />
+          ) : (
+            <div className="cb-progress-list co-classlist">
+              {classRows.map((row) => {
+                const { rate, band } = dueRate(row)
+                return (
+                  <button
+                    key={row.class}
+                    type="button"
+                    className="co-classrow"
+                    onClick={() => navigate(`/cpitl/collection?${new URLSearchParams({ class: row.class }).toString()}`)}
+                    aria-label={`Open fee collection for class ${row.class}`}
                   >
-                    <td className="px-5 py-2.5">
-                      <div className="font-medium text-slate-900 dark:text-white">{d.name}</div>
-                      <div className="text-xs text-slate-500">{d.rollNumber}</div>
-                    </td>
-                    <td className="px-3 py-2.5">
-                      {d.class}
-                      {d.section ? `-${d.section}` : ''}
-                    </td>
-                    <td className="px-3 py-2.5 tabular-nums">{d.guardianPhone || '—'}</td>
-                    <td className="px-3 py-2.5">{fmtDate(d.oldestDue)}</td>
-                    <td className="px-3 py-2.5 text-right tabular-nums">{d.installments}</td>
-                    <td className="px-5 py-2.5 text-right font-semibold tabular-nums text-rose-600 dark:text-rose-400">{inr(d.overdue)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                  <Progress
+                    label={`Class ${row.class}`}
+                    value={rate}
+                    tone={bandTone(band)}
+                    valueLabel={
+                      band === 'none'
+                        ? 'Nothing due yet'
+                        : `${pct(rate)} · ${inrShort(row.dueThisMonth ?? row.pending)} due${row.overdue > 0 ? ` · ${inrShort(row.overdue)} overdue` : ''}`
+                    }
+                  />
+                  </button>
+                )
+              })}
+            </div>
+          )}
+        </Card>
+
+        <Card fill title="By payment mode" subtitle={modeTotal > 0 ? `${inr(modeTotal)} collected so far.` : undefined}>
+          {data.byMode.length ? (
+            <div className="cb-progress-list">
+              {data.byMode.map((m) => (
+                <Progress
+                  key={m.mode}
+                  label={MODE_LABELS[m.mode] || m.mode}
+                  value={modeTotal > 0 ? (m.amount / modeTotal) * 100 : 0}
+                  tone="accent"
+                  valueLabel={`${inrShort(m.amount)} · ${plural(m.count, 'receipt')}`}
+                />
+              ))}
+            </div>
+          ) : (
+            <EmptyState compact icon={Wallet} title="No payments recorded yet" body="Record a payment from Collection to see the mix." />
+          )}
+        </Card>
+      </div>
+
+      <Card
+        title="Monthly collection"
+        subtitle={`${inr(payments.total)} from ${plural(payments.count, 'receipt')}${payments.lateFee > 0 ? `, including ${inr(payments.lateFee)} late fee` : ''}.`}
+      >
+        {months.length ? (
+          <div className="co-trend">
+            <div className="co-trend__scale" aria-hidden="true">
+              <span>Highest month {inrShort(monthMax)}</span>
+            </div>
+            <div className="co-trend__plot" role="list" aria-label="Fees collected per month">
+              {months.map((m) => (
+                <div
+                  key={m.month}
+                  className="co-trend__col"
+                  role="listitem"
+                  tabIndex={0}
+                  aria-label={`${m.label}: ${inr(m.amount)} from ${plural(m.count, 'receipt')}`}
+                >
+                  <span
+                    className={cx('co-trend__bar', m.amount <= 0 && 'is-zero')}
+                    style={m.amount > 0 ? { height: `${(m.amount / monthMax) * 100}%` } : undefined}
+                  />
+                  <span className="co-trend__label">{m.label}</span>
+                  <span className="co-trend__tip" aria-hidden="true">
+                    <strong>{m.label}</strong>
+                    {inr(m.amount)} · {plural(m.count, 'receipt')}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
         ) : (
-          <CpitlEmpty message="No overdue dues." />
+          <EmptyState compact icon={Receipt} title="No payments recorded yet" body="Collected fees show here month by month." />
         )}
-      </CpitlCard>
-    </CpitlPageShell>
+      </Card>
+
+      {showIncomeExpense && summary ? (
+        <Card
+          title="Income vs expenses"
+          subtitle="Fee income against recorded expenses, month by month."
+          action={
+            <Button variant="tertiary" size="sm" iconRight={ArrowRight} onClick={() => navigate('/cpitl/expenses')}>
+              Open expenses
+            </Button>
+          }
+        >
+          <div className="co-figures">
+            <div className="co-figure">
+              <span className="co-figure__label">Fee income</span>
+              <span className="co-figure__value">{inr(summary.totals.income)}</span>
+            </div>
+            <div className="co-figure">
+              <span className="co-figure__label">Expenses</span>
+              <span className="co-figure__value">{inr(summary.totals.expense)}</span>
+            </div>
+            <div className="co-figure">
+              <span className="co-figure__label">{summary.totals.net >= 0 ? 'Surplus' : 'Deficit'}</span>
+              <span className={cx('co-figure__value', summary.totals.net >= 0 ? 'is-success' : 'is-danger')}>
+                {inr(Math.abs(summary.totals.net))}
+              </span>
+            </div>
+          </div>
+          {ieMonths.length ? (
+            <div className="co-trend">
+              <div className="co-trend__plot" role="list" aria-label="Income and expenses per month">
+                {ieMonths.map((m) => (
+                  <div
+                    key={m.month}
+                    className="co-trend__col"
+                    role="listitem"
+                    tabIndex={0}
+                    aria-label={`${m.label}: income ${inr(m.income)}, expenses ${inr(m.expense)}`}
+                  >
+                    <span
+                      className={cx('co-trend__bar', m.income <= 0 && 'is-zero')}
+                      style={m.income > 0 ? { height: `${(m.income / ieMax) * 100}%` } : undefined}
+                    />
+                    <span
+                      className={cx('co-trend__bar co-trend__bar--expense', m.expense <= 0 && 'is-zero')}
+                      style={m.expense > 0 ? { height: `${(m.expense / ieMax) * 100}%` } : undefined}
+                    />
+                    <span className="co-trend__label">{m.label}</span>
+                    <span className="co-trend__tip" aria-hidden="true">
+                      <strong>{m.label}</strong>
+                      Income {inr(m.income)} · Expenses {inr(m.expense)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <div className="co-trend__legend">
+                <span>
+                  <i aria-hidden="true" />
+                  Income (fees)
+                </span>
+                <span>
+                  <i className="is-expense" aria-hidden="true" />
+                  Expenses
+                </span>
+              </div>
+            </div>
+          ) : null}
+        </Card>
+      ) : null}
+
+      <div id="co-defaulters" />
+      <Card
+        title="Top defaulters"
+        subtitle={data.defaulters.length ? 'Largest overdue balances. Open a student to collect.' : undefined}
+        flush
+        action={
+          <Button variant="tertiary" size="sm" icon={FileText} onClick={() => navigate('/cpitl/fee-slips')}>
+            Print fee slips
+          </Button>
+        }
+      >
+        {defaulterSelection.count > 0 ? (
+          <div className="co-bulk">
+            <BulkBar count={defaulterSelection.count} noun="student" onClear={defaulterSelection.clear} busy={printingSlips}>
+              <Button size="sm" icon={FileText} loading={printingSlips} disabled={printingSlips} onClick={printSelectedSlips}>
+                Print fee slips
+              </Button>
+            </BulkBar>
+          </div>
+        ) : null}
+        <DataTable
+          columns={defaulterColumns}
+          rows={data.defaulters}
+          selection={defaulterSelection.selection}
+          getRowKey={(d) => d.accountId}
+          onRowClick={(d) => d.studentId && navigate(`/cpitl/students/${d.studentId}`)}
+          caption="Students with overdue fees"
+          empty={
+            <EmptyState compact icon={Wallet} title="No overdue fees" body="Students with unpaid instalments past their due date show here." />
+          }
+        />
+      </Card>
+    </Page>
   )
 }
 

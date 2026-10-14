@@ -1,6 +1,6 @@
 const asyncHandler = require('../../middleware/asyncHandler');
 const { getModel } = require('../../modules/cpitl/feeService');
-const { round2 } = require('../../modules/cpitl/feeSchedule');
+const { round2, dueThroughMonthCutoff } = require('../../modules/cpitl/feeSchedule');
 
 const sortClassValue = (value) => {
   const numeric = parseInt(String(value || '').replace(/\D/g, ''), 10);
@@ -28,11 +28,16 @@ const getDashboard = asyncHandler(async (req, res) => {
   startOfToday.setHours(0, 0, 0, 0);
   const overdueExpr = { $cond: [{ $lt: ['$dueDate', now] }, '$balance', 0] };
   const dueSoFarExpr = { $cond: [{ $lte: ['$dueDate', now] }, '$total', 0] };
+  // "Due" for the school means up to the end of this month: what has fallen due (demanded)
+  // and what of it is still unpaid. Session-wide figures (expected / pending) stay as they were.
+  const monthCutoff = dueThroughMonthCutoff(now);
+  const demandedThisMonthExpr = { $cond: [{ $lt: ['$dueDate', monthCutoff] }, '$total', 0] };
+  const dueThisMonthExpr = { $cond: [{ $lt: ['$dueDate', monthCutoff] }, '$balance', 0] };
 
   const [totalsRow, classRows, paymentTotals, byMonth, byMode, defaulterRows, accountCount, studentCount] = await Promise.all([
     FeeDemand.aggregate([
       { $match: { status: { $ne: 'waived' } } },
-      { $group: { _id: null, ...sumFields, overdue: { $sum: overdueExpr }, dueSoFar: { $sum: dueSoFarExpr } } },
+      { $group: { _id: null, ...sumFields, overdue: { $sum: overdueExpr }, dueSoFar: { $sum: dueSoFarExpr }, demandedThisMonth: { $sum: demandedThisMonthExpr }, dueThisMonth: { $sum: dueThisMonthExpr } } },
     ]),
     FeeDemand.aggregate([
       { $match: { status: { $ne: 'waived' } } },
@@ -42,6 +47,8 @@ const getDashboard = asyncHandler(async (req, res) => {
           ...sumFields,
           overdue: { $sum: overdueExpr },
           dueSoFar: { $sum: dueSoFarExpr },
+          demandedThisMonth: { $sum: demandedThisMonthExpr },
+          dueThisMonth: { $sum: dueThisMonthExpr },
           students: { $addToSet: '$accountId' },
           defaulters: { $addToSet: { $cond: [{ $and: [{ $lt: ['$dueDate', now] }, { $gt: ['$balance', 0] }] }, '$accountId', '$$REMOVE'] } },
         },
@@ -97,14 +104,16 @@ const getDashboard = asyncHandler(async (req, res) => {
       pending: row.pending,
       overdue: row.overdue,
       dueSoFar: row.dueSoFar,
+      demandedThisMonth: row.demandedThisMonth,
+      dueThisMonth: row.dueThisMonth,
       students: row.students.length,
       defaulters: row.defaulters.length,
     });
     if (!classMap.has(cls)) {
-      classMap.set(cls, { class: cls, expected: 0, concession: 0, collected: 0, pending: 0, overdue: 0, dueSoFar: 0, students: 0, defaulters: 0, sections: [] });
+      classMap.set(cls, { class: cls, expected: 0, concession: 0, collected: 0, pending: 0, overdue: 0, dueSoFar: 0, demandedThisMonth: 0, dueThisMonth: 0, students: 0, defaulters: 0, sections: [] });
     }
     const entry = classMap.get(cls);
-    ['expected', 'concession', 'collected', 'pending', 'overdue', 'dueSoFar', 'students', 'defaulters'].forEach((k) => { entry[k] += sectionRow[k]; });
+    ['expected', 'concession', 'collected', 'pending', 'overdue', 'dueSoFar', 'demandedThisMonth', 'dueThisMonth', 'students', 'defaulters'].forEach((k) => { entry[k] += sectionRow[k]; });
     entry.sections.push(sectionRow);
   });
   const byClass = [...classMap.values()]
@@ -115,7 +124,7 @@ const getDashboard = asyncHandler(async (req, res) => {
     }))
     .sort((a, b) => sortClassValue(a.class) - sortClassValue(b.class) || a.class.localeCompare(b.class));
 
-  const totals = roundAll(totalsRow[0] || { expected: 0, gross: 0, concession: 0, collected: 0, pending: 0, overdue: 0, dueSoFar: 0 });
+  const totals = roundAll(totalsRow[0] || { expected: 0, gross: 0, concession: 0, collected: 0, pending: 0, overdue: 0, dueSoFar: 0, demandedThisMonth: 0, dueThisMonth: 0 });
   delete totals._id;
   const payments = roundAll(paymentTotals[0] || { total: 0, lateFee: 0, count: 0, today: 0, todayCount: 0 });
   delete payments._id;
@@ -127,6 +136,7 @@ const getDashboard = asyncHandler(async (req, res) => {
         ...totals,
         collectionRate: totals.expected > 0 ? round2((totals.collected / totals.expected) * 100) : 0,
         dueSoFarRate: totals.dueSoFar > 0 ? round2(Math.min(100, (totals.collected / totals.dueSoFar) * 100)) : 0,
+        dueThroughMonth: monthCutoff.toISOString(),
       },
       payments,
       coverage: { studentsWithStructure: accountCount, activeStudents: studentCount },

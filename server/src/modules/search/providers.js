@@ -174,10 +174,15 @@ const PROVIDERS = [
       prefix: ['rollNumber', 'schoolCode'],
       contains: ['name', 'fatherName']
     },
-    select: 'name rollNumber class schoolName schoolCode',
+    select: 'name rollNumber class schoolName schoolCode fatherName',
     map: (doc) => ({
       title: doc.name,
-      subtitle: join([doc.rollNumber && `Roll ${doc.rollNumber}`, doc.class && `Class ${doc.class}`, doc.schoolName]),
+      subtitle: join([
+        doc.rollNumber && `Roll ${doc.rollNumber}`,
+        doc.class && `Class ${doc.class}`,
+        doc.fatherName && `F: ${doc.fatherName}`,
+        doc.schoolName
+      ]),
       path: `/candidate-details/${doc._id}`
     })
   }

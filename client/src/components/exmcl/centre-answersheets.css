@@ -1,0 +1,38 @@
+/* Answer-sheet inventory (pages/AnswerSheets.tsx). Tokens only; scoped inside .cb-app. */
+
+/* Toolbar: class filter and the centre's series code with its save button. */
+.cb-app .cx-as-class { width: 148px; }
+.cb-app .cx-as-series { display: flex; align-items: center; gap: var(--space-2); margin: 0; }
+.cb-app .cx-as-series__field { width: 208px; }
+@media (max-width: 640px) {
+  .cb-app .cx-as-class { width: 100%; }
+  .cb-app .cx-as-series { width: 100%; }
+  .cb-app .cx-as-series__field { flex: 1; width: auto; }
+}
+
+/* Serial ranges stack inside one cell; supplementary bundles can hold several. */
+.cb-app .cx-as-serials { display: flex; flex-direction: column; gap: 2px; padding: var(--space-2) 0; font-variant-numeric: tabular-nums; }
+.cb-app .cx-as-serial-edit { display: flex; align-items: center; gap: var(--space-1); }
+.cb-app .cx-as-serial-input { width: 128px; }
+.cb-app .cb-tcard .cx-as-serial-input { width: 100%; }
+
+/* Inline Save / Cancel on a row being edited. */
+.cb-app .cx-as-actions { display: inline-flex; align-items: center; gap: var(--space-2); }
+
+/* Inline "main used" editor in the Used table. */
+.cb-app .cx-as-used-edit { display: inline-flex; align-items: center; gap: var(--space-1); }
+.cb-app .cx-as-used-edit .cb-field { width: 88px; }
+
+/* Long subject names truncate; the full name is in the title attribute. */
+.cb-app .cx-as-truncate { display: inline-block; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
+
+/* Consolidated-record PDF fills the sheet body. */
+
+/* Add-sheets form: one From / To pair per row, remove button beside it. */
+.cb-app .cx-as-range { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; gap: var(--space-3); align-items: end; }
+.cb-app .cx-as-hint { font-size: 13px; line-height: 18px; }
+@media (max-width: 640px) { .cb-app .cx-as-range { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
+
+/* Excel import: steps list and the picked file. */
+.cb-app .cx-as-steps { margin: var(--space-1) 0 0; padding-left: var(--space-5); display: flex; flex-direction: column; gap: 2px; }
+.cb-app .cx-as-file { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-3); min-width: 0; overflow-wrap: anywhere; }

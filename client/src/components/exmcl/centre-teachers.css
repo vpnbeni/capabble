@@ -1,0 +1,20 @@
+/* Exam functionaries / staff list (pages/Teachers.tsx). Tokens only; scoped inside .cb-app. */
+
+/* Toolbar holds the FilterBar and, when rows are selected, the BulkBar. */
+.cb-app .cx-teachers-toolbar { display: flex; flex-direction: column; gap: var(--space-3); }
+
+/* Name cell: avatar beside the kit Entity (name + OASIS ID). */
+.cb-app .cx-teachers-name { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
+
+/* Long school names truncate; the full name is in the title attribute. */
+.cb-app .cx-teachers-school { display: inline-block; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle; }
+
+/* Inline duty / type picker. Fills the mobile card instead of a fixed width. */
+.cb-app .cx-teachers-duty { width: 152px; }
+.cb-app .cb-tcard .cx-teachers-duty { min-width: 0; width: 100%; }
+
+/* Import error preview inside the result Banner. */
+.cb-app .cx-teachers-banner-list { margin: var(--space-2) 0 0; padding-left: var(--space-5); font-size: 13px; line-height: 18px; }
+
+/* Previous / next buttons in the table footer. */
+.cb-app .cx-teachers-pager { display: flex; align-items: center; gap: var(--space-2); }

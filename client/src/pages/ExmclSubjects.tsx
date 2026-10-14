@@ -1,9 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
 import { useNavigate } from 'react-router-dom'
+import { BookOpen, ClipboardList, Save } from 'lucide-react'
 import { useTimetable } from '@/contexts/TimetableContext'
 import exmclExamService, { type ExmclExamDefinition, type ExamSubjectMatrix } from '@/services/exmclExamService'
 import subjectService from '@/services/subjectService'
+import { Button, Card, CardToolbar, Checkbox, EmptyState, FilterBar, Page } from '@/components/ui'
+import { CardLoading, errorMessage } from '@/components/exmcl/ExmclUi'
+import '@/components/exmcl/exmcl.css'
 
 type SubjectRow = {
   key: string
@@ -23,6 +27,16 @@ const extractSubjectList = (payload: any): Array<{ name?: string }> => {
   return []
 }
 
+const sameMatrix = (a: ExamSubjectMatrix, b: ExamSubjectMatrix) => {
+  const keys = new Set([...Object.keys(a), ...Object.keys(b)])
+  for (const key of keys) {
+    const x = new Set(a[key] || [])
+    const y = b[key] || []
+    if (x.size !== y.length || y.some((v) => !x.has(v))) return false
+  }
+  return true
+}
+
 const ExmclSubjects: React.FC = () => {
   const navigate = useNavigate()
   const { subjects: timetableSubjects, classes: timetableClasses } = useTimetable()
@@ -30,6 +44,7 @@ const ExmclSubjects: React.FC = () => {
   const [saving, setSaving] = useState(false)
   const [exams, setExams] = useState<ExmclExamDefinition[]>([])
   const [matrix, setMatrix] = useState<ExamSubjectMatrix>({})
+  const [saved, setSaved] = useState<ExamSubjectMatrix>({})
   const [masterSubjectNames, setMasterSubjectNames] = useState<string[]>([])
   const [search, setSearch] = useState('')
 
@@ -42,13 +57,14 @@ const ExmclSubjects: React.FC = () => {
       ])
       setExams(matrixPayload.exams as ExmclExamDefinition[])
       setMatrix(matrixPayload.matrix || {})
+      setSaved(matrixPayload.matrix || {})
       setMasterSubjectNames(
         extractSubjectList(masterRes)
           .map((item) => String(item?.name || '').trim())
           .filter(Boolean)
       )
-    } catch (error: any) {
-      toast.error(String(error?.response?.data?.message || error?.message || 'Failed to load exam-subject matrix.'))
+    } catch (error) {
+      toast.error(errorMessage(error, 'Subjects didn’t load. Check your connection and try again.'))
     } finally {
       setLoading(false)
     }
@@ -82,9 +98,7 @@ const ExmclSubjects: React.FC = () => {
     })
     masterSubjectNames.forEach((name) => add(name, 'master'))
 
-    return Array.from(byKey.values()).sort((a, b) =>
-      a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
-    )
+    return Array.from(byKey.values()).sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
   }, [masterSubjectNames, timetableClasses, timetableSubjects])
 
   const filteredSubjects = useMemo(() => {
@@ -93,8 +107,9 @@ const ExmclSubjects: React.FC = () => {
     return subjectRows.filter((row) => row.name.toLowerCase().includes(q))
   }, [search, subjectRows])
 
-  const isChecked = (examId: string, key: string) =>
-    Array.isArray(matrix[examId]) && matrix[examId].includes(key)
+  const dirty = !sameMatrix(matrix, saved)
+
+  const isChecked = (examId: string, key: string) => Array.isArray(matrix[examId]) && matrix[examId].includes(key)
 
   const toggleCell = (examId: string, key: string) => {
     setMatrix((prev) => {
@@ -126,165 +141,150 @@ const ExmclSubjects: React.FC = () => {
   }
 
   const handleSave = async () => {
-    if (exams.length === 0) {
-      toast.error('Create exams first, then mark subjects.')
-      return
-    }
     setSaving(true)
     try {
       const payload = await exmclExamService.saveSubjectMatrix(matrix)
       setExams(payload.exams as ExmclExamDefinition[])
       setMatrix(payload.matrix || {})
-      toast.success('Exam-subject matrix saved.')
-    } catch (error: any) {
-      toast.error(String(error?.response?.data?.message || error?.message || 'Failed to save matrix.'))
+      setSaved(payload.matrix || {})
+      toast.success('Subjects saved for each exam.')
+    } catch (error) {
+      toast.error(errorMessage(error, 'The subjects weren’t saved. Try again.'))
     } finally {
       setSaving(false)
     }
   }
 
-  return (
-    <div className="p-6">
-      <div className="mx-auto max-w-[1400px] space-y-4">
-        <div className="flex flex-col gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm dark:border-gray-700 dark:bg-gray-800 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex flex-1 flex-wrap items-center gap-2">
-            <input
-              type="search"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search subjects"
-              title="Search subjects"
-              aria-label="Search subjects"
-              className="min-w-[200px] flex-1 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
-            />
-            <span className="text-xs text-gray-500 dark:text-gray-400">
-              {subjectRows.length} subjects · {exams.length} exams
-            </span>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              type="button"
-              onClick={() => navigate('/exmcl/exams')}
-              className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
-            >
-              Manage Exams
-            </button>
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={saving || loading || exams.length === 0}
-              className="rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {saving ? 'Saving…' : 'Save Matrix'}
-            </button>
-          </div>
-        </div>
-
-        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
-          {loading ? (
-            <div className="p-10 text-center text-sm text-gray-500 dark:text-gray-400">Loading subjects and exams…</div>
-          ) : exams.length === 0 ? (
-            <div className="p-10 text-center text-sm text-gray-500 dark:text-gray-400">
-              No exams created yet. Add exams first, then mark subjects for each exam.
-            </div>
-          ) : filteredSubjects.length === 0 ? (
-            <div className="p-10 text-center text-sm text-gray-500 dark:text-gray-400">
-              No subjects found from timetable or subjects master. Add subjects in Timetable or Subjects first.
-            </div>
-          ) : (
-            <div className="max-h-[70vh] overflow-auto">
-              <table className="w-max table-fixed border-collapse text-sm">
-                <colgroup>
-                  <col className="w-[200px]" />
+  let body: React.ReactNode
+  if (loading) body = <CardLoading label="Loading subjects and exams…" />
+  else if (exams.length === 0)
+    body = (
+      <EmptyState
+        icon={ClipboardList}
+        title="No exams set up for this session"
+        body="Add the session’s exams first, then tick the subjects each one covers."
+        action={
+          <Button size="sm" onClick={() => navigate('/exmcl/exams')}>
+            Add exams
+          </Button>
+        }
+      />
+    )
+  else if (subjectRows.length === 0)
+    body = (
+      <EmptyState
+        icon={BookOpen}
+        title="No subjects found"
+        body="Subjects come from the timetable and the subject list. Add them there and they appear here."
+      />
+    )
+  else if (filteredSubjects.length === 0)
+    body = (
+      <EmptyState
+        compact
+        icon={BookOpen}
+        title="No subjects match this search"
+        action={
+          <Button size="sm" onClick={() => setSearch('')}>
+            Clear search
+          </Button>
+        }
+      />
+    )
+  else
+    body = (
+      <div className="ex-matrix">
+        <table aria-label="Subjects in each exam">
+          <thead>
+            <tr>
+              <th scope="col" className="ex-matrix__subject">
+                Subject
+              </th>
+              {exams.map((exam) => {
+                const allSelected = filteredSubjects.every((row) => isChecked(exam._id, row.key))
+                const someSelected = !allSelected && filteredSubjects.some((row) => isChecked(exam._id, row.key))
+                return (
+                  <th key={exam._id} scope="col" title={exam.name}>
+                    <span className="ex-matrix__exam">
+                      <span>{exam.code}</span>
+                      <Checkbox
+                        checked={allSelected}
+                        indeterminate={someSelected}
+                        onChange={(checked) => toggleExamColumn(exam._id, checked)}
+                        aria-label={`Every subject in ${exam.code}`}
+                      />
+                    </span>
+                  </th>
+                )
+              })}
+              <th scope="col" className="ex-matrix__all">
+                All exams
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredSubjects.map((row) => {
+              const rowAll = exams.every((exam) => isChecked(exam._id, row.key))
+              const rowSome = !rowAll && exams.some((exam) => isChecked(exam._id, row.key))
+              return (
+                <tr key={row.key}>
+                  <th scope="row" className="ex-matrix__subject" title={row.name}>
+                    {row.name}
+                  </th>
                   {exams.map((exam) => (
-                    <col key={exam._id} className="w-[56px]" />
+                    <td key={exam._id}>
+                      <Checkbox
+                        checked={isChecked(exam._id, row.key)}
+                        onChange={() => toggleCell(exam._id, row.key)}
+                        aria-label={`${row.name} in ${exam.code}`}
+                      />
+                    </td>
                   ))}
-                  <col className="w-[48px]" />
-                </colgroup>
-                <thead className="sticky top-0 z-20 bg-gray-50 dark:bg-gray-900">
-                  <tr>
-                    <th className="sticky left-0 z-30 border-b border-r border-gray-200 bg-gray-50 px-2 py-1.5 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400">
-                      Subject
-                    </th>
-                    {exams.map((exam) => {
-                      const allSelected =
-                        filteredSubjects.length > 0 &&
-                        filteredSubjects.every((row) => isChecked(exam._id, row.key))
-                      const someSelected =
-                        !allSelected && filteredSubjects.some((row) => isChecked(exam._id, row.key))
-                      return (
-                        <th
-                          key={exam._id}
-                          className="border-b border-gray-200 px-1 py-1.5 text-center text-[11px] font-semibold uppercase tracking-normal text-gray-500 dark:border-gray-700 dark:text-gray-400"
-                          title={exam.name}
-                        >
-                          <div className="flex flex-col items-center gap-0.5">
-                            <span className="leading-tight">{exam.code}</span>
-                            <input
-                              type="checkbox"
-                              checked={allSelected}
-                              ref={(el) => {
-                                if (el) el.indeterminate = someSelected
-                              }}
-                              onChange={(e) => toggleExamColumn(exam._id, e.target.checked)}
-                              title={`Select all subjects for ${exam.code}`}
-                              aria-label={`Select all subjects for ${exam.code}`}
-                              className="h-3.5 w-3.5 cursor-pointer rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                            />
-                          </div>
-                        </th>
-                      )
-                    })}
-                    <th className="border-b border-gray-200 px-1 py-1.5 text-center text-[11px] font-semibold uppercase tracking-normal text-gray-500 dark:border-gray-700 dark:text-gray-400">
-                      All
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                  {filteredSubjects.map((row) => {
-                    const rowAll =
-                      exams.length > 0 && exams.every((exam) => isChecked(exam._id, row.key))
-                    const rowSome = !rowAll && exams.some((exam) => isChecked(exam._id, row.key))
-                    return (
-                      <tr key={row.key} className="hover:bg-gray-50/80 dark:hover:bg-gray-700/30">
-                        <td className="sticky left-0 z-10 truncate border-r border-gray-100 bg-white px-2 py-1.5 text-sm font-medium text-gray-900 dark:border-gray-800 dark:bg-gray-800 dark:text-white" title={row.name}>
-                          {row.name}
-                        </td>
-                        {exams.map((exam) => (
-                          <td key={`${row.key}-${exam._id}`} className="px-1 py-1 text-center">
-                            <input
-                              type="checkbox"
-                              checked={isChecked(exam._id, row.key)}
-                              onChange={() => toggleCell(exam._id, row.key)}
-                              title={`${row.name} for ${exam.code}`}
-                              aria-label={`${row.name} for ${exam.code}`}
-                              className="h-3.5 w-3.5 cursor-pointer rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                            />
-                          </td>
-                        ))}
-                        <td className="px-1 py-1 text-center">
-                          <input
-                            type="checkbox"
-                            checked={rowAll}
-                            ref={(el) => {
-                              if (el) el.indeterminate = rowSome
-                            }}
-                            onChange={(e) => toggleSubjectRow(row.key, e.target.checked)}
-                            title={`Mark ${row.name} for all exams`}
-                            aria-label={`Mark ${row.name} for all exams`}
-                            className="h-3.5 w-3.5 cursor-pointer rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                          />
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
+                  <td className="ex-matrix__all">
+                    <Checkbox
+                      checked={rowAll}
+                      indeterminate={rowSome}
+                      onChange={(checked) => toggleSubjectRow(row.key, checked)}
+                      aria-label={`${row.name} in every exam`}
+                    />
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
       </div>
-    </div>
+    )
+
+  return (
+    <Page>
+      <Card
+        flush
+        title="Subjects in each exam"
+        subtitle={
+          loading ? undefined : `${subjectRows.length} subjects · ${exams.length} exams · tick the subjects each exam covers`
+        }
+        action={
+          <Button size="sm" onClick={() => navigate('/exmcl/exams')}>
+            Manage exams
+          </Button>
+        }
+      >
+        {!loading && exams.length > 0 && subjectRows.length > 0 ? (
+          <CardToolbar>
+            <FilterBar
+              search={{ placeholder: 'Search subjects', value: search, onChange: setSearch, label: 'Search subjects' }}
+              actions={
+                <Button variant="primary" icon={Save} loading={saving} disabled={!dirty} onClick={() => void handleSave()}>
+                  Save subjects
+                </Button>
+              }
+            />
+          </CardToolbar>
+        ) : null}
+        {body}
+      </Card>
+    </Page>
   )
 }
 

@@ -1,0 +1,31 @@
+/* Exam rooms (CNTR + EXMCL room allocation). Tokens only; everything sits inside .cb-app (a <Page> or a kit overlay portal). */
+
+/* Room × exam-date allocation matrix: sticky header rows and room column, scrolls sideways. */
+.cb-app .cx-alloc { --cx-num-w: 48px; --cx-room-w: 200px; overflow: auto; max-height: 70vh; border-top: 1px solid var(--border); }
+.cb-app .cx-alloc table { border-collapse: separate; border-spacing: 0; min-width: 100%; font: 400 13px/18px var(--font-sans); color: var(--ink); }
+.cb-app .cx-alloc th, .cb-app .cx-alloc td { height: 48px; padding: 0 var(--space-2); border-bottom: 1px solid var(--border); background: var(--surface); text-align: center; white-space: nowrap; }
+.cb-app .cx-alloc thead th { position: sticky; z-index: 2; background: var(--surface-sunken); font: 500 12px/16px var(--font-sans); color: var(--ink-muted); font-variant-numeric: tabular-nums; }
+.cb-app .cx-alloc thead tr:first-child th { top: 0; height: 40px; }
+.cb-app .cx-alloc thead tr.cx-alloc__need th { top: 40px; height: 36px; }
+.cb-app .cx-alloc .cx-alloc__num { position: sticky; left: 0; z-index: 1; width: var(--cx-num-w); min-width: var(--cx-num-w); color: var(--ink-muted); font-variant-numeric: tabular-nums; }
+.cb-app .cx-alloc .cx-alloc__room { position: sticky; left: var(--cx-num-w); z-index: 1; width: var(--cx-room-w); min-width: var(--cx-room-w); max-width: var(--cx-room-w); padding: 0 var(--space-3); text-align: left; border-right: 1px solid var(--border); overflow: hidden; text-overflow: ellipsis; }
+.cb-app .cx-alloc thead .cx-alloc__num, .cb-app .cx-alloc thead .cx-alloc__room { z-index: 3; }
+.cb-app .cx-alloc__room-no { display: block; font-weight: 600; color: var(--ink); }
+.cb-app .cx-alloc__room-name { display: block; font-size: 12px; line-height: 16px; color: var(--ink-muted); overflow: hidden; text-overflow: ellipsis; }
+.cb-app .cx-alloc tbody tr:hover > * { background: var(--surface-hover); }
+.cb-app .cx-alloc__cell { display: inline-flex; flex-direction: column; align-items: center; gap: 2px; min-width: 64px; }
+.cb-app .cx-alloc__cell .cb-check { justify-content: center; }
+.cb-app .cx-alloc__order { font: 600 11px/14px var(--font-sans); color: var(--accent); font-variant-numeric: tabular-nums; }
+@media (max-width: 599px) {
+  .cb-app .cx-alloc { --cx-num-w: 0px; --cx-room-w: 128px; }
+  .cb-app .cx-alloc .cx-alloc__num { display: none; }
+}
+
+/* Seat map preview in the layout sheet: one line per row of benches, front of the room on top. */
+.cb-app .cx-seatmap { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface-sunken); overflow-x: auto; }
+.cb-app .cx-seatmap__front { padding-bottom: var(--space-2); border-bottom: 1px solid var(--border); text-align: center; font: 500 12px/16px var(--font-sans); color: var(--ink-muted); }
+.cb-app .cx-seatmap__row { display: flex; align-items: center; gap: var(--space-2); }
+.cb-app .cx-seatmap__label { flex: 0 0 48px; font: 500 12px/16px var(--font-sans); color: var(--ink-muted); font-variant-numeric: tabular-nums; }
+.cb-app .cx-seatmap__benches { display: flex; flex-wrap: wrap; gap: 6px; }
+.cb-app .cx-seatmap__bench { display: inline-flex; gap: 2px; padding: 2px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--surface); }
+.cb-app .cx-seatmap__seat { width: 10px; height: 10px; border-radius: 2px; background: var(--border-strong); }

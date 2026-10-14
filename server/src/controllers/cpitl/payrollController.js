@@ -4,7 +4,8 @@ const pdfGenerator = require('../../utils/pdfGenerator');
 const { numberToIndianWords } = require('../../utils/numberToIndianWords');
 const { httpError, getModel, auditUser, getSettings } = require('../../modules/cpitl/feeService');
 const { upsertForSource, voidForSource } = require('../../modules/cpitl/expenseLedger');
-const { computePayslip, daysInMonth, attendanceLop, DEFAULT_PAYROLL_SETTINGS } = require('../../modules/cpitl/payroll');
+const { computePayslip, daysInMonth, attendanceLop, reviseComponents, REVISION_LIMITS, DEFAULT_PAYROLL_SETTINGS } = require('../../modules/cpitl/payroll');
+const { parseIds, runBulk, sendBulk, labelled } = require('../../modules/cpitl/bulk');
 const { DEFAULT_SALARY_COMPONENTS } = require('../../modules/cpitl/constants');
 
 const ok = (res, data, extra = {}) => res.json({ success: true, data, ...extra });
@@ -133,17 +134,18 @@ const getSalarySummary = asyncHandler(async (req, res) => {
   } : null);
 });
 
-const saveStaffSalary = asyncHandler(async (req, res) => {
-  const Teacher = getModel(req.models, 'Teacher');
-  const StaffSalaryStructure = getModel(req.models, 'StaffSalaryStructure');
-  const SalaryComponent = getModel(req.models, 'SalaryComponent');
-  const teacher = await Teacher.findById(req.params.teacherId).select(STAFF_FIELDS).lean();
-  if (!teacher) throw httpError('Staff member not found.', 404);
+/**
+ * Saves a salary structure for one staff member and records a revision when the gross
+ * changes. Shared by the single-record save and the bulk revision so both behave the same.
+ */
+const applySalary = async (models, teacher, body, user, settings) => {
+  const StaffSalaryStructure = getModel(models, 'StaffSalaryStructure');
+  const SalaryComponent = getModel(models, 'SalaryComponent');
 
   const catalog = await SalaryComponent.find({}).lean();
   const byId = new Map(catalog.map((c) => [String(c._id), c]));
   const byCode = new Map(catalog.map((c) => [c.code, c]));
-  const components = (Array.isArray(req.body.components) ? req.body.components : [])
+  const components = (Array.isArray(body?.components) ? body.components : [])
     .map((line) => {
       const c = byId.get(String(line.componentId)) || byCode.get(String(line.code || '').toUpperCase());
       if (!c) return null;
@@ -154,11 +156,10 @@ const saveStaffSalary = asyncHandler(async (req, res) => {
     .filter((l) => l && l.value > 0);
   if (!components.some((c) => c.code === 'BASIC')) throw httpError('Basic pay is required.');
 
-  const options = { pf: true, pfWageCap: true, esi: 'auto', tdsMonthly: 0, ...(req.body.options || {}) };
-  const preview = computePayslip({ components, options }, { daysInMonth: 30 }, await payrollSettings(req.models));
+  const options = { pf: true, pfWageCap: true, esi: 'auto', tdsMonthly: 0, ...(body.options || {}) };
+  const preview = computePayslip({ components, options }, { daysInMonth: 30 }, settings || await payrollSettings(models));
   const staffKey = staffKeyFor(teacher);
-  const user = auditUser(req);
-  const effectiveFrom = req.body.effectiveFrom ? new Date(req.body.effectiveFrom) : new Date();
+  const effectiveFrom = body.effectiveFrom ? new Date(body.effectiveFrom) : new Date();
 
   let doc = await StaffSalaryStructure.findOne({ staffKey });
   const fromGross = doc?.gross || 0;
@@ -178,10 +179,118 @@ const saveStaffSalary = asyncHandler(async (req, res) => {
     updatedBy: user,
   });
   if (fromGross !== preview.gross || !doc.revisions.length) {
-    doc.revisions.push({ effectiveFrom, fromGross, toGross: preview.gross, toNet: preview.net, note: req.body.note || (fromGross ? 'Revised' : 'Salary set'), by: user });
+    doc.revisions.push({ effectiveFrom, fromGross, toGross: preview.gross, toNet: preview.net, note: body.note || (fromGross ? 'Revised' : 'Salary set'), by: user });
   }
   await doc.save();
+  return { doc, preview };
+};
+
+const saveStaffSalary = asyncHandler(async (req, res) => {
+  const Teacher = getModel(req.models, 'Teacher');
+  const teacher = await Teacher.findById(req.params.teacherId).select(STAFF_FIELDS).lean();
+  if (!teacher) throw httpError('Staff member not found.', 404);
+  const { doc, preview } = await applySalary(req.models, teacher, req.body, auditUser(req));
   return ok(res, { structure: doc, preview }, { message: 'Salary saved.' });
+});
+
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Validates the body of a bulk salary revision. */
+const parseRevision = (body = {}) => {
+  const { mode } = body;
+  if (!['percent', 'amount'].includes(mode)) throw httpError('Choose "percent" or "amount" as the change type.');
+  const value = Number(body.value);
+  const limits = REVISION_LIMITS[mode];
+  if (body.value === '' || body.value === null || !Number.isFinite(value) || value === 0) throw httpError('Enter a change other than zero.');
+  if (value < limits.min || value > limits.max) {
+    throw httpError(mode === 'percent'
+      ? `Percent change must be between ${limits.min}% and ${limits.max}%.`
+      : 'Amount change must be within ±₹10,00,000.');
+  }
+  const effectiveFrom = String(body.effectiveFrom || '');
+  const date = new Date(`${effectiveFrom}T00:00:00Z`);
+  if (!DATE_RE.test(effectiveFrom) || Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== effectiveFrom) {
+    throw httpError('Pick a valid effective-from date.');
+  }
+  const note = String(body.note || '').trim().slice(0, 200);
+  return { mode, value, effectiveFrom, note, preview: body.preview === true || body.preview === 'true' };
+};
+
+const revisionNote = (mode, value) => {
+  const sign = value > 0 ? '+' : '−';
+  return mode === 'percent'
+    ? `Revised ${sign}${Math.abs(value)}%`
+    : `Revised ${sign}₹${Math.abs(value).toLocaleString('en-IN')}`;
+};
+
+/**
+ * POST /salary/staff/bulk-revise — % or ₹ change to the monthly gross of selected staff,
+ * effective from a date. preview=true returns before/after without saving. Saving goes
+ * through applySalary (the same path as editing one salary), so history is kept.
+ */
+const bulkReviseSalaries = asyncHandler(async (req, res) => {
+  const ids = parseIds(req.body?.teacherIds, { field: 'teacherIds' });
+  const { mode, value, effectiveFrom, note, preview } = parseRevision(req.body || {});
+  const Teacher = getModel(req.models, 'Teacher');
+  const StaffSalaryStructure = getModel(req.models, 'StaffSalaryStructure');
+  const SalaryComponent = getModel(req.models, 'SalaryComponent');
+
+  const teachers = await Teacher.find({ _id: { $in: ids } }).select(STAFF_FIELDS).lean();
+  const teacherById = new Map(teachers.map((t) => [String(t._id), t]));
+  const structures = await StaffSalaryStructure.find({ staffKey: { $in: teachers.map(staffKeyFor) }, isActive: { $ne: false } }).lean();
+  const structureByKey = new Map(structures.map((s) => [s.staffKey, s]));
+  const catalog = await SalaryComponent.find({}).select('code').lean();
+  const knownIds = new Set(catalog.map((c) => String(c._id)));
+  const knownCodes = new Set(catalog.map((c) => c.code));
+  const settings = await payrollSettings(req.models);
+  const user = auditUser(req);
+  const rows = [];
+
+  const result = await runBulk(ids, async (id) => {
+    const teacher = teacherById.get(id);
+    const label = teacher?.name || 'Staff member';
+    const row = { teacherId: id, name: label, beforeGross: 0, afterGross: 0 };
+    rows.push(row);
+    try {
+      if (!teacher) throw httpError('Staff member not found.');
+      const structure = structureByKey.get(staffKeyFor(teacher));
+      if (!structure) throw httpError('No salary set.');
+      const before = computePayslip(structure, { daysInMonth: 30 }, settings);
+      row.beforeGross = before.gross;
+      row.beforeNet = before.net;
+      row.afterGross = before.gross;
+      row.afterNet = before.net;
+      const lines = (structure.components || []).filter((c) => Number(c.value) > 0);
+      if (lines.some((c) => !knownIds.has(String(c.componentId)) && !knownCodes.has(String(c.code || '').toUpperCase()))) {
+        throw httpError('This salary uses a component that no longer exists. Edit it on its own.');
+      }
+      let revised;
+      try {
+        revised = reviseComponents(lines, { mode, value });
+      } catch (error) {
+        throw httpError(error.message);
+      }
+      const after = computePayslip({ components: revised.components, options: structure.options }, { daysInMonth: 30 }, settings);
+      row.afterGross = after.gross;
+      row.afterNet = after.net;
+      if (!preview) {
+        await applySalary(req.models, teacher, {
+          components: revised.components.map((c) => ({ componentId: c.componentId, code: c.code, calc: c.calc, value: c.value })),
+          options: structure.options,
+          effectiveFrom,
+          note: note || revisionNote(mode, value),
+        }, user, settings);
+      }
+      return label;
+    } catch (error) {
+      row.error = error.message;
+      throw labelled(error, label);
+    }
+  });
+
+  const data = { ...result, preview, rows };
+  if (preview) return ok(res, data);
+  return sendBulk(res, data);
 });
 
 /** Live preview without saving. */
@@ -371,9 +480,16 @@ const reopenRun = asyncHandler(async (req, res) => {
 // ── Outputs ─────────────────────────────────────────────────────────
 const inr = (v) => Number(v || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+/**
+ * GET  ?staffKey=… → one staff member's payslip, or every payslip in the run.
+ * POST { teacherIds } → payslips for the selected staff only (ids can be too many for a URL).
+ */
 const payslipsPdf = asyncHandler(async (req, res) => {
+  const teacherIds = req.method === 'POST' ? new Set(parseIds(req.body?.teacherIds, { field: 'teacherIds' })) : null;
   const run = await loadRun(req.models, req.params.month);
-  const slips = req.query.staffKey ? run.payslips.filter((p) => p.staffKey === req.query.staffKey) : run.payslips;
+  let slips = run.payslips;
+  if (teacherIds) slips = run.payslips.filter((p) => teacherIds.has(String(p.teacherId)));
+  else if (req.query.staffKey) slips = run.payslips.filter((p) => p.staffKey === req.query.staffKey);
   if (!slips.length) throw httpError('No payslips found.', 404);
   const profile = req.models.SchoolProfile ? await req.models.SchoolProfile.findOne({}).lean() : null;
   const data = {
@@ -452,6 +568,7 @@ module.exports = {
   getStaffSalary,
   getSalarySummary,
   saveStaffSalary,
+  bulkReviseSalaries,
   previewSalary,
   listRuns,
   createRun,

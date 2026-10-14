@@ -118,3 +118,7 @@
 .cb-app.cb-shellnav { display: flex; flex-direction: column; border-right: 1px solid var(--border); }
 .cb-app.cb-shellnav .cb-sidenav { flex: 1 1 auto; min-height: 0; height: auto; border-right: 0; }
 .cb-app .cb-shellnav__legacyfoot { position: relative; flex: none; font-size: 16px; line-height: 24px; }
+
+/* School OS (Home) link above the module switcher. */
+.cb-app .cb-shellnav__homewrap { padding-bottom: var(--space-3); border-bottom: 1px solid var(--border); }
+.cb-app.cb-shellnav .cb-shellnav__home { font-weight: 600; }

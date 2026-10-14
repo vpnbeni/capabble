@@ -1,9 +1,13 @@
-import React, { useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Search } from 'lucide-react'
+import toast from 'react-hot-toast'
+import { Printer, Search, Users, Wallet } from 'lucide-react'
+import { Avatar, Badge, BulkBar, Button, Card, Checkbox, EmptyState, Page, Select, TextField, cx, useRowSelection } from '@/components/ui'
 import { useCpitlClasses, useFeeStudents } from '@/hooks/useCpitl'
 import StudentLedgerPanel from '@/components/cpitl/StudentLedgerPanel'
-import { CpitlCard, CpitlEmpty, CpitlPageShell, inputClass, inr } from '@/components/cpitl/CpitlUi'
+import { errorMessage, inr } from '@/components/cpitl/CpitlUi'
+import cpitlBulkService from '@/services/cpitlBulkService'
+import '@/components/cpitl/collection.css'
 
 const useDebounced = <T,>(value: T, delay = 300) => {
   const [debounced, setDebounced] = useState(value)
@@ -17,111 +21,200 @@ const useDebounced = <T,>(value: T, delay = 300) => {
 const CpitlCollection: React.FC = () => {
   const [params, setParams] = useSearchParams()
   const [q, setQ] = useState('')
-  const [cls, setCls] = useState('')
-  const [section, setSection] = useState('')
+  // ?class=4th&section=Rose (e.g. from the fee dashboard) opens with that class listed.
+  const [cls, setCls] = useState(() => params.get('class') || '')
+  const [section, setSection] = useState(() => params.get('section') || '')
   const selected = params.get('student') || ''
   const debouncedQ = useDebounced(q)
   const { data: classes = [] } = useCpitlClasses()
   const searching = Boolean(debouncedQ.trim() || cls)
   const { data: students = [], isFetching } = useFeeStudents({ q: debouncedQ.trim() || undefined, class: cls || undefined, section: section || undefined }, searching)
   const sections = classes.find((c) => c.class === cls)?.sections || []
+  const withDues = students.filter((s) => (s.dueNow || 0) > 0).length
 
-  const select = (id: string) => setParams(id ? { student: id } : {})
+  // Bulk fee slips: only students with a fee plan can be ticked; cleared when the search changes.
+  const getStudentId = useCallback((s: (typeof students)[number]) => s._id, [])
+  const hasFeePlan = useCallback((s: (typeof students)[number]) => Boolean(s.accountId), [])
+  const bulk = useRowSelection(students, getStudentId, {
+    resetKey: `${debouncedQ}|${cls}|${section}`,
+    isSelectable: hasFeePlan,
+  })
+  const selectableCount = students.filter(hasFeePlan).length
+  const [printing, setPrinting] = useState(false)
+  const printSlips = async () => {
+    setPrinting(true)
+    try {
+      await cpitlBulkService.printStudentSlips(bulk.selectedIds)
+    } catch (error) {
+      toast.error(await errorMessage(error))
+    } finally {
+      setPrinting(false)
+    }
+  }
+
+  // Keep the class filter in the address so back/refresh return to the same list.
+  const select = (id: string) => {
+    const next: Record<string, string> = {}
+    if (cls) next.class = cls
+    if (cls && section) next.section = section
+    if (id) next.student = id
+    setParams(next)
+  }
 
   return (
-    <CpitlPageShell title="Fee Collection" subtitle="Find a student, review dues and record a payment">
-      <div className="grid gap-6 lg:grid-cols-12">
-        <div className="lg:col-span-4 xl:col-span-3">
-          <CpitlCard className="lg:sticky lg:top-4">
-            <div className="relative">
-              <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
-                <Search className="h-4 w-4" />
-              </span>
-              <input
-                className={`${inputClass} !mt-0 pl-9`}
-                placeholder="Name, roll no., father, phone"
-                value={q}
-                autoFocus
-                onChange={(e) => setQ(e.target.value)}
-              />
-            </div>
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              <select
-                className={`${inputClass} mt-0`}
+    <Page>
+      <div className={cx('cc-collect', selected && 'has-selection')}>
+        <Card flush className="cc-finder">
+          <div className="cc-finder__search" role="search">
+            <TextField
+              aria-label="Search students"
+              icon={Search}
+              type="search"
+              placeholder="Name, roll no., father, phone"
+              value={q}
+              autoFocus
+              onChange={(e) => setQ(e.target.value)}
+            />
+            <div className="cc-finder__filters">
+              <Select
+                aria-label="Class"
+                size="sm"
                 value={cls}
+                placeholder="All classes"
+                options={classes.map((c) => ({ value: c.class, label: `Class ${c.class}` }))}
                 onChange={(e) => {
                   setCls(e.target.value)
                   setSection('')
                 }}
-              >
-                <option value="">All classes</option>
-                {classes.map((c) => (
-                  <option key={c.class} value={c.class}>
-                    Class {c.class}
-                  </option>
-                ))}
-              </select>
-              <select className={`${inputClass} mt-0`} value={section} disabled={!cls} onChange={(e) => setSection(e.target.value)}>
-                <option value="">All sections</option>
-                {sections.map((s) => (
-                  <option key={s.section} value={s.section}>
-                    {s.section || '—'}
-                  </option>
-                ))}
-              </select>
+              />
+              <Select
+                aria-label="Section"
+                size="sm"
+                value={section}
+                disabled={!cls}
+                placeholder="All sections"
+                options={sections.map((s) => ({ value: s.section, label: s.section || '—' }))}
+                onChange={(e) => setSection(e.target.value)}
+              />
             </div>
+          </div>
 
-            <div className="-mx-5 mt-4 max-h-[60vh] overflow-y-auto border-t border-slate-100 dark:border-slate-700">
-              {!searching ? (
-                <p className="px-5 py-8 text-center text-sm text-slate-500">Search by name or pick a class.</p>
-              ) : isFetching && !students.length ? (
-                <p className="px-5 py-8 text-center text-sm text-slate-500">Searching…</p>
-              ) : students.length ? (
-                <ul className="divide-y divide-slate-100 dark:divide-slate-700">
-                  {students.map((s) => {
-                    const balance = s.totals?.balance || 0
-                    return (
-                      <li key={s._id}>
-                        <button
-                          type="button"
-                          onClick={() => select(s._id)}
-                          className={`flex w-full items-center justify-between gap-2 px-5 py-2.5 text-left transition ${
-                            selected === s._id ? 'bg-indigo-50 dark:bg-indigo-900/30' : 'hover:bg-slate-50 dark:hover:bg-slate-700/40'
-                          }`}
-                        >
-                          <div className="min-w-0">
-                            <div className="truncate text-sm font-medium text-slate-900 dark:text-white">{s.name}</div>
-                            <div className="truncate text-xs text-slate-500">
-                              {s.class}
-                              {s.section ? `-${s.section}` : ''} · {s.rollNumber}
-                            </div>
-                          </div>
-                          <div className="shrink-0 text-right text-xs">
-                            {!s.accountId ? (
-                              <span className="text-slate-400">No fee plan</span>
-                            ) : balance > 0 ? (
-                              <span className="font-semibold tabular-nums text-amber-600">{inr(balance)}</span>
-                            ) : (
-                              <span className="font-medium text-emerald-600">Paid up</span>
-                            )}
-                          </div>
-                        </button>
-                      </li>
-                    )
-                  })}
-                </ul>
-              ) : (
-                <p className="px-5 py-8 text-center text-sm text-slate-500">No students found.</p>
-              )}
+          {searching && students.length ? (
+            <>
+              <div className="cc-finder__meta" aria-live="polite">
+                {selectableCount > 0 ? (
+                  <Checkbox
+                    className="cc-finder__all"
+                    label="Select all"
+                    checked={bulk.allSelected}
+                    indeterminate={!bulk.allSelected && bulk.count > 0}
+                    onChange={() => bulk.toggleAll()}
+                  />
+                ) : null}
+                <span>
+                  {students.length} {students.length === 1 ? 'student' : 'students'}
+                </span>
+                <span>{withDues} with dues</span>
+              </div>
+              {bulk.count > 0 ? (
+                <div className="cc-finder__bulk">
+                  <BulkBar count={bulk.count} noun="student" onClear={bulk.clear} busy={printing}>
+                    <Button size="sm" icon={Printer} loading={printing} disabled={printing} onClick={printSlips}>
+                      Print fee slips
+                    </Button>
+                  </BulkBar>
+                </div>
+              ) : null}
+            </>
+          ) : null}
+
+          {!searching ? (
+            <div className="cc-finder__state">
+              <EmptyState icon={Search} compact title="Find a student" body="Type a name, roll number, father's name or phone, or pick a class." />
             </div>
-          </CpitlCard>
-        </div>
+          ) : isFetching && !students.length ? (
+            <div className="cb-table-state" role="status">
+              <span className="cb-spinner" aria-hidden="true" />
+              Searching…
+            </div>
+          ) : students.length ? (
+            <ul className="cc-finder__list" aria-label="Students">
+              {students.map((s) => {
+                const dueNow = s.dueNow || 0
+                const balance = s.totals?.balance || 0
+                return (
+                  <li key={s._id} className={cx('cc-result-row', bulk.selection.isSelected(s) && 'is-checked')}>
+                    {s.accountId ? (
+                      <Checkbox
+                        className="cc-result__check"
+                        aria-label={`Select ${s.name}`}
+                        checked={bulk.selection.isSelected(s)}
+                        onChange={() => bulk.toggle(s)}
+                      />
+                    ) : (
+                      <span className="cc-result__check" aria-hidden="true" />
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => select(s._id)}
+                      aria-current={selected === s._id ? 'true' : undefined}
+                      className={cx('cc-result', selected === s._id && 'is-on')}
+                    >
+                      <Avatar name={s.name} size="sm" />
+                      <span className="cc-result__text">
+                        <span className="cc-result__name">{s.name}</span>
+                        <span className="cc-result__meta">
+                          {s.class}
+                          {s.section ? `-${s.section}` : ''} · Roll {s.rollNumber}
+                          {s.fatherName ? ` · ${s.fatherName}` : ''}
+                        </span>
+                      </span>
+                      <span className="cc-result__due">
+                        {!s.accountId ? (
+                          <Badge tone="neutral">No fee plan</Badge>
+                        ) : dueNow > 0 ? (
+                          <>
+                            <span className="cc-result__amount">{inr(dueNow)}</span>
+                            <span className="cc-result__label">Due</span>
+                          </>
+                        ) : balance > 0 ? (
+                          <Badge tone="success" title={`${inr(balance)} falls due later in the session`}>Up to date</Badge>
+                        ) : (
+                          <Badge tone="success">Paid up</Badge>
+                        )}
+                      </span>
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
+          ) : (
+            <div className="cc-finder__state">
+              <EmptyState icon={Users} compact title="No students match." body="Check the spelling or clear the class filter." />
+            </div>
+          )}
+        </Card>
 
-        <div className="lg:col-span-8 xl:col-span-9">
-          {selected ? <StudentLedgerPanel studentId={selected} showProfileLink /> : <CpitlEmpty message="Select a student to see their fee ledger." />}
+        <div className="cc-ledger">
+          {selected ? (
+            <>
+              <Button variant="tertiary" size="sm" icon={Search} className="cc-finder__back" onClick={() => select('')}>
+                Change student
+              </Button>
+              <StudentLedgerPanel studentId={selected} showProfileLink />
+            </>
+          ) : (
+            <Card>
+              <EmptyState
+                icon={Wallet}
+                title="No student selected."
+                body="Search by name or pick a class, then choose a student to see dues and collect fee."
+              />
+            </Card>
+          )}
         </div>
       </div>
-    </CpitlPageShell>
+    </Page>
   )
 }
 

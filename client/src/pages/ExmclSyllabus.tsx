@@ -1,18 +1,16 @@
 import React from 'react'
+import { BookOpen } from 'lucide-react'
+import { Page } from '@/components/ui'
+import { ComingSoon } from '@/components/exmcl/ExmclUi'
 
-const ExmclSyllabus: React.FC = () => {
-  return (
-    <div className="p-6">
-      <div className="max-w-6xl mx-auto space-y-6">
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Syllabus</h2>
-          <p className="text-sm text-gray-600 dark:text-gray-300">
-            Maintain subject-wise and exam-wise syllabus records.
-          </p>
-        </div>
-      </div>
-    </div>
-  )
-}
+const ExmclSyllabus: React.FC = () => (
+  <Page>
+    <ComingSoon
+      icon={BookOpen}
+      title="Syllabus records aren’t set up yet"
+      body="This is where each subject’s syllabus for every exam will be kept. It isn’t available yet."
+    />
+  </Page>
+)
 
 export default ExmclSyllabus

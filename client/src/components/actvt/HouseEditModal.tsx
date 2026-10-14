@@ -1,8 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react'
 import toast from 'react-hot-toast'
-import { ImagePlus, Trash2, X } from 'lucide-react'
+import { ImagePlus, Pencil, Trash2 } from 'lucide-react'
 import api from '@/services/api'
 import { ImageCropModal } from '@/components/common/ImageCropModal'
+import { Button, Sheet, TextField, initials } from '@/components/ui'
+import { isLikelyColor, toneStyle } from '@/components/actvt/entityTone'
+import '@/components/actvt/actvt.css'
+import '@/components/actvt/houses.css'
 
 export type HouseEditRecord = {
   _id?: string
@@ -23,17 +27,73 @@ type HouseEditForm = {
   color: string
 }
 
-const isLikelyColor = (value = '') => /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(value.trim())
+/** Default for a new house before the school picks its own colour. */
+export const DEFAULT_HOUSE_COLOR = '#3A7AE1'
 
-const initialsOf = (name = '') => {
-  const parts = String(name).trim().split(/\s+/).filter(Boolean)
-  if (parts.length === 0) return 'H'
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
-  return `${parts[0][0] || ''}${parts[1][0] || ''}`.toUpperCase()
-}
+export const houseInitials = (name = '') => initials(name) || 'H'
 
-const inputClass =
-  'h-10 w-full rounded-xl border border-slate-200 px-3 text-sm text-slate-800 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100'
+/** Colour picker plus hex field. The swatch shows the house colour exactly as typed. */
+export const HouseColorField: React.FC<{
+  value: string
+  onChange: (value: string) => void
+  label?: string
+}> = ({ value, onChange, label = 'Colour' }) => (
+  <div className="cb-field">
+    <span className="cb-field__label">{label}</span>
+    <div className="actvt-colorfield">
+      <input
+        type="color"
+        value={isLikelyColor(value) ? value : DEFAULT_HOUSE_COLOR}
+        onChange={(event) => onChange(event.target.value)}
+        aria-label="Pick house colour"
+      />
+      <TextField
+        aria-label="House colour hex code"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder="#3A7AE1"
+        error={value && !isLikelyColor(value) ? 'Use a hex code such as #FF0000' : undefined}
+      />
+    </div>
+  </div>
+)
+
+/** Logo preview with upload / replace / remove controls. */
+export const HouseLogoField: React.FC<{
+  preview: string
+  name: string
+  color: string
+  onPick: () => void
+  onRemove?: () => void
+}> = ({ preview, name, color, onPick, onRemove }) => (
+  <div className="cb-field">
+    <span className="cb-field__label">Logo</span>
+    <div className="ah-logofield" style={toneStyle(color)}>
+      <div className="ah-logofield__preview">
+        {preview ? (
+          <img src={preview} alt={name ? `${name} logo` : 'House logo'} />
+        ) : (
+          <span className="ah-logofield__initials actvt-tone-fill" aria-hidden="true">
+            {houseInitials(name)}
+          </span>
+        )}
+      </div>
+      <div className="ah-logofield__side">
+        <div className="ah-logofield__actions">
+          <Button size="sm" icon={ImagePlus} onClick={onPick}>
+            {preview ? 'Replace logo' : 'Upload logo'}
+          </Button>
+          {preview && onRemove ? (
+            <Button size="sm" variant="tertiary" icon={Trash2} onClick={onRemove}>
+              Remove
+            </Button>
+          ) : null}
+        </div>
+        <p className="ah-logofield__hint">Square image works best. You can crop it after choosing.</p>
+      </div>
+    </div>
+  </div>
+)
 
 type HouseEditModalProps = {
   open: boolean
@@ -52,13 +112,14 @@ export const HouseEditModal: React.FC<HouseEditModalProps> = ({
     name: '',
     tagline: '',
     motto: '',
-    color: '#4f46e5',
+    color: DEFAULT_HOUSE_COLOR,
   })
   const [logoPreview, setLogoPreview] = useState('')
   const [logoFile, setLogoFile] = useState<File | null>(null)
   const [clearLogo, setClearLogo] = useState(false)
   const [cropSource, setCropSource] = useState('')
   const [saving, setSaving] = useState(false)
+  const [nameError, setNameError] = useState('')
   const logoInputRef = useRef<HTMLInputElement | null>(null)
   const cropSourceRef = useRef('')
 
@@ -68,12 +129,13 @@ export const HouseEditModal: React.FC<HouseEditModalProps> = ({
       name: String(house.name || ''),
       tagline: String(house.tagline || ''),
       motto: String(house.motto || ''),
-      color: String(house.color || '#4f46e5'),
+      color: String(house.color || DEFAULT_HOUSE_COLOR),
     })
     setLogoPreview(String(house.logo || ''))
     setLogoFile(null)
     setClearLogo(false)
     setCropSource('')
+    setNameError('')
     if (logoInputRef.current) logoInputRef.current.value = ''
   }, [open, house])
 
@@ -87,24 +149,15 @@ export const HouseEditModal: React.FC<HouseEditModalProps> = ({
     }
   }, [])
 
-  useEffect(() => {
-    if (!open) return
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !cropSource) onClose()
-    }
-    document.addEventListener('keydown', onKey)
-    document.body.style.overflow = 'hidden'
-    return () => {
-      document.removeEventListener('keydown', onKey)
-      document.body.style.overflow = ''
-    }
-  }, [open, cropSource, onClose])
-
-  if (!open || !house?._id) return null
-
   const clearCropSource = () => {
     if (cropSource.startsWith('blob:')) URL.revokeObjectURL(cropSource)
     setCropSource('')
+  }
+
+  // The sheet stays open while the crop step is showing or a save is in flight.
+  const handleClose = () => {
+    if (saving || cropSource) return
+    onClose()
   }
 
   const handleLogoSelected = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -138,7 +191,9 @@ export const HouseEditModal: React.FC<HouseEditModalProps> = ({
 
   const handleSave = async (event: React.FormEvent) => {
     event.preventDefault()
+    if (!house?._id) return
     if (!form.name.trim()) {
+      setNameError('Enter a house name')
       toast.error('House name is required.')
       return
     }
@@ -166,139 +221,67 @@ export const HouseEditModal: React.FC<HouseEditModalProps> = ({
     }
   }
 
-  const tone = isLikelyColor(form.color) ? form.color : '#4f46e5'
-
   return (
     <>
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
-        <div className="absolute inset-0" onClick={() => !saving && onClose()} />
-        <div className="relative z-[1] flex max-h-[calc(100vh-2rem)] w-full max-w-xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl">
-          <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3">
-            <h3 className="text-sm font-semibold text-slate-900">Edit house</h3>
-            <button
-              type="button"
-              onClick={() => !saving && onClose()}
-              className="rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-              aria-label="Close"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-
-          <form onSubmit={handleSave} className="flex min-h-0 flex-1 flex-col">
-            <div className="flex-1 space-y-4 overflow-y-auto px-5 py-5">
-              <div className="flex flex-col items-center gap-3 sm:flex-row sm:items-start">
-                <div className="flex h-28 w-28 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 p-2">
-                  {logoPreview ? (
-                    <img src={logoPreview} alt={form.name || 'House logo'} className="h-full w-full rounded-xl object-contain" />
-                  ) : (
-                    <div
-                      className="flex h-full w-full items-center justify-center rounded-xl text-2xl font-bold text-white"
-                      style={{ backgroundColor: tone }}
-                    >
-                      {initialsOf(form.name)}
-                    </div>
-                  )}
-                </div>
-                <div className="flex flex-1 flex-col gap-2">
-                  <p className="text-xs font-medium text-slate-500">House logo</p>
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={() => logoInputRef.current?.click()}
-                      className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3 py-2 text-xs font-semibold text-white hover:bg-indigo-700"
-                    >
-                      <ImagePlus className="h-3.5 w-3.5" />
-                      {logoPreview ? 'Replace / Change' : 'Upload logo'}
-                    </button>
-                    {logoPreview ? (
-                      <button
-                        type="button"
-                        onClick={handleRemoveLogo}
-                        className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-100"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                        Remove
-                      </button>
-                    ) : null}
-                  </div>
-                  <input
-                    ref={logoInputRef}
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={handleLogoSelected}
-                  />
-                </div>
-              </div>
-
-              <label className="block text-xs">
-                <span className="mb-1 block font-medium text-slate-500">House name</span>
-                <input
-                  required
-                  value={form.name}
-                  onChange={(event) => setForm({ ...form, name: event.target.value })}
-                  className={inputClass}
-                />
-              </label>
-
-              <div className="grid gap-3 sm:grid-cols-2">
-                <label className="block text-xs">
-                  <span className="mb-1 block font-medium text-slate-500">Tagline</span>
-                  <input
-                    value={form.tagline}
-                    onChange={(event) => setForm({ ...form, tagline: event.target.value })}
-                    className={inputClass}
-                  />
-                </label>
-                <label className="block text-xs">
-                  <span className="mb-1 block font-medium text-slate-500">Motto</span>
-                  <input
-                    value={form.motto}
-                    onChange={(event) => setForm({ ...form, motto: event.target.value })}
-                    className={inputClass}
-                  />
-                </label>
-              </div>
-
-              <label className="block text-xs">
-                <span className="mb-1 block font-medium text-slate-500">Colour</span>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="color"
-                    value={isLikelyColor(form.color) ? form.color : '#4f46e5'}
-                    onChange={(event) => setForm({ ...form, color: event.target.value })}
-                    className="h-10 w-10 cursor-pointer rounded-lg border border-slate-200 bg-white p-1"
-                  />
-                  <input
-                    value={form.color}
-                    onChange={(event) => setForm({ ...form, color: event.target.value })}
-                    className={inputClass}
-                  />
-                </div>
-              </label>
-            </div>
-
-            <div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-3">
-              <button
-                type="button"
-                onClick={onClose}
-                disabled={saving}
-                className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 disabled:opacity-60"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={saving}
-                className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
-              >
-                {saving ? 'Saving...' : 'Save changes'}
-              </button>
-            </div>
-          </form>
+      <Sheet
+        open={open && Boolean(house?._id)}
+        onClose={handleClose}
+        title="Edit house"
+        description="Name, colour and logo appear on house cards, certificates and reports."
+        icon={Pencil}
+        onSubmit={handleSave}
+        footer={
+          <>
+            <Button size="sm" variant="tertiary" onClick={handleClose} disabled={saving}>
+              Cancel
+            </Button>
+            <Button size="sm" variant="primary" type="submit" loading={saving}>
+              Save changes
+            </Button>
+          </>
+        }
+      >
+        <div className="cb-form-section">
+          <HouseLogoField
+            preview={logoPreview}
+            name={form.name}
+            color={form.color}
+            onPick={() => logoInputRef.current?.click()}
+            onRemove={handleRemoveLogo}
+          />
+          <input
+            ref={logoInputRef}
+            type="file"
+            accept="image/*"
+            hidden
+            onChange={handleLogoSelected}
+          />
+          <TextField
+            label="House name"
+            required
+            value={form.name}
+            error={nameError || undefined}
+            onChange={(event) => {
+              setForm({ ...form, name: event.target.value })
+              if (nameError) setNameError('')
+            }}
+          />
+          <HouseColorField value={form.color} onChange={(color) => setForm({ ...form, color })} />
         </div>
-      </div>
+        <div className="cb-form-section">
+          <TextField
+            label="Tagline"
+            value={form.tagline}
+            onChange={(event) => setForm({ ...form, tagline: event.target.value })}
+            placeholder="For example, Courage and honour"
+          />
+          <TextField
+            label="Motto"
+            value={form.motto}
+            onChange={(event) => setForm({ ...form, motto: event.target.value })}
+          />
+        </div>
+      </Sheet>
 
       <ImageCropModal
         open={Boolean(cropSource)}

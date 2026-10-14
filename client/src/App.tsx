@@ -40,7 +40,7 @@ import AnswerSheets from './pages/AnswerSheets'
 import CentreGuidelines from './pages/CentreGuidelines'
 import CBSECirculars from './pages/CBSECirculars'
 import CBSEPortals from './pages/CBSEPortals'
-import SchoolHub from './pages/SchoolHub'
+import Home from './pages/Home'
 import Staff from './pages/Staff'
 import Activities from './pages/Activities'
 import BellTimings from './pages/timetable/BellTimings'
@@ -214,7 +214,7 @@ function App() {
             path="/"
             element={
               isAuthenticated ? (
-                hasSession ? <Navigate to="/dashboard" replace /> : <Navigate to="/select-session" replace />
+                hasSession ? <Navigate to="/home" replace /> : <Navigate to="/select-session" replace />
               ) : (
                 <PublicLanding />
               )
@@ -224,7 +224,7 @@ function App() {
             path="/login"
             element={
               isAuthenticated ? (
-                hasSession ? <Navigate to="/dashboard" replace /> : <Navigate to="/select-session" replace />
+                hasSession ? <Navigate to="/home" replace /> : <Navigate to="/select-session" replace />
               ) : (
                 <Login />
               )
@@ -234,7 +234,7 @@ function App() {
             path="/forgot-password"
             element={
               isAuthenticated ? (
-                hasSession ? <Navigate to="/dashboard" replace /> : <Navigate to="/select-session" replace />
+                hasSession ? <Navigate to="/home" replace /> : <Navigate to="/select-session" replace />
               ) : (
                 <ForgotPassword />
               )
@@ -244,7 +244,7 @@ function App() {
             path="/signup"
             element={
               isAuthenticated ? (
-                hasSession ? <Navigate to="/dashboard" replace /> : <Navigate to="/select-session" replace />
+                hasSession ? <Navigate to="/home" replace /> : <Navigate to="/select-session" replace />
               ) : (
                 <Signup />
               )
@@ -254,7 +254,7 @@ function App() {
             path="/signupold"
             element={
               isAuthenticated ? (
-                hasSession ? <Navigate to="/dashboard" replace /> : <Navigate to="/select-session" replace />
+                hasSession ? <Navigate to="/home" replace /> : <Navigate to="/select-session" replace />
               ) : (
                 <TenantSignupChat />
               )
@@ -264,7 +264,7 @@ function App() {
             path="/signup/complete"
             element={
               isAuthenticated ? (
-                hasSession ? <Navigate to="/dashboard" replace /> : <Navigate to="/select-session" replace />
+                hasSession ? <Navigate to="/home" replace /> : <Navigate to="/select-session" replace />
               ) : (
                 <TenantSignupComplete />
               )
@@ -278,7 +278,7 @@ function App() {
               !isAuthenticated ? (
                 <Navigate to="/" replace />
               ) : hasSession ? (
-                <Navigate to="/dashboard" replace />
+                <Navigate to="/home" replace />
               ) : (
                 <SessionSelector />
               )
@@ -326,7 +326,8 @@ function App() {
               }
             >
               <Route path="dashboard" element={<Dashboard />} />
-              <Route path="school-hub" element={<SchoolHub />} />
+              <Route path="home" element={<Home />} />
+              <Route path="school-hub" element={<Navigate to="/home" replace />} />
               <Route path="staff" element={<Staff />} />
               <Route path="activities" element={<Activities />} />
               <Route path="time-table/teachers" element={<TimetableTeachers />} />

@@ -1,5 +1,9 @@
+const fs = require('fs');
+const path = require('path');
+const handlebars = require('handlebars');
 const asyncHandler = require('../../middleware/asyncHandler');
 const pdfGenerator = require('../../utils/pdfGenerator');
+const { parseIds, runBulk, sendBulk, labelled } = require('../../modules/cpitl/bulk');
 const {
   httpError,
   getModel,
@@ -11,7 +15,7 @@ const {
   recordPayment,
   cancelPayment,
 } = require('../../modules/cpitl/feeService');
-const { outstandingLateFee, round2 } = require('../../modules/cpitl/feeSchedule');
+const { outstandingLateFee, round2, dueThroughMonthCutoff } = require('../../modules/cpitl/feeSchedule');
 
 const ok = (res, data, extra = {}) => res.json({ success: true, data, ...extra });
 
@@ -54,9 +58,24 @@ const searchStudents = asyncHandler(async (req, res) => {
     .select('student structureId totals')
     .lean();
   const byStudent = new Map(accounts.map((a) => [String(a.student), a]));
+  // Unpaid amount that has fallen due up to the end of this month (not the whole session).
+  const FeeDemand = getModel(req.models, 'FeeDemand');
+  const dueRows = accounts.length
+    ? await FeeDemand.aggregate([
+      { $match: { accountId: { $in: accounts.map((a) => a._id) }, status: { $in: ['due', 'partial'] }, dueDate: { $lt: dueThroughMonthCutoff() } } },
+      { $group: { _id: '$accountId', dueNow: { $sum: '$balance' } } },
+    ])
+    : [];
+  const dueByAccount = new Map(dueRows.map((r) => [String(r._id), round2(r.dueNow)]));
   return ok(res, students.map((s) => {
     const account = byStudent.get(String(s._id));
-    return { ...s, accountId: account?._id || null, structureId: account?.structureId || null, totals: account?.totals || null };
+    return {
+      ...s,
+      accountId: account?._id || null,
+      structureId: account?.structureId || null,
+      totals: account?.totals || null,
+      dueNow: account ? dueByAccount.get(String(account._id)) || 0 : 0,
+    };
   }));
 });
 
@@ -161,6 +180,33 @@ const waiveDemand = asyncHandler(async (req, res) => {
   return ok(res, demand, { message: demand.status === 'waived' ? 'Installment waived.' : 'Installment restored.' });
 });
 
+/**
+ * Waive (or, with waive=false, restore) many installments. Same rule as waiveDemand:
+ * installments that carry a payment are never touched. Account totals are recomputed
+ * once per affected account at the end instead of once per installment.
+ */
+const bulkWaiveDemands = asyncHandler(async (req, res) => {
+  const FeeDemand = getModel(req.models, 'FeeDemand');
+  const ids = parseIds(req.body?.ids);
+  const waive = req.body?.waive !== false;
+  const touchedAccounts = new Set();
+  const result = await runBulk(ids, async (id) => {
+    const demand = await FeeDemand.findById(id);
+    if (!demand) throw httpError('Installment not found.', 404);
+    const label = demand.label || demand.periodKey;
+    if (round2(demand.paid) > 0) throw labelled(httpError('Installments with payments cannot be waived.'), label);
+    if (waive && demand.status === 'waived') throw labelled(httpError('Installment is already waived.'), label);
+    if (!waive && demand.status !== 'waived') throw labelled(httpError('Installment is not waived.'), label);
+    demand.status = waive ? 'waived' : 'due';
+    await demand.save();
+    touchedAccounts.add(String(demand.accountId));
+    return label;
+  });
+  // Different accounts never share totals, so these can run together.
+  await Promise.all([...touchedAccounts].map((accountId) => recomputeAccountTotals(req.models, accountId)));
+  return sendBulk(res, result);
+});
+
 // ── Payments ────────────────────────────────────────────────────────
 const createPayment = asyncHandler(async (req, res) => {
   const account = await loadAccountForStudent(req.models, req.params.studentId);
@@ -204,6 +250,26 @@ const cancelPaymentHandler = asyncHandler(async (req, res) => {
   return ok(res, payment, { message: `Receipt ${payment.receiptNo} cancelled.` });
 });
 
+/** Cancel many receipts with one shared reason; each goes through cancelPayment like the single route. */
+const bulkCancelPayments = asyncHandler(async (req, res) => {
+  const FeePayment = getModel(req.models, 'FeePayment');
+  const ids = parseIds(req.body?.ids);
+  const reason = String(req.body?.reason || '').trim();
+  if (!reason) throw httpError('A reason is required to cancel receipts.');
+  const user = auditUser(req);
+  const result = await runBulk(ids, async (id) => {
+    const payment = await FeePayment.findById(id);
+    if (!payment) throw httpError('Receipt not found.', 404);
+    try {
+      await cancelPayment(req.models, payment, reason, user);
+    } catch (error) {
+      throw labelled(error, payment.receiptNo);
+    }
+    return payment.receiptNo;
+  });
+  return sendBulk(res, result);
+});
+
 const updateChequeStatus = asyncHandler(async (req, res) => {
   const FeePayment = getModel(req.models, 'FeePayment');
   const payment = await FeePayment.findById(req.params.id);
@@ -238,12 +304,8 @@ const sendPdf = (res, buffer, filename) => {
   return res.status(200).send(buffer);
 };
 
-const receiptPdf = asyncHandler(async (req, res) => {
-  const FeePayment = getModel(req.models, 'FeePayment');
-  const payment = await FeePayment.findById(req.params.id).lean();
-  if (!payment) throw httpError('Receipt not found.', 404);
-  const [school, settings] = await Promise.all([loadSchool(req.models), getSettings(req.models)]);
-
+/** Template data for one receipt (shared by the single and the combined receipt PDF). */
+const buildReceiptData = (payment, school, settings, sessionFallback) => {
   // Group allocation lines by installment for a readable receipt.
   const groups = new Map();
   payment.allocations.forEach((a) => {
@@ -252,7 +314,7 @@ const receiptPdf = asyncHandler(async (req, res) => {
     groups.get(key).push({ name: a.name, amount: formatINR(a.amount) });
   });
 
-  const data = {
+  return {
     school,
     settings: { gstin: settings.gstin, pan: settings.pan, footer: settings.slipFooterNote },
     receipt: {
@@ -269,14 +331,51 @@ const receiptPdf = asyncHandler(async (req, res) => {
       remarks: payment.remarks,
       cancelled: payment.status === 'cancelled',
       cancelReason: payment.cancellation?.reason || '',
-      session: payment.academicSession || req.academicSession || '',
+      session: payment.academicSession || sessionFallback || '',
     },
     student: payment.studentSnapshot,
     groups: [...groups.entries()].map(([label, lines]) => ({ label, lines })),
     copies: [{ title: 'Parent Copy' }, { title: 'School Copy' }],
   };
+};
+
+const receiptPdf = asyncHandler(async (req, res) => {
+  const FeePayment = getModel(req.models, 'FeePayment');
+  const payment = await FeePayment.findById(req.params.id).lean();
+  if (!payment) throw httpError('Receipt not found.', 404);
+  const [school, settings] = await Promise.all([loadSchool(req.models), getSettings(req.models)]);
+  const data = buildReceiptData(payment, school, settings, req.academicSession);
   const pdf = await pdfGenerator.generatePDF('cpitl-fee-receipt', data);
   return sendPdf(res, pdf, `receipt_${payment.receiptNo.replace(/\//g, '-')}.pdf`);
+});
+
+/**
+ * The combined template (cpitl-fee-receipts.html) reuses the single receipt's styles and
+ * page markup as partials, read from cpitl-fee-receipt.html, so both PDFs always match.
+ */
+const RECEIPT_TEMPLATE = path.join(__dirname, '../../templates/cpitl-fee-receipt.html');
+const registerReceiptPartials = () => {
+  const source = fs.readFileSync(RECEIPT_TEMPLATE, 'utf-8');
+  const styles = source.match(/<style>([\s\S]*?)<\/style>/i);
+  const body = source.match(/<body>([\s\S]*?)<\/body>/i);
+  if (!styles || !body) throw httpError('Receipt template is missing its styles or body.', 500);
+  handlebars.registerPartial('cpitlReceiptStyles', styles[1]);
+  handlebars.registerPartial('cpitlReceiptPage', body[1]);
+};
+
+/** One PDF with every selected receipt, each starting on its own page, in the order sent. */
+const bulkReceiptsPdf = asyncHandler(async (req, res) => {
+  const FeePayment = getModel(req.models, 'FeePayment');
+  const ids = parseIds(req.body?.ids);
+  const payments = await FeePayment.find({ _id: { $in: ids } }).lean();
+  if (!payments.length) throw httpError('None of the selected receipts were found.', 404);
+  const order = new Map(ids.map((id, index) => [id, index]));
+  payments.sort((a, b) => order.get(String(a._id)) - order.get(String(b._id)));
+  const [school, settings] = await Promise.all([loadSchool(req.models), getSettings(req.models)]);
+  registerReceiptPartials();
+  const receipts = payments.map((p) => buildReceiptData(p, school, settings, req.academicSession));
+  const pdf = await pdfGenerator.generatePDF('cpitl-fee-receipts', { receipts });
+  return sendPdf(res, pdf, `receipts_${payments.length}.pdf`);
 });
 
 /** Build slip data for one account: open demands up to `uptoPeriodKey` (or all open). */
@@ -372,16 +471,53 @@ const bulkFeeSlipsPdf = asyncHandler(async (req, res) => {
   return renderSlips(req, res, slips, `fee-slips_${cls}${section ? `-${section}` : ''}.pdf`);
 });
 
+/** Like parseUpto, but also accepts a month (YYYY-MM) meaning the end of that month. */
+const parseUptoMonth = (value) => {
+  const month = /^(\d{4})-(\d{2})$/.exec(String(value || '').trim());
+  if (month) return new Date(Number(month[1]), Number(month[2]), 0, 23, 59, 59, 999);
+  return parseUpto(value);
+};
+
+/** Fee slips for an explicit list of students (same output as bulkFeeSlipsPdf). */
+const studentSlipsPdf = asyncHandler(async (req, res) => {
+  const StudentFeeAccount = getModel(req.models, 'StudentFeeAccount');
+  const FeeDemand = getModel(req.models, 'FeeDemand');
+  const FeeStructure = getModel(req.models, 'FeeStructure');
+  const studentIds = parseIds(req.body?.studentIds, { field: 'studentIds' });
+  const accounts = await StudentFeeAccount.find({ student: { $in: studentIds } })
+    .sort({ 'studentSnapshot.class': 1, 'studentSnapshot.section': 1, 'studentSnapshot.name': 1 })
+    .lean();
+  if (!accounts.length) throw httpError('None of the selected students has a fee account yet.', 422);
+  const demands = await FeeDemand.find({ accountId: { $in: accounts.map((a) => a._id) } }).sort({ dueDate: 1 }).lean();
+  const structures = await FeeStructure.find({ _id: { $in: [...new Set(accounts.map((a) => String(a.structureId)).filter((id) => id !== 'null'))] } }).lean();
+  const structureById = new Map(structures.map((s) => [String(s._id), s]));
+  const demandsByAccount = demands.reduce((map, d) => {
+    const key = String(d.accountId);
+    if (!map.has(key)) map.set(key, []);
+    map.get(key).push(d);
+    return map;
+  }, new Map());
+  const upto = parseUptoMonth(req.body?.upto);
+  const slips = accounts
+    .map((a) => buildSlipForAccount(a, demandsByAccount.get(String(a._id)) || [], structureById.get(String(a.structureId)), upto))
+    .filter(Boolean);
+  return renderSlips(req, res, slips, `fee-slips_${slips.length || 0}-students.pdf`);
+});
+
 module.exports = {
   searchStudents,
   getStudentAccount,
   updateStudentAccount,
   waiveDemand,
+  bulkWaiveDemands,
   createPayment,
   listPayments,
   cancelPaymentHandler,
+  bulkCancelPayments,
   updateChequeStatus,
   receiptPdf,
+  bulkReceiptsPdf,
   studentFeeSlipPdf,
   bulkFeeSlipsPdf,
+  studentSlipsPdf,
 };

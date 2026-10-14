@@ -1,0 +1,10 @@
+/* Award list pages (generate + format designer). Tokens only; everything sits inside .cb-app. */
+
+/* Generate card footer: student count on the left, the download on the right. */
+.cb-app .ex-al-foot { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; width: 100%; }
+.cb-app .ex-al-count { font-size: 13px; line-height: 18px; color: var(--ink-muted); }
+.cb-app .ex-al-count strong { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+@media (max-width: 640px) { .cb-app .ex-al-foot .cb-btn { width: 100%; } }
+
+/* Preview card actions wrap under the title on narrow widths. */
+.cb-app .ex-al-actions { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }

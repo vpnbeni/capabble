@@ -27,7 +27,7 @@ import { OverlayShell } from '@/components/ui/overlays'
 import { useAcademicSession } from '@/contexts/AcademicSessionContext'
 import searchService, { type SearchRecordType } from '@/services/searchService'
 import { getTenantHeader } from '@/utils/tenantRuntime'
-import { isMacPlatform } from './CommandPaletteProvider'
+import { isMacPlatform } from './platform'
 import { scoreSearchable, type MatchRange } from './fuzzy'
 import {
   addRecentItem,
@@ -80,6 +80,8 @@ type Section = {
   label: string
   rows: Row[]
   loading?: boolean
+  /** Small pill beside the heading, e.g. "Closest matches" for typo-tolerant results. */
+  tag?: string
   action?: { label: string; onClick: () => void }
 }
 
@@ -146,6 +148,8 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose, storageK
   const [memory, setMemory] = useState(() => readMemory(storageKey))
   const inputRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
+  // Last real pointer position: Chrome fires mousemove when the list scrolls under a still cursor.
+  const pointerRef = useRef<{ x: number; y: number } | null>(null)
   const baseId = useId()
   const listId = `${baseId}-list`
   const isMac = useMemo(isMacPlatform, [])
@@ -241,9 +245,12 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose, storageK
 
     if (filter !== 'pages' && trimmed.length >= MIN_REMOTE_QUERY) {
       const groups = remote.data?.groups ?? []
+      // Nothing matched exactly, so the server returned the closest spellings instead.
+      const isFuzzy = remote.data?.fuzzy === true
       const remoteSections: Section[] = groups.map((group) => ({
         id: `remote:${group.type}`,
         label: group.label,
+        tag: isFuzzy ? 'Closest matches' : undefined,
         rows: group.items.map((hit) => ({
           key: `${hit.type}:${hit.id}`,
           kind: 'record',
@@ -269,6 +276,13 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose, storageK
   }, [isTyping, memory, storageKey, pageByPath, actions, filter, entries, trimmed, remote.data, remotePending])
 
   const rows = useMemo(() => sections.flatMap((section) => section.rows), [sections])
+  // Each row's position in `rows`, computed once — never counted during render, because
+  // OverlayShell can call its render function more than once per palette render.
+  const rowIndexByKey = useMemo(() => {
+    const map = new Map<string, number>()
+    sections.forEach((section) => section.rows.forEach((row) => map.set(`${section.id}:${row.key}`, map.size)))
+    return map
+  }, [sections])
 
   useEffect(() => {
     setActiveIndex(0)
@@ -356,7 +370,6 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose, storageK
   const activeRow = rows[activeIndex]
   const showEmpty = isTyping && rows.length === 0 && !remotePending
   const showFirstRun = !isTyping && rows.length === 0
-  let rowIndex = -1
 
   return (
     <OverlayShell open={open} onClose={onClose} variant="command">
@@ -428,7 +441,10 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose, storageK
             {sections.map((section) => (
               <div key={section.id} className="cb-cmdk__section" role="group" aria-label={section.label}>
                 <div className="cb-cmdk__sectionhead">
-                  <span>{section.label}</span>
+                  <span className="cb-cmdk__sectionlabel">
+                    {section.label}
+                    {section.tag ? <span className="cb-cmdk__sectiontag">{section.tag}</span> : null}
+                  </span>
                   {section.action ? (
                     <button
                       type="button"
@@ -449,8 +465,7 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose, storageK
                       </div>
                     ))
                   : section.rows.map((row) => {
-                      rowIndex += 1
-                      const index = rowIndex
+                      const index = rowIndexByKey.get(`${section.id}:${row.key}`) ?? -1
                       const Icon = row.icon
                       const isActive = index === activeIndex
                       return (
@@ -461,7 +476,10 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose, storageK
                           role="option"
                           aria-selected={isActive}
                           className={`cb-cmdk__row${isActive ? ' is-active' : ''}`}
-                          onMouseMove={() => {
+                          onMouseMove={(event) => {
+                            const last = pointerRef.current
+                            if (last && last.x === event.clientX && last.y === event.clientY) return
+                            pointerRef.current = { x: event.clientX, y: event.clientY }
                             if (!isActive) setActiveIndex(index)
                           }}
                           onMouseDown={(event) => event.preventDefault()}

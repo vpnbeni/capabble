@@ -5,6 +5,7 @@ const asyncHandler = require('../../middleware/asyncHandler');
 const { httpError, getModel, auditUser } = require('../../modules/cpitl/feeService');
 const { upsertForSource, voidForSource } = require('../../modules/cpitl/expenseLedger');
 const { PAYMENT_MODES } = require('../../modules/cpitl/constants');
+const { parseIds, runBulk, sendBulk, labelled } = require('../../modules/cpitl/bulk');
 
 const ok = (res, data, extra = {}) => res.json({ success: true, data, ...extra });
 const round = (v) => Math.round((Number(v) || 0) * 100) / 100;
@@ -129,6 +130,69 @@ const removeBill = asyncHandler(async (req, res) => {
   return ok(res, null, { message: 'Bill removed.' });
 });
 
+const billLabel = (bill) => [bill.connectionSnapshot?.name || 'Bill', bill.billMonth].filter(Boolean).join(' · ');
+
+/**
+ * POST /cpitl/electricity/bills/bulk-pay { ids, date, mode, reference? } — marks each
+ * unpaid bill paid through payBillDoc (same ledger entry as payBill). Date and mode are
+ * checked once up front; bills already paid or removed are skipped.
+ */
+const bulkPayBills = asyncHandler(async (req, res) => {
+  const ids = parseIds(req.body?.ids);
+  const body = req.body || {};
+  if (!body.date) throw httpError('Pick the date the bills were paid.');
+  const paidOn = new Date(body.date);
+  if (Number.isNaN(paidOn.getTime())) throw httpError('Invalid payment date.');
+  const mode = String(body.mode || '');
+  if (!PAYMENT_MODES.includes(mode)) throw httpError('Pick a valid payment mode.');
+  const reference = String(body.reference || '').trim();
+  const ElectricityBill = getModel(req.models, 'ElectricityBill');
+  const result = await runBulk(ids, async (id) => {
+    const bill = await ElectricityBill.findById(id);
+    if (!bill) throw httpError('Bill not found.', 404);
+    const label = billLabel(bill);
+    try {
+      if (bill.isActive === false) throw httpError('This bill was removed.', 400);
+      if (bill.status === 'paid') throw httpError('This bill is already paid.', 400);
+      await payBillDoc(req, bill, { paidOn: body.date, mode, reference });
+    } catch (error) {
+      throw labelled(error, label);
+    }
+    return label;
+  });
+  return sendBulk(res, result);
+});
+
+/**
+ * POST /cpitl/electricity/bills/bulk-remove { ids, reason } — removes each bill and voids
+ * its ledger expense, as removeBill does. Bills already removed are skipped.
+ */
+const bulkRemoveBills = asyncHandler(async (req, res) => {
+  const ids = parseIds(req.body?.ids);
+  const reason = String(req.body?.reason || '').trim();
+  if (!reason) throw httpError('A reason is required to remove bills.');
+  const ElectricityBill = getModel(req.models, 'ElectricityBill');
+  const user = auditUser(req);
+  const result = await runBulk(ids, async (id) => {
+    const existing = await ElectricityBill.findById(id).select('connectionSnapshot billMonth isActive').lean();
+    if (!existing) throw httpError('Bill not found.', 404);
+    const label = billLabel(existing);
+    try {
+      const bill = await ElectricityBill.findOneAndUpdate(
+        { _id: id, isActive: { $ne: false } },
+        { isActive: false },
+        { new: true }
+      );
+      if (!bill) throw httpError('This bill is already removed.', 400);
+      await voidForSource(req.models, bill._id, reason, user);
+    } catch (error) {
+      throw labelled(error, label);
+    }
+    return label;
+  });
+  return sendBulk(res, result);
+});
+
 /** Monthly units & cost per connection, across all sessions so year-on-year works. */
 const electricityAnalytics = asyncHandler(async (req, res) => {
   const ElectricityBill = getModel(req.models, 'ElectricityBill');
@@ -244,6 +308,8 @@ module.exports = {
   updateBill,
   payBill,
   removeBill,
+  bulkPayBills,
+  bulkRemoveBills,
   electricityAnalytics,
   listProjects,
   getProject,

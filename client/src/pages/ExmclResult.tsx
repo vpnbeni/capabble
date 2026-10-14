@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { X } from 'lucide-react'
-import { Tabs } from '@/components/common/Tabs'
+import { BookOpen, ClipboardList, EyeOff, RotateCcw, Save, Users } from 'lucide-react'
 import exmclExamService, { type ExmclExamDefinition } from '@/services/exmclExamService'
 import exmclResultService, { type ResultClassSectionStatus } from '@/services/exmclResultService'
 import subjectService from '@/services/subjectService'
@@ -10,8 +9,9 @@ import { useTimetable } from '@/contexts/TimetableContext'
 import { sortSectionNames } from '@/constants/studentClasses'
 import { resolveApiBaseUrl } from '@/utils/tenantRuntime'
 import ResultEntryStatusPanel from '@/components/exmcl/ResultEntryStatusPanel'
-
-type ResultTab = 'exam'
+import { Avatar, Banner, Button, Card, Checkbox, EmptyState, Entity, FilterBar, Menu, Page, Select, cx } from '@/components/ui'
+import { CardLoading, errorMessage } from '@/components/exmcl/ExmclUi'
+import '@/components/exmcl/result.css'
 
 type StudentRow = {
   _id: string
@@ -35,24 +35,12 @@ type SubjectColumn = {
   name: string
 }
 
-const tabConfig = [{ id: 'exam' as const, label: 'Exam', color: 'indigo' as const }]
-
 const SERVER_URL = resolveApiBaseUrl().replace('/api', '')
 
 const getProfileImageUrl = (profileImage?: string | null) => {
   if (!profileImage) return null
   if (profileImage.startsWith('http')) return profileImage
   return `${SERVER_URL}${profileImage}`
-}
-
-const getInitials = (name: string) => {
-  const parts = String(name || '')
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean)
-  if (parts.length === 0) return '?'
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
-  return `${parts[0][0] || ''}${parts[1][0] || ''}`.toUpperCase()
 }
 
 const sortClassNames = (left: string, right: string) =>
@@ -98,7 +86,6 @@ const extractSubjectList = (payload: any): Array<{ _id?: string; name?: string; 
 
 const ExmclResult: React.FC = () => {
   const { matrixClasses, matrixSections, matrixSelection, classes: timetableClasses } = useTimetable()
-  const [activeTab, setActiveTab] = useState<ResultTab>('exam')
   const [loading, setLoading] = useState(true)
   const [studentsLoading, setStudentsLoading] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -117,6 +104,9 @@ const ExmclResult: React.FC = () => {
   const [statusRows, setStatusRows] = useState<ResultClassSectionStatus[]>([])
   const [statusLoading, setStatusLoading] = useState(false)
   const [statusRefreshToken, setStatusRefreshToken] = useState(0)
+  // Section to apply once a class change has reset the section (opening a sheet from the status list).
+  const pendingSectionRef = useRef<string | null>(null)
+  const sheetRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -140,7 +130,7 @@ const ExmclResult: React.FC = () => {
         if (examList.length > 0) setSelectedExamId(examList[0]._id)
       } catch (error: any) {
         if (cancelled) return
-        const message = String(error?.response?.data?.message || error?.message || 'Failed to load result setup data.')
+        const message = errorMessage(error, 'Exams and classes didn’t load. Check your connection and refresh the page.')
         setLoadError(message)
         toast.error(message)
       } finally {
@@ -237,7 +227,8 @@ const ExmclResult: React.FC = () => {
   )
 
   useEffect(() => {
-    setSelectedSection('')
+    setSelectedSection(pendingSectionRef.current ?? '')
+    pendingSectionRef.current = null
   }, [selectedClass])
 
   useEffect(() => {
@@ -292,7 +283,7 @@ const ExmclResult: React.FC = () => {
         if (cancelled) return
         setStudents([])
         setClassSubjects([])
-        toast.error(String(error?.response?.data?.message || error?.message || 'Failed to load students.'))
+        toast.error(errorMessage(error, 'Students didn’t load. Pick the section again to retry.'))
       } finally {
         if (!cancelled) setStudentsLoading(false)
       }
@@ -421,7 +412,7 @@ const ExmclResult: React.FC = () => {
     if (value !== '' && !/^\d{0,3}(\.\d{0,2})?$/.test(value)) return
     if (value !== '' && Number(value) < 0) return
     if (hasMaxMarks && value !== '' && Number(value) > maxMarks) {
-      toast.error(`Marks cannot exceed M.M. ${maxMarks}.`)
+      toast.error(`Marks can’t be more than ${maxMarks}, the maximum for this exam.`)
       return
     }
     setMarksByStudent((prev) => ({
@@ -486,7 +477,7 @@ const ExmclResult: React.FC = () => {
           })
         )
         if (overMax) {
-          toast.error(`Marks cannot exceed M.M. ${maxMarks} for ${selectedExam?.code || 'this exam'}.`)
+          toast.error(`Some marks are more than ${maxMarks}, the maximum for ${selectedExam?.code || 'this exam'}. Correct them and save again.`)
           return
         }
       }
@@ -518,11 +509,10 @@ const ExmclResult: React.FC = () => {
         results,
       })
 
-      toast.success('Results saved successfully.')
+      toast.success(`Marks saved for Class ${selectedClass}-${selectedSection}.`)
       refreshEntryStatus()
     } catch (error: any) {
-      const message = String(error?.response?.data?.message || error?.message || 'Failed to save results.')
-      toast.error(message)
+      toast.error(errorMessage(error, 'Marks weren’t saved. Check your connection and save again.'))
     } finally {
       savingRef.current = false
       setSaving(false)
@@ -610,345 +600,300 @@ const ExmclResult: React.FC = () => {
     }
   }, [filteredStudents, studentScoreById])
 
-  return (
-    <div className="p-8 max-w-[1600px] mx-auto min-h-screen bg-gray-50/50 dark:bg-gray-900">
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between px-4 py-3 bg-gray-50/50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700">
-          <Tabs<ResultTab>
-            tabs={tabConfig}
-            activeTab={activeTab}
-            onChange={setActiveTab}
-            variant="pill"
-            size="sm"
-            ariaLabel="Result mode"
-          />
-          <div className="flex flex-1 flex-wrap items-center gap-2 lg:mx-4">
-            <select
-              title="Select exam"
-              aria-label="Select exam"
-              value={selectedExamId}
-              onChange={(e) => setSelectedExamId(e.target.value)}
-              className="min-w-[200px] rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-            >
-              <option value="">Exam</option>
-              {exams.map((exam) => (
-                <option key={exam._id} value={exam._id}>
-                  {exam.code} - {exam.name}
-                </option>
-              ))}
-            </select>
-            <select
-              title="Select class"
-              aria-label="Select class"
-              value={selectedClass}
-              onChange={(e) => setSelectedClass(e.target.value)}
-              className="min-w-[130px] rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-            >
-              <option value="">Class</option>
-              {classOptions.map((className) => (
-                <option key={className} value={className}>
-                  {className}
-                </option>
-              ))}
-            </select>
-            <select
-              title="Select section"
-              aria-label="Select section"
-              value={selectedSection}
-              onChange={(e) => setSelectedSection(e.target.value)}
-              className="min-w-[140px] rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-              disabled={!selectedClass}
-            >
-              <option value="">{selectedClass ? 'Section' : 'Select class first'}</option>
-              {sectionOptions.map((section) => (
-                <option key={section} value={section}>
-                  {section}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="flex items-center gap-3 shrink-0">
-            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-              Result Entry
-              {hasMaxMarks ? <span className="ml-2 text-xs font-medium text-indigo-600 dark:text-indigo-400">M.M. {maxMarks}</span> : null}
-            </h3>
-            <button
-              onClick={handleSave}
-              disabled={!canSave || saving}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1 transition-colors"
-            >
-              {saving ? (
-                <>
-                  <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-                  </svg>
-                  Saving…
-                </>
-              ) : (
-                'Save Results'
-              )}
-            </button>
-          </div>
-        </div>
+  const ready = Boolean(selectedExamId && selectedClass && selectedSection)
+  const hiddenCount = allSubjects.length - filteredSubjects.length
+  const sectionLabel = `Class ${selectedClass}-${selectedSection}`
 
-        <div className="max-h-[70vh] overflow-x-auto overflow-y-auto">
-          {loading ? (
-            <div className="p-10 text-center text-sm text-gray-500 dark:text-gray-400">Loading result sheet...</div>
-          ) : loadError ? (
-            <div className="p-10 text-center text-sm text-red-600 dark:text-red-400">{loadError}</div>
-          ) : !selectedExamId || !selectedClass || !selectedSection ? (
-            <div className="p-10 text-center text-sm text-gray-500 dark:text-gray-400">
-              Select Exam, Class, and Section to load students and enter marks.
-            </div>
-          ) : studentsLoading ? (
-            <div className="p-10 text-center text-sm text-gray-500 dark:text-gray-400">Loading students...</div>
-          ) : filteredSubjects.length === 0 && allSubjects.length === 0 ? (
-            <div className="p-10 text-center text-sm text-gray-500 dark:text-gray-400">
-              No subjects found for the selected class. Assign subjects to students or add them in Subjects.
-            </div>
-          ) : filteredSubjects.length === 0 ? (
-            <div className="p-10 text-center text-sm text-gray-500 dark:text-gray-400">
-              All subject columns have been removed. Change class or exam to reset.
-            </div>
-          ) : (
-            <table className="w-max table-fixed border-collapse divide-y divide-gray-200 dark:divide-gray-700">
-              <colgroup>
-                <col className="w-[88px]" />
-                <col className="w-[40px]" />
-                <col className="w-[64px]" />
-                <col className="w-[168px]" />
-                <col className="w-[52px]" />
-                {filteredSubjects.map((subject) => (
-                  <col key={subject.id} className="w-[72px]" />
-                ))}
-                <col className="w-[72px]" />
-                <col className="w-[76px]" />
-              </colgroup>
-              <thead className="sticky top-0 z-40 bg-gray-50/95 backdrop-blur dark:bg-gray-900/95">
-                <tr>
-                  <th className="sticky left-0 z-50 bg-gray-50/95 px-2 py-2 text-left text-xs font-semibold uppercase tracking-normal text-gray-500 backdrop-blur dark:bg-gray-900/95 dark:text-gray-400">
-                    Adm. No.
-                  </th>
-                  <th className="sticky left-[88px] z-50 bg-gray-50/95 px-1 py-2 text-left text-xs font-semibold uppercase tracking-normal text-gray-500 backdrop-blur dark:bg-gray-900/95 dark:text-gray-400">
-                    Photo
-                  </th>
-                  <th className="sticky left-[128px] z-50 bg-gray-50/95 px-2 py-2 text-left text-xs font-semibold uppercase tracking-normal text-gray-500 backdrop-blur dark:bg-gray-900/95 dark:text-gray-400">
-                    Roll No
-                  </th>
-                  <th className="sticky left-[192px] z-50 bg-gray-50/95 px-2 py-2 text-left text-xs font-semibold uppercase tracking-normal text-gray-500 backdrop-blur dark:bg-gray-900/95 dark:text-gray-400">
-                    Student Name
-                  </th>
-                  <th
-                    className="sticky left-[360px] z-50 bg-gray-50/95 px-1 py-2 text-center text-[11px] font-semibold uppercase tracking-normal text-gray-500 backdrop-blur dark:bg-gray-900/95 dark:text-gray-400"
-                    title="Tick to mark absent in all subjects. To mark one subject only, type Ab in that cell."
-                  >
-                    Abs
-                  </th>
-                  {filteredSubjects.map((subject) => (
-                    <th
-                      key={subject.id}
-                      className="group px-1 py-2 text-left text-[11px] font-semibold uppercase leading-tight tracking-normal text-gray-500 dark:text-gray-400"
-                    >
-                      <div className="flex items-start gap-0.5">
-                        <span className="min-w-0 break-words">
-                          {subject.name}
-                          {hasMaxMarks ? <span className="ml-0.5 text-[10px] font-medium normal-case text-indigo-500">/{maxMarks}</span> : null}
-                        </span>
-                        <button
-                          onClick={() => deleteSubject(subject.id)}
-                          title="Remove from result entry"
-                          className="invisible mt-0.5 shrink-0 rounded p-0.5 text-gray-400 hover:bg-red-50 hover:text-red-500 group-hover:visible dark:hover:bg-red-900/30 dark:hover:text-red-400 transition-colors"
-                        >
-                          <X size={11} />
-                        </button>
-                      </div>
-                    </th>
-                  ))}
-                  <th className="px-1 py-2 text-left text-[11px] font-semibold uppercase leading-tight tracking-normal text-gray-600 dark:text-gray-300">
-                    Total
-                    {hasMaxMarks && filteredSubjects.length > 0 ? (
-                      <span className="ml-0.5 text-[10px] font-medium normal-case text-indigo-500">
-                        /{maxMarks * filteredSubjects.length}
-                      </span>
-                    ) : null}
-                  </th>
-                  <th className="px-1 py-2 text-left text-[11px] font-semibold uppercase leading-tight tracking-normal text-gray-600 dark:text-gray-300">
-                    %
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200 bg-white dark:divide-gray-700 dark:bg-gray-800">
-                {filteredStudents.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan={7 + filteredSubjects.length}
-                      className="px-4 py-10 text-center text-sm text-gray-400 dark:text-gray-500"
-                    >
-                      No students found for class {selectedClass}, section {selectedSection}. Add them in Student Management.
-                    </td>
-                  </tr>
-                ) : (
-                  filteredStudents.map((student) => {
-                    const fullyAbsent =
-                      filteredSubjects.length > 0 &&
-                      filteredSubjects.every((subject) => isSubjectAbsent(student._id, subject.id))
-                    const partlyAbsent =
-                      !fullyAbsent && filteredSubjects.some((subject) => isSubjectAbsent(student._id, subject.id))
-                    const stickyBg = fullyAbsent
-                      ? 'bg-amber-50 dark:bg-amber-950/40'
-                      : 'bg-white dark:bg-gray-800'
-                    const photoUrl = getProfileImageUrl(student.profileImage)
+  const openFromStatus = (className: string, section: string) => {
+    if (className === selectedClass) {
+      setSelectedSection(section)
+    } else {
+      pendingSectionRef.current = section
+      setSelectedClass(className)
+    }
+    sheetRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
+  const sheetBody = () => {
+    if (loading) return <CardLoading label="Loading exams and classes…" />
+    if (loadError) {
+      return (
+        <div className="ex-marks__notice">
+          <Banner tone="danger" title="Marks entry couldn’t load">
+            {loadError}
+          </Banner>
+        </div>
+      )
+    }
+    if (exams.length === 0) {
+      return (
+        <EmptyState
+          icon={ClipboardList}
+          title="No exams set up for this session"
+          body="Add exams in Exams first. Marks are entered against each exam."
+        />
+      )
+    }
+    if (!ready) {
+      return (
+        <EmptyState
+          icon={ClipboardList}
+          title="Choose an exam, class and section"
+          body="That section’s students and subjects open here for marks entry."
+        />
+      )
+    }
+    if (studentsLoading) return <CardLoading label="Loading students…" />
+    if (allSubjects.length === 0) {
+      return (
+        <EmptyState
+          icon={BookOpen}
+          title={`No subjects found for Class ${selectedClass}`}
+          body="Add subjects for this class in Subjects, or assign them to students."
+        />
+      )
+    }
+    if (filteredSubjects.length === 0) {
+      return (
+        <EmptyState
+          icon={EyeOff}
+          title="All subject columns are hidden"
+          body="Show them again to enter marks."
+          action={
+            <Button size="sm" icon={RotateCcw} onClick={() => setDeletedSubjectIds(new Set())}>
+              Show all subjects
+            </Button>
+          }
+        />
+      )
+    }
+    if (filteredStudents.length === 0) {
+      return (
+        <EmptyState
+          icon={Users}
+          title={`No active students in ${sectionLabel}`}
+          body="Add them in Students, then come back to enter marks."
+        />
+      )
+    }
+
+    return (
+      <div className="ex-marks-scroll">
+        <table className="ex-marks">
+          <caption className="cb-visually-hidden">
+            Marks for {sectionLabel}
+            {selectedExam ? `, ${selectedExam.code}` : ''}
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col" className="is-pin is-roll">
+                Roll no.
+              </th>
+              <th scope="col" className="is-pin is-student">
+                Student
+              </th>
+              <th
+                scope="col"
+                className="is-pin is-abs"
+                title="Tick to mark absent in every subject. For one subject, type Ab in that cell."
+              >
+                Absent
+              </th>
+              {filteredSubjects.map((subject) => (
+                <th key={subject.id} scope="col" className="ex-marks__subject">
+                  <div className="ex-marks__subhead">
+                    <span className="ex-marks__subname">
+                      {subject.name}
+                      {hasMaxMarks ? <span className="ex-marks__max"> /{maxMarks}</span> : null}
+                    </span>
+                    <Menu
+                      label={`Options for ${subject.name}`}
+                      items={[
+                        { label: 'Hide from this sheet', icon: EyeOff, onSelect: () => deleteSubject(subject.id) },
+                      ]}
+                    />
+                  </div>
+                </th>
+              ))}
+              <th scope="col" className="is-right ex-marks__sum">
+                Total
+                {hasMaxMarks ? <span className="ex-marks__max"> /{maxMarks * filteredSubjects.length}</span> : null}
+              </th>
+              <th scope="col" className="is-right">
+                %
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredStudents.map((student) => {
+              const fullyAbsent = filteredSubjects.every((subject) => isSubjectAbsent(student._id, subject.id))
+              const partlyAbsent =
+                !fullyAbsent && filteredSubjects.some((subject) => isSubjectAbsent(student._id, subject.id))
+              const absentLabel = fullyAbsent
+                ? `Mark ${student.name} present in all subjects`
+                : `Mark ${student.name} absent in all subjects`
+              return (
+                <tr key={student._id} className={cx(fullyAbsent && 'is-absent')}>
+                  <td className="is-pin is-roll">{student.classRollNo || '—'}</td>
+                  <td className="is-pin is-student" title={student.name}>
+                    <div className="ex-marks__who">
+                      <Avatar size="sm" name={student.name} src={getProfileImageUrl(student.profileImage)} />
+                      <Entity primary={student.name} secondary={`Adm. no. ${student.rollNumber || '—'}`} />
+                    </div>
+                  </td>
+                  <td className="is-pin is-abs">
+                    <Checkbox
+                      checked={fullyAbsent}
+                      indeterminate={partlyAbsent}
+                      onChange={() => toggleAbsent(student._id)}
+                      aria-label={absentLabel}
+                    />
+                  </td>
+                  {filteredSubjects.map((subject) => {
+                    const subjectAbsent = isSubjectAbsent(student._id, subject.id)
+                    const hint = subjectAbsent
+                      ? `${student.name} is absent in ${subject.name}. Type marks to mark present, or double-click.`
+                      : `Marks for ${student.name} in ${subject.name}${hasMaxMarks ? ` (out of ${maxMarks})` : ''}. Type Ab to mark absent.`
                     return (
-                    <tr
-                      key={student._id}
-                      className={
-                        fullyAbsent
-                          ? 'bg-amber-50/80 dark:bg-amber-950/30'
-                          : 'hover:bg-gray-50 dark:hover:bg-gray-700/50'
-                      }
-                    >
-                      <td className={`sticky left-0 z-20 px-2 py-1.5 text-sm font-medium text-gray-900 dark:text-white ${stickyBg}`}>
-                        {student.rollNumber}
-                      </td>
-                      <td className={`sticky left-[88px] z-20 px-1 py-1.5 ${stickyBg}`}>
-                        {photoUrl ? (
-                          <img
-                            src={photoUrl}
-                            alt=""
-                            loading="lazy"
-                            decoding="async"
-                            className="h-7 w-7 rounded-full object-cover ring-1 ring-gray-200 dark:ring-gray-600"
-                          />
-                        ) : (
-                          <span
-                            aria-hidden
-                            className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-slate-200 text-[9px] font-semibold text-slate-600 dark:bg-slate-700 dark:text-slate-200"
-                          >
-                            {getInitials(student.name)}
-                          </span>
-                        )}
-                      </td>
-                      <td className={`sticky left-[128px] z-20 px-2 py-1.5 text-sm text-gray-900 dark:text-white ${stickyBg}`}>
-                        {student.classRollNo || '—'}
-                      </td>
-                      <td
-                        className={`sticky left-[192px] z-20 truncate px-2 py-1.5 text-sm text-gray-900 dark:text-white ${stickyBg}`}
-                        title={student.name}
-                      >
-                        {student.name}
-                      </td>
-                      <td className={`sticky left-[360px] z-20 px-1 py-1.5 text-center ${stickyBg}`}>
+                      <td key={`${student._id}-${subject.id}`} className="ex-marks__cell">
                         <input
-                          type="checkbox"
-                          checked={fullyAbsent}
-                          ref={(el) => {
-                            if (el) el.indeterminate = partlyAbsent
+                          type="text"
+                          inputMode="text"
+                          className={cx('ex-mark', subjectAbsent && 'is-absent')}
+                          title={hint}
+                          aria-label={hint}
+                          value={subjectAbsent ? 'Ab' : marksByStudent[student._id]?.[subject.id] ?? ''}
+                          onChange={(e) => updateMark(student._id, subject.id, e.target.value)}
+                          onDoubleClick={() => toggleSubjectAbsent(student._id, subject.id)}
+                          onFocus={(e) => {
+                            if (subjectAbsent) e.currentTarget.select()
                           }}
-                          onChange={() => toggleAbsent(student._id)}
-                          title={
-                            fullyAbsent
-                              ? `Mark ${student.name} present in all subjects`
-                              : `Mark ${student.name} absent in all subjects`
-                          }
-                          aria-label={
-                            fullyAbsent
-                              ? `Mark ${student.name} present in all subjects`
-                              : `Mark ${student.name} absent in all subjects`
-                          }
-                          className="h-3.5 w-3.5 cursor-pointer rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+                          placeholder={hasMaxMarks ? `0–${maxMarks}` : '0'}
                         />
                       </td>
-                      {filteredSubjects.map((subject) => {
-                        const subjectAbsent = isSubjectAbsent(student._id, subject.id)
-                        return (
-                        <td key={`${student._id}-${subject.id}`} className="px-1 py-1">
-                          <input
-                            type="text"
-                            inputMode="text"
-                            title={
-                              subjectAbsent
-                                ? `${student.name} is absent in ${subject.name}. Type marks to mark present, or click Ab.`
-                                : `Marks for ${student.name} in ${subject.name}${hasMaxMarks ? ` (max ${maxMarks})` : ''}. Type Ab to mark absent.`
-                            }
-                            value={subjectAbsent ? 'Ab' : marksByStudent[student._id]?.[subject.id] ?? ''}
-                            onChange={(e) => updateMark(student._id, subject.id, e.target.value)}
-                            onDoubleClick={() => toggleSubjectAbsent(student._id, subject.id)}
-                            onFocus={(e) => {
-                              if (subjectAbsent) e.currentTarget.select()
-                            }}
-                            placeholder={hasMaxMarks ? `0–${maxMarks}` : '0'}
-                            className={
-                              subjectAbsent
-                                ? 'w-14 rounded-md border border-amber-300 bg-amber-50 px-1.5 py-1 text-center text-xs font-semibold text-amber-800 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-300'
-                                : 'w-14 rounded-md border border-gray-300 bg-white px-1.5 py-1 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-900 dark:text-white'
-                            }
-                          />
-                        </td>
-                        )
-                      })}
-                      <td className="px-1 py-1.5 text-sm font-semibold tabular-nums text-gray-900 dark:text-white">
-                        {studentScoreById[student._id]?.total ?? '—'}
-                      </td>
-                      <td className="px-1 py-1.5 text-sm font-semibold tabular-nums text-gray-900 dark:text-white">
-                        {studentScoreById[student._id]?.percentage ?? '—'}
-                      </td>
-                    </tr>
                     )
-                  })
-                )}
-              </tbody>
-              {filteredStudents.length > 0 ? (
-                <tfoot className="sticky bottom-0 z-30">
-                  <tr className="border-t-2 border-indigo-200 bg-indigo-50 dark:border-indigo-800 dark:bg-indigo-950/50">
-                    <td
-                      colSpan={4}
-                      className="sticky left-0 z-40 bg-indigo-50 px-2 py-2 text-xs font-semibold uppercase tracking-normal text-indigo-800 dark:bg-indigo-950/50 dark:text-indigo-200"
-                    >
-                      Subject Average
-                    </td>
-                    <td className="px-1 py-2" />
-                    {filteredSubjects.map((subject) => (
-                      <td
-                        key={`avg-${subject.id}`}
-                        className="px-1 py-2 text-sm font-semibold tabular-nums text-indigo-800 dark:text-indigo-200"
-                        title={`Average of entered ${subject.name} marks`}
-                      >
-                        {subjectAverages[subject.id]}
-                      </td>
-                    ))}
-                    <td className="px-1 py-2 text-sm font-semibold tabular-nums text-indigo-800 dark:text-indigo-200">
-                      {classScoreAverages.total}
-                    </td>
-                    <td className="px-1 py-2 text-sm font-semibold tabular-nums text-indigo-800 dark:text-indigo-200">
-                      {classScoreAverages.percentage}
-                    </td>
-                  </tr>
-                </tfoot>
-              ) : null}
-            </table>
-          )}
-        </div>
-        <p className="border-t border-gray-100 px-4 py-2 text-xs text-gray-500 dark:border-gray-700 dark:text-gray-400">
-          Double click the cell to mark student absent in the subject.
-        </p>
+                  })}
+                  <td className="is-right ex-marks__num ex-marks__sum">{studentScoreById[student._id]?.total ?? '—'}</td>
+                  <td className="is-right ex-marks__num">{studentScoreById[student._id]?.percentage ?? '—'}</td>
+                </tr>
+              )
+            })}
+          </tbody>
+          <tfoot>
+            <tr>
+              <th scope="row" colSpan={3} className="is-pin is-footlabel">
+                Subject average
+              </th>
+              {filteredSubjects.map((subject) => (
+                <td
+                  key={`avg-${subject.id}`}
+                  className="ex-marks__num ex-marks__cell"
+                  title={`Average of entered ${subject.name} marks`}
+                >
+                  {subjectAverages[subject.id]}
+                </td>
+              ))}
+              <td className="is-right ex-marks__num ex-marks__sum">{classScoreAverages.total}</td>
+              <td className="is-right ex-marks__num">{classScoreAverages.percentage}</td>
+            </tr>
+          </tfoot>
+        </table>
       </div>
+    )
+  }
 
-      {selectedExamId ? (
-        <div className="mt-5">
+  const subtitle = selectedExam
+    ? hasMaxMarks
+      ? `${selectedExam.code} · ${selectedExam.name} · out of ${maxMarks} per subject`
+      : `${selectedExam.code} · ${selectedExam.name} · no maximum marks set`
+    : 'Choose an exam, class and section to enter marks'
+
+  return (
+    <Page width="full">
+      <div className="cb-stack">
+        <div ref={sheetRef} className="ex-marks-anchor">
+          <Card
+            flush
+            title="Marks entry"
+            subtitle={subtitle}
+            className="ex-marks-card"
+            footer={
+              <div className="ex-marks__foot">
+                <span>
+                  {ready && !studentsLoading && filteredStudents.length > 0
+                    ? `${filteredStudents.length} student${filteredStudents.length === 1 ? '' : 's'} in ${sectionLabel}. `
+                    : ''}
+                  Type Ab or double-click a cell to mark a student absent in that subject.
+                </span>
+                {hiddenCount > 0 && filteredSubjects.length > 0 ? (
+                  <button type="button" className="cb-link" onClick={() => setDeletedSubjectIds(new Set())}>
+                    Show {hiddenCount} hidden subject{hiddenCount === 1 ? '' : 's'}
+                  </button>
+                ) : null}
+              </div>
+            }
+          >
+            <div className="ex-marks__toolbar">
+              <FilterBar
+                filters={
+                  <>
+                    <Select
+                      aria-label="Exam"
+                      size="sm"
+                      className="ex-marks__exam"
+                      value={selectedExamId}
+                      onChange={(e) => setSelectedExamId(e.target.value)}
+                      placeholder="Choose exam"
+                      options={exams.map((exam) => ({ value: exam._id, label: `${exam.code} · ${exam.name}` }))}
+                    />
+                    <Select
+                      aria-label="Class"
+                      size="sm"
+                      value={selectedClass}
+                      onChange={(e) => setSelectedClass(e.target.value)}
+                      placeholder="Choose class"
+                      options={classOptions}
+                    />
+                    <Select
+                      aria-label="Section"
+                      size="sm"
+                      value={selectedSection}
+                      onChange={(e) => setSelectedSection(e.target.value)}
+                      disabled={!selectedClass}
+                      placeholder={selectedClass ? 'Choose section' : 'Choose class first'}
+                      options={sectionOptions}
+                    />
+                  </>
+                }
+                actions={
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    icon={Save}
+                    onClick={() => void handleSave()}
+                    loading={saving}
+                    disabled={!canSave}
+                  >
+                    Save marks
+                  </Button>
+                }
+              />
+            </div>
+            {sheetBody()}
+          </Card>
+        </div>
+
+        {selectedExamId ? (
           <ResultEntryStatusPanel
             loading={statusLoading}
             rows={statusRows}
             selectedClass={selectedClass}
             selectedSection={selectedSection}
-            onSelectClassSection={(className, section) => {
-              setSelectedClass(className)
-              setSelectedSection(section)
-            }}
+            onSelectClassSection={openFromStatus}
           />
-        </div>
-      ) : null}
-    </div>
+        ) : null}
+      </div>
+    </Page>
   )
 }
 

@@ -1,0 +1,59 @@
+/* ASETS workflow pages (allocations, transfers, maintenance, stock, audits, procurement, disposal, reports, settings). Tokens only; inside .cb-app. */
+
+/* ---------- Records card: toolbar above a flush table ---------- */
+.cb-app .aw-card .cb-table-wrap { border-top: 1px solid var(--border); }
+.cb-app .aw-toolbar { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-4) var(--space-5); }
+@media (max-width: 640px) { .cb-app .aw-toolbar { padding: var(--space-3) var(--space-4); } }
+
+/* ---------- Cells ---------- */
+.cb-app .aw-entity { display: flex; flex-direction: column; min-width: 0; }
+.cb-app .aw-entity__primary { font-weight: 600; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cb-app .aw-entity__secondary { font-size: 12px; line-height: 16px; color: var(--ink-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cb-app .aw-code { font-variant-numeric: tabular-nums; letter-spacing: 0.01em; }
+.cb-app .aw-clip { display: inline-block; max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle; }
+.cb-app .aw-route { display: inline-flex; align-items: center; gap: var(--space-1); min-width: 0; color: var(--ink); }
+.cb-app .aw-route .cb-icon { flex: none; color: var(--ink-subtle); }
+.cb-app .aw-actions { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-1); }
+.cb-app .cb-tcard .aw-actions { justify-content: flex-start; }
+.cb-app .aw-qty { display: inline-flex; align-items: baseline; gap: 4px; }
+.cb-app .aw-qty__unit { font-size: 12px; line-height: 16px; color: var(--ink-muted); }
+
+/* ---------- Sheet extras ---------- */
+.cb-app .aw-sheet-total { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); padding: var(--space-3) var(--space-4); border-radius: var(--radius-md); background: var(--surface-sunken); font-size: 13px; line-height: 18px; color: var(--ink-muted); }
+.cb-app .aw-sheet-total strong { font-size: 16px; line-height: 24px; color: var(--ink); font-variant-numeric: tabular-nums; }
+
+/* ---------- Audit workspace (inside the audit sheet) ---------- */
+.cb-app .aw-audit { display: flex; flex-direction: column; gap: var(--space-5); }
+.cb-app .aw-audit__summary { display: grid; gap: var(--space-2); grid-template-columns: repeat(6, minmax(0, 1fr)); }
+@media (max-width: 900px) { .cb-app .aw-audit__summary { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.cb-app .aw-audit__metric { display: flex; flex-direction: column; gap: 2px; padding: var(--space-2) var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); min-width: 0; }
+.cb-app .aw-audit__metric dt { font-size: 12px; line-height: 16px; color: var(--ink-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cb-app .aw-audit__metric dd { margin: 0; font: 600 18px/26px var(--font-sans); color: var(--ink); font-variant-numeric: tabular-nums; }
+.cb-app .aw-scan { display: flex; align-items: flex-end; gap: var(--space-2); }
+.cb-app .aw-scan .cb-field { flex: 1 1 auto; min-width: 0; }
+.cb-app .aw-state-select { width: 168px; }
+.cb-app .cb-tcard .aw-state-select { width: 100%; }
+.cb-app .aw-confirm { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; width: 100%; }
+.cb-app .aw-confirm__text { flex: 1 1 200px; font-size: 13px; line-height: 18px; color: var(--ink-muted); }
+
+/* ---------- Reports ---------- */
+.cb-app .aw-tiles { display: grid; gap: var(--space-3); grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 1100px) { .cb-app .aw-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 800px) { .cb-app .aw-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 480px) { .cb-app .aw-tiles { grid-template-columns: minmax(0, 1fr); } }
+.cb-app .aw-tile { display: flex; align-items: flex-start; gap: var(--space-3); width: 100%; min-width: 0; padding: var(--space-3) var(--space-4); border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); color: var(--ink); text-align: left; font: inherit; cursor: pointer; box-shadow: var(--shadow-xs); }
+.cb-app .aw-tile:hover { background: var(--surface-hover); border-color: var(--border-strong); }
+.cb-app .aw-tile:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.cb-app .aw-tile.is-active { border-color: var(--accent-strong); background: var(--accent-soft); }
+.cb-app .aw-tile__icon { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: var(--radius-md); background: var(--surface-sunken); color: var(--ink-muted); }
+.cb-app .aw-tile.is-active .aw-tile__icon { background: var(--surface); color: var(--accent-strong); }
+.cb-app .aw-tile__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.cb-app .aw-tile__title { font: 600 13px/18px var(--font-sans); color: var(--ink); }
+.cb-app .aw-tile.is-active .aw-tile__title { color: var(--accent-soft-ink); }
+.cb-app .aw-tile__desc { font-size: 12px; line-height: 16px; color: var(--ink-muted); }
+.cb-app .aw-report-cell { display: inline-block; max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle; }
+
+/* ---------- Settings ---------- */
+.cb-app .aw-settings { display: flex; flex-direction: column; gap: var(--space-6); max-width: 760px; }
+.cb-app .aw-settings__foot { display: flex; justify-content: flex-end; gap: var(--space-2); }
+@media (max-width: 640px) { .cb-app .aw-settings__foot .cb-btn { width: 100%; } }

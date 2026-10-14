@@ -169,6 +169,8 @@ export type StudentSearchRow = StudentSnapshot & {
   accountId: string | null
   structureId: string | null
   totals: AccountTotals | null
+  /** Unpaid amount that has fallen due up to the end of this month. */
+  dueNow?: number
 }
 
 export type CapitalSettings = {
@@ -193,12 +195,15 @@ export type ClassRow = {
   dueSoFar: number
   students: number
   defaulters: number
+  /** Demanded / still unpaid for instalments due up to the end of this month. */
+  demandedThisMonth?: number
+  dueThisMonth?: number
   collectionRate?: number
   sections?: ClassRow[]
 }
 
 export type CpitlDashboard = {
-  totals: { expected: number; gross: number; concession: number; collected: number; pending: number; overdue: number; dueSoFar: number; collectionRate: number; dueSoFarRate: number }
+  totals: { expected: number; gross: number; concession: number; collected: number; pending: number; overdue: number; dueSoFar: number; collectionRate: number; dueSoFarRate: number; demandedThisMonth?: number; dueThisMonth?: number; dueThroughMonth?: string }
   payments: { total: number; lateFee: number; count: number; today: number; todayCount: number }
   coverage: { studentsWithStructure: number; activeStudents: number }
   byClass: ClassRow[]

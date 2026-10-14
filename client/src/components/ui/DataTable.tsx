@@ -19,6 +19,8 @@ export interface DataTableColumn<R> {
   interactive?: boolean
   /** Accessible label for the header when `header` is not plain text. */
   headerLabel?: string
+  /** Lets long text in this cell wrap instead of widening the table (descriptions, excerpts). */
+  wrap?: boolean
 }
 
 export interface DataTableSelection<R> {
@@ -28,6 +30,8 @@ export interface DataTableSelection<R> {
   someSelected: boolean
   onToggleAll: () => void
   rowLabel: (row: R) => string
+  /** Rows that can't take part in bulk actions show a disabled checkbox. */
+  isDisabled?: (row: R) => boolean
 }
 
 export interface DataTableProps<R> {
@@ -91,8 +95,12 @@ export function DataTable<R>({
     const titleCol = columns.find((c) => c.mobile === 'title') || columns[0]
     const subCol = columns.find((c) => c.mobile === 'subtitle')
     const asideCol = columns.find((c) => c.mobile === 'aside')
+    // Header-less columns (a row's "…" menu) sit at the card's top-right, not as a labelled field.
+    const actionCols = columns.filter(
+      (c) => c !== titleCol && c !== subCol && c !== asideCol && c.mobile !== 'hidden' && c.header === ''
+    )
     const fieldCols = columns.filter(
-      (c) => c !== titleCol && c !== subCol && c !== asideCol && c.mobile !== 'hidden'
+      (c) => c !== titleCol && c !== subCol && c !== asideCol && c.mobile !== 'hidden' && c.header !== ''
     )
 
     const headerCell = (column: DataTableColumn<R>) => {
@@ -163,6 +171,7 @@ export function DataTable<R>({
                       <Checkbox
                         checked={selection.isSelected(row)}
                         onChange={() => selection.onToggle(row)}
+                        disabled={selection.isDisabled?.(row)}
                         aria-label={selection.rowLabel(row)}
                       />
                     </td>
@@ -170,7 +179,7 @@ export function DataTable<R>({
                   {columns.map((column) => (
                     <td
                       key={column.key}
-                      className={cx(column.align && `is-${column.align}`, column.numeric && 'is-num')}
+                      className={cx(column.align && `is-${column.align}`, column.numeric && 'is-num', column.wrap && 'is-wrap')}
                       onClick={column.interactive ? stop : undefined}
                       onKeyDown={column.interactive ? stop : undefined}
                     >
@@ -204,6 +213,7 @@ export function DataTable<R>({
                     <Checkbox
                       checked={selection.isSelected(row)}
                       onChange={() => selection.onToggle(row)}
+                        disabled={selection.isDisabled?.(row)}
                       aria-label={selection.rowLabel(row)}
                     />
                   </span>
@@ -217,6 +227,11 @@ export function DataTable<R>({
                     {cellValue(asideCol, row)}
                   </div>
                 ) : null}
+                {actionCols.map((column) => (
+                  <div key={column.key} className="cb-tcard__actions" onClick={stop} onKeyDown={stop}>
+                    {cellValue(column, row)}
+                  </div>
+                ))}
               </div>
               {fieldCols.length ? (
                 <dl className="cb-tcard__fields">

@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { AlertCircle, CalendarDays, Check, FileSpreadsheet, FileText, FileWarning, Layers, Link2, Paperclip, Pencil, Plus, Trash2, X, Download, ExternalLink } from 'lucide-react'
 import type { AnswerSheetEntry, AnswerSheetSerialRange } from '../services/answerSheetService'
 import type { CentreDatesheetEntry } from '../services/centreDatesheetService'
 import api from '../services/api'
@@ -14,11 +15,29 @@ import {
   useUpdateSeriesMutation,
 } from '../hooks/useAnswerSheets'
 import { useCentreDatesheetEntries } from '../hooks/useSeatingPlan'
-import { Dropdown } from '../components/common/Dropdown'
-import type { DropdownOption } from '../components/common/Dropdown'
-import { Tabs } from '../components/common/Tabs'
-import type { TabConfig } from '../components/common/Tabs'
 import { useAttendanceAbsentees } from '../hooks/useAttendance'
+import {
+  Banner,
+  Button,
+  Card,
+  CardToolbar,
+  DataTable,
+  DetailList,
+  Dialog,
+  EmptyState,
+  FilterBar,
+  Menu,
+  Page,
+  Select,
+  Sheet,
+  Tabs,
+  TextField,
+  type DataTableColumn,
+  PdfFrame,
+} from '@/components/ui'
+import { CardLoading } from '@/components/exmcl/ExmclUi'
+import '@/components/exmcl/exmcl.css'
+import '@/components/exmcl/centre-answersheets.css'
 import {
   createEmptySerialRange,
   getAnswerSheetSerialRanges,
@@ -175,10 +194,10 @@ const AnswerSheets: React.FC = () => {
     discardMutation.isPending
   const error = listError?.message ?? null
 
-  const classOptions: DropdownOption[] = [
-    { value: '', label: 'All Classes' },
-    { value: '10', label: '10th' },
-    { value: '12', label: '12th' }
+  const classOptions = [
+    { value: '', label: 'All classes' },
+    { value: '10', label: 'Class 10' },
+    { value: '12', label: 'Class 12' }
   ]
 
   // Format time from 24-hour (HH:MM) to 12-hour format with AM/PM
@@ -881,1335 +900,938 @@ const AnswerSheets: React.FC = () => {
     return typeMap[type] || type
   }
 
-  // Define tabs configuration
-  const tabs: TabConfig<'received' | 'used' | 'balance' | 'discarded'>[] = [
-    {
-      id: 'received',
-      label: 'Received',
-      badge: totals.received,
-      color: 'blue',
-      icon: (
-        <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-        </svg>
-      )
-    },
-    {
-      id: 'used',
-      label: 'Used',
-      badge: totals.used,
-      color: 'emerald',
-      icon: (
-        <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-        </svg>
-      )
-    },
-    {
-      id: 'balance',
-      label: 'Balance',
-      badge: balance,
-      color: 'amber',
-      icon: (
-        <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-      )
-    },
-    {
-      id: 'discarded',
-      label: 'Discarded',
-      badge: totals.discarded,
-      color: 'rose',
-      icon: (
-        <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-        </svg>
-      )
-    }
+  type TabId = 'received' | 'used' | 'balance' | 'discarded'
+
+  const tabItems: Array<{ id: TabId; label: string; count: number }> = [
+    { id: 'received', label: 'Received', count: totals.received },
+    { id: 'used', label: 'Used', count: totals.used },
+    { id: 'balance', label: 'Balance', count: balance },
+    { id: 'discarded', label: 'Discarded', count: totals.discarded },
   ]
 
-  return (
-    <div className="p-6">
-      {/* Data Table */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-        {/* Ribbon: tabs left, dropdowns right */}
-        <div className="px-6 py-3 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
-          <Tabs
-            tabs={tabs}
-            activeTab={activeTab}
-            onChange={setActiveTab}
-            variant="pill"
-            size="sm"
-            ariaLabel="Answer sheet status"
-          />
-          <div className="flex items-center space-x-4 min-w-0">
-            {/* Series input */}
-            <div className="flex items-center space-x-2">
-              <label className="text-sm font-medium text-gray-600 dark:text-gray-400 whitespace-nowrap">Series</label>
-              <div className="flex">
-                <input
-                  type="text"
-                  value={seriesInput}
-                  onChange={(e) => setSeriesInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      handleSaveSeries()
-                    }
+  const cardCopy: Record<TabId, { title: string; subtitle: string }> = {
+    received: {
+      title: 'Received stock',
+      subtitle: 'Serial ranges recorded for each sheet type. Open a row to see its full record.',
+    },
+    used: {
+      title: 'Used per exam',
+      subtitle: 'Main sheets count one per candidate once the exam day has passed. Upcoming exams can be edited.',
+    },
+    balance: {
+      title: 'Balance in hand',
+      subtitle: 'Sheets still in stock, by type and class.',
+    },
+    discarded: {
+      title: 'Discarded sheets',
+      subtitle: 'Damaged or misprinted sheets taken out of stock.',
+    },
+  }
+
+  const dash = (value: string | number | undefined | null) =>
+    value === undefined || value === null || value === '' || value === '-' ? '—' : value
+
+  const closeUploadSheet = () => {
+    setShowUploadModal(false)
+    setUploadFile(null)
+  }
+
+  const closeLinkDialog = () => {
+    setShowLinkModal(false)
+    setLinkingEntry(null)
+    setSelectedDatesheetEntry('')
+  }
+
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // ---------- Received ----------
+  type ReceivedRow = { entry: AnswerSheetEntry; index: number }
+  const receivedRows: ReceivedRow[] =
+    activeTab === 'received' ? getFilteredEntries().map((entry, index) => ({ entry, index })) : []
+
+  const renderSerialCell = (entry: AnswerSheetEntry, field: 'serialFrom' | 'serialTo') => {
+    const isEditing = editingEntry === getEntryEditingKey(entry)
+    if (isEditing) {
+      const supplementary = isSupplementaryEntry(entry.answerSheetType)
+      const editSerialRanges = editValues.serialRanges
+      return (
+        <div className="cx-as-serials">
+          {editSerialRanges.map((range, rangeIndex) => (
+            <div key={`edit-${field}-${rangeIndex}`} className="cx-as-serial-edit">
+              <TextField
+                size="sm"
+                className="cx-as-serial-input"
+                aria-label={`${field === 'serialFrom' ? 'From' : 'To'} serial, range ${rangeIndex + 1}`}
+                placeholder={`${field === 'serialFrom' ? 'From' : 'To'} ${rangeIndex + 1}`}
+                value={range[field]}
+                onChange={(e) => updateEditSerialRange(rangeIndex, field, e.target.value)}
+                onClick={(e) => e.stopPropagation()}
+              />
+              {field === 'serialTo' && supplementary && editSerialRanges.length > 1 ? (
+                <Button
+                  variant="tertiary"
+                  size="sm"
+                  icon={X}
+                  aria-label={`Remove range ${rangeIndex + 1}`}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    removeEditSerialRange(rangeIndex)
                   }}
-                  placeholder="e.g. GGM - 31"
-                  className="w-36 px-2.5 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-l-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
-                  maxLength={50}
-                />
-                <button
-                  type="button"
-                  onClick={() => handleSaveSeries()}
-                  disabled={updateSeriesMutation.isPending}
-                  className="px-2.5 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 rounded-r-md border border-blue-600 hover:border-blue-700 disabled:border-blue-400 transition-colors"
-                  title="Save series"
-                >
-                  {updateSeriesMutation.isPending ? (
-                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                    </svg>
-                  ) : (
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                  )}
-                </button>
-              </div>
-            </div>
-            <Dropdown
-              options={classOptions}
-              value={selectedClass}
-              onChange={(v) => setSelectedClass(Array.isArray(v) ? v[0] ?? '' : v)}
-              placeholder="All Classes"
-              size="md"
-              className="w-52"
-              clearable={false}
-            />
-          </div>
-        </div>
-
-        <div className="overflow-x-auto">
-          {activeTab === 'received' ? (
-            // Received Tab - Special Table
-            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-              <thead className="bg-gray-50 dark:bg-gray-700">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Sr No
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Answer Sheet
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Pages
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Colour
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Class
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Serial No From
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Serial No To
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Total
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                {(() => {
-                  const receivedEntries = getFilteredEntries()
-                  if (loading) {
-                    return (
-                      <tr>
-                        <td colSpan={9} className="px-6 py-12 text-center">
-                          <div className="flex flex-col items-center">
-                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-                            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">Loading...</p>
-                          </div>
-                        </td>
-                      </tr>
-                    )
-                  }
-                  return receivedEntries.length > 0 ? (
-                    receivedEntries.map((entry, index) => {
-                      const entryKey = getEntryEditingKey(entry)
-                      const isEditing = editingEntry === entryKey
-                      const entrySerialRanges = getAnswerSheetSerialRanges(entry)
-                      const editSerialRanges = editValues.serialRanges
-
-                      return (
-                        <tr
-                          key={entry._id || index}
-                          onClick={() => {
-                            if (!isEditing && entry._id && !entry.isTemplate) {
-                              navigate(`/answersheets/${entry._id}`)
-                            }
-                          }}
-                          className={`${index % 2 === 1 ? 'bg-gray-50 dark:bg-gray-700/50' : 'bg-white dark:bg-gray-800'} ${!isEditing && entry._id && !entry.isTemplate ? 'cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors' : ''}`}
-                        >
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                            {getDisplaySequenceNo(entry, index)}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                            {entry.answerSheetType}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                            {entry.pages} Pages
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm">
-                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${entry.colour.toLowerCase() === 'blue' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' :
-                              entry.colour.toLowerCase() === 'red' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' :
-                                entry.colour.toLowerCase() === 'yellow' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
-                                  entry.colour.toLowerCase() === 'pink' ? 'bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-200' :
-                                    entry.colour.toLowerCase() === 'white' ? 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200' :
-                                      'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
-                              }`}>
-                              {entry.colour}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                            {entry.class}
-                          </td>
-                          <td className="px-6 py-4 text-sm font-mono align-top">
-                            {isEditing ? (
-                              <div className="space-y-2">
-                                {editSerialRanges.map((range, rangeIndex) => (
-                                  <input
-                                    key={`edit-from-${rangeIndex}`}
-                                    type="text"
-                                    value={range.serialFrom}
-                                    onChange={(e) => updateEditSerialRange(rangeIndex, 'serialFrom', e.target.value)}
-                                    onClick={(e) => e.stopPropagation()}
-                                    className="w-28 px-2 py-1 border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
-                                    placeholder={`From ${rangeIndex + 1}`}
-                                  />
-                                ))}
-                              </div>
-                            ) : (
-                              <div className="space-y-1">
-                                {entrySerialRanges.map((range, rangeIndex) => (
-                                  <div
-                                    key={`display-from-${range.serialFrom}-${rangeIndex}`}
-                                    className={range.serialFrom ? 'text-gray-900 dark:text-white' : 'text-gray-400 dark:text-gray-500'}
-                                  >
-                                    {range.serialFrom || '-'}
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </td>
-                          <td className="px-6 py-4 text-sm font-mono align-top">
-                            {isEditing ? (
-                              <div className="space-y-2">
-                                {editSerialRanges.map((range, rangeIndex) => (
-                                  <div key={`edit-to-${rangeIndex}`} className="flex items-center gap-2">
-                                    <input
-                                      type="text"
-                                      value={range.serialTo}
-                                      onChange={(e) => updateEditSerialRange(rangeIndex, 'serialTo', e.target.value)}
-                                      onClick={(e) => e.stopPropagation()}
-                                      className="w-28 px-2 py-1 border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
-                                      placeholder={`To ${rangeIndex + 1}`}
-                                    />
-                                    {isSupplementaryEntry(entry.answerSheetType) && editSerialRanges.length > 1 && (
-                                      <button
-                                        type="button"
-                                        onClick={(e) => {
-                                          e.stopPropagation()
-                                          removeEditSerialRange(rangeIndex)
-                                        }}
-                                        className="text-xs text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
-                                      >
-                                        Remove
-                                      </button>
-                                    )}
-                                  </div>
-                                ))}
-                                {isSupplementaryEntry(entry.answerSheetType) && (
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      addEditSerialRange()
-                                    }}
-                                    className="text-xs font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
-                                  >
-                                    + Add range
-                                  </button>
-                                )}
-                              </div>
-                            ) : (
-                              <div className="space-y-1">
-                                {entrySerialRanges.map((range, rangeIndex) => (
-                                  <div
-                                    key={`display-to-${range.serialTo}-${rangeIndex}`}
-                                    className={range.serialTo ? 'text-gray-900 dark:text-white' : 'text-gray-400 dark:text-gray-500'}
-                                  >
-                                    {range.serialTo || '-'}
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-blue-600 dark:text-blue-400">
-                            {entry.total || 0}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm space-x-2">
-                            {isEditing ? (
-                              <>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    handleSaveEdit(entry)
-                                  }}
-                                  className="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300"
-                                  disabled={loading}
-                                >
-                                  Save
-                                </button>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    handleCancelEdit()
-                                  }}
-                                  className="text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-300"
-                                  disabled={loading}
-                                >
-                                  Cancel
-                                </button>
-                              </>
-                            ) : (
-                              <>
-                                {entry._id && !entry.isTemplate && (
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      openConsolidatedPreview(entry)
-                                    }}
-                                    className="inline-flex items-center justify-center p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:text-emerald-400 dark:hover:bg-emerald-900/30 transition-colors duration-150"
-                                    disabled={loading}
-                                    title="Preview consolidated PDF"
-                                    aria-label="Preview consolidated PDF"
-                                  >
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-                                      <path d="M12 3v12m0 0l4-4m-4 4l-4-4" />
-                                      <path d="M4 17v1a2 2 0 002 2h12a2 2 0 002-2v-1" />
-                                    </svg>
-                                  </button>
-                                )}
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    handleEditClick(entry)
-                                  }}
-                                  className="inline-flex items-center justify-center p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:text-blue-400 dark:hover:bg-blue-900/30 transition-colors duration-150"
-                                  disabled={loading}
-                                  title="Edit"
-                                  aria-label="Edit"
-                                >
-                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-                                    <path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                  </svg>
-                                </button>
-                              </>
-                            )}
-                          </td>
-                        </tr>
-                      )
-                    })
-                  ) : (
-                    <tr>
-                      <td colSpan={9} className="px-6 py-12 text-center">
-                        <div className="flex flex-col items-center">
-                          {error ? (
-                            <>
-                              <svg className="mx-auto h-12 w-12 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                              </svg>
-                              <p className="mt-2 text-sm text-red-500 dark:text-red-400">{error}</p>
-                            </>
-                          ) : (
-                            <>
-                              <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                              </svg>
-                              <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                                No answer sheets received yet. Click "Add Received Quantity" to start.
-                              </p>
-                            </>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })()}
-              </tbody>
-            </table>
-          ) : (
-            // Other Tabs - Summary Table
-            <table
-              className={
-                activeTab === 'used'
-                  ? 'table-auto divide-y divide-gray-200 dark:divide-gray-700'
-                  : 'min-w-full divide-y divide-gray-200 dark:divide-gray-700'
-              }
-            >
-              <thead className="bg-gray-50 dark:bg-gray-700">
-                <tr>
-                  <th className="px-1 py-2 text-center align-middle text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Sr No
-                  </th>
-                  {activeTab === 'used' && (
-                    <>
-                      <th className="px-1 py-2 text-center align-middle text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        Date
-                      </th>
-                      <th className="px-1 py-2 text-center align-middle text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        Class
-                      </th>
-                      <th className="px-1 py-2 text-center align-middle text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        Subject Code
-                      </th>
-                      <th className="px-1 py-2 text-center align-middle text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        Subject Name
-                      </th>
-                      <th className="px-1 py-2 text-center align-middle text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        Answer Sheet Type
-                      </th>
-                      <th className="px-1 py-2 text-center align-middle text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        Candidates
-                      </th>
-                      <th className="px-1 py-2 text-center align-middle text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        Main Used
-                      </th>
-                      <th className="px-1 py-2 text-center align-middle text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        Supp. Used
-                      </th>
-                      <th className="px-1 py-2 text-center align-middle text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        Absent
-                      </th>
-                    </>
-                  )}
-                  {activeTab === 'discarded' && (
-                    <>
-                      <th className="px-1 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        Serial No
-                      </th>
-                      <th className="px-1 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        Date
-                      </th>
-                      <th className="px-1 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        Subject
-                      </th>
-                      <th className="px-1 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        Code
-                      </th>
-                      <th className="px-1 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        Room No
-                      </th>
-                    </>
-                  )}
-                  {activeTab !== 'used' && activeTab !== 'discarded' && (
-                    <>
-                      <th className="px-1 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        Answer Sheet
-                      </th>
-                      <th className="px-1 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        Class
-                      </th>
-                    </>
-                  )}
-                  {activeTab !== 'used' && (
-                    <>
-                      <th className="px-1 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        Received
-                      </th>
-                      <th className="px-1 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        Used
-                      </th>
-                      <th className="px-1 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        Balance
-                      </th>
-                      <th className="px-1 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        Discarded
-                      </th>
-                    </>
-                  )}
-                  {activeTab !== 'used' && (
-                    <th className="px-1 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      Actions
-                    </th>
-                  )}
-                </tr>
-              </thead>
-              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                {loading ? (
-                  <tr>
-                    <td
-                      colSpan={activeTab === 'used' ? 10 : activeTab === 'discarded' ? 11 : 8}
-                      className="px-1 py-8 text-center"
-                    >
-                      <div className="flex flex-col items-center">
-                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-                        <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">Loading...</p>
-                      </div>
-                    </td>
-                  </tr>
-                ) : activeTab === 'used' ? (
-                  // Used Tab - Show Centre Datesheet Entries
-                  getUsedTabEntries().length > 0 ? (
-                    (() => {
-                      const srNoByDate = new Map<string, number>()
-                      let srCounter = 0
-                      const usedEntries = getUsedTabEntries()
-
-                      return usedEntries.map((datesheetEntry, index) => {
-                      const candidateCount = datesheetEntry.candidateCount ?? 0
-
-                      // Determine if this exam date is today or in the past
-                      const examDayStart = new Date(datesheetEntry.examDate)
-                      examDayStart.setHours(0, 0, 0, 0)
-                      const todayStart = new Date()
-                      todayStart.setHours(0, 0, 0, 0)
-                      const isPastOrToday = examDayStart.getTime() <= todayStart.getTime()
-
-                      // Used: for past/today exams, used = candidateCount (every candidate gets a sheet)
-                      // For future exams, show whatever has been manually linked
-                      let totalUsed = 0
-                      if (isPastOrToday) {
-                        totalUsed = candidateCount
-                      } else {
-                        const usedSheets = entries.filter(e =>
-                          e.linkedExamDate &&
-                          new Date(e.linkedExamDate).toDateString() === new Date(datesheetEntry.examDate).toDateString() &&
-                          e.linkedSubjectCode === datesheetEntry.subjectCode
-                        )
-                        const rawTotalUsed = usedSheets.reduce((sum, e) => sum + (e.used ?? 0), 0)
-                        totalUsed = candidateCount > 0 ? Math.min(rawTotalUsed, candidateCount) : rawTotalUsed
-                      }
-
-                      const dateKey = new Date(datesheetEntry.examDate).toDateString()
-                      if (!srNoByDate.has(dateKey)) {
-                        srCounter += 1
-                        srNoByDate.set(dateKey, srCounter)
-                      }
-                      const srNo = srNoByDate.get(dateKey) ?? index + 1
-                      const entryId = String(datesheetEntry._id || '').trim()
-                      const subjectKey = buildSupplementaryUsageSubjectKey(
-                        datesheetEntry.examDate,
-                        datesheetEntry.subjectCode,
-                        datesheetEntry.class
-                      )
-                      const supplementaryUsed = (
-                        (entryId ? supplementaryUsageCounts.byEntryId.get(entryId) : undefined)
-                        ?? (subjectKey ? supplementaryUsageCounts.bySubjectKey.get(subjectKey) : undefined)
-                        ?? 0
-                      )
-                      const absentKey = `${dateKey}|${datesheetEntry.subjectCode}`
-                      const absentCount = absenteesByDateAndSubject.get(absentKey) ?? 0
-
-                      return (
-                        <tr
-                          key={datesheetEntry._id}
-                          className={index % 2 === 1 ? 'bg-gray-50 dark:bg-gray-700/50' : 'bg-white dark:bg-gray-800'}
-                        >
-                          <td className="px-1 py-2 whitespace-nowrap text-sm text-gray-900 dark:text-white text-center align-middle">
-                            {srNo}
-                          </td>
-                          <td className="px-1 py-2 whitespace-nowrap text-sm text-gray-900 dark:text-white text-center align-middle">
-                            {formatShortDate(datesheetEntry.examDate)}
-                          </td>
-                          <td className="px-1 py-2 whitespace-nowrap text-sm text-gray-900 dark:text-white text-center align-middle">
-                            {datesheetEntry.class}
-                          </td>
-                          <td className="px-1 py-2 whitespace-nowrap text-sm font-mono text-gray-900 dark:text-white text-center align-middle">
-                            {datesheetEntry.subjectCode}
-                          </td>
-                          <td className="px-1 py-2 whitespace-nowrap text-sm text-gray-900 dark:text-white text-center align-middle">
-                            {datesheetEntry.subjectName}
-                          </td>
-                          <td className="px-1 py-2 whitespace-nowrap text-sm text-gray-900 dark:text-white text-center align-middle">
-                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${datesheetEntry.answerSheetType === '32_pages' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' :
-                              datesheetEntry.answerSheetType === '20_pages' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
-                                datesheetEntry.answerSheetType === '40_graph' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200' :
-                                  'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
-                              }`}>
-                              {formatAnswerSheetType(datesheetEntry.answerSheetType)}
-                            </span>
-                          </td>
-                          <td className="px-1 py-2 whitespace-nowrap text-sm font-semibold text-blue-600 dark:text-blue-400 text-center align-middle">
-                            {datesheetEntry.candidateCount}
-                          </td>
-                          <td className="px-1 py-2 whitespace-nowrap text-sm font-semibold text-green-600 dark:text-green-400 text-center align-middle">
-                            {isPastOrToday ? (
-                              <span title="Auto-set to candidate count for completed exams">
-                                {totalUsed}
-                              </span>
-                            ) : editingUsedEntry === datesheetEntry._id ? (
-                              <div className="flex items-center space-x-2">
-                                <input
-                                  type="number"
-                                  min="0"
-                                  max={candidateCount > 0 ? candidateCount : undefined}
-                                  value={editUsedValue}
-                                  onChange={(e) => {
-                                    const v = e.target.value
-                                    const num = parseInt(v, 10)
-                                    if (candidateCount > 0 && !Number.isNaN(num) && num > candidateCount) {
-                                      setEditUsedValue(String(candidateCount))
-                                    } else {
-                                      setEditUsedValue(v)
-                                    }
-                                  }}
-                                  className="w-20 px-2 py-1 border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
-                                  autoFocus
-                                  title="Used sheets (cannot exceed candidates)"
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                      handleSaveUsed(datesheetEntry)
-                                    } else if (e.key === 'Escape') {
-                                      setEditingUsedEntry(null)
-                                      setEditUsedValue('')
-                                    }
-                                  }}
-                                />
-                                <button
-                                  onClick={() => handleSaveUsed(datesheetEntry)}
-                                  className="text-green-600 hover:text-green-900 dark:text-green-400"
-                                  disabled={loading}
-                                >
-                                  ✓
-                                </button>
-                                <button
-                                  onClick={() => {
-                                    setEditingUsedEntry(null)
-                                    setEditUsedValue('')
-                                  }}
-                                  className="text-gray-600 hover:text-gray-900 dark:text-gray-400"
-                                  disabled={loading}
-                                >
-                                  ✕
-                                </button>
-                              </div>
-                            ) : (
-                              <div
-                                className="cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 px-2 py-1 rounded"
-                                onClick={() => {
-                                  setEditingUsedEntry(datesheetEntry._id)
-                                  setEditUsedValue(String(totalUsed))
-                                }}
-                                title="Click to edit"
-                              >
-                                {totalUsed || 0}
-                              </div>
-                            )}
-                          </td>
-                          <td className="px-1 py-2 whitespace-nowrap text-sm font-semibold text-indigo-600 dark:text-indigo-400 text-center align-middle">
-                            {supplementaryUsed}
-                          </td>
-                          <td className="px-1 py-2 whitespace-nowrap text-sm font-semibold text-rose-600 dark:text-rose-400 text-center align-middle">
-                            {absentCount}
-                          </td>
-                        </tr>
-                      )
-                    })
-                    })()
-                  ) : (
-                    <tr>
-                      <td colSpan={10} className="px-1 py-8 text-center">
-                        <div className="flex flex-col items-center">
-                          <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                          </svg>
-                          <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                            No exam schedule found. Please ensure:
-                          </p>
-                          <ul className="mt-2 text-sm text-gray-500 dark:text-gray-400 text-left">
-                            <li>• CBSE datesheet is imported</li>
-                            <li>• Candidates have subjects linked</li>
-                          </ul>
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                ) : activeTab === 'balance' ? (
-                  // Balance Tab - aggregated per type/class
-                  balanceRows.length > 0 ? (
-                    balanceRows.map((row) => (
-                      <tr key={`${row.answerSheetType}-${row.classLabel}`} className="odd:bg-white even:bg-gray-50 dark:odd:bg-gray-800 dark:even:bg-gray-900/40">
-                        <td className="px-1 py-2 whitespace-nowrap text-sm text-gray-900 dark:text-white text-center align-middle">
-                          {row.srNo}
-                        </td>
-                        <td className="px-1 py-2 whitespace-nowrap text-sm text-gray-900 dark:text-white text-center align-middle">
-                          {row.answerSheetType}
-                        </td>
-                        <td className="px-1 py-2 whitespace-nowrap text-sm text-gray-900 dark:text-white text-center align-middle">
-                          {row.classLabel}
-                        </td>
-                        <td className="px-1 py-2 whitespace-nowrap text-sm font-semibold text-blue-600 dark:text-blue-400 text-center align-middle">
-                          {row.received}
-                        </td>
-                        <td className="px-1 py-2 whitespace-nowrap text-sm font-semibold text-green-600 dark:text-green-400 text-center align-middle">
-                          {row.used}
-                        </td>
-                        <td className="px-1 py-2 whitespace-nowrap text-sm font-semibold text-yellow-600 dark:text-yellow-400 text-center align-middle">
-                          {row.balance}
-                        </td>
-                        <td className="px-1 py-2 whitespace-nowrap text-sm font-semibold text-red-600 dark:text-red-400 text-center align-middle">
-                          {row.discarded}
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={8} className="px-1 py-8 text-center">
-                        <div className="flex flex-col items-center">
-                          <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                          </svg>
-                          <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                            No balance records found. Add received quantities first.
-                          </p>
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                ) : activeTab === 'discarded' ? (
-                  getDiscardedRows().length > 0 ? (
-                    getDiscardedRows().map((row, index) => {
-                      const entryDiscarded = getDiscardedCount(row.entry)
-                      const entryBalance = row.entry.total - row.entry.used - entryDiscarded
-                      return (
-                        <tr key={row.key} className={index % 2 === 1 ? 'bg-gray-50 dark:bg-gray-700/50' : 'bg-white dark:bg-gray-800'}>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                            {index + 1}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-900 dark:text-white">
-                            {row.serialNo}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                            {row.date}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white" title={row.subject}>
-                            <span className="inline-block max-w-[220px] truncate align-bottom">{row.subject}</span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-900 dark:text-white">
-                            {row.code}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                            {row.roomNo}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-blue-600 dark:text-blue-400">
-                            {row.entry.total}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-green-600 dark:text-green-400">
-                            {row.entry.used}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-yellow-600 dark:text-yellow-400">
-                            {entryBalance}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-red-600 dark:text-red-400">
-                            {entryDiscarded}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm space-x-2">
-                            {row.entry._id && (
-                              <button
-                                onClick={() => navigate(`/answersheets/${row.entry._id}`)}
-                                className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
-                                title={row.reason}
-                              >
-                                View
-                              </button>
-                            )}
-                          </td>
-                        </tr>
-                      )
-                    })
-                  ) : (
-                    <tr>
-                      <td colSpan={11} className="px-6 py-12 text-center">
-                        <div className="flex flex-col items-center">
-                          <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                          </svg>
-                          <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                            No discarded sheet records found.
-                          </p>
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                ) : (
-                  // Other Tabs - Show Answer Sheets
-                  getFilteredEntries().length > 0 ? (
-                    getFilteredEntries().map((entry, index) => {
-                      const entryDiscarded = getDiscardedCount(entry)
-                      const entryBalance = entry.total - entry.used - entryDiscarded
-                      return (
-                        <tr key={entry._id} className={index % 2 === 1 ? 'bg-gray-50 dark:bg-gray-700/50' : 'bg-white dark:bg-gray-800'}>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                            {getDisplaySequenceNo(entry, index)}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                            {entry.answerSheetType}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                            {entry.class}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-blue-600 dark:text-blue-400">
-                            {entry.total}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-green-600 dark:text-green-400">
-                            {entry.used}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-yellow-600 dark:text-yellow-400">
-                            {entryBalance}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-red-600 dark:text-red-400">
-                            {entryDiscarded}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm space-x-2">
-                            {entryBalance > 0 && (
-                              <>
-                                <button
-                                  onClick={() => {
-                                    const qty = prompt('Enter quantity to mark as used:')
-                                    if (qty && entry._id) handleUseSheets(entry._id, parseInt(qty))
-                                  }}
-                                  className="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300"
-                                  disabled={loading}
-                                >
-                                  Use
-                                </button>
-                                <button
-                                  onClick={() => {
-                                    const qty = prompt('Enter quantity to discard:')
-                                    if (qty && entry._id) handleDiscardSheets(entry._id, parseInt(qty))
-                                  }}
-                                  className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
-                                  disabled={loading}
-                                >
-                                  Discard
-                                </button>
-                              </>
-                            )}
-                          </td>
-                        </tr>
-                      )
-                    })
-                  ) : (
-                    <tr>
-                      <td colSpan={8} className="px-6 py-12 text-center">
-                        <div className="flex flex-col items-center">
-                          <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                          </svg>
-                          <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                            No answer sheets found for this category.
-                          </p>
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                )}
-              </tbody>
-            </table>
-          )}
-        </div>
-      </div>
-
-      {showConsolidatedPreview && (consolidatedPreviewUrl || consolidatedPreviewLoading || consolidatedPreviewError) && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4">
-          <div className="w-full max-w-6xl h-[88vh] bg-white dark:bg-gray-900 rounded-xl shadow-xl overflow-hidden flex flex-col">
-            <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between flex-shrink-0">
-              <h4 className="text-sm font-semibold text-gray-900 dark:text-white truncate pr-4">
-                Consolidated Answer Sheet Record
-                {consolidatedPreviewEntry && (
-                  <span className="ml-2 text-gray-500 dark:text-gray-400 font-normal">
-                    {consolidatedPreviewEntry.answerSheetType} • {consolidatedPreviewEntry.pages} Pages • {consolidatedPreviewEntry.colour} • Class {consolidatedPreviewEntry.class}
-                  </span>
-                )}
-              </h4>
-              <div className="flex items-center gap-2 flex-shrink-0">
-                {consolidatedPreviewUrl && consolidatedPreviewEntry && (
-                  <>
-                    <a
-                      href={consolidatedPreviewUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center px-3 py-1.5 rounded-md text-xs font-semibold border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
-                    >
-                      Open in New Tab
-                    </a>
-                    <a
-                      href={consolidatedPreviewUrl}
-                      download={getConsolidatedRecordFilename(consolidatedPreviewEntry)}
-                      className="inline-flex items-center px-3 py-1.5 rounded-md text-xs font-semibold bg-blue-600 text-white hover:bg-blue-700"
-                    >
-                      Download PDF
-                    </a>
-                  </>
-                )}
-                <button
-                  type="button"
-                  onClick={closeConsolidatedPreview}
-                  className="inline-flex items-center px-3 py-1.5 rounded-md text-xs font-semibold border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-            <div className="w-full flex-1 overflow-auto bg-gray-100 dark:bg-gray-800 p-4 min-h-0">
-              {consolidatedPreviewLoading ? (
-                <div className="h-full w-full flex flex-col items-center justify-center gap-3 text-sm text-gray-600 dark:text-gray-300">
-                  <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
-                  <p>Generating preview...</p>
-                </div>
-              ) : consolidatedPreviewError ? (
-                <div className="h-full w-full flex flex-col items-center justify-center gap-2 p-6 text-center text-sm text-gray-600 dark:text-gray-300">
-                  <svg className="w-12 h-12 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                  <p>{consolidatedPreviewError}</p>
-                </div>
-              ) : consolidatedPreviewUrl ? (
-                <iframe
-                  src={`${consolidatedPreviewUrl}#toolbar=0`}
-                  className="w-full h-full min-h-[60vh] border-0 rounded-lg bg-white dark:bg-gray-900"
-                  title="Consolidated answer sheet PDF preview"
                 />
               ) : null}
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* Upload Excel Modal */}
-      {showUploadModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
-                  Upload Answer Sheets Excel
-                </h3>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowUploadModal(false)
-                    setUploadFile(null)
-                  }}
-                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                  aria-label="Close upload modal"
-                  title="Close upload modal"
-                >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-
-              <div className="space-y-4">
-                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-                  <div className="flex">
-                    <svg className="w-5 h-5 text-blue-600 dark:text-blue-400 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <div className="text-sm text-blue-800 dark:text-blue-200">
-                      <p className="font-medium mb-2">How to use:</p>
-                      <ol className="list-decimal list-inside space-y-1 mb-2">
-                        <li>Click "Download Template" (file will have timestamp in name)</li>
-                        <li>Open the downloaded file in Excel</li>
-                        <li>Fill in "From" and "To" columns with serial numbers</li>
-                        <li>Save the file with a NEW name (e.g., "Filled_Answer_Sheets.xlsx")</li>
-                        <li>Upload the SAVED file here</li>
-                      </ol>
-                      <p className="text-xs mt-2 text-blue-700 dark:text-blue-300 font-semibold">
-                        ⚠️ Important: The template is EMPTY. You must fill in serial numbers before uploading!
-                      </p>
-                      <p className="text-xs mt-1 text-blue-700 dark:text-blue-300">
-                        💡 Tip: Save your filled file with a different name to avoid confusion.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <label htmlFor="answer-sheet-excel-upload" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Select Excel File
-                  </label>
-                  <input
-                    id="answer-sheet-excel-upload"
-                    type="file"
-                    accept=".xlsx,.xls"
-                    onChange={handleFileSelect}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
-                    title="Select Excel file (.xlsx or .xls) to upload"
-                    aria-label="Select Excel file (.xlsx or .xls) to upload"
-                  />
-                  {uploadFile && (
-                    <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                      Selected: {uploadFile.name}
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              <div className="flex justify-end space-x-3 mt-6">
-                <button
-                  onClick={() => {
-                    setShowUploadModal(false)
-                    setUploadFile(null)
-                  }}
-                  className="btn btn-secondary"
-                  disabled={loading}
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleUploadExcel}
-                  className="btn btn-primary"
-                  disabled={loading || !uploadFile}
-                >
-                  {loading ? 'Uploading...' : 'Upload & Import'}
-                </button>
-              </div>
+          ))}
+          {field === 'serialTo' && supplementary ? (
+            <div>
+              <Button
+                variant="tertiary"
+                size="sm"
+                icon={Plus}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  addEditSerialRange()
+                }}
+              >
+                Add range
+              </Button>
             </div>
-          </div>
+          ) : null}
         </div>
-      )}
+      )
+    }
+    return (
+      <div className="cx-as-serials">
+        {getAnswerSheetSerialRanges(entry).map((range, rangeIndex) => (
+          <span
+            key={`display-${field}-${range[field]}-${rangeIndex}`}
+            className={range[field] ? 'is-num' : 'cb-subtle'}
+          >
+            {range[field] || '—'}
+          </span>
+        ))}
+      </div>
+    )
+  }
 
-      {/* Add Quantity Modal */}
-      {showAddModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
-                  Add Received Answer Sheets
-                </h3>
-                <button
-                  type="button"
-                  onClick={() => setShowAddModal(false)}
-                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                  aria-label="Close add received answer sheets modal"
-                  title="Close"
-                >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Answer Sheet Type *
-                    </label>
-                    <select
-                      value={formData.answerSheetType}
-                      onChange={(e) => {
-                        const nextType = e.target.value
-                        setFormData((current) => ({
-                          ...current,
-                          answerSheetType: nextType,
-                          serialRanges: isSupplementaryEntry(nextType)
-                            ? current.serialRanges
-                            : [current.serialRanges[0] || createEmptySerialRange()],
-                        }))
-                      }}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
-                      aria-label="Answer Sheet Type"
-                      title="Answer Sheet Type"
-                      required
-                    >
-                      <option value="">Select Type</option>
-                      <option value="Main">Main</option>
-                      <option value="Graph">Graph</option>
-                      <option value="Supplementary">Supplementary</option>
-                      <option value="For Blind">For Blind</option>
-                      <option value="Drawing Sheets">Drawing Sheets</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Pages *
-                    </label>
-                    <input
-                      type="number"
-                      value={formData.pages}
-                      onChange={(e) => setFormData({ ...formData, pages: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
-                      placeholder="e.g., 32"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Colour *
-                    </label>
-                    <select
-                      value={formData.colour}
-                      onChange={(e) => setFormData({ ...formData, colour: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
-                      aria-label="Colour"
-                      title="Colour"
-                      required
-                    >
-                      <option value="">Select Colour</option>
-                      <option value="Red">Red</option>
-                      <option value="Blue">Blue</option>
-                      <option value="Yellow">Yellow</option>
-                      <option value="Pink">Pink</option>
-                      <option value="White">White</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Class *
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.class}
-                      onChange={(e) => setFormData({ ...formData, class: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
-                      placeholder="e.g., 10, 12, 10/12"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        {isSupplementaryEntry(formData.answerSheetType) ? 'Serial Number Ranges *' : 'Serial Number Range *'}
-                      </label>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">
-                        Leading zeros will be preserved. Use multiple rows for supplementary bundles.
-                      </p>
-                    </div>
-                    {isSupplementaryEntry(formData.answerSheetType) && (
-                      <button
-                        type="button"
-                        onClick={addFormSerialRange}
-                        className="text-sm font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
-                      >
-                        + Add range
-                      </button>
-                    )}
-                  </div>
-
-                  {formData.serialRanges.map((range, rangeIndex) => (
-                    <div key={`form-range-${rangeIndex}`} className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_1fr_auto]">
-                      <div>
-                        <input
-                          type="text"
-                          value={range.serialFrom}
-                          onChange={(e) => updateFormSerialRange(rangeIndex, 'serialFrom', e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white font-mono"
-                          placeholder={`From ${rangeIndex + 1}`}
-                          title="Supports: 1001, 001001, A1001, A001001 (leading zeros preserved)"
-                          required
-                        />
-                      </div>
-
-                      <div>
-                        <input
-                          type="text"
-                          value={range.serialTo}
-                          onChange={(e) => updateFormSerialRange(rangeIndex, 'serialTo', e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white font-mono"
-                          placeholder={`To ${rangeIndex + 1}`}
-                          title="Supports: 2000, 002000, A2000, A002000 (leading zeros preserved)"
-                          required
-                        />
-                      </div>
-
-                      {isSupplementaryEntry(formData.answerSheetType) && (
-                        <div className="flex items-center">
-                          <button
-                            type="button"
-                            onClick={() => removeFormSerialRange(rangeIndex)}
-                            className="text-sm font-medium text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
-                            disabled={formData.serialRanges.length === 1}
-                          >
-                            Remove
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Exam (Optional)
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.exam}
-                      onChange={(e) => setFormData({ ...formData, exam: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
-                      placeholder="e.g., Term 1"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Subject (Optional)
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.subject}
-                      onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
-                      placeholder="e.g., Mathematics"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex justify-end space-x-3 mt-6">
-                <button
-                  onClick={() => setShowAddModal(false)}
-                  className="btn btn-secondary"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleAddQuantity}
-                  className="btn btn-primary"
-                >
-                  Add Quantity
-                </button>
-              </div>
+  const receivedColumns: DataTableColumn<ReceivedRow>[] = [
+    {
+      key: 'seq',
+      header: '#',
+      width: 48,
+      numeric: true,
+      mobile: 'hidden',
+      render: ({ entry, index }) => getDisplaySequenceNo(entry, index),
+    },
+    {
+      key: 'type',
+      header: 'Answer sheet',
+      mobile: 'title',
+      render: ({ entry }) => <span className="cb-strong">{entry.answerSheetType}</span>,
+    },
+    { key: 'pages', header: 'Pages', mobile: 'subtitle', render: ({ entry }) => `${entry.pages} pages` },
+    { key: 'colour', header: 'Colour', render: ({ entry }) => dash(entry.colour) },
+    { key: 'class', header: 'Class', render: ({ entry }) => dash(entry.class) },
+    { key: 'from', header: 'Serial from', render: ({ entry }) => renderSerialCell(entry, 'serialFrom') },
+    { key: 'to', header: 'Serial to', render: ({ entry }) => renderSerialCell(entry, 'serialTo') },
+    {
+      key: 'total',
+      header: 'Total',
+      numeric: true,
+      align: 'right',
+      mobile: 'aside',
+      render: ({ entry }) => <span className="cb-strong">{entry.total || 0}</span>,
+    },
+    {
+      key: 'actions',
+      header: '',
+      headerLabel: 'Actions',
+      align: 'right',
+      interactive: true,
+      render: ({ entry }) => {
+        const isEditing = editingEntry === getEntryEditingKey(entry)
+        if (isEditing) {
+          return (
+            <div className="cx-as-actions">
+              <Button size="sm" onClick={handleCancelEdit} disabled={loading}>
+                Cancel
+              </Button>
+              <Button variant="primary" size="sm" onClick={() => handleSaveEdit(entry)} disabled={loading}>
+                Save
+              </Button>
             </div>
-          </div>
-        </div>
-      )}
+          )
+        }
+        const canPreview = Boolean(entry._id && !entry.isTemplate)
+        return (
+          <Menu
+            label={`Actions for ${entry.answerSheetType} ${entry.pages} pages, class ${entry.class}`}
+            items={[
+              ...(canPreview
+                ? [
+                    {
+                      label: 'Preview consolidated record',
+                      icon: FileText,
+                      disabled: loading,
+                      onSelect: () => openConsolidatedPreview(entry),
+                    },
+                  ]
+                : []),
+              { label: 'Edit serial numbers', icon: Pencil, disabled: loading, onSelect: () => handleEditClick(entry) },
+            ]}
+          />
+        )
+      },
+    },
+  ]
 
-      {/* Link to Centre Datesheet Modal */}
-      {showLinkModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
-                  Link Answer Sheets to Exam
-                </h3>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowLinkModal(false)
-                    setLinkingEntry(null)
-                    setSelectedDatesheetEntry('')
-                  }}
-                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                  aria-label="Close link answer sheets to exam modal"
-                  title="Close"
-                >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
+  // ---------- Used ----------
+  type UsedRow = {
+    datesheetEntry: CentreDatesheetEntry
+    srNo: number
+    candidateCount: number
+    isPastOrToday: boolean
+    totalUsed: number
+    supplementaryUsed: number
+    absentCount: number
+  }
 
-              <div className="space-y-4">
-                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-                  <p className="text-sm text-blue-800 dark:text-blue-200">
-                    Select the exam for which these answer sheets will be used. This helps track answer sheet usage per subject and exam date.
-                  </p>
-                </div>
+  const usedRows: UsedRow[] = (() => {
+    if (activeTab !== 'used') return []
+    const srNoByDate = new Map<string, number>()
+    let srCounter = 0
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Select Exam (Optional)
-                  </label>
-                  <select
-                    value={selectedDatesheetEntry}
-                    onChange={(e) => setSelectedDatesheetEntry(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
-                    aria-label="Select Exam (Optional)"
-                    title="Select Exam (Optional)"
-                  >
-                    <option value="">-- Skip linking (mark as used without exam details) --</option>
-                    {centreDatesheetEntries.map((entry) => (
-                      <option key={entry._id} value={entry._id}>
-                        {formatShortDate(entry.examDate)} - {entry.dayName} - Class {entry.class} - {entry.subjectCode} {entry.subjectName} ({entry.candidateCount} candidates)
-                      </option>
-                    ))}
-                  </select>
-                </div>
+    return getUsedTabEntries().map((datesheetEntry, index) => {
+      const candidateCount = datesheetEntry.candidateCount ?? 0
 
-                {selectedDatesheetEntry && (
-                  <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
-                    {(() => {
-                      const entry = centreDatesheetEntries.find(e => e._id === selectedDatesheetEntry)
-                      if (!entry) return null
-                      return (
-                        <div className="text-sm text-green-800 dark:text-green-200">
-                          <p className="font-semibold mb-2">Selected Exam Details:</p>
-                          <ul className="space-y-1">
-                            <li><strong>Date:</strong> {formatShortDate(entry.examDate)} ({entry.dayName})</li>
-                            <li><strong>Class:</strong> {entry.class}</li>
-                            <li><strong>Subject:</strong> {entry.subjectCode} - {entry.subjectName}</li>
-                            <li><strong>Time:</strong> {formatTime(entry.timeSlot.start)} - {formatTime(entry.timeSlot.end)}</li>
-                            <li><strong>Candidates:</strong> {entry.candidateCount}</li>
-                            <li><strong>Rooms Needed:</strong> {entry.roomsNeeded}</li>
-                          </ul>
-                        </div>
-                      )
-                    })()}
-                  </div>
-                )}
-              </div>
+      // Determine if this exam date is today or in the past
+      const examDayStart = new Date(datesheetEntry.examDate)
+      examDayStart.setHours(0, 0, 0, 0)
+      const todayStart = new Date()
+      todayStart.setHours(0, 0, 0, 0)
+      const isPastOrToday = examDayStart.getTime() <= todayStart.getTime()
 
-              <div className="flex justify-end space-x-3 mt-6">
-                <button
-                  onClick={() => {
-                    setShowLinkModal(false)
-                    setLinkingEntry(null)
-                    setSelectedDatesheetEntry('')
-                  }}
-                  className="btn btn-secondary"
-                  disabled={loading}
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleConfirmUseSheets}
-                  className="btn btn-primary"
-                  disabled={loading}
-                >
-                  {loading ? 'Processing...' : 'Confirm & Mark as Used'}
-                </button>
-              </div>
+      // Used: for past/today exams, used = candidateCount (every candidate gets a sheet)
+      // For future exams, show whatever has been manually linked
+      let totalUsed = 0
+      if (isPastOrToday) {
+        totalUsed = candidateCount
+      } else {
+        const usedSheets = entries.filter(e =>
+          e.linkedExamDate &&
+          new Date(e.linkedExamDate).toDateString() === new Date(datesheetEntry.examDate).toDateString() &&
+          e.linkedSubjectCode === datesheetEntry.subjectCode
+        )
+        const rawTotalUsed = usedSheets.reduce((sum, e) => sum + (e.used ?? 0), 0)
+        totalUsed = candidateCount > 0 ? Math.min(rawTotalUsed, candidateCount) : rawTotalUsed
+      }
+
+      const dateKey = new Date(datesheetEntry.examDate).toDateString()
+      if (!srNoByDate.has(dateKey)) {
+        srCounter += 1
+        srNoByDate.set(dateKey, srCounter)
+      }
+      const srNo = srNoByDate.get(dateKey) ?? index + 1
+      const entryId = String(datesheetEntry._id || '').trim()
+      const subjectKey = buildSupplementaryUsageSubjectKey(
+        datesheetEntry.examDate,
+        datesheetEntry.subjectCode,
+        datesheetEntry.class
+      )
+      const supplementaryUsed = (
+        (entryId ? supplementaryUsageCounts.byEntryId.get(entryId) : undefined)
+        ?? (subjectKey ? supplementaryUsageCounts.bySubjectKey.get(subjectKey) : undefined)
+        ?? 0
+      )
+      const absentKey = `${dateKey}|${datesheetEntry.subjectCode}`
+      const absentCount = absenteesByDateAndSubject.get(absentKey) ?? 0
+
+      return { datesheetEntry, srNo, candidateCount, isPastOrToday, totalUsed, supplementaryUsed, absentCount }
+    })
+  })()
+
+  const cancelUsedEdit = () => {
+    setEditingUsedEntry(null)
+    setEditUsedValue('')
+  }
+
+  const usedColumns: DataTableColumn<UsedRow>[] = [
+    { key: 'sr', header: '#', width: 48, numeric: true, mobile: 'hidden', render: (row) => row.srNo },
+    {
+      key: 'date',
+      header: 'Date',
+      mobile: 'aside',
+      render: (row) => <span className="is-num">{formatShortDate(row.datesheetEntry.examDate)}</span>,
+    },
+    { key: 'class', header: 'Class', render: (row) => dash(row.datesheetEntry.class) },
+    {
+      key: 'code',
+      header: 'Subject code',
+      mobile: 'subtitle',
+      render: (row) => <span className="ex-code">{row.datesheetEntry.subjectCode}</span>,
+    },
+    {
+      key: 'subject',
+      header: 'Subject',
+      mobile: 'title',
+      render: (row) => <span className="cb-strong">{dash(row.datesheetEntry.subjectName)}</span>,
+    },
+    {
+      key: 'type',
+      header: 'Answer sheet type',
+      render: (row) => formatAnswerSheetType(row.datesheetEntry.answerSheetType),
+    },
+    {
+      key: 'candidates',
+      header: 'Candidates',
+      numeric: true,
+      align: 'right',
+      render: (row) => dash(row.datesheetEntry.candidateCount),
+    },
+    {
+      key: 'main',
+      header: 'Main used',
+      numeric: true,
+      align: 'right',
+      interactive: true,
+      render: (row) => {
+        const { datesheetEntry, candidateCount, totalUsed } = row
+        if (row.isPastOrToday) {
+          return (
+            <span className="is-num" title="Auto-set to candidate count for completed exams">
+              {totalUsed}
+            </span>
+          )
+        }
+        if (editingUsedEntry === datesheetEntry._id) {
+          return (
+            <div className="cx-as-used-edit">
+              <TextField
+                size="sm"
+                type="number"
+                min={0}
+                max={candidateCount > 0 ? candidateCount : undefined}
+                value={editUsedValue}
+                aria-label={`Main sheets used for ${datesheetEntry.subjectCode}`}
+                title="Used sheets (cannot exceed candidates)"
+                autoFocus
+                onChange={(e) => {
+                  const v = e.target.value
+                  const num = parseInt(v, 10)
+                  if (candidateCount > 0 && !Number.isNaN(num) && num > candidateCount) {
+                    setEditUsedValue(String(candidateCount))
+                  } else {
+                    setEditUsedValue(v)
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleSaveUsed(datesheetEntry)
+                  } else if (e.key === 'Escape') {
+                    cancelUsedEdit()
+                  }
+                }}
+              />
+              <Button
+                variant="tertiary"
+                size="sm"
+                icon={Check}
+                aria-label="Save used count"
+                onClick={() => handleSaveUsed(datesheetEntry)}
+                disabled={loading}
+              />
+              <Button
+                variant="tertiary"
+                size="sm"
+                icon={X}
+                aria-label="Cancel editing"
+                onClick={cancelUsedEdit}
+                disabled={loading}
+              />
             </div>
+          )
+        }
+        return (
+          <Button
+            variant="tertiary"
+            size="sm"
+            title="Edit used count"
+            onClick={() => {
+              setEditingUsedEntry(datesheetEntry._id)
+              setEditUsedValue(String(totalUsed))
+            }}
+          >
+            {totalUsed || 0}
+          </Button>
+        )
+      },
+    },
+    {
+      key: 'supp',
+      header: 'Supplementary used',
+      numeric: true,
+      align: 'right',
+      render: (row) => row.supplementaryUsed,
+    },
+    { key: 'absent', header: 'Absent', numeric: true, align: 'right', render: (row) => row.absentCount },
+  ]
+
+  // ---------- Balance ----------
+  type BalanceRow = (typeof balanceRows)[number]
+  const balanceColumns: DataTableColumn<BalanceRow>[] = [
+    { key: 'sr', header: '#', width: 48, numeric: true, mobile: 'hidden', render: (row) => row.srNo },
+    {
+      key: 'type',
+      header: 'Answer sheet',
+      mobile: 'title',
+      render: (row) => <span className="cb-strong">{row.answerSheetType}</span>,
+    },
+    { key: 'class', header: 'Class', mobile: 'subtitle', render: (row) => dash(row.classLabel) },
+    { key: 'received', header: 'Received', numeric: true, align: 'right', render: (row) => row.received },
+    { key: 'used', header: 'Used', numeric: true, align: 'right', render: (row) => row.used },
+    {
+      key: 'balance',
+      header: 'Balance',
+      numeric: true,
+      align: 'right',
+      mobile: 'aside',
+      render: (row) => <span className="cb-strong">{row.balance}</span>,
+    },
+    { key: 'discarded', header: 'Discarded', numeric: true, align: 'right', render: (row) => row.discarded },
+  ]
+
+  // ---------- Discarded ----------
+  type DiscardedRow = ReturnType<typeof getDiscardedRows>[number] & { index: number }
+  const discardedRows: DiscardedRow[] =
+    activeTab === 'discarded' ? getDiscardedRows().map((row, index) => ({ ...row, index })) : []
+
+  const discardedColumns: DataTableColumn<DiscardedRow>[] = [
+    { key: 'sr', header: '#', width: 48, numeric: true, mobile: 'hidden', render: (row) => row.index + 1 },
+    {
+      key: 'serial',
+      header: 'Serial no.',
+      mobile: 'title',
+      render: (row) => <span className="cb-strong is-num">{dash(row.serialNo)}</span>,
+    },
+    { key: 'date', header: 'Date', render: (row) => <span className="is-num">{dash(row.date)}</span> },
+    {
+      key: 'subject',
+      header: 'Subject',
+      mobile: 'subtitle',
+      render: (row) => (
+        <span className="cx-as-truncate" title={row.subject}>
+          {dash(row.subject)}
+        </span>
+      ),
+    },
+    {
+      key: 'code',
+      header: 'Code',
+      render: (row) => (row.code && row.code !== '-' ? <span className="ex-code">{row.code}</span> : '—'),
+    },
+    { key: 'room', header: 'Room', render: (row) => dash(row.roomNo) },
+    { key: 'reason', header: 'Reason', mobile: 'hidden', render: (row) => <span className="cb-muted">{row.reason}</span> },
+    { key: 'received', header: 'Received', numeric: true, align: 'right', render: (row) => row.entry.total },
+    { key: 'used', header: 'Used', numeric: true, align: 'right', render: (row) => row.entry.used },
+    {
+      key: 'balance',
+      header: 'Balance',
+      numeric: true,
+      align: 'right',
+      render: (row) => row.entry.total - row.entry.used - getDiscardedCount(row.entry),
+    },
+    {
+      key: 'discarded',
+      header: 'Discarded',
+      numeric: true,
+      align: 'right',
+      mobile: 'aside',
+      render: (row) => getDiscardedCount(row.entry),
+    },
+  ]
+
+  // ---------- Per-entry stock (Use / Discard) ----------
+  type StockRow = { entry: AnswerSheetEntry; index: number }
+  const stockColumns: DataTableColumn<StockRow>[] = [
+    {
+      key: 'seq',
+      header: '#',
+      width: 48,
+      numeric: true,
+      mobile: 'hidden',
+      render: ({ entry, index }) => getDisplaySequenceNo(entry, index),
+    },
+    {
+      key: 'type',
+      header: 'Answer sheet',
+      mobile: 'title',
+      render: ({ entry }) => <span className="cb-strong">{entry.answerSheetType}</span>,
+    },
+    { key: 'class', header: 'Class', mobile: 'subtitle', render: ({ entry }) => dash(entry.class) },
+    { key: 'received', header: 'Received', numeric: true, align: 'right', render: ({ entry }) => entry.total },
+    { key: 'used', header: 'Used', numeric: true, align: 'right', render: ({ entry }) => entry.used },
+    {
+      key: 'balance',
+      header: 'Balance',
+      numeric: true,
+      align: 'right',
+      mobile: 'aside',
+      render: ({ entry }) => entry.total - entry.used - getDiscardedCount(entry),
+    },
+    {
+      key: 'discarded',
+      header: 'Discarded',
+      numeric: true,
+      align: 'right',
+      render: ({ entry }) => getDiscardedCount(entry),
+    },
+    {
+      key: 'actions',
+      header: '',
+      headerLabel: 'Actions',
+      align: 'right',
+      width: 48,
+      interactive: true,
+      render: ({ entry }) =>
+        entry.total - entry.used - getDiscardedCount(entry) > 0 ? (
+          <Menu
+            label={`Actions for ${entry.answerSheetType}, class ${entry.class}`}
+            items={[
+              {
+                label: 'Mark sheets as used',
+                icon: Check,
+                disabled: loading,
+                onSelect: () => {
+                  const qty = prompt('Enter quantity to mark as used:')
+                  if (qty && entry._id) handleUseSheets(entry._id, parseInt(qty))
+                },
+              },
+              { divider: true },
+              {
+                label: 'Discard sheets',
+                icon: Trash2,
+                tone: 'danger',
+                disabled: loading,
+                onSelect: () => {
+                  const qty = prompt('Enter quantity to discard:')
+                  if (qty && entry._id) handleDiscardSheets(entry._id, parseInt(qty))
+                },
+              },
+            ]}
+          />
+        ) : null,
+    },
+  ]
+
+  const renderTable = () => {
+    switch (activeTab) {
+      case 'received':
+        return (
+          <DataTable
+            caption="Received answer sheets"
+            columns={receivedColumns}
+            rows={receivedRows}
+            getRowKey={({ entry, index }) => entry._id || `${getEntryEditingKey(entry)}-${index}`}
+            onRowClick={({ entry }) => {
+              const isEditing = editingEntry === getEntryEditingKey(entry)
+              if (!isEditing && entry._id && !entry.isTemplate) {
+                navigate(`/answersheets/${entry._id}`)
+              }
+            }}
+            loading={loading}
+            loadingLabel="Loading answer sheets…"
+            empty={
+              error ? (
+                <EmptyState icon={AlertCircle} title="Answer sheets didn’t load" body={error} />
+              ) : (
+                <EmptyState
+                  icon={FileText}
+                  title="No answer sheets received yet"
+                  body="Each sheet type appears here once its serial range is recorded."
+                />
+              )
+            }
+          />
+        )
+      case 'used':
+        return (
+          <DataTable
+            caption="Answer sheets used per exam"
+            columns={usedColumns}
+            rows={usedRows}
+            getRowKey={(row) => row.datesheetEntry._id}
+            loading={loading}
+            loadingLabel="Loading exam schedule…"
+            empty={
+              <EmptyState
+                icon={CalendarDays}
+                title="No exam schedule found"
+                body="Usage is tracked per exam once the CBSE datesheet is imported and candidates have their subjects linked."
+              />
+            }
+          />
+        )
+      case 'balance':
+        return (
+          <DataTable
+            caption="Answer sheet balance"
+            columns={balanceColumns}
+            rows={balanceRows}
+            getRowKey={(row) => `${row.answerSheetType}-${row.classLabel}`}
+            loading={loading}
+            loadingLabel="Loading balance…"
+            empty={
+              <EmptyState
+                icon={Layers}
+                title="No sheets in balance"
+                body="Balance shows once received quantities are recorded."
+              />
+            }
+          />
+        )
+      case 'discarded':
+        return (
+          <DataTable
+            caption="Discarded answer sheets"
+            columns={discardedColumns}
+            rows={discardedRows}
+            getRowKey={(row) => row.key}
+            onRowClick={(row) => {
+              if (row.entry._id) navigate(`/answersheets/${row.entry._id}`)
+            }}
+            loading={loading}
+            loadingLabel="Loading discarded sheets…"
+            empty={<EmptyState icon={Trash2} title="No discarded sheets" body="Sheets taken out of stock are listed here." />}
+          />
+        )
+      default:
+        return (
+          <DataTable
+            caption="Answer sheet stock"
+            columns={stockColumns}
+            rows={getFilteredEntries().map((entry, index) => ({ entry, index }))}
+            getRowKey={({ entry, index }) => entry._id || `${getEntryEditingKey(entry)}-${index}`}
+            loading={loading}
+            empty={<EmptyState icon={FileText} title="No answer sheets found for this category" compact />}
+          />
+        )
+    }
+  }
+
+  const selectedLinkEntry = selectedDatesheetEntry
+    ? centreDatesheetEntries.find(e => e._id === selectedDatesheetEntry)
+    : undefined
+
+  const previewMeta = consolidatedPreviewEntry
+    ? `${consolidatedPreviewEntry.answerSheetType} · ${consolidatedPreviewEntry.pages} pages · ${consolidatedPreviewEntry.colour} · Class ${consolidatedPreviewEntry.class}`
+    : undefined
+
+  const formIsSupplementary = isSupplementaryEntry(formData.answerSheetType)
+
+  return (
+    <Page>
+      <Tabs
+        label="Answer sheet status"
+        items={tabItems}
+        value={activeTab}
+        onChange={(id) => setActiveTab(id as TabId)}
+      />
+
+      <Card flush title={cardCopy[activeTab].title} subtitle={cardCopy[activeTab].subtitle}>
+        <CardToolbar>
+          <FilterBar
+            filters={
+              <Select
+                size="sm"
+                className="cx-as-class"
+                aria-label="Class"
+                value={String(selectedClass)}
+                onChange={(e) => setSelectedClass(e.target.value)}
+                options={classOptions}
+              />
+            }
+            actions={
+              <form
+                className="cx-as-series"
+                onSubmit={(e) => {
+                  e.preventDefault()
+                  handleSaveSeries()
+                }}
+              >
+                <TextField
+                  size="sm"
+                  className="cx-as-series__field"
+                  prefix="Series"
+                  aria-label="Answer sheet series"
+                  placeholder="e.g. GGM - 31"
+                  value={seriesInput}
+                  onChange={(e) => setSeriesInput(e.target.value)}
+                  maxLength={50}
+                />
+                <Button type="submit" size="sm" loading={updateSeriesMutation.isPending}>
+                  Save series
+                </Button>
+              </form>
+            }
+          />
+        </CardToolbar>
+        {renderTable()}
+      </Card>
+
+      <Sheet
+        open={showConsolidatedPreview && Boolean(consolidatedPreviewUrl || consolidatedPreviewLoading || consolidatedPreviewError)}
+        onClose={closeConsolidatedPreview}
+        size="xl"
+        icon={FileText}
+        title="Consolidated answer-sheet record"
+        description={previewMeta}
+        footer={
+          <>
+            <Button onClick={closeConsolidatedPreview}>Close</Button>
+            {consolidatedPreviewUrl && consolidatedPreviewEntry ? (
+              <>
+                <Button icon={ExternalLink} onClick={() => window.open(consolidatedPreviewUrl, '_blank', 'noopener,noreferrer')}>
+                  Open in new tab
+                </Button>
+                <Button
+                  variant="primary"
+                  icon={Download}
+                  onClick={() => {
+                    const link = document.createElement('a')
+                    link.href = consolidatedPreviewUrl
+                    link.download = getConsolidatedRecordFilename(consolidatedPreviewEntry)
+                    link.click()
+                  }}
+                >
+                  Download PDF
+                </Button>
+              </>
+            ) : null}
+          </>
+        }
+      >
+        {consolidatedPreviewLoading ? (
+          <CardLoading label="Generating preview…" />
+        ) : consolidatedPreviewError ? (
+          <EmptyState icon={FileWarning} title="The preview couldn’t be generated" body={consolidatedPreviewError} />
+        ) : consolidatedPreviewUrl ? (
+          <PdfFrame src={consolidatedPreviewUrl} title="Consolidated answer sheet PDF preview" />
+        ) : null}
+      </Sheet>
+
+      <Sheet
+        open={showUploadModal}
+        onClose={closeUploadSheet}
+        icon={FileSpreadsheet}
+        title="Import answer sheets from Excel"
+        description="Fill the serial numbers in the template, then upload it here."
+        footer={
+          <>
+            <Button onClick={closeUploadSheet} disabled={loading}>
+              Cancel
+            </Button>
+            <Button variant="primary" onClick={handleUploadExcel} disabled={!uploadFile} loading={loading}>
+              Upload and import
+            </Button>
+          </>
+        }
+      >
+        <Banner tone="info" title="Before you upload">
+          <ol className="cx-as-steps">
+            <li>Download the template. Its file name carries a timestamp.</li>
+            <li>Open it in Excel and fill the From and To columns with serial numbers.</li>
+            <li>Save it under a new name, for example Filled_Answer_Sheets.xlsx.</li>
+            <li>Upload the saved file here.</li>
+          </ol>
+        </Banner>
+        <Banner tone="warning">The template starts empty. Rows without serial numbers are skipped.</Banner>
+        <div className="cb-form-section">
+          <span className="cb-form-section__title">Excel file</span>
+          <div className="cx-as-file">
+            <Button icon={Paperclip} onClick={() => fileInputRef.current?.click()}>
+              {uploadFile ? 'Choose another file' : 'Choose file'}
+            </Button>
+            <span className={uploadFile ? 'cb-strong' : 'cb-muted'}>
+              {uploadFile ? uploadFile.name : '.xlsx or .xls'}
+            </span>
           </div>
+          <input
+            ref={fileInputRef}
+            id="answer-sheet-excel-upload"
+            type="file"
+            accept=".xlsx,.xls"
+            onChange={handleFileSelect}
+            aria-label="Select Excel file (.xlsx or .xls) to upload"
+            hidden
+          />
         </div>
-      )}
-    </div>
+      </Sheet>
+
+      <Sheet
+        open={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        icon={FileText}
+        title="Add received answer sheets"
+        description="Record a sheet type and the serial range the centre received."
+        onSubmit={(event) => {
+          event.preventDefault()
+          void handleAddQuantity()
+        }}
+        footer={
+          <>
+            <Button onClick={() => setShowAddModal(false)}>Cancel</Button>
+            <Button type="submit" variant="primary" loading={createMutation.isPending}>
+              Add sheets
+            </Button>
+          </>
+        }
+      >
+        <div className="cb-form-grid">
+          <Select
+            label="Answer sheet type"
+            required
+            placeholder="Select type"
+            value={formData.answerSheetType}
+            onChange={(e) => {
+              const nextType = e.target.value
+              setFormData((current) => ({
+                ...current,
+                answerSheetType: nextType,
+                serialRanges: isSupplementaryEntry(nextType)
+                  ? current.serialRanges
+                  : [current.serialRanges[0] || createEmptySerialRange()],
+              }))
+            }}
+            options={['Main', 'Graph', 'Supplementary', 'For Blind', 'Drawing Sheets']}
+          />
+          <TextField
+            label="Pages"
+            required
+            type="number"
+            inputMode="numeric"
+            placeholder="e.g. 32"
+            value={formData.pages}
+            onChange={(e) => setFormData({ ...formData, pages: e.target.value })}
+          />
+          <Select
+            label="Colour"
+            required
+            placeholder="Select colour"
+            value={formData.colour}
+            onChange={(e) => setFormData({ ...formData, colour: e.target.value })}
+            options={['Red', 'Blue', 'Yellow', 'Pink', 'White']}
+          />
+          <TextField
+            label="Class"
+            required
+            placeholder="e.g. 10, 12, 10/12"
+            value={formData.class}
+            onChange={(e) => setFormData({ ...formData, class: e.target.value })}
+          />
+        </div>
+
+        <div className="cb-form-section">
+          <span className="cb-form-section__title">{formIsSupplementary ? 'Serial number ranges' : 'Serial number range'}</span>
+          <p className="cb-muted cx-as-hint">
+            Leading zeros are kept, so 001001 and A001001 both work. Supplementary bundles can take several ranges.
+          </p>
+          {formData.serialRanges.map((range, rangeIndex) => (
+            <div key={`form-range-${rangeIndex}`} className="cx-as-range">
+              <TextField
+                label={`From${formData.serialRanges.length > 1 ? ` (range ${rangeIndex + 1})` : ''}`}
+                required
+                placeholder={`From ${rangeIndex + 1}`}
+                title="Supports: 1001, 001001, A1001, A001001 (leading zeros preserved)"
+                value={range.serialFrom}
+                onChange={(e) => updateFormSerialRange(rangeIndex, 'serialFrom', e.target.value)}
+              />
+              <TextField
+                label={`To${formData.serialRanges.length > 1 ? ` (range ${rangeIndex + 1})` : ''}`}
+                required
+                placeholder={`To ${rangeIndex + 1}`}
+                title="Supports: 2000, 002000, A2000, A002000 (leading zeros preserved)"
+                value={range.serialTo}
+                onChange={(e) => updateFormSerialRange(rangeIndex, 'serialTo', e.target.value)}
+              />
+              {formIsSupplementary ? (
+                <Button
+                  variant="tertiary"
+                  icon={X}
+                  aria-label={`Remove range ${rangeIndex + 1}`}
+                  onClick={() => removeFormSerialRange(rangeIndex)}
+                  disabled={formData.serialRanges.length === 1}
+                />
+              ) : null}
+            </div>
+          ))}
+          {formIsSupplementary ? (
+            <div>
+              <Button size="sm" icon={Plus} onClick={addFormSerialRange}>
+                Add range
+              </Button>
+            </div>
+          ) : null}
+        </div>
+
+        <div className="cb-form-grid">
+          <TextField
+            label="Exam"
+            hint="Optional"
+            placeholder="e.g. Term 1"
+            value={formData.exam}
+            onChange={(e) => setFormData({ ...formData, exam: e.target.value })}
+          />
+          <TextField
+            label="Subject"
+            hint="Optional"
+            placeholder="e.g. Mathematics"
+            value={formData.subject}
+            onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
+          />
+        </div>
+      </Sheet>
+
+      <Dialog
+        open={showLinkModal}
+        onClose={closeLinkDialog}
+        title="Link sheets to an exam"
+        description="Pick the exam these sheets are used for, so usage is tracked per subject and date."
+        footer={
+          <>
+            <Button onClick={closeLinkDialog} disabled={loading}>
+              Cancel
+            </Button>
+            <Button variant="primary" icon={Link2} onClick={handleConfirmUseSheets} loading={loading}>
+              Mark as used
+            </Button>
+          </>
+        }
+      >
+        <Select
+          label="Exam"
+          hint="Optional. Leave it on skip to mark the sheets as used without exam details."
+          placeholder="Skip linking"
+          value={selectedDatesheetEntry}
+          onChange={(e) => setSelectedDatesheetEntry(e.target.value)}
+          options={centreDatesheetEntries.map((entry) => ({
+            value: entry._id,
+            label: `${formatShortDate(entry.examDate)} · ${entry.dayName} · Class ${entry.class} · ${entry.subjectCode} ${entry.subjectName} (${entry.candidateCount} candidates)`,
+          }))}
+        />
+        {selectedLinkEntry ? (
+          <DetailList
+            columns={2}
+            items={[
+              { label: 'Date', value: `${formatShortDate(selectedLinkEntry.examDate)} (${selectedLinkEntry.dayName})` },
+              { label: 'Class', value: selectedLinkEntry.class },
+              { label: 'Subject', value: `${selectedLinkEntry.subjectCode} · ${selectedLinkEntry.subjectName}`, wide: true },
+              { label: 'Time', value: `${formatTime(selectedLinkEntry.timeSlot.start)} – ${formatTime(selectedLinkEntry.timeSlot.end)}` },
+              { label: 'Candidates', value: selectedLinkEntry.candidateCount },
+              { label: 'Rooms needed', value: selectedLinkEntry.roomsNeeded },
+            ]}
+          />
+        ) : null}
+      </Dialog>
+    </Page>
   )
 }
 

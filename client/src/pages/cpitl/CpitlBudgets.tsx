@@ -1,10 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
-import { Copy, Save } from 'lucide-react'
+import { CalendarClock, Copy, Save, Target, TrendingUp, Wallet } from 'lucide-react'
 import { useBudgets, useInvalidateCpitl } from '@/hooks/useCpitl'
 import cpitlService, { BudgetRow, ExpenseKind } from '@/services/cpitlService'
+import { Badge, Button, Card, DataTable, Dialog, Page, StatCard, TextField, cx, type DataTableColumn } from '@/components/ui'
 import { CategoryIcon } from '@/components/cpitl/IconPicker'
-import { CpitlCard, CpitlPageShell, Field, UsageBar, btnPrimary, btnSecondary, errorMessage, inputClass, inr, tableHead } from '@/components/cpitl/CpitlUi'
+import { UsageBar, errorMessage, inr, inrShort } from '@/components/cpitl/CpitlUi'
+import '@/components/cpitl/expenses.css'
 
 const GROUPS: Array<{ kind: ExpenseKind; title: string; hint: string }> = [
   { kind: 'salary', title: 'Salary', hint: 'Net pay plus employer PF and ESI' },
@@ -14,19 +16,34 @@ const GROUPS: Array<{ kind: ExpenseKind; title: string; hint: string }> = [
   { kind: 'infra', title: 'Infrastructure', hint: 'Development works this session' },
 ]
 
+const keyOf = (r: BudgetRow) => `${r.kind}:${r.targetKey}`
+
 const CpitlBudgets: React.FC = () => {
   const [growthPct, setGrowthPct] = useState(8)
   const { data, isLoading } = useBudgets(growthPct)
   const invalidate = useInvalidateCpitl()
   const [edits, setEdits] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
+  const [confirmCopy, setConfirmCopy] = useState(false)
+  const [copying, setCopying] = useState(false)
 
   useEffect(() => setEdits({}), [data])
 
   const rows = useMemo(() => data?.rows || [], [data])
-  const keyOf = (r: BudgetRow) => `${r.kind}:${r.targetKey}`
   const valueOf = (r: BudgetRow) => (edits[keyOf(r)] !== undefined ? edits[keyOf(r)] : r.budget ? String(r.budget) : '')
-  const dirty = Object.keys(edits).length > 0
+  const dirtyCount = Object.keys(edits).length
+  const dirty = dirtyCount > 0
+
+  const totals = useMemo(() => {
+    const all = rows.filter((r) => r.targetKey === 'all')
+    return {
+      budget: all.reduce((s, r) => s + (r.budget || 0), 0),
+      actual: all.reduce((s, r) => s + (r.actual || 0), 0),
+      projected: all.reduce((s, r) => s + (r.projectedYearEnd || 0), 0),
+      nextYear: all.reduce((s, r) => s + (r.nextYear || 0), 0),
+    }
+  }, [rows])
+  const usedPct = totals.budget > 0 ? (totals.actual / totals.budget) * 100 : null
 
   const save = async () => {
     setSaving(true)
@@ -45,116 +62,188 @@ const CpitlBudgets: React.FC = () => {
   }
 
   const copyFromActuals = async () => {
-    if (!window.confirm(`Set every budget from last session's actual spend + ${growthPct}%? Existing budgets will be overwritten.`)) return
+    setCopying(true)
     try {
       const res = await cpitlService.copyBudgetsFromActuals(growthPct)
       toast.success(res?.message || 'Budgets updated.')
+      setConfirmCopy(false)
       invalidate()
     } catch (error) {
       toast.error(await errorMessage(error))
+    } finally {
+      setCopying(false)
     }
   }
 
+  const columnsFor = (groupTitle: string): DataTableColumn<BudgetRow>[] => [
+    {
+      key: 'head',
+      header: 'Budget head',
+      mobile: 'title',
+      render: (r) =>
+        r.targetKey === 'all' ? (
+          <span className="ce-total-label">
+            {groupTitle} total
+            <Badge tone="neutral" dot={false}>
+              Total
+            </Badge>
+          </span>
+        ) : (
+          <span className="ce-inline">
+            {r.icon ? <CategoryIcon icon={r.icon} color={r.color} size="sm" /> : null}
+            <span>{r.targetLabel}</span>
+          </span>
+        ),
+    },
+    {
+      key: 'budget',
+      header: 'Session budget',
+      headerLabel: 'Session budget',
+      interactive: true,
+      render: (r) => (
+        <TextField
+          className="ce-budget-input"
+          size="sm"
+          type="number"
+          inputMode="decimal"
+          min={0}
+          prefix="₹"
+          aria-label={`Budget for ${r.targetKey === 'all' ? `${groupTitle} total` : r.targetLabel}`}
+          value={valueOf(r)}
+          placeholder="0"
+          onChange={(e) => setEdits((prev) => ({ ...prev, [keyOf(r)]: e.target.value }))}
+        />
+      ),
+    },
+    { key: 'actual', header: 'Spent', align: 'right', numeric: true, mobile: 'aside', render: (r) => inr(r.actual) },
+    {
+      key: 'used',
+      header: 'Used',
+      headerLabel: 'Used',
+      render: (r) => {
+        const budget = Number(valueOf(r)) || 0
+        const pct = budget > 0 ? (r.actual / budget) * 100 : null
+        if (pct === null) return <span className="cb-subtle">No budget</span>
+        return (
+          <div className="ce-used">
+            <UsageBar pct={pct} />
+            <span className={cx('ce-used__pct', pct > 100 && 'is-over')}>{pct > 100 ? `Over · ${Math.round(pct)}%` : `${Math.round(pct)}%`}</span>
+          </div>
+        )
+      },
+    },
+    {
+      key: 'projected',
+      header: 'Year-end estimate',
+      headerLabel: 'Year-end estimate',
+      align: 'right',
+      numeric: true,
+      render: (r) => (
+        <span className="ce-stack-num">
+          {inr(r.projectedYearEnd)}
+          {r.monthsRecorded ? <small>from {r.monthsRecorded} mo of data</small> : null}
+        </span>
+      ),
+    },
+    { key: 'next', header: 'Next year', align: 'right', numeric: true, render: (r) => <span className="cb-strong">{inr(r.nextYear)}</span> },
+  ]
+
   return (
-    <CpitlPageShell
-      title="Budgets"
-      subtitle={`Session budget vs actual spend${data ? ` · ${data.meta.monthsElapsed} of 12 months elapsed` : ''}`}
-      actions={
-        <>
-          <button type="button" className={btnSecondary} onClick={copyFromActuals}>
-            <Copy className="h-4 w-4" /> Copy last session + {growthPct}%
-          </button>
-          <button type="button" className={btnPrimary} disabled={!dirty || saving} onClick={save}>
-            <Save className="h-4 w-4" /> {saving ? 'Saving…' : 'Save budgets'}
-          </button>
-        </>
-      }
-    >
-      <CpitlCard>
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <p className="max-w-2xl text-sm text-slate-500">
-            “Year-end estimate” scales each head's spend to 12 months, counting from when it was first recorded this session. “Next year” adds the expected increase, which is useful when preparing next
-            session's budget.
-          </p>
-          <Field label="Expected increase next year (%)" className="w-56">
-            <input type="number" className={inputClass} value={growthPct} onChange={(e) => setGrowthPct(Number(e.target.value) || 0)} />
-          </Field>
+    <Page>
+      <div className="ce-toolbar">
+        <p className="ce-toolbar__lede">
+          Session budget vs actual spend{data ? ` · ${data.meta.monthsElapsed} of 12 months elapsed` : ''}
+        </p>
+        <div className="ce-toolbar__actions">
+          {dirty ? (
+            <span className="ce-dirty" role="status">
+              {dirtyCount} unsaved change{dirtyCount === 1 ? '' : 's'}
+            </span>
+          ) : null}
+          <Button icon={Copy} onClick={() => setConfirmCopy(true)}>
+            Copy last session + {growthPct}%
+          </Button>
+          <Button variant="primary" icon={Save} disabled={!dirty} loading={saving} onClick={() => void save()}>
+            Save budgets
+          </Button>
         </div>
-      </CpitlCard>
+      </div>
+
+      <div className="cb-stats">
+        <StatCard
+          label="Session budget"
+          value={totals.budget ? inrShort(totals.budget) : '—'}
+          icon={Target}
+          hint={totals.budget ? undefined : 'No budgets set yet'}
+        />
+        <StatCard
+          label="Spent so far"
+          value={inrShort(totals.actual)}
+          icon={Wallet}
+          hint={usedPct !== null ? (usedPct > 100 ? `Over budget · ${Math.round(usedPct)}%` : `${Math.round(usedPct)}% of budget`) : undefined}
+          progress={usedPct !== null ? Math.min(100, usedPct) : undefined}
+          progressTone={usedPct !== null && usedPct > 100 ? 'danger' : usedPct !== null && usedPct >= 85 ? 'warning' : 'success'}
+        />
+        <StatCard label="Year-end estimate" value={inrShort(totals.projected)} icon={CalendarClock} />
+        <StatCard label="Next year" value={inrShort(totals.nextYear)} icon={TrendingUp} hint={`With ${growthPct}% increase`} />
+      </div>
+
+      <Card>
+        <div className="ce-intro">
+          <p className="ce-intro__text">
+            “Year-end estimate” scales each head’s spend to 12 months, counting from when it was first recorded this session. “Next year” adds the expected increase,
+            which helps when preparing next session’s budget.
+          </p>
+          <TextField
+            className="ce-intro__field"
+            label="Expected increase next year"
+            type="number"
+            inputMode="decimal"
+            suffix="%"
+            value={growthPct}
+            onChange={(e) => setGrowthPct(Number(e.target.value) || 0)}
+          />
+        </div>
+      </Card>
 
       {isLoading ? (
-        <div className="h-72 animate-pulse rounded-2xl bg-slate-100 dark:bg-slate-800" />
+        <Card>
+          <div className="cb-table-state" role="status">
+            <span className="cb-spinner" aria-hidden="true" />
+            Loading budgets…
+          </div>
+        </Card>
       ) : (
         GROUPS.map((g) => {
           const groupRows = rows.filter((r) => r.kind === g.kind)
           if (!groupRows.length) return null
           return (
-            <CpitlCard key={g.kind} title={g.title} actions={<span className="text-xs text-slate-400">{g.hint}</span>}>
-              <div className="-mx-5 overflow-x-auto">
-                <table className="min-w-full text-sm">
-                  <thead className={tableHead}>
-                    <tr>
-                      <th className="px-5 py-2.5">Budget head</th>
-                      <th className="w-44 px-3 py-2.5">Session budget</th>
-                      <th className="px-3 py-2.5 text-right">Spent</th>
-                      <th className="w-48 px-3 py-2.5">Used</th>
-                      <th className="px-3 py-2.5 text-right">Year-end estimate</th>
-                      <th className="px-5 py-2.5 text-right">Next year</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-                    {groupRows.map((r) => {
-                      const budget = Number(valueOf(r)) || 0
-                      const pct = budget > 0 ? (r.actual / budget) * 100 : null
-                      return (
-                        <tr key={keyOf(r)} className={r.targetKey === 'all' ? 'bg-slate-50/60 font-medium dark:bg-slate-900/20' : ''}>
-                          <td className="px-5 py-2">
-                            <div className="flex items-center gap-2">
-                              {r.icon ? <CategoryIcon icon={r.icon} color={r.color} size="sm" /> : null}
-                              <span className="text-slate-800 dark:text-slate-100">{r.targetKey === 'all' ? `${g.title} — total` : r.targetLabel}</span>
-                            </div>
-                          </td>
-                          <td className="px-3 py-2">
-                            <div className="relative">
-                              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">₹</span>
-                              <input
-                                type="number"
-                                min={0}
-                                aria-label={`Budget for ${r.targetLabel}`}
-                                className={`${inputClass} mt-0 pl-7 tabular-nums`}
-                                value={valueOf(r)}
-                                placeholder="0"
-                                onChange={(e) => setEdits((prev) => ({ ...prev, [keyOf(r)]: e.target.value }))}
-                              />
-                            </div>
-                          </td>
-                          <td className="px-3 py-2 text-right tabular-nums">{inr(r.actual)}</td>
-                          <td className="px-3 py-2">
-                            {pct !== null ? (
-                              <div className="flex items-center gap-2">
-                                <UsageBar pct={pct} />
-                                <span className={`w-12 text-right text-xs tabular-nums ${pct > 100 ? 'font-semibold text-rose-600' : 'text-slate-500'}`}>{Math.round(pct)}%</span>
-                              </div>
-                            ) : (
-                              <span className="text-xs text-slate-400">—</span>
-                            )}
-                          </td>
-                          <td className="px-3 py-2 text-right tabular-nums text-slate-600 dark:text-slate-300">
-                            {inr(r.projectedYearEnd)}
-                            {r.monthsRecorded ? <div className="text-[10px] text-slate-400">from {r.monthsRecorded} mo of data</div> : null}
-                          </td>
-                          <td className="px-5 py-2 text-right tabular-nums text-slate-900 dark:text-white">{inr(r.nextYear)}</td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </CpitlCard>
+            <Card key={g.kind} flush title={g.title} subtitle={g.hint} className="ce-records">
+              <DataTable caption={`${g.title} budgets`} columns={columnsFor(g.title)} rows={groupRows} getRowKey={keyOf} />
+            </Card>
           )
         })
       )}
-    </CpitlPageShell>
+
+      <Dialog
+        open={confirmCopy}
+        onClose={() => !copying && setConfirmCopy(false)}
+        tone="danger"
+        size="sm"
+        title="Overwrite budgets from last session?"
+        description={`Every budget is set from last session’s actual spend plus ${growthPct}%. Existing budgets are overwritten.`}
+        footer={
+          <>
+            <Button onClick={() => setConfirmCopy(false)} disabled={copying}>
+              Cancel
+            </Button>
+            <Button variant="danger" icon={Copy} loading={copying} onClick={() => void copyFromActuals()}>
+              Overwrite budgets
+            </Button>
+          </>
+        }
+      />
+    </Page>
   )
 }
 

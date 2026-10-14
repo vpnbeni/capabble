@@ -1,10 +1,12 @@
-import React, { useRef, useState } from 'react'
+import React, { useId, useRef, useState } from 'react'
 import toast from 'react-hot-toast'
 import { FileText, Paperclip, X } from 'lucide-react'
 import cpitlService, { Attachment } from '@/services/cpitlService'
+import { Button, Icon } from '@/components/ui'
 import { errorMessage } from './CpitlUi'
+import './expenses.css'
 
-/** Upload bill/receipt photos or PDFs; keeps the list of uploaded attachments. */
+/** Upload bill/receipt photos or PDFs; keeps the list of uploaded attachments. Renders inside `.cb-app`. */
 const AttachmentInput: React.FC<{ value: Attachment[]; onChange: (next: Attachment[]) => void; label?: string }> = ({
   value,
   onChange,
@@ -12,6 +14,7 @@ const AttachmentInput: React.FC<{ value: Attachment[]; onChange: (next: Attachme
 }) => {
   const inputRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
+  const id = useId()
 
   const pick = async (files: FileList | null) => {
     if (!files?.length) return
@@ -35,38 +38,43 @@ const AttachmentInput: React.FC<{ value: Attachment[]; onChange: (next: Attachme
   }
 
   return (
-    <div>
-      <div className="flex flex-wrap items-center gap-2">
+    <div className="ce-attach">
+      <div className="ce-attach__list">
         {value.map((a, i) => (
-          <span key={a._id || a.url} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 py-1 pl-1 pr-2 text-xs dark:border-slate-600 dark:bg-slate-700">
+          <span key={a._id || a.url} className="ce-attach__chip">
             {a.mimeType?.startsWith('image/') ? (
-              <img src={a.url} alt="" className="h-7 w-7 rounded object-cover" />
+              <img src={a.url} alt="" className="ce-attach__thumb" />
             ) : (
-              <FileText className="h-4 w-4 text-slate-500" />
+              <Icon icon={FileText} size={16} className="ce-attach__file" />
             )}
-            <a href={a.url} target="_blank" rel="noreferrer" className="max-w-[140px] truncate text-slate-700 hover:underline dark:text-slate-200">
+            <a href={a.url} target="_blank" rel="noreferrer" className="ce-attach__name" title={a.name}>
               {a.name}
             </a>
-            <button type="button" aria-label="Remove attachment" className="text-slate-400 hover:text-rose-600" onClick={() => onChange(value.filter((_, idx) => idx !== i))}>
-              <X className="h-3.5 w-3.5" />
+            <button
+              type="button"
+              aria-label={`Remove ${a.name}`}
+              className="ce-attach__remove"
+              onClick={() => onChange(value.filter((_, idx) => idx !== i))}
+            >
+              <Icon icon={X} size={14} />
             </button>
           </span>
         ))}
-        <button
-          type="button"
-          disabled={uploading}
-          onClick={() => inputRef.current?.click()}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600 hover:border-indigo-400 hover:text-indigo-600 disabled:opacity-60 dark:border-slate-600 dark:text-slate-300"
-        >
-          <Paperclip className="h-3.5 w-3.5" /> {uploading ? 'Uploading…' : label}
-        </button>
+        <Button size="sm" icon={Paperclip} loading={uploading} onClick={() => inputRef.current?.click()} aria-describedby={`${id}-hint`}>
+          {uploading ? 'Uploading…' : label}
+        </Button>
       </div>
+      <span id={`${id}-hint`} className="ce-hint">
+        Photos or PDFs, up to 10 MB each.
+      </span>
       <input
         ref={inputRef}
         type="file"
         accept="image/*,application/pdf"
         multiple
-        className="hidden"
+        className="ce-file-input"
+        tabIndex={-1}
+        aria-hidden="true"
         onChange={(e) => pick(e.target.files)}
       />
     </div>

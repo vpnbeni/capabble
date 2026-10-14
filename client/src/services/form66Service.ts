@@ -30,19 +30,20 @@ const getRecords = async (): Promise<Form66Record[]> => {
   return Array.isArray(body) ? body : []
 }
 
-const getProcessedPdfUrl = async (classValue: Form66Class): Promise<string | null> => {
-  const response = await api.get('/form66/processed-pdf', {
-    params: { class: classValue },
-  })
-  return response?.data?.url || null
+// A class with no uploaded file answers 404: that's "no file yet", not an error to toast.
+const getFileUrl = async (path: string, classValue: Form66Class): Promise<string | null> => {
+  try {
+    const response = await api.get(path, { params: { class: classValue }, _silent: true } as any)
+    return response?.data?.url || null
+  } catch (error: any) {
+    if (error?.response?.status === 404) return null
+    throw error
+  }
 }
 
-const getOriginalFileUrl = async (classValue: Form66Class): Promise<string | null> => {
-  const response = await api.get('/form66/original-file', {
-    params: { class: classValue },
-  })
-  return response?.data?.url || null
-}
+const getProcessedPdfUrl = (classValue: Form66Class) => getFileUrl('/form66/processed-pdf', classValue)
+
+const getOriginalFileUrl = (classValue: Form66Class) => getFileUrl('/form66/original-file', classValue)
 
 const upload = async (file: File): Promise<Form66UploadResponse> => {
   const formData = new FormData()

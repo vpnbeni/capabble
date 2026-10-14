@@ -1,0 +1,106 @@
+/* Exam duty assignment (CNTR + EXMCL Duties page). Tokens only; everything sits inside .cb-app. */
+
+/* Functionary × exam-date register: two sticky header rows, the first four columns pinned on the left. */
+.cb-app .cx-duty-matrix { overflow: auto; max-height: 70vh; border-top: 1px solid var(--border); }
+.cb-app .cx-duty-matrix table { border-collapse: separate; border-spacing: 0; min-width: 100%; font-size: 13px; line-height: 18px; }
+.cb-app .cx-duty-matrix th,
+.cb-app .cx-duty-matrix td {
+  height: 40px;
+  padding: 0 var(--space-3);
+  border-bottom: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--ink);
+  text-align: center;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.cb-app .cx-duty-matrix thead th { position: sticky; z-index: 2; background: var(--surface-sunken); font: 500 12px/16px var(--font-sans); color: var(--ink-muted); }
+.cb-app .cx-duty-matrix thead tr:first-child th { top: 0; }
+.cb-app .cx-duty-matrix thead tr + tr th { top: 41px; height: 32px; }
+.cb-app .cx-duty-matrix tbody tr:hover > * { background: var(--surface-hover); }
+.cb-app .cx-duty-matrix .cb-check { justify-content: center; }
+
+.cb-app .cx-duty-matrix .is-pin { position: sticky; z-index: 1; }
+.cb-app .cx-duty-matrix thead .is-pin { z-index: 3; }
+.cb-app .cx-duty-matrix .is-pin-1 { left: 0; width: 56px; min-width: 56px; }
+.cb-app .cx-duty-matrix .is-pin-2 { left: 56px; width: 208px; min-width: 208px; max-width: 208px; text-align: left; overflow: hidden; text-overflow: ellipsis; }
+.cb-app .cx-duty-matrix .is-pin-3 { left: 264px; width: 80px; min-width: 80px; }
+.cb-app .cx-duty-matrix .is-pin-4 { left: 344px; width: 112px; min-width: 112px; text-align: left; border-right-color: var(--border-strong); }
+.cb-app .cx-duty-matrix .is-pin-12 { left: 0; text-align: left; }
+.cb-app .cx-duty-matrix .is-pin-34 { left: 264px; border-right-color: var(--border-strong); }
+.cb-app .cx-duty-matrix tbody .is-pin-2 { font-weight: 500; }
+
+.cb-app .cx-duty-matrix__sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.cb-app .cx-duty-matrix__sort:hover { color: var(--ink); }
+.cb-app .cx-duty-matrix__sort:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; border-radius: var(--radius-sm); }
+
+/* Assigned / required counts: short = danger, met = success, over = warning. */
+.cb-app .cx-duty-count { font-weight: 600; font-variant-numeric: tabular-nums; color: var(--ink); }
+.cb-app .cx-duty-count.is-short { color: var(--danger-ink); }
+.cb-app .cx-duty-count.is-met { color: var(--success-ink); }
+.cb-app .cx-duty-count.is-over { color: var(--warning-ink); }
+
+@media (max-width: 640px) {
+  .cb-app .cx-duty-matrix .is-pin-1 { width: 40px; min-width: 40px; }
+  .cb-app .cx-duty-matrix .is-pin-2 { left: 40px; width: 140px; min-width: 140px; max-width: 140px; }
+  .cb-app .cx-duty-matrix .is-pin-3,
+  .cb-app .cx-duty-matrix .is-pin-4,
+  .cb-app .cx-duty-matrix .is-pin-34 { position: static; }
+}
+
+/* Exam-date stepper in the room assignment toolbar. */
+.cb-app .cx-duty-date { display: inline-flex; align-items: center; gap: var(--space-1); }
+.cb-app .cx-duty-date__label { min-width: 72px; text-align: center; font: 600 13px/18px var(--font-sans); color: var(--ink); font-variant-numeric: tabular-nums; }
+.cb-app .cx-duty-banner { padding: 0 var(--space-5) var(--space-4); }
+@media (max-width: 640px) { .cb-app .cx-duty-banner { padding: 0 var(--space-4) var(--space-3); } }
+
+/* Duty record layout: a print mock-up on paper, with draggable column edges. */
+.cb-app .cx-duty-record { align-self: stretch; min-width: 960px; }
+.cb-app .cx-duty-sheet { font-size: 11px; line-height: 15px; }
+.cb-app .cx-duty-sheet__row { display: flex; justify-content: space-between; gap: var(--space-4); font-weight: 600; margin-bottom: var(--space-1); }
+.cb-app .cx-duty-sheet__title { text-align: center; font-size: 12px; font-weight: 600; margin-bottom: var(--space-2); }
+.cb-app .cx-duty-sheet table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 10px; }
+.cb-app .cx-duty-sheet th,
+.cb-app .cx-duty-sheet td { border: 1px solid currentColor; padding: 2px 4px; overflow: hidden; }
+.cb-app .cx-duty-sheet th { position: relative; font-weight: 600; text-align: center; }
+.cb-app .cx-duty-sheet td.is-center { text-align: center; }
+.cb-app .cx-duty-sheet__grip { position: absolute; top: 0; right: 0; width: 8px; height: 100%; cursor: col-resize; }
+.cb-app .cx-duty-sheet__grip:hover { background: var(--accent-soft); }
+.cb-app .cx-duty-sheet__foot { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-6); margin-top: var(--space-4); font-size: 10px; }
+.cb-app .cx-duty-sheet__foot strong { display: block; margin-bottom: var(--space-2); }
+.cb-app .cx-duty-sheet__foot p { margin: 0 0 var(--space-2); }
+.cb-app .cx-duty-sheet__sign { margin-top: var(--space-5); text-align: right; font-weight: 600; }
+
+/* PDF preview pages on the paper stage. */
+.cb-app .cx-duty-pdf .react-pdf__Page { overflow: hidden; border: 1px solid var(--border); box-shadow: var(--shadow-xs); }
+
+/* Auto-assignment conflicts dialog: compact table with expandable room reasons. */
+.cb-app .cx-duty-conflicts { width: 100%; border-collapse: collapse; font-size: 13px; line-height: 18px; }
+.cb-app .cx-duty-conflicts th { padding: var(--space-2); text-align: left; font: 500 12px/16px var(--font-sans); color: var(--ink-muted); border-bottom: 1px solid var(--border); }
+.cb-app .cx-duty-conflicts td { padding: var(--space-2); border-bottom: 1px solid var(--border); color: var(--ink); vertical-align: middle; }
+.cb-app .cx-duty-conflicts .is-num { font-variant-numeric: tabular-nums; }
+.cb-app .cx-duty-conflicts .is-end { text-align: right; }
+.cb-app .cx-duty-conflicts tr.is-expandable { cursor: pointer; }
+.cb-app .cx-duty-conflicts tr.is-expandable:hover > td,
+.cb-app .cx-duty-conflicts tr.is-open > td { background: var(--surface-hover); }
+.cb-app .cx-duty-conflicts td.cx-duty-conflicts__detail { background: var(--surface-sunken); }
+.cb-app .cx-duty-reasons { display: flex; flex-direction: column; gap: var(--space-2); }
+.cb-app .cx-duty-reasons__room { display: flex; align-items: flex-start; gap: var(--space-2); }
+.cb-app .cx-duty-reasons__room > span:first-child { flex: none; min-width: 64px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.cb-app .cx-duty-reasons__list { display: flex; flex-wrap: wrap; gap: var(--space-1); }
+.cb-app .cx-duty-scroll { max-height: 50vh; overflow: auto; }
+
+/* Duty-type tabs sit edge to edge under the flush card head. */
+.cb-app .cx-duty-tabs { padding: 0 var(--space-5); }
+@media (max-width: 640px) { .cb-app .cx-duty-tabs { padding: 0 var(--space-4); } }

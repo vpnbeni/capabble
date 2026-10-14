@@ -1,10 +1,20 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
-import { ImagePlus, Pencil, Search, Trash2 } from 'lucide-react'
+import { ImagePlus, Pencil, Plus, SearchX, Shapes, Trash2 } from 'lucide-react'
 import api from '@/services/api'
-import { ImageCropModal } from '@/components/common/ImageCropModal'
-import { ClubEditModal, type ClubEditRecord } from '@/components/actvt/ClubEditModal'
+import {
+  ClubColorField,
+  ClubEditModal,
+  ClubLogoCropper,
+  ClubLogoTile,
+  DEFAULT_CLUB_COLOR,
+  type ClubEditRecord,
+} from '@/components/actvt/ClubEditModal'
+import { Badge, Button, Card, Dialog, EmptyState, FilterBar, Page, Sheet, TextField } from '@/components/ui'
+import { isLikelyColor, toneStyle } from '@/components/actvt/entityTone'
+import '@/components/actvt/actvt.css'
+import '@/components/actvt/clubs.css'
 
 type ClubRecord = ClubEditRecord
 
@@ -15,51 +25,19 @@ type ClubFormState = {
 
 const emptyForm = (): ClubFormState => ({
   name: '',
-  color: '#4f46e5',
+  color: DEFAULT_CLUB_COLOR,
 })
-
-const initialsOf = (name = '') => {
-  const parts = String(name).trim().split(/\s+/).filter(Boolean)
-  if (parts.length === 0) return 'C'
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
-  return `${parts[0][0] || ''}${parts[1][0] || ''}`.toUpperCase()
-}
-
-const isLikelyColor = (value = '') => /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(value.trim())
-
-const ClubLogoBadge = ({
-  logo,
-  name,
-  tone,
-}: {
-  logo?: string
-  name?: string
-  tone: string
-}) => (
-  <div className="flex aspect-square w-full items-center justify-center rounded-2xl border-4 border-white bg-white p-2 shadow-md">
-    {logo ? (
-      <img
-        src={logo}
-        alt={name || 'Club logo'}
-        className="h-full w-full rounded-xl object-contain"
-      />
-    ) : (
-      <div
-        className="flex h-full w-full items-center justify-center rounded-xl text-lg font-bold text-white"
-        style={{ backgroundColor: isLikelyColor(tone) ? tone : '#312e81' }}
-      >
-        {initialsOf(name)}
-      </div>
-    )}
-  </div>
-)
 
 const ActvtClubs: React.FC = () => {
   const navigate = useNavigate()
   const [records, setRecords] = useState<ClubRecord[]>([])
   const [form, setForm] = useState<ClubFormState>(emptyForm)
+  const [addOpen, setAddOpen] = useState(false)
   const [editingClub, setEditingClub] = useState<ClubRecord | null>(null)
+  const [removing, setRemoving] = useState<ClubRecord | null>(null)
+  const [removeBusy, setRemoveBusy] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [loaded, setLoaded] = useState(false)
   const [saving, setSaving] = useState(false)
   const [query, setQuery] = useState('')
   const [logoFile, setLogoFile] = useState<File | null>(null)
@@ -77,6 +55,7 @@ const ActvtClubs: React.FC = () => {
       toast.error(String(error?.response?.data?.message || error?.message || 'Failed to load clubs.'))
     } finally {
       setLoading(false)
+      setLoaded(true)
     }
   }
 
@@ -88,11 +67,14 @@ const ActvtClubs: React.FC = () => {
     cropSourceRef.current = cropSource
   }, [cropSource])
 
-  useEffect(() => () => {
-    if (cropSourceRef.current.startsWith('blob:')) {
-      URL.revokeObjectURL(cropSourceRef.current)
-    }
-  }, [])
+  useEffect(
+    () => () => {
+      if (cropSourceRef.current.startsWith('blob:')) {
+        URL.revokeObjectURL(cropSourceRef.current)
+      }
+    },
+    []
+  )
 
   const visible = useMemo(() => {
     const needle = query.trim().toLowerCase()
@@ -109,13 +91,17 @@ const ActvtClubs: React.FC = () => {
     setCropSource('')
   }
 
-  const resetForm = () => {
+  const clearLogo = () => {
     if (logoPreview.startsWith('blob:')) URL.revokeObjectURL(logoPreview)
-    setForm(emptyForm())
     setLogoFile(null)
     setLogoPreview('')
-    clearCropSource()
     if (logoInputRef.current) logoInputRef.current.value = ''
+  }
+
+  const resetForm = () => {
+    setForm(emptyForm())
+    clearLogo()
+    clearCropSource()
   }
 
   const handleLogoSelected = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -145,6 +131,11 @@ const ActvtClubs: React.FC = () => {
     if (logoInputRef.current) logoInputRef.current.value = ''
   }
 
+  const closeAdd = () => {
+    if (saving || cropSource) return
+    setAddOpen(false)
+  }
+
   const handleSave = async (event: React.FormEvent) => {
     event.preventDefault()
     if (!form.name.trim()) {
@@ -166,6 +157,7 @@ const ActvtClubs: React.FC = () => {
       })
       toast.success('Club saved.')
       resetForm()
+      setAddOpen(false)
       await load()
     } catch (error: any) {
       toast.error(String(error?.response?.data?.message || error?.message || 'Failed to save club.'))
@@ -174,190 +166,226 @@ const ActvtClubs: React.FC = () => {
     }
   }
 
-  const handleRemove = async (item: ClubRecord) => {
-    if (!item._id || !window.confirm(`Remove club "${item.name || 'Untitled'}"?`)) return
+  const handleRemove = async () => {
+    const item = removing
+    if (!item?._id) return
+    setRemoveBusy(true)
     try {
       await api.delete(`/actvt/clubs/${item._id}`)
       toast.success('Club removed.')
       if (editingClub?._id === item._id) setEditingClub(null)
+      setRemoving(null)
       await load()
     } catch (error: any) {
       toast.error(String(error?.response?.data?.message || error?.message || 'Failed to remove club.'))
+    } finally {
+      setRemoveBusy(false)
     }
   }
 
-  const clubCountLabel = `${visible.length} Club${visible.length === 1 ? '' : 's'}`
+  const openClub = (club: ClubRecord) => {
+    if (club._id) navigate(`/actvt/clubs/${club._id}`)
+  }
+
+  const countLabel = query.trim()
+    ? `${visible.length} of ${records.length} club${records.length === 1 ? '' : 's'}`
+    : `${records.length} club${records.length === 1 ? '' : 's'}`
+
+  let content: React.ReactNode
+  if (loading && !loaded) {
+    content = (
+      <Card>
+        <div className="cb-table-state" role="status">
+          <span className="cb-spinner" aria-hidden="true" />
+          Loading clubs
+        </div>
+      </Card>
+    )
+  } else if (records.length === 0) {
+    content = (
+      <Card>
+        <EmptyState
+          icon={Shapes}
+          title="No clubs yet"
+          body="Add a club with its name, colour and logo, then open it to manage members and activities."
+          action={
+            <Button icon={Plus} onClick={() => setAddOpen(true)}>
+              Add club
+            </Button>
+          }
+        />
+      </Card>
+    )
+  } else if (visible.length === 0) {
+    content = (
+      <Card>
+        <EmptyState
+          icon={SearchX}
+          title={`No clubs match “${query.trim()}”`}
+          body="Search looks at names, taglines, mottos, colours, incharge and meeting days."
+          action={<Button onClick={() => setQuery('')}>Clear search</Button>}
+        />
+      </Card>
+    )
+  } else {
+    content = (
+      <ul className="actvt-grid" aria-label="Clubs" aria-busy={loading || undefined}>
+        {visible.map((club, index) => {
+          const name = club.name || 'Untitled club'
+          return (
+            <li key={club._id || club.name} className="actvt-card ac-card" style={toneStyle(club.color, index)}>
+              <button type="button" className="actvt-card__open" onClick={() => openClub(club)} aria-label={`Open ${name}`}>
+                <span className="actvt-card__band" aria-hidden="true" />
+                <ClubLogoTile logo={club.logo} name={club.name} className="actvt-card__logo" />
+                <span className="actvt-card__body">
+                  <span className="actvt-card__name">{name}</span>
+                  {club.tagline ? <span className="actvt-card__tagline">{club.tagline}</span> : null}
+                  {club.motto ? <span className="actvt-card__motto">“{club.motto}”</span> : null}
+                  {club.incharge || club.meetingDay ? (
+                    <span className="actvt-card__meta">
+                      {club.meetingDay ? (
+                        <Badge tone="neutral" dot={false}>
+                          Meets {club.meetingDay}
+                        </Badge>
+                      ) : null}
+                      {club.incharge ? (
+                        <Badge tone="neutral" dot={false}>
+                          {club.incharge}
+                        </Badge>
+                      ) : null}
+                    </span>
+                  ) : null}
+                </span>
+              </button>
+              <div className="actvt-card__foot">
+                <span className="actvt-card__swatch">
+                  <span className="actvt-tone-dot" aria-hidden="true" />
+                  <span className="ac-truncate">{isLikelyColor(club.color || '') ? club.color : 'No colour saved'}</span>
+                </span>
+                <span className="actvt-card__actions">
+                  <Button
+                    size="sm"
+                    variant="tertiary"
+                    icon={Pencil}
+                    aria-label={`Edit ${name}`}
+                    title="Edit club"
+                    onClick={() => setEditingClub(club)}
+                  />
+                  <Button
+                    size="sm"
+                    variant="tertiary"
+                    icon={Trash2}
+                    aria-label={`Remove ${name}`}
+                    title="Remove club"
+                    onClick={() => setRemoving(club)}
+                  />
+                </span>
+              </div>
+            </li>
+          )
+        })}
+      </ul>
+    )
+  }
 
   return (
-    <div className="p-6">
-      <div className="mx-auto max-w-[1400px] space-y-6">
-        <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
-          <form
-            onSubmit={handleSave}
-            className="mb-4 flex flex-wrap items-center gap-x-2 gap-y-2"
-          >
-            <h3 className="shrink-0 text-lg font-semibold text-slate-900">{clubCountLabel}</h3>
+    <Page>
+      <div className="cb-stack">
+        <FilterBar
+          search={{ placeholder: 'Search clubs', value: query, onChange: setQuery, label: 'Search clubs' }}
+          filters={
+            loaded ? (
+              <span className="ac-count" aria-live="polite">
+                {countLabel}
+              </span>
+            ) : null
+          }
+          actions={
+            <Button variant="primary" icon={Plus} onClick={() => setAddOpen(true)}>
+              Add club
+            </Button>
+          }
+        />
 
-            <div className="relative shrink-0">
-              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
-              <input
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="Search clubs"
-                className="h-9 w-[160px] rounded-lg border border-slate-200 py-1.5 pl-8 pr-2.5 text-sm outline-none focus:border-indigo-400 sm:w-[180px]"
-              />
-            </div>
+        {content}
+      </div>
 
-            <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
-              <button
-                type="button"
-                onClick={() => logoInputRef.current?.click()}
-                className="flex h-9 shrink-0 items-center justify-center gap-1.5 overflow-hidden rounded-lg border border-slate-200 bg-white px-2.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-50"
-                title="Upload and crop logo"
-              >
+      <Sheet
+        open={addOpen}
+        onClose={closeAdd}
+        title="Add club"
+        description="Start with the name, colour and logo. Add the tagline, incharge and members from the club page."
+        icon={Shapes}
+        size="md"
+        onSubmit={handleSave}
+        footer={
+          <>
+            <Button variant="secondary" onClick={closeAdd} disabled={saving}>
+              Cancel
+            </Button>
+            <Button variant="primary" type="submit" loading={saving}>
+              Add club
+            </Button>
+          </>
+        }
+      >
+        <div className="cb-form-section">
+          <div className="ac-logo-field" style={toneStyle(form.color)}>
+            <ClubLogoTile logo={logoPreview} name={form.name} className="ac-logo-tile--lg" />
+            <div className="ac-logo-field__body">
+              <p className="ac-logo-field__label">Club logo</p>
+              <p className="ac-logo-field__hint">Optional. Square image; you can crop it after choosing.</p>
+              <div className="ac-logo-field__actions">
+                <Button size="sm" icon={ImagePlus} onClick={() => logoInputRef.current?.click()}>
+                  {logoPreview ? 'Replace logo' : 'Upload logo'}
+                </Button>
                 {logoPreview ? (
-                  <span className="flex h-6 w-6 items-center justify-center overflow-hidden rounded-md bg-white ring-1 ring-slate-200">
-                    <img src={logoPreview} alt="Logo preview" className="h-full w-full object-contain" />
-                  </span>
-                ) : (
-                  <ImagePlus className="h-3.5 w-3.5" />
-                )}
-                <span className="truncate">Logo</span>
-              </button>
+                  <Button size="sm" variant="tertiary" icon={Trash2} onClick={clearLogo}>
+                    Remove
+                  </Button>
+                ) : null}
+              </div>
               <input
                 ref={logoInputRef}
                 type="file"
                 accept="image/*"
+                className="ac-file-input"
+                tabIndex={-1}
+                aria-hidden="true"
                 onChange={handleLogoSelected}
-                className="hidden"
               />
-
-              <input
-                required
-                value={form.name}
-                onChange={(event) => setForm({ ...form, name: event.target.value })}
-                placeholder="Club name"
-                className={`${inputClassCompact} min-w-[120px] max-w-[180px] flex-1`}
-              />
-
-              <div className="flex shrink-0 items-center gap-1.5">
-                <input
-                  type="color"
-                  value={isLikelyColor(form.color) ? form.color : '#4f46e5'}
-                  onChange={(event) => setForm({ ...form, color: event.target.value })}
-                  className="h-9 w-9 cursor-pointer rounded-lg border border-slate-200 bg-white p-1"
-                  aria-label="Pick club colour"
-                />
-                <input
-                  value={form.color}
-                  onChange={(event) => setForm({ ...form, color: event.target.value })}
-                  placeholder="#4f46e5"
-                  className={`${inputClassCompact} w-[88px]`}
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={saving}
-                className="h-9 shrink-0 rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
-              >
-                {saving ? 'Saving...' : 'Add'}
-              </button>
             </div>
-          </form>
+          </div>
+          <TextField
+            label="Club name"
+            required
+            value={form.name}
+            onChange={(event) => setForm({ ...form, name: event.target.value })}
+            placeholder="e.g. Eco club"
+            autoFocus
+          />
+          <ClubColorField value={form.color} onChange={(color) => setForm({ ...form, color })} />
+        </div>
+      </Sheet>
 
-          {loading ? <p className="text-sm text-slate-500">Loading clubs...</p> : null}
-
-          {!loading && visible.length === 0 ? (
-            <div className="flex min-h-[200px] flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 px-6 text-center">
-              <p className="text-sm font-medium text-slate-700">No clubs yet</p>
-              <p className="mt-1 max-w-sm text-sm text-slate-500">
-                Add a club with name, colour, and logo. Open a club to manage members and activities.
-              </p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
-              {visible.map((club, index) => {
-                const tone = isLikelyColor(club.color || '') ? club.color! : PROFILE_TONES[index % PROFILE_TONES.length]
-                return (
-                  <article
-                    key={club._id || club.name}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => club._id && navigate(`/actvt/clubs/${club._id}`)}
-                    onKeyDown={(event) => {
-                      if ((event.key === 'Enter' || event.key === ' ') && club._id) {
-                        event.preventDefault()
-                        navigate(`/actvt/clubs/${club._id}`)
-                      }
-                    }}
-                    className="flex cursor-pointer flex-col overflow-hidden rounded-[22px] border border-slate-100 bg-white shadow-[0_16px_36px_-24px_rgba(15,23,42,0.45)] transition hover:-translate-y-0.5 hover:shadow-[0_22px_40px_-20px_rgba(15,23,42,0.5)]"
-                  >
-                    <div
-                      className="h-36 shrink-0"
-                      style={{
-                        backgroundColor: isLikelyColor(tone) ? tone : '#312e81',
-                      }}
-                    />
-
-                    <div className="relative z-[1] -mt-24 px-4">
-                      <ClubLogoBadge logo={club.logo} name={club.name} tone={tone} />
-                    </div>
-
-                    <div className="relative flex flex-1 flex-col px-3 pb-3 pt-3">
-                      <div className="flex flex-1 flex-col text-center">
-                        <p className="line-clamp-2 text-sm font-semibold leading-snug text-slate-900">
-                          {club.name || 'Untitled club'}
-                        </p>
-                        <p className="mt-1 line-clamp-2 min-h-[32px] text-[11px] font-medium text-indigo-600">
-                          {club.tagline || 'No tagline'}
-                        </p>
-                        <p className="mt-2 line-clamp-3 min-h-[48px] text-xs italic leading-relaxed text-slate-600">
-                          {club.motto ? `“${club.motto}”` : 'No motto added'}
-                        </p>
-                      </div>
-
-                      <div className="mt-3 flex items-center justify-between gap-2 border-t border-slate-100 pt-3">
-                        <span className="inline-flex min-w-0 items-center gap-1.5 text-[10px] font-semibold text-slate-600">
-                          <span
-                            className="h-2.5 w-2.5 shrink-0 rounded-full border border-slate-200"
-                            style={{ backgroundColor: isLikelyColor(tone) ? tone : '#94a3b8' }}
-                          />
-                          <span className="truncate">{club.color || 'No colour'}</span>
-                        </span>
-                        <div className="flex shrink-0 gap-3">
-                          <button
-                            type="button"
-                            onClick={(event) => {
-                              event.stopPropagation()
-                              setEditingClub(club)
-                            }}
-                            className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-600"
-                          >
-                            <Pencil className="h-3 w-3" />
-                            Edit
-                          </button>
-                          <button
-                            type="button"
-                            onClick={(event) => {
-                              event.stopPropagation()
-                              void handleRemove(club)
-                            }}
-                            className="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-600"
-                          >
-                            <Trash2 className="h-3 w-3" />
-                            Remove
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </article>
-                )
-              })}
-            </div>
-          )}
-        </section>
-      </div>
+      <Dialog
+        open={Boolean(removing)}
+        onClose={() => !removeBusy && setRemoving(null)}
+        tone="danger"
+        size="sm"
+        title={`Remove ${removing?.name || 'this club'}?`}
+        description="The club and its member roster will be removed from Activities."
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setRemoving(null)} disabled={removeBusy}>
+              Keep club
+            </Button>
+            <Button variant="danger" icon={Trash2} loading={removeBusy} onClick={() => void handleRemove()}>
+              Remove club
+            </Button>
+          </>
+        }
+      />
 
       <ClubEditModal
         open={Boolean(editingClub)}
@@ -368,21 +396,9 @@ const ActvtClubs: React.FC = () => {
         }}
       />
 
-      <ImageCropModal
-        open={Boolean(cropSource)}
-        imageSrc={cropSource}
-        title="Crop club logo"
-        aspect={1}
-        onCancel={handleCropCancel}
-        onCropped={handleCropped}
-      />
-    </div>
+      <ClubLogoCropper imageSrc={cropSource} onCancel={handleCropCancel} onCropped={handleCropped} />
+    </Page>
   )
 }
-
-const inputClassCompact =
-  'h-9 w-full rounded-lg border border-slate-200 px-3 text-sm text-slate-900 outline-none focus:border-indigo-400'
-
-const PROFILE_TONES = ['#4f46e5', '#0f766e', '#b45309', '#be123c', '#0369a1', '#7c3aed']
 
 export default ActvtClubs

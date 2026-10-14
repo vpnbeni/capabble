@@ -1,12 +1,33 @@
 import React, { useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
-import { ChevronLeft, ChevronRight, Paperclip, Plus, Settings2 } from 'lucide-react'
+import { Ban, ChevronLeft, ChevronRight, Download, Paperclip, Pencil, Plus, Receipt, Settings2, Shapes, Target, Wallet } from 'lucide-react'
 import { useBudgets, useExpenseCategories, useExpenses, useInvalidateCpitl } from '@/hooks/useCpitl'
 import cpitlService, { CapitalExpense, ExpenseCategory } from '@/services/cpitlService'
+import cpitlBulkService from '@/services/cpitlBulkService'
+import {
+  BulkBar,
+  BulkResultDialog,
+  Button,
+  Card,
+  Checkbox,
+  Dialog,
+  EmptyState,
+  FilterBar,
+  Icon,
+  Menu,
+  Page,
+  StatCard,
+  TextArea,
+  TextField,
+  cx,
+  useRowSelection,
+  type BulkResult,
+} from '@/components/ui'
 import QuickExpenseSheet from '@/components/cpitl/QuickExpenseSheet'
 import CategoryManager from '@/components/cpitl/CategoryManager'
-import { CategoryIcon } from '@/components/cpitl/IconPicker'
-import { CpitlCard, CpitlEmpty, CpitlPageShell, MODE_LABELS, MONTHS, btnGhost, btnPrimary, btnSecondary, errorMessage, inr } from '@/components/cpitl/CpitlUi'
+import { CategoryIcon, catStyle } from '@/components/cpitl/IconPicker'
+import { MODE_LABELS, MONTHS, errorMessage, inr, inrShort } from '@/components/cpitl/CpitlUi'
+import '@/components/cpitl/expenses.css'
 
 const monthBounds = (offset: number) => {
   const now = new Date()
@@ -16,18 +37,40 @@ const monthBounds = (offset: number) => {
   return { from: iso(start), to: iso(end), label: `${MONTHS[start.getMonth()]} ${start.getFullYear()}` }
 }
 
-/** Budget ring around a category icon: stroke = share of monthly budget used. */
-const BudgetRing: React.FC<{ pct: number | null; color: string; children: React.ReactNode }> = ({ pct, color, children }) => {
+// Ledger rows owned by the fuel, electricity or payroll pages can only be voided there.
+const MANAGED_SOURCES = new Set(['FuelLog', 'ElectricityBill', 'PayrollRun'])
+const isVoidable = (e: CapitalExpense) => e.status !== 'void' && !MANAGED_SOURCES.has(e.sourceRef?.model || '')
+const expenseId = (e: CapitalExpense) => e._id
+
+const csvCell = (value: unknown) => {
+  const text = value === null || value === undefined ? '' : String(value)
+  return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text
+}
+
+/** Builds a CSV in the browser and saves it (with a BOM so Excel reads ₹ and Hindi text). */
+const downloadCsv = (filename: string, header: string[], rows: unknown[][]) => {
+  const csv = [header, ...rows].map((row) => row.map(csvCell).join(',')).join('\r\n')
+  const url = URL.createObjectURL(new Blob(['\ufeff', csv], { type: 'text/csv;charset=utf-8' }))
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  window.setTimeout(() => URL.revokeObjectURL(url), 10_000)
+}
+
+/** Budget ring around a category icon: stroke = share of the monthly budget used (user colour; red when over). */
+const BudgetRing: React.FC<{ pct: number | null; children: React.ReactNode }> = ({ pct, children }) => {
   const r = 26
   const c = 2 * Math.PI * r
   const used = pct === null ? 0 : Math.min(1, pct / 100)
-  const over = pct !== null && pct > 100
   return (
-    <span className="relative inline-flex h-16 w-16 items-center justify-center">
-      <svg className="absolute inset-0 -rotate-90" viewBox="0 0 60 60" aria-hidden>
-        <circle cx="30" cy="30" r={r} fill="none" strokeWidth="4" className="stroke-slate-100 dark:stroke-slate-700" />
+    <span className="ce-ring">
+      <svg viewBox="0 0 60 60" aria-hidden="true">
+        <circle className="ce-ring__track" cx="30" cy="30" r={r} fill="none" strokeWidth="4" />
         {pct !== null ? (
-          <circle cx="30" cy="30" r={r} fill="none" strokeWidth="4" strokeLinecap="round" stroke={over ? '#e11d48' : color} strokeDasharray={`${used * c} ${c}`} />
+          <circle className={cx('ce-ring__fill', pct > 100 && 'is-over')} cx="30" cy="30" r={r} fill="none" strokeWidth="4" strokeLinecap="round" strokeDasharray={`${used * c} ${c}`} />
         ) : null}
       </svg>
       {children}
@@ -39,14 +82,24 @@ const CpitlOperating: React.FC = () => {
   const invalidate = useInvalidateCpitl()
   const [offset, setOffset] = useState(0)
   const [activeCat, setActiveCat] = useState<string | null>(null)
+  const [search, setSearch] = useState('')
   const [sheet, setSheet] = useState<{ open: boolean; expense?: CapitalExpense | null }>({ open: false })
   const [managerOpen, setManagerOpen] = useState(false)
+  const [voiding, setVoiding] = useState<CapitalExpense | null>(null)
+  const [voidReason, setVoidReason] = useState('')
+  const [voidTried, setVoidTried] = useState(false)
+  const [voidBusy, setVoidBusy] = useState(false)
+  const [bulkVoidOpen, setBulkVoidOpen] = useState(false)
+  const [bulkReason, setBulkReason] = useState('')
+  const [bulkTried, setBulkTried] = useState(false)
+  const [bulkBusy, setBulkBusy] = useState(false)
+  const [bulkResult, setBulkResult] = useState<(BulkResult & { action: string; noun: string }) | null>(null)
   const { from, to, label } = monthBounds(offset)
 
   const { data: categories = [] } = useExpenseCategories()
   const { data, isLoading } = useExpenses({ kind: 'operating', from, to, limit: 1000 })
   const { data: budgetData } = useBudgets()
-  const expenses = data?.items || []
+  const expenses = useMemo(() => data?.items || [], [data])
 
   const catById = useMemo(() => new Map(categories.map((c) => [c._id, c])), [categories])
   const rootOf = (id: string | null): ExpenseCategory | undefined => {
@@ -77,8 +130,28 @@ const CpitlOperating: React.FC = () => {
   const tiles = roots
     .map((c) => ({ cat: c, spent: spentByRoot.get(c._id) || 0, budget: monthlyBudget.get(c._id) || 0 }))
     .sort((a, b) => b.spent - a.spent || (a.cat.sortOrder || 0) - (b.cat.sortOrder || 0))
+  const budgetedTiles = tiles.filter((t) => t.budget > 0)
+  const monthBudget = budgetedTiles.reduce((s, t) => s + t.budget, 0)
+  const budgetedSpent = budgetedTiles.reduce((s, t) => s + t.spent, 0)
+  const overCount = budgetedTiles.filter((t) => t.spent > t.budget).length
+  const top = tiles[0]?.spent ? tiles[0] : null
 
-  const visible = activeCat ? expenses.filter((e) => rootOf(e.categoryId)?._id === activeCat) : expenses
+  const needle = search.trim().toLowerCase()
+  const visible = useMemo(
+    () =>
+      expenses.filter((e) => {
+        if (activeCat && rootOf(e.categoryId)?._id !== activeCat) return false
+        if (!needle) return true
+        const cat = e.categoryId ? catById.get(e.categoryId) : undefined
+        return [e.title, e.payee, e.reference, e.notes, cat?.name].some((v) => String(v || '').toLowerCase().includes(needle))
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [expenses, activeCat, needle, catById]
+  )
+  // Selection covers the rows on screen and clears when the month, category or search changes.
+  const bulk = useRowSelection(visible, expenseId, { resetKey: `${from}|${activeCat || ''}|${needle}`, isSelectable: isVoidable })
+  const selectableCount = useMemo(() => visible.filter(isVoidable).length, [visible])
+  const selectedTotal = bulk.selectedRows.reduce((s, e) => s + e.amount, 0)
   const byDay = useMemo(() => {
     const groups = new Map<string, CapitalExpense[]>()
     visible.forEach((e) => {
@@ -89,136 +162,282 @@ const CpitlOperating: React.FC = () => {
     return [...groups.entries()]
   }, [visible])
 
-  const voidExpense = async (e: CapitalExpense) => {
-    const reason = window.prompt(`Void ${inr(e.amount)} "${e.title}"? Reason:`)
-    if (!reason?.trim()) return
+  const openVoid = (e: CapitalExpense) => {
+    setVoidReason('')
+    setVoidTried(false)
+    setVoiding(e)
+  }
+
+  const voidExpense = async () => {
+    if (!voiding) return
+    setVoidTried(true)
+    if (!voidReason.trim()) return
+    setVoidBusy(true)
     try {
-      await cpitlService.voidExpense(e._id, reason)
+      await cpitlService.voidExpense(voiding._id, voidReason.trim())
       toast.success('Expense voided.')
+      setVoiding(null)
       invalidate()
     } catch (error) {
       toast.error(await errorMessage(error))
+    } finally {
+      setVoidBusy(false)
     }
   }
 
+  const exportSelected = () => {
+    const rows = [...bulk.selectedRows].sort((a, b) => a.date.localeCompare(b.date))
+    downloadCsv(
+      `operating-expenses_${from.slice(0, 7)}.csv`,
+      ['Date', 'Description', 'Category', 'Payee', 'Mode', 'Amount', 'Reference'],
+      rows.map((e) => {
+        const cat = e.categoryId ? catById.get(e.categoryId) : undefined
+        const root = rootOf(e.categoryId)
+        return [
+          e.date.slice(0, 10),
+          e.title || cat?.name || 'Expense',
+          cat && root && root._id !== cat._id ? `${root.name} › ${cat.name}` : cat?.name || '',
+          e.payee,
+          MODE_LABELS[e.mode] || e.mode,
+          e.amount,
+          e.reference,
+        ]
+      })
+    )
+  }
+
+  const openBulkVoid = () => {
+    setBulkReason('')
+    setBulkTried(false)
+    setBulkVoidOpen(true)
+  }
+
+  const runBulkVoid = async () => {
+    setBulkTried(true)
+    const reason = bulkReason.trim()
+    if (!reason || !bulk.count) return
+    setBulkBusy(true)
+    try {
+      const result = await cpitlBulkService.voidExpenses(bulk.selectedIds, reason)
+      setBulkVoidOpen(false)
+      bulk.clear()
+      if (result.failed.length) setBulkResult({ ...result, action: 'Void expenses', noun: 'expenses' })
+      else toast.success(`${result.succeeded} ${result.succeeded === 1 ? 'expense' : 'expenses'} voided.`)
+      invalidate()
+    } catch (error) {
+      toast.error(await errorMessage(error))
+    } finally {
+      setBulkBusy(false)
+    }
+  }
+
+  const openAdd = () => setSheet({ open: true, expense: null })
+  const activeName = activeCat ? catById.get(activeCat)?.name : null
+  const filtered = Boolean(activeCat || needle)
+
+  const spentTiles = [...tiles].filter((t) => t.spent > 0).sort((x, y) => y.spent - x.spent)
+  const monthTotal = spentTiles.reduce((sum, t) => sum + t.spent, 0)
+
   return (
-    <CpitlPageShell
-      title="Operating Costs"
-      subtitle="Day-to-day school spending by category"
-      actions={
-        <>
-          <button type="button" className={btnSecondary} onClick={() => setManagerOpen(true)}>
-            <Settings2 className="h-4 w-4" /> Categories
-          </button>
-          <button type="button" className={btnPrimary} onClick={() => setSheet({ open: true, expense: null })}>
-            <Plus className="h-4 w-4" /> Add expense
-          </button>
-        </>
-      }
-    >
-      <CpitlCard>
-        <div className="flex items-center justify-between">
-          <button type="button" className={btnGhost} aria-label="Previous month" onClick={() => setOffset((o) => o - 1)}>
-            <ChevronLeft className="h-4 w-4" />
-          </button>
-          <div className="text-center">
-            <p className="text-sm font-medium text-slate-500">{label}</p>
-            <p className="text-3xl font-semibold tabular-nums text-slate-900 dark:text-white">{inr(total)}</p>
-            <p className="text-xs text-slate-400">{expenses.length} expense(s)</p>
-          </div>
-          <button type="button" className={btnGhost} aria-label="Next month" disabled={offset >= 0} onClick={() => setOffset((o) => Math.min(0, o + 1))}>
-            <ChevronRight className="h-4 w-4" />
-          </button>
-        </div>
-
-        <div className="mt-6 grid grid-cols-[repeat(auto-fill,minmax(88px,1fr))] gap-3">
-          {tiles.map(({ cat, spent, budget }) => {
-            const pct = budget > 0 ? (spent / budget) * 100 : null
-            const on = activeCat === cat._id
-            return (
-              <button
-                key={cat._id}
-                type="button"
-                onClick={() => setActiveCat(on ? null : cat._id)}
-                className={`flex flex-col items-center gap-1 rounded-2xl p-2 text-center transition ${on ? 'ring-2' : 'hover:bg-slate-50 dark:hover:bg-slate-700/40'} ${
-                  spent ? '' : 'opacity-60'
-                }`}
-                style={on ? { ['--tw-ring-color' as string]: cat.color, backgroundColor: `${cat.color}10` } : undefined}
-                title={pct !== null ? `${Math.round(pct)}% of monthly budget` : 'No budget set'}
-              >
-                <BudgetRing pct={pct} color={cat.color}>
-                  <CategoryIcon icon={cat.icon} color={cat.color} />
-                </BudgetRing>
-                <span className="line-clamp-1 text-xs font-medium text-slate-700 dark:text-slate-200">{cat.name}</span>
-                <span className="text-xs tabular-nums text-slate-500">{spent ? inr(spent) : '—'}</span>
-              </button>
-            )
-          })}
-        </div>
-      </CpitlCard>
-
-      <CpitlCard
-        title={activeCat ? `${catById.get(activeCat)?.name} — ${label}` : `All expenses — ${label}`}
-        actions={activeCat ? <button type="button" className={btnGhost} onClick={() => setActiveCat(null)}>Show all</button> : null}
-      >
-        {isLoading ? (
-          <div className="h-40 animate-pulse rounded-xl bg-slate-100 dark:bg-slate-700" />
-        ) : byDay.length ? (
-          <div className="space-y-5">
-            {byDay.map(([day, items]) => (
-              <div key={day}>
-                <div className="mb-1.5 flex items-baseline justify-between text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  <span>{new Date(`${day}T00:00:00`).toLocaleDateString('en-IN', { weekday: 'short', day: '2-digit', month: 'short' })}</span>
-                  <span className="tabular-nums">{inr(items.reduce((s, e) => s + e.amount, 0))}</span>
-                </div>
-                <ul className="divide-y divide-slate-100 rounded-xl border border-slate-100 dark:divide-slate-700 dark:border-slate-700">
-                  {items.map((e) => {
-                    const cat = e.categoryId ? catById.get(e.categoryId) : undefined
-                    return (
-                      <li key={e._id} className="group flex items-center gap-3 px-3 py-2.5">
-                        <CategoryIcon icon={cat?.icon} color={cat?.color} size="sm" />
-                        <button type="button" className="min-w-0 flex-1 text-left" onClick={() => setSheet({ open: true, expense: e })}>
-                          <div className="truncate text-sm font-medium text-slate-900 dark:text-white">{e.title || cat?.name}</div>
-                          <div className="truncate text-xs text-slate-500">
-                            {[cat?.parentId ? cat.name : null, e.payee, MODE_LABELS[e.mode] || e.mode, e.createdBy?.name].filter(Boolean).join(' · ')}
-                          </div>
-                        </button>
-                        {e.attachments?.length ? (
-                          <a href={e.attachments[0].url} target="_blank" rel="noreferrer" className="text-slate-400 hover:text-indigo-600" aria-label="Open attachment">
-                            <Paperclip className="h-4 w-4" />
-                          </a>
-                        ) : null}
-                        <span className="text-sm font-semibold tabular-nums text-slate-900 dark:text-white">{inr(e.amount)}</span>
-                        <button type="button" className={`${btnGhost} invisible text-rose-600 group-hover:visible`} onClick={() => voidExpense(e)}>
-                          Void
-                        </button>
-                      </li>
-                    )
-                  })}
-                </ul>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <CpitlEmpty
-            message={`No operating expenses in ${label}.`}
-            action={
-              <button type="button" className={btnPrimary} onClick={() => setSheet({ open: true, expense: null })}>
-                <Plus className="h-4 w-4" /> Add expense
-              </button>
-            }
+    <Page>
+      <div className="ce-toolbar">
+        <div className="ce-month" role="group" aria-label="Month">
+          <Button variant="tertiary" size="sm" icon={ChevronLeft} aria-label="Previous month" onClick={() => setOffset((o) => o - 1)} />
+          <span className="ce-month__label" aria-live="polite">
+            {label}
+          </span>
+          <Button
+            variant="tertiary"
+            size="sm"
+            icon={ChevronRight}
+            aria-label="Next month"
+            disabled={offset >= 0}
+            onClick={() => setOffset((o) => Math.min(0, o + 1))}
           />
-        )}
-      </CpitlCard>
+          {offset < 0 ? (
+            <Button variant="tertiary" size="sm" onClick={() => setOffset(0)}>
+              This month
+            </Button>
+          ) : null}
+        </div>
+        <div className="ce-toolbar__actions">
+          <Button icon={Settings2} onClick={() => setManagerOpen(true)}>
+            Manage categories
+          </Button>
+          <Button variant="primary" icon={Plus} onClick={openAdd}>
+            Add expense
+          </Button>
+        </div>
+      </div>
 
-      <button
-        type="button"
-        aria-label="Add expense"
-        onClick={() => setSheet({ open: true, expense: null })}
-        className="fixed bottom-6 right-6 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-indigo-600 text-white shadow-lg transition hover:bg-indigo-700 sm:hidden"
+      <div className="cb-stats">
+        <StatCard label={`Spent in ${label}`} value={inrShort(total)} icon={Wallet} hint={isLoading ? 'Loading…' : undefined} />
+        <StatCard label="Expenses" value={expenses.length} icon={Receipt} hint={expenses.length ? `Avg ${inrShort(total / expenses.length)}` : undefined} />
+        <StatCard label="Top category" value={top ? top.cat.name : '—'} icon={Shapes} hint={top ? inr(top.spent) : 'Nothing spent yet'} />
+        <StatCard
+          label="Monthly budget used"
+          value={monthBudget > 0 ? `${Math.round((budgetedSpent / monthBudget) * 100)}%` : '—'}
+          icon={Target}
+          hint={monthBudget > 0 ? (overCount ? `${overCount} categor${overCount === 1 ? 'y' : 'ies'} over budget` : `of ${inrShort(monthBudget)}`) : 'No category budgets set'}
+          progress={monthBudget > 0 ? Math.min(100, (budgetedSpent / monthBudget) * 100) : undefined}
+          progressTone={budgetedSpent > monthBudget ? 'danger' : budgetedSpent >= monthBudget * 0.85 ? 'warning' : 'success'}
+        />
+      </div>
+
+      <Card
+        title="By category"
+        subtitle={
+          spentTiles.length
+            ? 'Highest spending first. Rings show the share of each monthly budget used. Select a category to see only its expenses.'
+            : 'Spending by category shows here once expenses are recorded this month.'
+        }
       >
-        <Plus className="h-6 w-6" />
-      </button>
+        {tiles.length === 0 ? (
+          <EmptyState compact icon={Settings2} title="No categories yet" body="Use Manage categories to add the heads you spend on, like Stationery or Repairs." />
+        ) : spentTiles.length === 0 ? (
+          <EmptyState compact icon={Settings2} title={`Nothing spent in ${label}`} body="Add an expense and its category will show here." />
+        ) : (
+          <div className="ce-tiles" role="group" aria-label="Filter by category">
+            {tiles.map(({ cat, spent, budget }) => {
+              const pct = budget > 0 ? (spent / budget) * 100 : null
+              const on = activeCat === cat._id
+              const share = monthTotal > 0 ? (spent / monthTotal) * 100 : 0
+              return (
+                <button
+                  key={cat._id}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() => setActiveCat(on ? null : cat._id)}
+                  className={cx('ce-tile', on && 'is-active', !spent && 'is-zero')}
+                  style={catStyle(cat.color)}
+                >
+                  <BudgetRing pct={pct}>
+                    <CategoryIcon icon={cat.icon} color={cat.color} />
+                  </BudgetRing>
+                  <span className="ce-tile__name">{cat.name}</span>
+                  <span className="ce-tile__amt">{spent ? inr(spent) : '—'}</span>
+                  <span className={cx('ce-tile__meta', pct !== null && pct > 100 && 'is-over')}>
+                    {pct !== null ? (pct > 100 ? `Over · ${Math.round(pct)}% of budget` : `${Math.round(pct)}% of budget`) : spent ? `${Math.round(share)}% of month` : 'No spending'}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        )}
+      </Card>
+
+      <Card
+        title={activeName ? `${activeName} · ${label}` : `All expenses · ${label}`}
+        subtitle={filtered ? `${visible.length} of ${expenses.length} shown · ${inr(visible.reduce((s, e) => s + e.amount, 0))}` : undefined}
+        action={
+          activeCat ? (
+            <Button variant="tertiary" size="sm" onClick={() => setActiveCat(null)}>
+              Show all categories
+            </Button>
+          ) : null
+        }
+      >
+        <div className="cb-stack">
+          {expenses.length ? (
+            <FilterBar search={{ placeholder: 'Search description, payee or reference', value: search, onChange: setSearch, label: 'Search expenses' }} />
+          ) : null}
+          {!isLoading && selectableCount > 0 ? (
+            <div className="ce-selectall">
+              <Checkbox
+                label={`Select all shown (${selectableCount})`}
+                checked={bulk.allSelected}
+                indeterminate={!bulk.allSelected && bulk.count > 0}
+                onChange={() => bulk.toggleAll()}
+                disabled={bulkBusy}
+              />
+            </div>
+          ) : null}
+          <BulkBar count={bulk.count} noun="expense" onClear={bulk.clear} busy={bulkBusy}>
+            <Button size="sm" icon={Download} onClick={exportSelected} disabled={bulkBusy}>
+              Export CSV
+            </Button>
+            <Button size="sm" variant="danger" icon={Ban} onClick={openBulkVoid} loading={bulkBusy}>
+              Void
+            </Button>
+          </BulkBar>
+          {isLoading ? (
+            <div className="cb-table-state" role="status">
+              <span className="cb-spinner" aria-hidden="true" />
+              Loading expenses…
+            </div>
+          ) : byDay.length ? (
+            <div className="ce-days">
+              {byDay.map(([day, items]) => (
+                <section key={day} className="ce-day" aria-label={day}>
+                  <div className="ce-day__head">
+                    <span>{new Date(`${day}T00:00:00`).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })}</span>
+                    <span className="ce-day__total">{inr(items.reduce((s, e) => s + e.amount, 0))}</span>
+                  </div>
+                  <ul className="ce-day__list">
+                    {items.map((e) => {
+                      const cat = e.categoryId ? catById.get(e.categoryId) : undefined
+                      const meta = [cat?.parentId ? cat.name : null, e.payee, MODE_LABELS[e.mode] || e.mode, e.createdBy?.name].filter(Boolean).join(' · ')
+                      const voidable = isVoidable(e)
+                      const selected = bulk.selection.isSelected(e)
+                      return (
+                        <li key={e._id} className={cx('ce-exp', selected && 'is-selected')}>
+                          <span className="ce-exp__select" title={voidable ? undefined : `Managed from the ${e.kind} page`}>
+                            <Checkbox
+                              aria-label={voidable ? `Select ${e.title || cat?.name || 'expense'}` : `${e.title || 'Expense'} is managed from the ${e.kind} page`}
+                              checked={selected}
+                              disabled={!voidable || bulkBusy}
+                              onChange={() => bulk.toggle(e)}
+                            />
+                          </span>
+                          <CategoryIcon icon={cat?.icon} color={cat?.color} size="sm" />
+                          <button type="button" className="ce-exp__main" onClick={() => setSheet({ open: true, expense: e })}>
+                            <span className="ce-exp__title">{e.title || cat?.name || 'Expense'}</span>
+                            {meta ? <span className="ce-exp__meta">{meta}</span> : null}
+                          </button>
+                          {e.attachments?.length ? (
+                            <a href={e.attachments[0].url} target="_blank" rel="noreferrer" className="ce-exp__clip" aria-label={`Open attachment ${e.attachments[0].name}`}>
+                              <Icon icon={Paperclip} size={16} />
+                            </a>
+                          ) : null}
+                          <span className="ce-exp__amt">{inr(e.amount)}</span>
+                          <Menu
+                            label={`Actions for ${e.title || 'expense'}`}
+                            items={[
+                              { label: 'Edit expense', icon: Pencil, onSelect: () => setSheet({ open: true, expense: e }) },
+                              { divider: true },
+                              { label: 'Void expense', icon: Ban, tone: 'danger', onSelect: () => openVoid(e) },
+                            ]}
+                          />
+                        </li>
+                      )
+                    })}
+                  </ul>
+                </section>
+              ))}
+            </div>
+          ) : filtered ? (
+            <EmptyState
+              compact
+              icon={Receipt}
+              title="No expenses match"
+              body="Try another search, or show every category."
+              action={
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    setSearch('')
+                    setActiveCat(null)
+                  }}
+                >
+                  Clear filters
+                </Button>
+              }
+            />
+          ) : (
+            <EmptyState icon={Receipt} title={`No operating expenses in ${label}`} body="Use Add expense to record a bill; it takes a few seconds." />
+          )}
+        </div>
+      </Card>
 
       <QuickExpenseSheet
         isOpen={sheet.open}
@@ -229,7 +448,69 @@ const CpitlOperating: React.FC = () => {
         onSaved={invalidate}
       />
       <CategoryManager isOpen={managerOpen} onClose={() => setManagerOpen(false)} categories={categories} onChanged={invalidate} />
-    </CpitlPageShell>
+
+      <Dialog
+        open={bulkVoidOpen}
+        onClose={() => !bulkBusy && setBulkVoidOpen(false)}
+        tone="danger"
+        size="sm"
+        title={`Void ${bulk.count} ${bulk.count === 1 ? 'expense' : 'expenses'}?`}
+        description={`${inr(selectedTotal)} stops counting towards totals and budgets. The records are kept with your reason.`}
+        footer={
+          <>
+            <Button onClick={() => setBulkVoidOpen(false)} disabled={bulkBusy}>
+              Cancel
+            </Button>
+            <Button variant="danger" icon={Ban} loading={bulkBusy} disabled={!bulk.count} onClick={() => void runBulkVoid()}>
+              Void {bulk.count} {bulk.count === 1 ? 'expense' : 'expenses'}
+            </Button>
+          </>
+        }
+      >
+        <TextArea
+          label="Reason"
+          required
+          autoFocus
+          rows={2}
+          hint="Saved on every voided expense."
+          value={bulkReason}
+          onChange={(e) => setBulkReason(e.target.value)}
+          error={bulkTried && !bulkReason.trim() ? 'Say why these are being voided.' : undefined}
+        />
+      </Dialog>
+      <BulkResultDialog result={bulkResult} onClose={() => setBulkResult(null)} />
+
+      <Dialog
+        open={Boolean(voiding)}
+        onClose={() => !voidBusy && setVoiding(null)}
+        tone="danger"
+        size="sm"
+        title="Void this expense?"
+        description={voiding ? `${inr(voiding.amount)} “${voiding.title || 'Expense'}” stops counting towards totals. The record is kept with your reason.` : undefined}
+        footer={
+          <>
+            <Button onClick={() => setVoiding(null)} disabled={voidBusy}>
+              Cancel
+            </Button>
+            <Button variant="danger" icon={Ban} loading={voidBusy} onClick={() => void voidExpense()}>
+              Void expense
+            </Button>
+          </>
+        }
+      >
+        <TextField
+          label="Reason"
+          required
+          autoFocus
+          value={voidReason}
+          onChange={(e) => setVoidReason(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') void voidExpense()
+          }}
+          error={voidTried && !voidReason.trim() ? 'Say why it is being voided.' : undefined}
+        />
+      </Dialog>
+    </Page>
   )
 }
 

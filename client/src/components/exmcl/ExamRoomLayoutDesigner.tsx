@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
+import { Armchair, LayoutGrid, Save } from 'lucide-react'
 import type { Room } from '../../services/seatingPlanService'
 import { seatingPlanService } from '../../services/seatingPlanService'
 import {
@@ -7,10 +8,28 @@ import {
   calculateLayoutCapacity,
   calculateRowSeats,
   getRoomSeatingLayout,
+  getSeatsPerBench,
   normalizeSeatingLayout,
   type RoomSeatingLayout,
   type SeatingLayoutRow,
 } from '../../constants/examRoomLayout'
+import {
+  Badge,
+  Banner,
+  Button,
+  Card,
+  CardToolbar,
+  DataTable,
+  EmptyState,
+  Menu,
+  MetricTile,
+  MetricTiles,
+  Select,
+  Sheet,
+  TextField,
+  type DataTableColumn,
+} from '@/components/ui'
+import './centre-rooms.css'
 
 interface ExamRoomLayoutDesignerProps {
   rooms: Room[]
@@ -23,6 +42,8 @@ function cloneLayout(layout: RoomSeatingLayout): RoomSeatingLayout {
     rows: layout.rows.map((row) => ({ ...row })),
   }
 }
+
+type RowEntry = { index: number; row: SeatingLayoutRow }
 
 const ExamRoomLayoutDesigner: React.FC<ExamRoomLayoutDesignerProps> = ({ rooms, pendingSaveCount = 0, onSaved }) => {
   const [expandedRoomId, setExpandedRoomId] = useState<string | null>(null)
@@ -90,7 +111,7 @@ const ExamRoomLayoutDesigner: React.FC<ExamRoomLayoutDesignerProps> = ({ rooms, 
       toast.success('Room layout saved.')
       onSaved?.()
     } catch (error: any) {
-      toast.error(error?.response?.data?.message || 'Failed to save room layout.')
+      toast.error(error?.response?.data?.message || 'The room layout wasn’t saved. Try again.')
     } finally {
       setSavingRoomId(null)
     }
@@ -109,180 +130,239 @@ const ExamRoomLayoutDesigner: React.FC<ExamRoomLayoutDesignerProps> = ({ rooms, 
       toast.success(`Saved layouts for ${sortedRooms.length} room(s).`)
       onSaved?.()
     } catch (error: any) {
-      toast.error(error?.response?.data?.message || 'Failed to save room layouts.')
+      toast.error(error?.response?.data?.message || 'The room layouts weren’t saved. Try again.')
     } finally {
       setSavingAll(false)
     }
   }
 
+  const isUnsaved = (room: Room) =>
+    JSON.stringify(normalizeSeatingLayout(getDraft(room._id))) !== JSON.stringify(getRoomSeatingLayout(room))
+
+  const roomLabel = (room: Room) => room.roomName || `Room ${room.roomNo}`
+
+  const title = 'Seating layouts'
+  const subtitle = `Rows, benches and bench type for each exam room · ${totalCapacity} seats saved across ${sortedRooms.length} room(s)`
+
   if (sortedRooms.length === 0) {
     return (
-      <div className="ra-msg">
-        <svg fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
-        </svg>
-        {pendingSaveCount > 0
-          ? (
-            <>
-              {pendingSaveCount} room(s) selected above. Click <b>Save Exam Rooms</b> before configuring seating layouts.
-            </>
-          )
-          : (
-            <>
-              Select exam rooms above and click <b>Save Exam Rooms</b> to configure seating layouts.
-            </>
-          )}
-      </div>
+      <Card title={title} subtitle="Rows, benches and bench type for each exam room">
+        <EmptyState
+          icon={LayoutGrid}
+          title="No exam rooms saved yet"
+          body={
+            pendingSaveCount > 0
+              ? `${pendingSaveCount} room(s) are ticked above. Save exam rooms first, then set their seating layouts here.`
+              : 'Tick the rooms to use for exams above and save them. Their seating layouts are set here.'
+          }
+        />
+      </Card>
     )
   }
 
+  const openRoom = sortedRooms.find((room) => room._id === expandedRoomId) || null
+  const openDraft = openRoom ? getDraft(openRoom._id) : null
+
+  const columns: DataTableColumn<Room>[] = [
+    {
+      key: 'order',
+      header: '#',
+      width: 48,
+      numeric: true,
+      mobile: 'hidden',
+      render: (room) => sortedRooms.indexOf(room) + 1,
+    },
+    { key: 'roomNo', header: 'Room no.', mobile: 'title', render: (room) => <span className="cb-strong">{room.roomNo}</span> },
+    { key: 'roomName', header: 'Room name', mobile: 'subtitle', render: (room) => roomLabel(room) },
+    { key: 'rows', header: 'Rows', numeric: true, align: 'right', render: (room) => getDraft(room._id).rows.length },
+    {
+      key: 'capacity',
+      header: 'Seats',
+      numeric: true,
+      align: 'right',
+      mobile: 'aside',
+      render: (room) => <span className="cb-strong">{calculateLayoutCapacity(getDraft(room._id))}</span>,
+    },
+    {
+      key: 'status',
+      header: 'Layout',
+      render: (room) => (isUnsaved(room) ? <Badge tone="warning">Not saved</Badge> : <Badge tone="success">Saved</Badge>),
+    },
+    {
+      key: 'actions',
+      header: '',
+      headerLabel: 'Actions',
+      align: 'right',
+      width: 48,
+      interactive: true,
+      render: (room) => (
+        <Menu
+          label={`Actions for room ${room.roomNo}`}
+          items={[
+            { label: 'Design layout', icon: LayoutGrid, onSelect: () => setExpandedRoomId(room._id) },
+            {
+              label: savingRoomId === room._id ? 'Saving…' : 'Save layout',
+              icon: Save,
+              disabled: savingRoomId === room._id || savingAll,
+              onSelect: () => void saveRoomLayout(room._id),
+            },
+          ]}
+        />
+      ),
+    },
+  ]
+
+  const rowColumns: DataTableColumn<RowEntry>[] = openRoom
+    ? [
+        { key: 'row', header: 'Row', mobile: 'title', render: ({ index }) => <span className="cb-strong">Row {index + 1}</span> },
+        {
+          key: 'benches',
+          header: 'Benches',
+          interactive: true,
+          render: ({ index, row }) => (
+            <TextField
+              size="sm"
+              type="number"
+              inputMode="numeric"
+              min={1}
+              max={50}
+              aria-label={`Benches in row ${index + 1}`}
+              value={row.benchCount}
+              onChange={(e) => updateRow(openRoom._id, index, { benchCount: Number(e.target.value) })}
+            />
+          ),
+        },
+        {
+          key: 'benchType',
+          header: 'Bench type',
+          interactive: true,
+          render: ({ index, row }) => (
+            <Select
+              size="sm"
+              aria-label={`Bench type in row ${index + 1}`}
+              value={row.benchType}
+              onChange={(e) => updateRow(openRoom._id, index, { benchType: e.target.value as SeatingLayoutRow['benchType'] })}
+              options={BENCH_TYPE_OPTIONS.map((option) => ({ value: option.value, label: option.label }))}
+            />
+          ),
+        },
+        {
+          key: 'seats',
+          header: 'Seats',
+          numeric: true,
+          align: 'right',
+          mobile: 'aside',
+          render: ({ row }) => calculateRowSeats(row),
+        },
+      ]
+    : []
+
   return (
     <>
-      {pendingSaveCount > 0 ? (
-        <div className="ra-layout-pending-banner">
-          {pendingSaveCount} newly selected room(s) are not saved yet. Click <b>Save Exam Rooms</b> above to include them here.
-        </div>
-      ) : null}
-      <div className="ra-layout-summary">
-        <span>{sortedRooms.length} selected exam room(s)</span>
-        <span className="ra-layout-summary-divider">·</span>
-        <span>{totalCapacity} total seats configured</span>
-      </div>
+      <Card
+        flush
+        title={title}
+        subtitle={subtitle}
+        action={
+          <Button
+            variant="primary"
+            icon={Save}
+            loading={savingAll}
+            disabled={savingRoomId !== null}
+            onClick={() => void saveAllLayouts()}
+          >
+            Save all layouts
+          </Button>
+        }
+      >
+        {pendingSaveCount > 0 ? (
+          <CardToolbar>
+            <Banner tone="warning" title={`${pendingSaveCount} newly ticked room(s) aren’t saved yet`}>
+              Save exam rooms above to set their seating layouts here.
+            </Banner>
+          </CardToolbar>
+        ) : null}
+        <DataTable
+          caption="Seating layouts"
+          columns={columns}
+          rows={sortedRooms}
+          getRowKey={(room) => room._id}
+          onRowClick={(room) => setExpandedRoomId(room._id)}
+        />
+      </Card>
 
-      <div className="ra-table-wrap">
-        <table className="ra-table ra-layout-table">
-          <thead>
-            <tr>
-              <th>Sr No</th>
-              <th>Room No</th>
-              <th>Room Name</th>
-              <th>Rows</th>
-              <th>Total Capacity</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {sortedRooms.map((room, index) => {
-              const draft = getDraft(room._id)
-              const capacity = calculateLayoutCapacity(draft)
-              const isExpanded = expandedRoomId === room._id
+      <Sheet
+        open={Boolean(openRoom)}
+        onClose={() => setExpandedRoomId(null)}
+        size="lg"
+        icon={Armchair}
+        title={openRoom ? `Seating layout · ${roomLabel(openRoom)}` : 'Seating layout'}
+        description="Rows count from the front of the room. Capacity follows the benches and bench type in each row."
+        footer={
+          openRoom ? (
+            <>
+              <Button onClick={() => setExpandedRoomId(null)}>Close</Button>
+              <Button
+                variant="primary"
+                loading={savingRoomId === openRoom._id}
+                disabled={savingAll}
+                onClick={() => void saveRoomLayout(openRoom._id)}
+              >
+                Save layout
+              </Button>
+            </>
+          ) : null
+        }
+      >
+        {openRoom && openDraft ? (
+          <div className="cb-stack">
+            <MetricTiles>
+              <MetricTile label="Rows" value={openDraft.rows.length} />
+              <MetricTile label="Seats" value={calculateLayoutCapacity(openDraft)} hint="Total seating capacity" />
+            </MetricTiles>
 
-              return (
-                <React.Fragment key={room._id}>
-                  <tr>
-                    <td><span className="ra-sr">{index + 1}</span></td>
-                    <td><span className="ra-room-no">{room.roomNo}</span></td>
-                    <td><span className="ra-room-name">{room.roomName || `Room ${room.roomNo}`}</span></td>
-                    <td>{draft.rows.length}</td>
-                    <td><span className="ra-layout-capacity">{capacity}</span></td>
-                    <td>
-                      <div className="ra-action-group">
-                        <button
-                          type="button"
-                          className="ra-action-link ra-action-edit"
-                          onClick={() => setExpandedRoomId(isExpanded ? null : room._id)}
-                        >
-                          {isExpanded ? 'Close' : 'Design Layout'}
-                        </button>
-                        <button
-                          type="button"
-                          className="ra-action-link ra-action-save"
-                          disabled={savingRoomId === room._id || savingAll}
-                          onClick={() => void saveRoomLayout(room._id)}
-                        >
-                          {savingRoomId === room._id ? 'Saving...' : 'Save'}
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                  {isExpanded ? (
-                    <tr className="ra-layout-expand-row">
-                      <td colSpan={6}>
-                        <div className="ra-layout-editor">
-                          <div className="ra-layout-editor-header">
-                            <div>
-                              <div className="ra-layout-editor-title">Seating layout for {room.roomName || room.roomNo}</div>
-                              <div className="ra-layout-editor-subtitle">
-                                Configure rows, benches per row, and bench type. Capacity is calculated automatically.
-                              </div>
-                            </div>
-                            <label className="ra-layout-row-count">
-                              <span>Number of rows</span>
-                              <input
-                                type="number"
-                                min={1}
-                                max={20}
-                                value={draft.rows.length}
-                                onChange={(e) => setRowCount(room._id, Number(e.target.value))}
-                                className="ra-input ra-input-compact"
-                              />
-                            </label>
-                          </div>
+            <TextField
+              label="Number of rows"
+              hint="Between 1 and 20"
+              type="number"
+              inputMode="numeric"
+              min={1}
+              max={20}
+              value={openDraft.rows.length}
+              onChange={(e) => setRowCount(openRoom._id, Number(e.target.value))}
+            />
 
-                          <table className="ra-layout-rows-table">
-                            <thead>
-                              <tr>
-                                <th>Row</th>
-                                <th>Benches in row</th>
-                                <th>Bench type</th>
-                                <th>Seats in row</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {draft.rows.map((row, rowIndex) => (
-                                <tr key={`${room._id}-row-${rowIndex}`}>
-                                  <td>Row {rowIndex + 1}</td>
-                                  <td>
-                                    <input
-                                      type="number"
-                                      min={1}
-                                      max={50}
-                                      value={row.benchCount}
-                                      onChange={(e) => updateRow(room._id, rowIndex, { benchCount: Number(e.target.value) })}
-                                      className="ra-input ra-input-compact"
-                                    />
-                                  </td>
-                                  <td>
-                                    <select
-                                      value={row.benchType}
-                                      onChange={(e) => updateRow(room._id, rowIndex, { benchType: e.target.value as SeatingLayoutRow['benchType'] })}
-                                      className="ra-input ra-input-compact"
-                                    >
-                                      {BENCH_TYPE_OPTIONS.map((option) => (
-                                        <option key={option.value} value={option.value}>{option.label}</option>
-                                      ))}
-                                    </select>
-                                  </td>
-                                  <td><span className="ra-layout-capacity">{calculateRowSeats(row)}</span></td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
+            <DataTable
+              caption={`Rows in ${roomLabel(openRoom)}`}
+              columns={rowColumns}
+              rows={openDraft.rows.map((row, index) => ({ index, row }))}
+              getRowKey={({ index }) => `${openRoom._id}-row-${index}`}
+            />
 
-                          <div className="ra-layout-editor-footer">
-                            <span>Total seating capacity: <strong>{capacity}</strong></span>
-                          </div>
-                        </div>
-                      </td>
-                    </tr>
-                  ) : null}
-                </React.Fragment>
-              )
-            })}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="ra-layout-save-all">
-        <button
-          type="button"
-          className="ra-btn ra-btn-save"
-          disabled={savingAll || savingRoomId !== null}
-          onClick={() => void saveAllLayouts()}
-        >
-          {savingAll ? 'Saving...' : 'Save All Layouts'}
-        </button>
-      </div>
+            <div className="cx-seatmap" aria-label="Seat map preview" role="img">
+              <div className="cx-seatmap__front">Front of room</div>
+              {openDraft.rows.map((row, rowIndex) => {
+                const benches = Math.max(0, Math.min(50, Math.floor(Number(row.benchCount) || 0)))
+                const seats = getSeatsPerBench(row.benchType)
+                return (
+                  <div key={rowIndex} className="cx-seatmap__row">
+                    <span className="cx-seatmap__label">Row {rowIndex + 1}</span>
+                    <span className="cx-seatmap__benches">
+                      {Array.from({ length: benches }, (_, benchIndex) => (
+                        <span key={benchIndex} className="cx-seatmap__bench">
+                          {Array.from({ length: seats }, (__, seatIndex) => (
+                            <span key={seatIndex} className="cx-seatmap__seat" />
+                          ))}
+                        </span>
+                      ))}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        ) : null}
+      </Sheet>
     </>
   )
 }

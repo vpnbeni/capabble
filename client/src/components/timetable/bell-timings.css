@@ -12,11 +12,11 @@
 /* ---------- Schedule card: toolbar (start time + timeline) above a flush table ---------- */
 .cb-app .tbt-toolbar { display: flex; align-items: flex-end; gap: var(--space-4); flex-wrap: wrap; padding: var(--space-1) var(--space-5) var(--space-4); }
 @media (max-width: 640px) { .cb-app .tbt-toolbar { padding: var(--space-1) var(--space-4) var(--space-3); } }
-.cb-app .tbt-start { flex: none; width: 152px; }
+.cb-app .tbt-start { flex: none; width: 152px; align-self: flex-start; }
 .cb-app .tbt-schedule .cb-table-wrap { border-top: 1px solid var(--border); }
 
 /* ---------- Day timeline: periods vs breaks as proportional blocks ---------- */
-.cb-app .tbt-timeline { flex: 1 1 280px; min-width: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.cb-app .tbt-timeline { flex: 1 1 360px; min-width: 0; display: flex; flex-direction: column; gap: var(--space-2); }
 .cb-app .tbt-timeline__scroll { overflow-x: auto; }
 .cb-app .tbt-timeline__track { display: flex; gap: 2px; min-width: 420px; height: var(--control-sm); margin: 0; padding: 0; list-style: none; }
 .cb-app .tbt-timeline__seg { flex-basis: 0; min-width: 6px; display: flex; align-items: center; justify-content: center; overflow: hidden; padding: 0 2px; background: var(--accent-soft); color: var(--accent-soft-ink); border: 1px solid var(--accent); border-radius: var(--radius-sm); }
@@ -33,7 +33,7 @@
 .cb-app .tbt-table .cb-table tbody tr:has(.tbt-label.is-break) td { background: var(--warning-soft); }
 .cb-app .tbt-table .cb-table tbody tr:has(.tbt-label.is-break):hover td { background: var(--surface-hover); }
 .cb-app .tbt-table .cb-tcard:has(.tbt-label.is-break) { background: var(--warning-soft); }
-.cb-app .tbt-label { width: 100%; min-width: 120px; max-width: 200px; }
+.cb-app .tbt-label { width: 100%; min-width: 160px; max-width: 280px; }
 .cb-app .tbt-label.is-break input, .cb-app .tbt-duration.is-break input { font-weight: 600; }
 .cb-app .tbt-type { width: 112px; }
 .cb-app .tbt-duration { width: 104px; }

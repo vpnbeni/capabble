@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { Download } from 'lucide-react'
+import { Download, FileText, Settings2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useNavigate } from 'react-router-dom'
 import exmclExamService, { type ExmclExamDefinition } from '@/services/exmclExamService'
@@ -11,6 +11,9 @@ import schoolProfileService, { type SchoolProfile } from '@/services/schoolProfi
 import api from '@/services/api'
 import { sortSectionNames } from '@/constants/studentClasses'
 import AwardListPreview, { type AwardListPreviewStudent } from '@/components/exmcl/AwardListPreview'
+import { Button, Card, EmptyState, Page, Paper, PaperCopies, PaperStage, Select, TextField } from '@/components/ui'
+import { CardLoading, errorMessage } from '@/components/exmcl/ExmclUi'
+import '@/components/exmcl/award-list.css'
 
 type ClassSectionEntry = {
   _id?: { class?: string; section?: string }
@@ -20,14 +23,6 @@ type ClassSectionEntry = {
 
 const sortClassNames = (left: string, right: string) =>
   left.localeCompare(right, undefined, { numeric: true, sensitivity: 'base' })
-
-const selectClassName =
-  'min-w-[140px] rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-60 dark:border-gray-600 dark:bg-gray-800 dark:text-white'
-
-const PAGE_ASPECT: Record<'A4' | 'legal', Record<'portrait' | 'landscape', string>> = {
-  A4: { portrait: '210 / 297', landscape: '297 / 210' },
-  legal: { portrait: '8.5 / 14', landscape: '14 / 8.5' },
-}
 
 const formatDisplayDate = (value: string) => {
   const match = String(value || '').trim().match(/^(\d{4})-(\d{2})-(\d{2})$/)
@@ -77,7 +72,7 @@ const ExmclAwardList: React.FC = () => {
         if (profile) setSchool(profile)
         if (examList.length > 0) setSelectedExamId(examList[0]._id)
       } catch {
-        if (!cancelled) toast.error('Failed to load award list.')
+        if (!cancelled) toast.error('Exams and classes didn’t load. Check your connection and try again.')
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -176,15 +171,13 @@ const ExmclAwardList: React.FC = () => {
   const selectedExam = exams.find((exam) => exam._id === selectedExamId)
   const canGenerate = Boolean(selectedExamId && selectedClass && selectedSection)
   const twoUp = design.copiesPerSheet === 2
-  const pageAspect = PAGE_ASPECT[design.pageSize || 'A4'][design.orientation || 'landscape']
   const schoolName = String(school.name || '').trim() || 'SCHOOL NAME'
   const schoolAddress = String(school.address || '').trim()
-  const copyCount = twoUp ? [0, 1] : [0]
   const previewSubjects = subjectName.trim() ? [subjectName.trim()] : ['Marks']
 
   const handleGenerate = async () => {
     if (!canGenerate) {
-      toast.error('Select exam, class, and section.')
+      toast.error('Select an exam, class and section.')
       return
     }
 
@@ -198,170 +191,157 @@ const ExmclAwardList: React.FC = () => {
         { subject: subjectName, examDate }
       )
       toast.success('Award list PDF downloaded.')
-    } catch (error: any) {
-      toast.error(String(error?.message || 'Failed to generate award list PDF.'))
+    } catch (error) {
+      toast.error(errorMessage(error, 'The award list PDF wasn’t generated. Try again.'))
     } finally {
       setGenerating(false)
     }
   }
 
+  const classLabel = selectedClass && selectedSection ? `Class ${selectedClass}-${selectedSection}` : ''
+  const previewSubtitle =
+    [selectedExam?.name, classLabel, subjectName.trim()].filter(Boolean).join(' · ') ||
+    'Updates as you pick the exam and class.'
+
+  const countLine = !(selectedClass && selectedSection) ? (
+    'Pick an exam, class and section to generate its award list.'
+  ) : previewLoading ? (
+    'Counting students…'
+  ) : studentCount === null ? (
+    'Student count didn’t load. You can still download the PDF.'
+  ) : (
+    <>
+      <strong>{studentCount}</strong> {studentCount === 1 ? 'student' : 'students'} in {classLabel}
+    </>
+  )
+
   return (
-    <div className="p-6">
-      <div className="mx-auto max-w-[1400px] space-y-4">
-        <div className="flex flex-col gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm dark:border-gray-700 dark:bg-gray-800 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex flex-1 flex-wrap items-center gap-2">
-            <select
-              title="Exam"
-              aria-label="Exam"
+    <Page>
+      <form
+        noValidate
+        onSubmit={(event) => {
+          event.preventDefault()
+          void handleGenerate()
+        }}
+      >
+        <Card
+          title="Generate award list"
+          subtitle="A blank marks sheet for one class section, with every active student in roll order."
+          action={
+            <Button variant="tertiary" size="sm" icon={Settings2} onClick={() => navigate('/exmcl/performas/award-list')}>
+              Change format
+            </Button>
+          }
+          footer={
+            <div className="ex-al-foot">
+              <span className="ex-al-count" aria-live="polite">
+                {countLine}
+              </span>
+              <Button
+                type="submit"
+                variant="primary"
+                icon={Download}
+                loading={generating}
+                disabled={!canGenerate || loading}
+              >
+                {generating ? 'Preparing award list…' : 'Download award list'}
+              </Button>
+            </div>
+          }
+        >
+          <div className="cb-form-grid cb-form-grid--3">
+            <Select
+              label="Exam"
+              required
               value={selectedExamId}
-              onChange={(e) => setSelectedExamId(e.target.value)}
               disabled={loading}
-              className={`${selectClassName} min-w-[220px]`}
-            >
-              <option value="">{loading ? 'Loading exams...' : 'Select exam'}</option>
-              {exams.map((exam) => (
-                <option key={exam._id} value={exam._id}>
-                  {exam.code} — {exam.name}
-                </option>
-              ))}
-            </select>
-            <select
-              title="Class"
-              aria-label="Class"
+              placeholder={loading ? 'Loading exams…' : exams.length ? 'Choose exam' : 'No exams yet'}
+              hint={!loading && exams.length === 0 ? 'Add an exam under Exams first.' : undefined}
+              options={exams.map((exam) => ({ value: exam._id, label: `${exam.code} · ${exam.name}` }))}
+              onChange={(event) => setSelectedExamId(event.target.value)}
+            />
+            <Select
+              label="Class"
+              required
               value={selectedClass}
-              onChange={(e) => setSelectedClass(e.target.value)}
               disabled={loading}
-              className={selectClassName}
-            >
-              <option value="">Class</option>
-              {classOptions.map((className) => (
-                <option key={className} value={className}>
-                  {className}
-                </option>
-              ))}
-            </select>
-            <select
-              title="Section"
-              aria-label="Section"
+              placeholder="Choose class"
+              options={classOptions}
+              onChange={(event) => setSelectedClass(event.target.value)}
+            />
+            <Select
+              label="Section"
+              required
               value={selectedSection}
-              onChange={(e) => setSelectedSection(e.target.value)}
               disabled={loading || !selectedClass}
-              className={selectClassName}
-            >
-              <option value="">{selectedClass ? 'Section' : 'Select class first'}</option>
-              {sectionOptions.map((section) => (
-                <option key={section} value={section}>
-                  {section}
-                </option>
-              ))}
-            </select>
+              placeholder={selectedClass ? 'Choose section' : 'Choose class first'}
+              options={sectionOptions}
+              onChange={(event) => setSelectedSection(event.target.value)}
+            />
             {design.headerFields.subject ? (
-              <input
-                title="Subject (optional)"
-                aria-label="Subject (optional)"
-                placeholder="Subject (optional)"
+              <TextField
+                label="Subject"
+                hint="Optional. Printed in the header."
                 value={subjectName}
-                onChange={(e) => setSubjectName(e.target.value)}
-                className={`${selectClassName} min-w-[160px]`}
+                onChange={(event) => setSubjectName(event.target.value)}
               />
             ) : null}
             {design.headerFields.date ? (
-              <input
+              <TextField
+                label="Exam date"
                 type="date"
-                title="Date (optional)"
-                aria-label="Date (optional)"
+                hint="Optional. Printed in the header."
                 value={examDate}
-                onChange={(e) => setExamDate(e.target.value)}
-                className={selectClassName}
+                onChange={(event) => setExamDate(event.target.value)}
               />
             ) : null}
-            <p className="text-[11px] text-slate-500">
-              {selectedClass && selectedSection
-                ? previewLoading
-                  ? 'Loading students...'
-                  : studentCount === null
-                    ? 'Unable to load student count.'
-                    : `${studentCount} student${studentCount === 1 ? '' : 's'}`
-                : 'Select exam, class, and section'}
-              {' · '}
-              <button
-                type="button"
-                onClick={() => navigate('/exmcl/performas/award-list')}
-                className="font-medium text-blue-600 hover:underline"
-              >
-                Change format
-              </button>
-            </p>
           </div>
-          <button
-            type="button"
-            onClick={handleGenerate}
-            disabled={!canGenerate || generating}
-            className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            <Download className="h-3.5 w-3.5" />
-            {generating ? 'Generating...' : 'Download PDF'}
-          </button>
-        </div>
+        </Card>
+      </form>
 
-        <div className="rounded-xl border border-gray-200 bg-slate-100 p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900">
-          <p className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-            Live preview
-            {selectedExam ? ` · ${selectedExam.name}` : ''}
-            {selectedClass && selectedSection ? ` · ${selectedClass}-${selectedSection}` : ''}
-            {subjectName.trim() ? ` · ${subjectName.trim()}` : ''}
-          </p>
-          {!canGenerate ? (
-            <p className="py-16 text-center text-sm text-slate-500">
-              Select exam, class, and section to preview the award list.
-            </p>
-          ) : previewLoading ? (
-            <p className="py-16 text-center text-sm text-slate-500">Loading preview...</p>
-          ) : studentCount === 0 ? (
-            <p className="py-16 text-center text-sm text-slate-500">
-              No students found for class {selectedClass}, section {selectedSection}.
-            </p>
-          ) : (
-            <div className="overflow-auto">
-              <div
-                className="mx-auto max-w-full bg-white p-3 shadow-md"
-                style={{
-                  aspectRatio: pageAspect,
-                  width: design.orientation === 'portrait' ? 'min(100%, 640px)' : '100%',
-                }}
-              >
-                <div className={twoUp ? 'flex h-full gap-3' : 'h-full'}>
-                  {copyCount.map((index) => (
-                    <div
-                      key={index}
-                      className={twoUp ? 'min-w-0 flex-1 border-r border-dashed border-slate-300 pr-3 last:border-r-0 last:pr-0 last:pl-3' : ''}
-                    >
-                      <AwardListPreview
-                        design={design}
-                        compact={twoUp}
-                        data={{
-                          schoolName,
-                          schoolAddress,
-                          logoUrl: school.logoUrl,
-                          className: selectedClass,
-                          section: selectedSection,
-                          examName: selectedExam?.name || '',
-                          examDate: formatDisplayDate(examDate),
-                          subject: subjectName,
-                          maxMarks: selectedExam?.maximumMarks || '',
-                          subjects: previewSubjects,
-                          students: previewStudents,
-                        }}
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
+      <Card title="Preview" subtitle={previewSubtitle}>
+        {loading ? (
+          <CardLoading label="Loading award list format…" />
+        ) : !canGenerate ? (
+          <EmptyState
+            icon={FileText}
+            title="Nothing to preview yet"
+            body="Pick an exam, class and section to see the award list as it will print."
+          />
+        ) : previewLoading ? (
+          <CardLoading label="Loading students…" />
+        ) : studentCount === 0 ? (
+          <EmptyState
+            title={`No active students in ${classLabel}`}
+            body="Add students to this section, or pick another class."
+          />
+        ) : (
+          <PaperStage>
+            <Paper pageSize={design.pageSize || 'A4'} orientation={design.orientation || 'landscape'}>
+              <PaperCopies count={twoUp ? 2 : 1}>
+                <AwardListPreview
+                  design={design}
+                  compact={twoUp}
+                  data={{
+                    schoolName,
+                    schoolAddress,
+                    logoUrl: school.logoUrl,
+                    className: selectedClass,
+                    section: selectedSection,
+                    examName: selectedExam?.name || '',
+                    examDate: formatDisplayDate(examDate),
+                    subject: subjectName,
+                    maxMarks: selectedExam?.maximumMarks || '',
+                    subjects: previewSubjects,
+                    students: previewStudents,
+                  }}
+                />
+              </PaperCopies>
+            </Paper>
+          </PaperStage>
+        )}
+      </Card>
+    </Page>
   )
 }
 

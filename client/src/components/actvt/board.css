@@ -1,0 +1,113 @@
+/*
+ * Activity board / events calendar (pages/actvt/ActvtBoard.tsx). Tokens only.
+ * House colours (entity data) arrive as --tone / --tone-ink via entityTone.toneStyle().
+ * Activity types are a fixed app palette mapped to --chart-1..6 in order (ab-type--N);
+ * the type name is always printed next to the colour.
+ */
+
+.cb-app .ab-page { display: flex; flex-direction: column; gap: var(--space-6); }
+
+/* ---------- Activity type palette ---------- */
+.cb-app .ab-type--neutral { --tone: var(--neutral-solid); }
+.cb-app .ab-type--1 { --tone: var(--chart-1); }
+.cb-app .ab-type--2 { --tone: var(--chart-2); }
+.cb-app .ab-type--3 { --tone: var(--chart-3); }
+.cb-app .ab-type--4 { --tone: var(--chart-4); }
+.cb-app .ab-type--5 { --tone: var(--chart-5); }
+.cb-app .ab-type--6 { --tone: var(--chart-6); }
+
+.cb-app .ab-typetag { display: inline-flex; align-items: center; gap: 6px; height: 22px; padding: 0 8px; border-radius: var(--radius-full); background: color-mix(in srgb, var(--tone) 12%, var(--surface)); color: var(--ink); font: 500 12px/16px var(--font-sans); white-space: nowrap; }
+.cb-app .ab-typetag__dot { width: 8px; height: 8px; border-radius: var(--radius-full); background: var(--tone); flex: none; }
+
+/* ---------- Lists inside flush cards ---------- */
+.cb-app .ab-filterbar { padding: 0 var(--space-5) var(--space-3); border-bottom: 1px solid var(--border); }
+.cb-app .ab-list { list-style: none; margin: 0; padding: 0; }
+.cb-app .ab-list--flush > .ab-row + .ab-row { border-top: 1px solid var(--border); }
+.cb-app .ab-row { display: flex; align-items: center; gap: var(--space-2); padding: 0 var(--space-3) 0 0; min-width: 0; }
+.cb-app .ab-row:hover { background: var(--surface-hover); }
+.cb-app .ab-row__open { all: unset; box-sizing: border-box; flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; padding: var(--space-3) var(--space-5); cursor: pointer; }
+.cb-app .ab-row__open.is-static { cursor: default; }
+.cb-app .ab-row__open:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; border-radius: var(--radius-md); }
+.cb-app .ab-row__head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); min-width: 0; }
+.cb-app .ab-row__title { font: 600 14px/20px var(--font-sans); color: var(--ink); overflow-wrap: anywhere; }
+.cb-app .ab-row__meta { font-size: 12px; line-height: 18px; color: var(--ink-muted); overflow-wrap: anywhere; }
+.cb-app .ab-row:last-child .ab-row__open { padding-bottom: var(--space-4); }
+
+.cb-app .ab-house { display: inline-flex; align-items: center; gap: 6px; color: var(--ink); font-weight: 500; }
+.cb-app .ab-house--picked { font-size: 13px; line-height: 18px; margin-top: calc(-1 * var(--space-1)); }
+.cb-app .ab-points { font: 600 13px/18px var(--font-sans); color: var(--ink); }
+
+/* ---------- Calendar ---------- */
+.cb-app .ab-calnav { display: flex; align-items: center; gap: var(--space-2); }
+.cb-app .ab-stepper { display: inline-flex; height: var(--control-sm); border: 1px solid var(--border-control); border-radius: var(--radius-md); background: var(--surface); overflow: hidden; }
+.cb-app .ab-stepper__btn { display: inline-flex; align-items: center; justify-content: center; width: 32px; border: 0; background: none; color: var(--ink-muted); cursor: pointer; }
+.cb-app .ab-stepper__btn + .ab-stepper__btn { border-left: 1px solid var(--border); }
+.cb-app .ab-stepper__btn:hover { background: var(--surface-hover); color: var(--ink); }
+.cb-app .ab-stepper__btn:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+
+.cb-app .ab-cal { min-width: 0; }
+.cb-app .ab-cal__weekdays, .cb-app .ab-cal__grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: var(--space-1); }
+.cb-app .ab-cal__weekdays { margin-bottom: var(--space-1); }
+.cb-app .ab-cal__weekday { padding: var(--space-1) 0; text-align: center; font: 600 11px/16px var(--font-sans); letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-subtle); }
+.cb-app .ab-cal__weekday.is-sunday { color: var(--danger-ink); }
+
+.cb-app .ab-cal__cell { all: unset; box-sizing: border-box; position: relative; display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; min-height: 84px; padding: 6px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); cursor: pointer; }
+.cb-app .ab-cal__cell:hover { background: var(--surface-hover); border-color: var(--border-strong); }
+.cb-app .ab-cal__cell:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+.cb-app .ab-cal__cell.is-empty { background: var(--surface-sunken); border-color: transparent; cursor: default; opacity: 0.5; }
+.cb-app .ab-cal__cell.is-selected { border-color: var(--accent); background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
+.cb-app .ab-cal__day { display: inline-flex; align-items: center; justify-content: center; align-self: flex-start; min-width: 22px; height: 22px; padding: 0 4px; border-radius: var(--radius-full); font: 600 12px/16px var(--font-sans); color: var(--ink); font-variant-numeric: tabular-nums; }
+.cb-app .ab-cal__cell.is-sunday .ab-cal__day { color: var(--danger-ink); }
+.cb-app .ab-cal__cell.is-today .ab-cal__day { background: var(--accent-strong); color: var(--on-accent); }
+.cb-app .ab-cal__chips { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.cb-app .ab-cal__chip { display: block; min-width: 0; padding: 1px 6px; border-radius: var(--radius-sm); background: color-mix(in srgb, var(--tone) 14%, var(--surface)); box-shadow: inset 3px 0 0 var(--tone); color: var(--ink); font: 500 11px/16px var(--font-sans); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cb-app .ab-cal__chip.is-cancelled { text-decoration: line-through; color: var(--ink-muted); }
+.cb-app .ab-cal__more { font-size: 11px; line-height: 16px; color: var(--ink-subtle); padding-left: 6px; }
+.cb-app .ab-cal__dots { display: none; gap: 3px; justify-content: center; }
+.cb-app .ab-cal__dot { width: 6px; height: 6px; border-radius: var(--radius-full); background: var(--tone); }
+
+.cb-app .ab-legend { list-style: none; margin: var(--space-4) 0 0; padding: var(--space-3) 0 0; border-top: 1px solid var(--border); display: flex; flex-wrap: wrap; gap: var(--space-2); }
+
+/* ---------- Standings ---------- */
+.cb-app .ab-standings { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-4); }
+.cb-app .ab-standing { display: flex; flex-direction: column; gap: 6px; }
+.cb-app .ab-standing__head { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
+.cb-app .ab-standing__rank { min-width: 28px; font: 600 13px/18px var(--font-sans); color: var(--ink-subtle); }
+.cb-app .ab-standing__name { flex: 1; min-width: 0; font: 600 14px/20px var(--font-sans); color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cb-app .ab-standing__pts { font: 600 15px/20px var(--font-sans); color: var(--ink); white-space: nowrap; }
+.cb-app .ab-standing__pts span { font-size: 12px; font-weight: 500; color: var(--ink-muted); }
+.cb-app .ab-standing__track { height: 8px; border-radius: var(--radius-full); background: var(--surface-sunken); overflow: hidden; }
+.cb-app .ab-standing__fill { height: 100%; border-radius: var(--radius-full); background: var(--tone); }
+.cb-app .ab-standing__entries { font-size: 12px; line-height: 16px; color: var(--ink-subtle); padding-left: 36px; }
+
+/* ---------- Criteria ---------- */
+.cb-app .ab-criteria { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-4); grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
+.cb-app .ab-crit { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; padding: var(--space-4); border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); }
+.cb-app .ab-crit__head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-2); }
+.cb-app .ab-crit__titles { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.cb-app .ab-crit__title { margin: 0; font: 600 14px/20px var(--font-sans); color: var(--ink); overflow-wrap: anywhere; }
+.cb-app .ab-crit__meta { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); font-size: 12px; line-height: 16px; color: var(--ink-muted); }
+.cb-app .ab-crit__points { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; font-size: 13px; line-height: 18px; color: var(--ink); }
+.cb-app .ab-crit__points li::marker { color: var(--ink-subtle); font-variant-numeric: tabular-nums; }
+.cb-app .ab-crit__none { margin: 0; font-size: 13px; color: var(--ink-subtle); }
+.cb-app .ab-crit__notes { margin: 0; padding-top: var(--space-3); border-top: 1px solid var(--border); font-size: 12px; line-height: 18px; color: var(--ink-muted); }
+
+/* ---------- Sheet footer: destructive action sits apart on the left ---------- */
+@media (min-width: 641px) {
+  .cb-app .ab-sheet-left { margin-right: auto; }
+}
+
+/* ---------- Phones: calendar collapses to day numbers + type dots ---------- */
+@media (max-width: 640px) {
+  .cb-app .ab-page { gap: var(--space-4); }
+  .cb-app .ab-filterbar { padding: 0 var(--space-4) var(--space-3); }
+  .cb-app .ab-row__open { padding: var(--space-3) var(--space-4); }
+  .cb-app .ab-calnav { gap: var(--space-1); }
+  .cb-app .ab-cal__weekdays, .cb-app .ab-cal__grid { gap: 2px; }
+  .cb-app .ab-cal__weekday { font-size: 10px; letter-spacing: 0; }
+  .cb-app .ab-cal__cell { min-height: 48px; padding: 4px 2px; align-items: center; gap: 2px; }
+  .cb-app .ab-cal__day { align-self: center; }
+  .cb-app .ab-cal__chips { display: none; }
+  .cb-app .ab-cal__dots { display: flex; }
+  .cb-app .ab-criteria { grid-template-columns: minmax(0, 1fr); }
+}

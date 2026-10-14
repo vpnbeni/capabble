@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
-import { Bus, MapPinned, ShieldAlert, Users } from 'lucide-react'
-import trnstService, { type TransportOverview } from '@/services/trnstService'
+import { ArrowRight, Bus, Footprints, MapPinned, Users } from 'lucide-react'
+import trnstService, { type SelfStudentRecord, type TransportOverview, type TransportRoute, type TransportVehicle } from '@/services/trnstService'
+import { Banner, Button, Card, DataTable, EmptyState, Page, StatCard, orDash, type DataTableColumn } from '@/components/ui'
+import { Entity, PapersBadge, VehicleStatusBadge, errorMessage, papersDue, routeVehicle, vehicleName } from '@/components/trnst/TrnstUi'
 
-const emptyStats = {
+const emptyStats: TransportOverview['stats'] = {
   vehicleCount: 0,
   routeCount: 0,
   activeVehicles: 0,
@@ -15,16 +17,16 @@ const emptyStats = {
 }
 
 const TrnstOverview: React.FC = () => {
+  const navigate = useNavigate()
   const [data, setData] = useState<TransportOverview | null>(null)
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const load = async () => {
-      setLoading(true)
       try {
         setData(await trnstService.getOverview())
-      } catch (error: any) {
-        toast.error(String(error?.response?.data?.message || error?.message || 'Failed to load transport overview.'))
+      } catch (error) {
+        toast.error(errorMessage(error, 'Could not load the transport overview.'))
       } finally {
         setLoading(false)
       }
@@ -32,107 +34,158 @@ const TrnstOverview: React.FC = () => {
     void load()
   }, [])
 
+  if (loading && !data) {
+    return (
+      <Page>
+        <div className="cb-table-state" role="status">
+          <span className="cb-spinner" aria-hidden="true" />
+          Loading transport records
+        </div>
+      </Page>
+    )
+  }
+
   const stats = data?.stats || emptyStats
+  const vehicles = data?.vehicles || []
+  const routes = data?.routes || []
+  const selfStudents = data?.selfStudents || []
+  const withPapersDue = vehicles.filter((vehicle) => papersDue(vehicle).length > 0)
+  const withoutDriver = vehicles.filter((vehicle) => vehicle.status === 'active' && !vehicle.driverName).length
+
+  const vehicleColumns: DataTableColumn<TransportVehicle>[] = [
+    {
+      key: 'vehicle',
+      header: 'Vehicle',
+      mobile: 'title',
+      render: (v) => <Entity primary={vehicleName(v)} secondary={`${v.registrationNumber} · ${v.capacity || 0} seats`} />,
+    },
+    { key: 'driver', header: 'Driver', mobile: 'subtitle', render: (v) => orDash(v.driverName) },
+    {
+      key: 'status',
+      header: 'Status',
+      mobile: 'aside',
+      render: (v) => (
+        <span className="tr-badges">
+          <VehicleStatusBadge status={v.status} />
+          <PapersBadge vehicle={v} />
+        </span>
+      ),
+    },
+  ]
+
+  const routeColumns: DataTableColumn<TransportRoute>[] = [
+    {
+      key: 'route',
+      header: 'Route',
+      mobile: 'title',
+      render: (r) => <Entity primary={`${r.code} · ${r.name}`} secondary={`${r.startPoint || 'Start'} → ${r.endPoint || 'End'}`} />,
+    },
+    { key: 'vehicle', header: 'Vehicle', mobile: 'subtitle', render: (r) => vehicleName(routeVehicle(r)) || 'Unassigned' },
+    { key: 'stops', header: 'Stops', numeric: true, mobile: 'aside', render: (r) => r.stops?.length || 0 },
+  ]
+
+  const selfColumns: DataTableColumn<SelfStudentRecord>[] = [
+    {
+      key: 'name',
+      header: 'Student',
+      mobile: 'title',
+      render: (s) => <Entity primary={s.name} secondary={s.rollNumber ? `Roll ${s.rollNumber}` : undefined} />,
+    },
+    { key: 'class', header: 'Class', mobile: 'subtitle', render: (s) => orDash([s.className, s.section].filter(Boolean).join(' ')) },
+    { key: 'mode', header: 'Comes by', mobile: 'aside', render: (s) => s.commuteMode },
+    { key: 'phone', header: 'Guardian phone', mobile: 'hidden', render: (s) => orDash(s.guardianPhone) },
+  ]
 
   return (
-    <div className="p-6">
-      <div className="mx-auto max-w-[1400px] space-y-6">
-        <div className="rounded-[28px] border border-amber-100 bg-white px-6 py-5 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wide text-amber-600">TRNST</p>
-          <h2 className="mt-1 text-2xl font-semibold text-slate-900">School transport</h2>
-          <p className="mt-2 text-sm text-slate-500">Keep vehicle papers, assigned staff, and route stops in one place.</p>
-        </div>
+    <Page>
+      {withPapersDue.length ? (
+        <Banner tone={withPapersDue.some((v) => papersDue(v).some((p) => p.days < 0)) ? 'danger' : 'warning'} title="Vehicle papers need renewing">
+          {withPapersDue.map(vehicleName).join(', ')} {withPapersDue.length === 1 ? 'has' : 'have'} insurance or fitness lapsed or lapsing within 30 days.
+        </Banner>
+      ) : null}
 
-        {loading && !data ? (
-          <div className="rounded-[28px] border border-slate-200 bg-white px-6 py-16 text-center text-sm text-slate-500">Loading transport records...</div>
-        ) : (
-          <>
-            <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <StatCard icon={<Bus className="h-5 w-5" />} label="Vehicles" value={stats.vehicleCount} hint={`${stats.activeVehicles} running`} tone="bg-amber-50 text-amber-700" />
-              <StatCard icon={<MapPinned className="h-5 w-5" />} label="Routes" value={stats.routeCount} hint={`${stats.totalStops} stops mapped`} tone="bg-sky-50 text-sky-700" />
-              <StatCard icon={<Users className="h-5 w-5" />} label="Seat capacity" value={stats.totalCapacity} hint="Across active fleet" tone="bg-indigo-50 text-indigo-700" />
-              <StatCard icon={<ShieldAlert className="h-5 w-5" />} label="Self students" value={stats.selfStudentCount || 0} hint="Coming to school without school transport" tone="bg-emerald-50 text-emerald-700" />
-            </section>
+      <section className="cb-stats" aria-label="Transport totals">
+        <StatCard
+          label="Vehicles"
+          value={stats.vehicleCount}
+          icon={Bus}
+          hint={stats.maintenanceVehicles ? `${stats.activeVehicles} running · ${stats.maintenanceVehicles} in maintenance` : `${stats.activeVehicles} running`}
+        />
+        <StatCard label="Routes" value={stats.routeCount} icon={MapPinned} hint={`${stats.totalStops} stops mapped`} />
+        <StatCard
+          label="Seat capacity"
+          value={stats.totalCapacity}
+          icon={Users}
+          hint={withoutDriver ? `${withoutDriver} active vehicle${withoutDriver === 1 ? '' : 's'} without a driver` : 'Across the active fleet'}
+        />
+        <StatCard label="Self students" value={stats.selfStudentCount || 0} icon={Footprints} hint="Come without school transport" />
+      </section>
 
-            <div className="grid gap-6 xl:grid-cols-2">
-              <Panel title="Vehicles" to="/trnst/vehicles" action="Manage vehicles">
-                {(data?.vehicles || []).slice(0, 5).map((vehicle) => (
-                  <div key={vehicle._id} className="flex items-center justify-between rounded-2xl border border-slate-100 px-4 py-3">
-                    <div>
-                      <p className="font-semibold text-slate-900">
-                        Bus {vehicle.busNo || '—'}
-                      </p>
-                      <p className="text-xs text-slate-500">
-                        {vehicle.registrationNumber} · {vehicle.vehicleType} · {vehicle.capacity} seats · {vehicle.driverName || 'No driver assigned'}
-                      </p>
-                    </div>
-                    <StatusPill status={vehicle.status} />
-                  </div>
-                ))}
-                {(data?.vehicles || []).length === 0 ? <Empty text="Add the first school bus or van." /> : null}
-              </Panel>
-              <Panel title="Routes" to="/trnst/routes" action="Manage routes">
-                {(data?.routes || []).slice(0, 5).map((route) => (
-                  <div key={route._id} className="rounded-2xl border border-slate-100 px-4 py-3">
-                    <p className="font-semibold text-slate-900">{route.code} · {route.name}</p>
-                    <p className="text-xs text-slate-500">
-                      {route.startPoint || 'Start'} → {route.endPoint || 'End'} · {route.stops?.length || 0} stops
-                    </p>
-                  </div>
-                ))}
-                {(data?.routes || []).length === 0 ? <Empty text="Create a pickup route and attach a vehicle." /> : null}
-              </Panel>
-            </div>
-            <Panel title="Self students" to="/trnst/self-students" action="Manage self students">
-              {(data?.selfStudents || []).slice(0, 6).map((student) => (
-                <div key={student._id} className="flex items-center justify-between rounded-2xl border border-slate-100 px-4 py-3">
-                  <div>
-                    <p className="font-semibold text-slate-900">{student.name}</p>
-                    <p className="text-xs text-slate-500">{student.className} {student.section} · {student.commuteMode}</p>
-                  </div>
-                </div>
-              ))}
-              {(data?.selfStudents || []).length === 0 ? <Empty text="Record students who walk, cycle, or are dropped by parents." /> : null}
-            </Panel>
-          </>
-        )}
+      <div className="cb-grid-6-6">
+        <Card
+          flush
+          className="tr-records"
+          title="Vehicles"
+          subtitle="Fleet status and assigned drivers."
+          action={
+            <Button variant="tertiary" size="sm" iconRight={ArrowRight} onClick={() => navigate('/trnst/vehicles')}>
+              Manage vehicles
+            </Button>
+          }
+        >
+          <DataTable
+            caption="Vehicles"
+            columns={vehicleColumns}
+            rows={vehicles.slice(0, 5)}
+            getRowKey={(v) => v._id}
+            onRowClick={() => navigate('/trnst/vehicles')}
+            empty={<EmptyState compact icon={Bus} title="No vehicles yet" body="Add the first school bus or van." />}
+          />
+        </Card>
+        <Card
+          flush
+          className="tr-records"
+          title="Routes"
+          subtitle="Pickup routes and the vehicle on each."
+          action={
+            <Button variant="tertiary" size="sm" iconRight={ArrowRight} onClick={() => navigate('/trnst/routes')}>
+              Manage routes
+            </Button>
+          }
+        >
+          <DataTable
+            caption="Routes"
+            columns={routeColumns}
+            rows={routes.slice(0, 5)}
+            getRowKey={(r) => r._id}
+            onRowClick={() => navigate('/trnst/routes')}
+            empty={<EmptyState compact icon={MapPinned} title="No routes yet" body="Create a pickup route and attach a vehicle." />}
+          />
+        </Card>
       </div>
-    </div>
+
+      <Card
+        flush
+        className="tr-records"
+        title="Self students"
+        subtitle="Students who walk, cycle or are dropped by family."
+        action={
+          <Button variant="tertiary" size="sm" iconRight={ArrowRight} onClick={() => navigate('/trnst/self-students')}>
+            Manage self students
+          </Button>
+        }
+      >
+        <DataTable
+          caption="Self students"
+          columns={selfColumns}
+          rows={selfStudents.slice(0, 6)}
+          getRowKey={(s) => s._id}
+          onRowClick={() => navigate('/trnst/self-students')}
+          empty={<EmptyState compact icon={Footprints} title="No self students recorded" body="Record students who walk, cycle or are dropped by parents." />}
+        />
+      </Card>
+    </Page>
   )
 }
-
-const StatCard = ({ icon, label, value, hint, tone }: { icon: React.ReactNode; label: string; value: number; hint: string; tone: string }) => (
-  <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
-    <div className="flex items-center gap-3">
-      <div className={`flex h-11 w-11 items-center justify-center rounded-2xl ${tone}`}>{icon}</div>
-      <div>
-        <p className="text-sm font-medium text-slate-500">{label}</p>
-        <p className="text-3xl font-bold tracking-tight text-slate-900">{value}</p>
-      </div>
-    </div>
-    <p className="mt-4 text-sm text-slate-500">{hint}</p>
-  </div>
-)
-
-const Panel = ({ title, to, action, children }: { title: string; to: string; action: string; children: React.ReactNode }) => (
-  <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
-    <div className="mb-4 flex items-center justify-between">
-      <h3 className="text-lg font-semibold text-slate-900">{title}</h3>
-      <Link to={to} className="text-sm font-semibold text-indigo-600 hover:text-indigo-700">{action}</Link>
-    </div>
-    <div className="space-y-3">{children}</div>
-  </section>
-)
-
-const StatusPill = ({ status }: { status: string }) => {
-  const map: Record<string, string> = {
-    active: 'bg-emerald-50 text-emerald-700',
-    maintenance: 'bg-amber-50 text-amber-700',
-    inactive: 'bg-slate-100 text-slate-600',
-  }
-  return <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold capitalize ${map[status] || map.inactive}`}>{status}</span>
-}
-
-const Empty = ({ text }: { text: string }) => <p className="rounded-2xl bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">{text}</p>
 
 export default TrnstOverview

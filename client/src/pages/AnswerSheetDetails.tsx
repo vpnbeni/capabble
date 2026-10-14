@@ -1,29 +1,29 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
-import { motion } from 'framer-motion'
+import { ArrowLeft, Ban, Download, FileText, Pencil, Plus, Save, Trash2, X, ExternalLink } from 'lucide-react'
 import {
-    ArrowLeft,
-    FileText,
-    Layers,
-    Palette,
-    GraduationCap,
-    Hash,
-    Edit2,
-    Save,
-    X,
-    Calendar,
-    Users,
-    AlertCircle,
-    BookOpen,
-    CheckCircle2,
-    TrendingUp,
-    Trash2,
-    Plus,
-    Ban,
-    Download,
-    Loader2
-} from 'lucide-react'
+    Button,
+    Card,
+    DataTable,
+    DetailList,
+    Dialog,
+    EmptyState,
+    MetricTile,
+    MetricTiles,
+    Page,
+    PageHeader,
+    Progress,
+    Select,
+    Sheet,
+    Tabs,
+    TextField,
+    Entity,
+    Banner,
+} from '@/components/ui'
+import type { DataTableColumn } from '@/components/ui'
+import { CardLoading } from '@/components/exmcl/ExmclUi'
+import '@/components/exmcl/centre-answersheet-details.css'
 import api from '../services/api'
 import answerSheetService, {
     AnswerSheetEntry,
@@ -31,6 +31,7 @@ import answerSheetService, {
     DiscardedSerial,
     SupplementarySubjectContext,
     SupplementaryUsageContextResponse,
+    SupplementaryUsageRecord,
 } from '../services/answerSheetService'
 import {
     createEmptySerialRange,
@@ -38,6 +39,16 @@ import {
     getAnswerSheetSerialRanges,
     validateSerialRangeInputs,
 } from '../utils/answerSheetSerialRanges'
+
+const DISCARD_REASONS = [
+    'Damaged/Misprinted',
+    'Received Damaged (Wear/Tear during transport)',
+    'Torn',
+    'Water Damage',
+    'Missing Pages',
+    'Printing Defect',
+    'Other',
+]
 
 interface RelatedExam {
     _id: string
@@ -477,37 +488,30 @@ const AnswerSheetDetails: React.FC = () => {
         return typeMap[type] || type
     }
 
-    const getColorStyles = (color: string) => {
-        const c = color.toLowerCase();
-        if (c === 'red') return 'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800';
-        if (c === 'blue') return 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-800';
-        if (c === 'green') return 'bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-300 dark:border-green-800';
-        if (c === 'yellow') return 'bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-300 dark:border-yellow-800';
-        if (c === 'pink') return 'bg-pink-50 text-pink-700 border-pink-200 dark:bg-pink-900/20 dark:text-pink-300 dark:border-pink-800';
-        return 'bg-gray-50 text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700';
-    }
+    const goBack = () => navigate(-1)
 
     if (loading && !answerSheet) {
         return (
-            <div className="flex h-screen items-center justify-center bg-gray-50 dark:bg-gray-900">
-                <div className="h-12 w-12 animate-spin rounded-full border-b-2 border-t-2 border-blue-600"></div>
-            </div>
+            <Page>
+                <Card>
+                    <CardLoading label="Loading answer sheet…" />
+                </Card>
+            </Page>
         )
     }
 
     if (!answerSheet) {
         return (
-            <div className="flex h-screen items-center justify-center bg-gray-50 dark:bg-gray-900">
-                <div className="text-center">
-                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Answer sheet not found</h2>
-                    <button
-                        onClick={() => navigate(-1)}
-                        className="mt-4 text-blue-600 hover:text-blue-500 font-medium flex items-center justify-center gap-2"
-                    >
-                        <ArrowLeft className="w-4 h-4" /> Go Back
-                    </button>
-                </div>
-            </div>
+            <Page>
+                <Card>
+                    <EmptyState
+                        icon={FileText}
+                        title="Answer sheet not found"
+                        body="It may have been removed, or the link is out of date."
+                        action={<Button icon={ArrowLeft} onClick={goBack}>Go back</Button>}
+                    />
+                </Card>
+            </Page>
         )
     }
 
@@ -515,905 +519,600 @@ const AnswerSheetDetails: React.FC = () => {
     const usableTotal = isSupplementary
         ? Math.max(0, (answerSheet?.total || 0) - (supplementaryContext?.discardedCount || allocation?.discardedCount || 0))
         : allocation?.usableTotal || allocation?.total || 0
-    const usagePercentage = usableTotal ? Math.round((actualUsedCount / usableTotal) * 100) : 0;
+    const usagePercentage = usableTotal ? Math.round((actualUsedCount / usableTotal) * 100) : 0
+    const discardedCount = supplementaryContext?.discardedCount || allocation?.discardedCount || 0
+    const usageTone: 'success' | 'warning' | 'danger' =
+        usagePercentage > 90 ? 'danger' : usagePercentage > 75 ? 'warning' : 'success'
+    const showUtilization =
+        (allocation && allocation.hasSerialNumbers) || (isSupplementary && answerSheetSerialRanges.length > 0)
+    const typeLabel = formatAnswerSheetType(answerSheet.answerSheetType)
 
-    // Calculate color based on percentage
-    const getProgressBarColor = (percentage: number) => {
-        if (percentage > 100) return 'bg-red-600';
-        if (percentage > 90) return 'bg-orange-500';
-        if (percentage > 75) return 'bg-yellow-500';
-        return 'bg-green-500';
-    };
+    const cancelEdit = () => {
+        setEditMode(false)
+        setEditValues({
+            serialRanges: getAnswerSheetSerialRanges(answerSheet)
+        })
+    }
+
+    const closeDiscardDialog = () => {
+        setShowDiscardedModal(false)
+        setDiscardInput({ serial: '', fromSerial: '', toSerial: '', reason: 'Damaged/Misprinted' })
+    }
+
+    const discardedColumns: DataTableColumn<DiscardedSerial>[] = [
+        {
+            key: 'serial',
+            header: 'Serial no.',
+            mobile: 'title',
+            render: (item) => <span className="cb-strong is-num">{item.serial}</span>,
+        },
+        {
+            key: 'reason',
+            header: 'Reason',
+            mobile: 'subtitle',
+            render: (item) => <span className="cb-muted">{item.reason || '—'}</span>,
+        },
+        {
+            key: 'actions',
+            header: '',
+            headerLabel: 'Actions',
+            align: 'right',
+            width: 64,
+            mobile: 'aside',
+            interactive: true,
+            render: (item) => (
+                <Button
+                    variant="tertiary"
+                    size="sm"
+                    icon={X}
+                    title="Remove from discarded"
+                    aria-label={`Remove ${item.serial} from discarded`}
+                    onClick={() => handleRemoveDiscarded(item.serial)}
+                />
+            ),
+        },
+    ]
+
+    const allocationColumns: DataTableColumn<SerialAllocation>[] = [
+        {
+            key: 'exam',
+            header: 'Date and subject',
+            mobile: 'title',
+            render: (alloc) => (
+                <Entity
+                    primary={formatDate(alloc.examDate)}
+                    secondary={<span title={alloc.subjectName}>{alloc.subjectName} ({alloc.subjectCode})</span>}
+                />
+            ),
+        },
+        {
+            key: 'students',
+            header: 'Students',
+            numeric: true,
+            align: 'right',
+            render: (alloc) => alloc.candidateCount,
+        },
+        {
+            key: 'range',
+            header: 'Serial range',
+            mobile: 'subtitle',
+            render: (alloc) => (
+                <span className="is-num">
+                    {alloc.serialFrom} – {alloc.serialTo}
+                </span>
+            ),
+        },
+        {
+            key: 'sheets',
+            header: 'Sheets',
+            numeric: true,
+            align: 'right',
+            mobile: 'aside',
+            render: (alloc) => <span className="cb-strong">{alloc.sheetsAllocated}</span>,
+        },
+        {
+            key: 'download',
+            header: '',
+            headerLabel: 'Dispatch record',
+            align: 'right',
+            width: 64,
+            interactive: true,
+            render: (alloc) => {
+                const hasAllocation = alloc.serialFrom !== 'N/A' && alloc.serialTo !== 'N/A' && alloc.sheetsAllocated > 0
+                const label = hasAllocation ? 'Preview and download dispatch record PDF' : 'No allocation available for download'
+                return (
+                    <Button
+                        variant="tertiary"
+                        size="sm"
+                        icon={Download}
+                        loading={dispatchPreviewLoading && dispatchPreviewAlloc?._id === alloc._id}
+                        onClick={() => hasAllocation ? openDispatchPreview(alloc) : undefined}
+                        disabled={!hasAllocation || (dispatchPreviewLoading && dispatchPreviewAlloc?._id !== alloc._id)}
+                        title={label}
+                        aria-label={label}
+                    />
+                )
+            },
+        },
+    ]
+
+    const usageRowsFor = (subject: SupplementarySubjectContext) =>
+        subject.usages.map((usage, usageIndex) => ({
+            usage,
+            sheetNo: usage.sheetNo || usage.serials?.[0] || '-',
+            key: `${usage._id}-${usage.sheetNo || usage.serials?.[0] || '-'}-${usageIndex}`,
+        }))
+
+    const usageColumns: DataTableColumn<{ usage: SupplementaryUsageRecord; sheetNo: string; key: string }>[] = [
+        { key: 'room', header: 'Room no.', mobile: 'subtitle', render: (row) => row.usage.roomNo },
+        { key: 'roll', header: 'Roll number', mobile: 'title', render: (row) => <span className="cb-strong is-num">{row.usage.rollNo}</span> },
+        { key: 'sheet', header: 'Sheet no.', render: (row) => <span className="is-num">{row.sheetNo}</span> },
+        {
+            key: 'actions',
+            header: '',
+            headerLabel: 'Actions',
+            align: 'right',
+            width: 64,
+            mobile: 'aside',
+            interactive: true,
+            render: (row) => (
+                <Button
+                    variant="tertiary"
+                    size="sm"
+                    icon={X}
+                    title="Remove usage"
+                    aria-label={`Remove sheet ${row.sheetNo} for roll ${row.usage.rollNo}`}
+                    onClick={() => handleRemoveSupplementaryUsage(row.usage._id, row.usage.sheetNo || row.usage.serials?.[0])}
+                />
+            ),
+        },
+    ]
+
+    const serialCardAction = !editMode ? (
+        <Button size="sm" icon={Pencil} onClick={() => setEditMode(true)}>
+            Edit range
+        </Button>
+    ) : (
+        <div className="cb-card-actions">
+            <Button size="sm" variant="tertiary" onClick={cancelEdit} disabled={loading}>
+                Cancel
+            </Button>
+            <Button size="sm" variant="primary" icon={Save} onClick={handleSaveSerialNumbers} disabled={loading}>
+                Save range
+            </Button>
+        </div>
+    )
+
+    const subtitleParts = [`Class ${answerSheet.class}`, `${answerSheet.pages} pages`, answerSheet.colour].filter(Boolean)
 
     return (
-        <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4 }}
-            className="min-h-screen bg-gray-50/50 dark:bg-gray-900 p-6 lg:p-8"
-        >
-            <div className="mx-auto max-w-7xl">
-                {/* Info Cards Grid */}
-                <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                    <motion.div
-                        whileHover={{ y: -2 }}
-                        className="relative overflow-hidden rounded-xl bg-white p-5 shadow-sm ring-1 ring-gray-100 dark:bg-gray-800 dark:ring-gray-700"
+        <Page>
+            <PageHeader
+                title={`${typeLabel} answer sheets`}
+                subtitle={subtitleParts.join(' · ')}
+            />
+
+            <div className="cb-grid-8-4">
+                <div className="cb-stack">
+                    {/* Serial number range */}
+                    <Card
+                        title={answerSheetSerialRanges.length > 1 ? 'Serial number ranges' : 'Serial number range'}
+                        subtitle={editMode ? 'Enter the range printed on the bundles received from the board.' : undefined}
+                        action={serialCardAction}
                     >
-                        <div className="flex items-start justify-between">
-                            <div>
-                                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Type</p>
-                                <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
-                                    {formatAnswerSheetType(answerSheet.answerSheetType)}
-                                </p>
-                            </div>
-                            <div className="rounded-lg bg-blue-50 p-2.5 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">
-                                <FileText className="h-5 w-5" />
-                            </div>
-                        </div>
-                    </motion.div>
-
-                    <motion.div
-                        whileHover={{ y: -2 }}
-                        className="relative overflow-hidden rounded-xl bg-white p-5 shadow-sm ring-1 ring-gray-100 dark:bg-gray-800 dark:ring-gray-700"
-                    >
-                        <div className="flex items-start justify-between">
-                            <div>
-                                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Pages</p>
-                                <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">{answerSheet.pages} Pages</p>
-                            </div>
-                            <div className="rounded-lg bg-purple-50 p-2.5 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400">
-                                <Layers className="h-5 w-5" />
-                            </div>
-                        </div>
-                    </motion.div>
-
-                    <motion.div
-                        whileHover={{ y: -2 }}
-                        className="relative overflow-hidden rounded-xl bg-white p-5 shadow-sm ring-1 ring-gray-100 dark:bg-gray-800 dark:ring-gray-700"
-                    >
-                        <div className="flex items-start justify-between">
-                            <div>
-                                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Colour</p>
-                                <div className={`mt-2 inline-flex items-center rounded-md px-2.5 py-0.5 text-sm font-medium border ${getColorStyles(answerSheet.colour)}`}>
-                                    {answerSheet.colour}
-                                </div>
-                            </div>
-                            <div className="rounded-lg bg-pink-50 p-2.5 text-pink-600 dark:bg-pink-900/30 dark:text-pink-400">
-                                <Palette className="h-5 w-5" />
-                            </div>
-                        </div>
-                    </motion.div>
-
-                    <motion.div
-                        whileHover={{ y: -2 }}
-                        className="relative overflow-hidden rounded-xl bg-white p-5 shadow-sm ring-1 ring-gray-100 dark:bg-gray-800 dark:ring-gray-700"
-                    >
-                        <div className="flex items-start justify-between">
-                            <div>
-                                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Class</p>
-                                <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">Class {answerSheet.class}</p>
-                            </div>
-                            <div className="rounded-lg bg-indigo-50 p-2.5 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400">
-                                <GraduationCap className="h-5 w-5" />
-                            </div>
-                        </div>
-                    </motion.div>
-                </div>
-
-                {/* Main Content Area */}
-                <div className="grid grid-cols-1 gap-8">
-                    {/* Left Column: Serial Allocation Stats */}
-                    <div className="space-y-6">
-                        {/* Serial Number Management Card */}
-                        <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-100 dark:bg-gray-800 dark:ring-gray-700">
-                            <div className="border-b border-gray-100 bg-gray-50/50 px-6 py-4 dark:border-gray-700 dark:bg-gray-800/50">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2">
-                                        <div className="rounded-md bg-white p-1.5 shadow-sm ring-1 ring-gray-200 dark:bg-gray-700 dark:ring-gray-600">
-                                            <Hash className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-                                        </div>
-                                        <h2 className="font-semibold text-gray-900 dark:text-white">
-                                            {answerSheetSerialRanges.length > 1 ? 'Serial Number Ranges' : 'Serial Number Range'}
-                                        </h2>
-                                    </div>
-                                    {!editMode ? (
-                                        <button
-                                            onClick={() => setEditMode(true)}
-                                            className="group inline-flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-sm ring-1 ring-gray-200 transition-all hover:bg-gray-50 hover:text-blue-600 hover:ring-blue-200 dark:bg-gray-700 dark:text-gray-200 dark:ring-gray-600 dark:hover:bg-gray-600"
-                                        >
-                                            <Edit2 className="h-3.5 w-3.5 transition-colors group-hover:text-blue-600" />
-                                            Edit Range
-                                        </button>
-                                    ) : (
-                                        <div className="flex gap-2">
-                                            <button
-                                                onClick={handleSaveSerialNumbers}
-                                                disabled={loading}
-                                                className="inline-flex items-center gap-1.5 rounded-lg bg-green-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm transition-all hover:bg-green-700 disabled:opacity-50"
-                                            >
-                                                <Save className="h-3.5 w-3.5" />
-                                                Save
-                                            </button>
-                                            <button
-                                                onClick={() => {
-                                                    setEditMode(false)
-                                                    setEditValues({
-                                                        serialRanges: getAnswerSheetSerialRanges(answerSheet)
-                                                    })
-                                                }}
-                                                disabled={loading}
-                                                className="inline-flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-sm ring-1 ring-gray-200 hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-200 dark:ring-gray-600 disabled:opacity-50"
-                                            >
-                                                <X className="h-3.5 w-3.5" />
-                                                Cancel
-                                            </button>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-
-                            <div className="p-6">
-                                <div className="space-y-4">
-                                    {editMode ? (
-                                        <>
-                                            {editValues.serialRanges.map((range, rangeIndex) => (
-                                                <div key={`edit-range-${rangeIndex}`} className="grid grid-cols-1 gap-4 md:grid-cols-[1fr_1fr_auto]">
-                                                    <div className="relative rounded-xl bg-gray-50/50 p-4 ring-1 ring-gray-100 dark:bg-gray-800/50 dark:ring-gray-700">
-                                                        <label className="mb-2 block text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                                                            Start From
-                                                        </label>
-                                                        <input
-                                                            type="text"
-                                                            value={range.serialFrom}
-                                                            onChange={(e) => updateEditSerialRange(rangeIndex, 'serialFrom', e.target.value)}
-                                                            className="w-full rounded-lg border-gray-200 bg-white px-3 py-2 font-mono text-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
-                                                            placeholder="e.g. 626101"
-                                                        />
-                                                    </div>
-                                                    <div className="relative rounded-xl bg-gray-50/50 p-4 ring-1 ring-gray-100 dark:bg-gray-800/50 dark:ring-gray-700">
-                                                        <label className="mb-2 block text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                                                            End At
-                                                        </label>
-                                                        <input
-                                                            type="text"
-                                                            value={range.serialTo}
-                                                            onChange={(e) => updateEditSerialRange(rangeIndex, 'serialTo', e.target.value)}
-                                                            className="w-full rounded-lg border-gray-200 bg-white px-3 py-2 font-mono text-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
-                                                            placeholder="e.g. 627458"
-                                                        />
-                                                    </div>
-                                                    {isSupplementaryEntry(answerSheet.answerSheetType) && (
-                                                        <div className="flex items-center justify-end">
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => removeEditSerialRange(rangeIndex)}
-                                                                disabled={editValues.serialRanges.length === 1}
-                                                                className="text-sm font-medium text-red-600 hover:text-red-800 disabled:opacity-50 dark:text-red-400 dark:hover:text-red-300"
-                                                            >
-                                                                Remove
-                                                            </button>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            ))}
-                                            {isSupplementaryEntry(answerSheet.answerSheetType) && (
-                                                <button
-                                                    type="button"
-                                                    onClick={addEditSerialRange}
-                                                    className="text-sm font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
-                                                >
-                                                    + Add another range
-                                                </button>
-                                            )}
-                                        </>
-                                    ) : (
-                                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                                            {answerSheetSerialRanges.map((range, rangeIndex) => (
-                                                <div
-                                                    key={`display-range-${range.serialFrom}-${range.serialTo}-${rangeIndex}`}
-                                                    className="relative rounded-xl bg-gray-50/50 p-4 ring-1 ring-gray-100 dark:bg-gray-800/50 dark:ring-gray-700"
-                                                >
-                                                    <label className="mb-2 block text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                                                        {answerSheetSerialRanges.length > 1 ? `Range ${rangeIndex + 1}` : 'Configured Range'}
-                                                    </label>
-                                                    <div className="font-mono text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
-                                                        {formatSerialRangeLabel(range)}
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-
-                                {((allocation && allocation.hasSerialNumbers) || (isSupplementary && answerSheetSerialRanges.length > 0)) && (
-                                    <div className="mt-8">
-                                        <div className="mb-3 flex items-end justify-between">
-                                            <div>
-                                                <h3 className="text-base font-bold text-gray-900 dark:text-white">Utilization (So Far)</h3>
-                                                <p className="text-xs text-gray-500 mt-1">
-                                                    <span className="font-medium text-gray-900 dark:text-white">{actualUsedCount.toLocaleString()}</span> used so far (of <span className="font-medium text-gray-900 dark:text-white">{usableTotal.toLocaleString()}</span> usable)
-                                                    {((supplementaryContext?.discardedCount || allocation?.discardedCount || 0) > 0) && (
-                                                        <span className="text-red-500 ml-1">({(supplementaryContext?.discardedCount || allocation?.discardedCount || 0)} discarded)</span>
-                                                    )}
-                                                </p>
-                                                {!isSupplementary && allocation?.totalAllocated != null && actualUsedCount < allocation.totalAllocated && (
-                                                    <p className="text-[10px] text-gray-400 mt-0.5">
-                                                        Total allocated across all exam dates: {allocation.totalAllocated.toLocaleString()}
-                                                    </p>
-                                                )}
-                                            </div>
-                                            <div className={`text-xl font-bold ${usagePercentage > 90 ? 'text-red-600' :
-                                                    usagePercentage > 75 ? 'text-orange-600' : 'text-green-600'
-                                                }`}>
-                                                {usagePercentage}%
-                                            </div>
-                                        </div>
-                                        <div className="relative h-3 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-gray-700">
-                                            <motion.div
-                                                initial={{ width: 0 }}
-                                                animate={{ width: `${Math.min(usagePercentage, 100)}%` }}
-                                                transition={{ duration: 1, ease: "easeOut" }}
-                                                className={`h-full rounded-full ${getProgressBarColor(usagePercentage)} shadow-sm`}
+                        {editMode ? (
+                            <div className="cb-form-section">
+                                {editValues.serialRanges.map((range, rangeIndex) => (
+                                    <div
+                                        key={`edit-range-${rangeIndex}`}
+                                        className={isSupplementary ? 'cx-asd-range' : 'cx-asd-range cx-asd-range--pair'}
+                                    >
+                                        <TextField
+                                            label={editValues.serialRanges.length > 1 ? `Range ${rangeIndex + 1} from` : 'Start from'}
+                                            value={range.serialFrom}
+                                            onChange={(e) => updateEditSerialRange(rangeIndex, 'serialFrom', e.target.value)}
+                                            placeholder="e.g. 626101"
+                                            inputMode="numeric"
+                                        />
+                                        <TextField
+                                            label="End at"
+                                            value={range.serialTo}
+                                            onChange={(e) => updateEditSerialRange(rangeIndex, 'serialTo', e.target.value)}
+                                            placeholder="e.g. 627458"
+                                            inputMode="numeric"
+                                        />
+                                        {isSupplementary && (
+                                            <Button
+                                                variant="tertiary"
+                                                icon={Trash2}
+                                                onClick={() => removeEditSerialRange(rangeIndex)}
+                                                disabled={editValues.serialRanges.length === 1}
+                                                aria-label={`Remove range ${rangeIndex + 1}`}
+                                                title="Remove range"
                                             />
-                                        </div>
-
-                                        <div className="mt-6 grid grid-cols-4 divide-x divide-gray-100 dark:divide-gray-700">
-                                            <div className="px-3 text-center">
-                                                <div className="text-xs font-medium uppercase tracking-wider text-blue-500">Received</div>
-                                                <div className="mt-1 text-lg font-bold text-blue-600">{(answerSheet.total || 0).toLocaleString()}</div>
-                                            </div>
-                                            <div className="px-3 text-center">
-                                                <div className="text-xs font-medium uppercase tracking-wider text-green-500">Used</div>
-                                                <div className="mt-1 text-lg font-bold text-green-600">{actualUsedCount.toLocaleString()}</div>
-                                            </div>
-                                            <div className="px-3 text-center">
-                                                <div className="text-xs font-medium uppercase tracking-wider text-red-500">Discarded</div>
-                                                <div className="mt-1 text-lg font-bold text-red-600">{((supplementaryContext?.discardedCount || allocation?.discardedCount || 0)).toLocaleString()}</div>
-                                            </div>
-                                            <div className="px-3 text-center">
-                                                <div className="text-xs font-medium uppercase tracking-wider text-yellow-500">Balance</div>
-                                                <div className="mt-1 text-lg font-bold text-yellow-600">{(usableTotal - actualUsedCount).toLocaleString()}</div>
-                                            </div>
-                                        </div>
+                                        )}
+                                    </div>
+                                ))}
+                                {isSupplementary && (
+                                    <div>
+                                        <Button size="sm" variant="tertiary" icon={Plus} onClick={addEditSerialRange}>
+                                            Add another range
+                                        </Button>
                                     </div>
                                 )}
                             </div>
-                        </div>
+                        ) : answerSheetSerialRanges.length > 0 ? (
+                            <DetailList
+                                items={answerSheetSerialRanges.map((range, rangeIndex) => ({
+                                    label: answerSheetSerialRanges.length > 1 ? `Range ${rangeIndex + 1}` : 'Configured range',
+                                    value: <span className="cb-strong is-num">{formatSerialRangeLabel(range)}</span>,
+                                }))}
+                            />
+                        ) : (
+                            <p className="cb-muted">No serial range set yet.</p>
+                        )}
+                    </Card>
 
-                        {/* Discarded Sheets Management Card */}
-                        {allocation && allocation.hasSerialNumbers && (
-                            <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-100 dark:bg-gray-800 dark:ring-gray-700">
-                                <div className="border-b border-gray-100 bg-gray-50/50 px-6 py-4 dark:border-gray-700 dark:bg-gray-800/50">
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-2">
-                                            <div className="rounded-md bg-red-50 p-1.5 shadow-sm ring-1 ring-red-200 dark:bg-red-900/30 dark:ring-red-800">
-                                                <Ban className="h-4 w-4 text-red-500 dark:text-red-400" />
-                                            </div>
-                                            <div>
-                                                <h2 className="font-semibold text-gray-900 dark:text-white">Discarded Sheets</h2>
-                                                <p className="text-xs text-gray-500">Mark damaged or unusable sheets to skip in allocation</p>
-                                            </div>
-                                        </div>
-                                        <button
-                                            onClick={() => setShowDiscardedModal(true)}
-                                            className="group inline-flex items-center gap-1.5 rounded-lg bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 shadow-sm ring-1 ring-red-200 transition-all hover:bg-red-100 hover:ring-red-300 dark:bg-red-900/30 dark:text-red-300 dark:ring-red-800 dark:hover:bg-red-900/50"
-                                        >
-                                            <Plus className="h-3.5 w-3.5" />
-                                            Add Discarded
-                                        </button>
-                                    </div>
-                                </div>
+                    {/* Utilization */}
+                    {showUtilization && (
+                        <Card title="Utilization so far">
+                            <div className="cb-form-section">
+                                <Progress
+                                    value={Math.min(usagePercentage, 100)}
+                                    valueLabel={`${usagePercentage}%`}
+                                    tone={usageTone}
+                                    label={
+                                        <>
+                                            {actualUsedCount.toLocaleString()} used of {usableTotal.toLocaleString()} usable
+                                            {discardedCount > 0 && ` (${discardedCount} discarded)`}
+                                        </>
+                                    }
+                                />
+                                {!isSupplementary && allocation?.totalAllocated != null && actualUsedCount < allocation.totalAllocated && (
+                                    <p className="cb-subtle">
+                                        Total allocated across all exam dates: <span className="is-num">{allocation.totalAllocated.toLocaleString()}</span>
+                                    </p>
+                                )}
+                                <MetricTiles>
+                                    <MetricTile label="Received" value={(answerSheet.total || 0).toLocaleString()} />
+                                    <MetricTile label="Used" value={actualUsedCount.toLocaleString()} />
+                                    <MetricTile
+                                        label="Discarded"
+                                        value={discardedCount.toLocaleString()}
+                                        tone={discardedCount > 0 ? 'danger' : 'neutral'}
+                                    />
+                                    <MetricTile label="Balance" value={(usableTotal - actualUsedCount).toLocaleString()} />
+                                </MetricTiles>
+                            </div>
+                        </Card>
+                    )}
 
-                                <div className="p-6">
-                                    {(allocation.discardedSerials?.length || 0) === 0 ? (
-                                        <div className="text-center py-8">
-                                            <Ban className="mx-auto h-10 w-10 text-gray-300 dark:text-gray-600" />
-                                            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">No discarded sheets</p>
-                                            <p className="text-xs text-gray-400 dark:text-gray-500">Click "Add Discarded" to mark damaged or unusable sheets</p>
-                                        </div>
-                                    ) : (
-                                        <div className="space-y-2 max-h-48 overflow-y-auto">
-                                            {allocation.discardedSerials?.map((item, index) => (
-                                                <div
-                                                    key={item.serial || index}
-                                                    className="flex items-center justify-between rounded-lg border border-red-200 bg-red-50/50 px-3 py-2 dark:border-red-800 dark:bg-red-900/10"
-                                                >
-                                                    <div className="flex items-center gap-3">
-                                                        <span className="font-mono text-sm font-medium text-red-700 dark:text-red-400">{item.serial}</span>
-                                                        <span className="text-xs text-gray-500 dark:text-gray-400">{item.reason}</span>
-                                                    </div>
-                                                    <button
-                                                        onClick={() => handleRemoveDiscarded(item.serial)}
-                                                        className="rounded p-1 text-gray-400 hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900/30 transition-colors"
-                                                        title="Remove from discarded"
-                                                    >
-                                                        <X className="h-4 w-4" />
-                                                    </button>
+                    {/* Discarded sheets */}
+                    {allocation && allocation.hasSerialNumbers && (
+                        <Card
+                            flush
+                            title="Discarded sheets"
+                            subtitle="Damaged or unusable sheets are skipped during allocation."
+                            action={
+                                <Button size="sm" icon={Ban} onClick={() => setShowDiscardedModal(true)}>
+                                    Mark discarded
+                                </Button>
+                            }
+                        >
+                            <DataTable
+                                columns={discardedColumns}
+                                rows={allocation.discardedSerials || []}
+                                getRowKey={(item) => item.serial}
+                                density="compact"
+                                maxHeight="16rem"
+                                empty={
+                                    <EmptyState
+                                        compact
+                                        icon={Ban}
+                                        title="No discarded sheets"
+                                        body="Use Mark discarded to record damaged or unusable sheets."
+                                    />
+                                }
+                            />
+                        </Card>
+                    )}
+
+                    {/* Supplementary usage */}
+                    {isSupplementary && supplementarySubjects.length > 0 && (
+                        <Card
+                            title="Supplementary usage"
+                            subtitle={`Pick the room, roll number and sheet numbers for each subject · ${supplementarySubjects.length} subjects`}
+                        >
+                            <div className="cx-asd-subjects">
+                                {supplementarySubjects.map((subject, index) => {
+                                    const draft = usageDrafts[subject._id] || createSupplementaryUsageDraft()
+                                    const selectedRoom = subject.roomOptions.find((option) => option.roomNo === draft.roomNo)
+                                    const usageRows = usageRowsFor(subject)
+
+                                    return (
+                                        <div key={subject._id || index} className="cx-asd-subject">
+                                            <div className="cx-asd-subject__head">
+                                                <Entity
+                                                    primary={formatDate(subject.examDate)}
+                                                    secondary={<span title={subject.subjectName}>{subject.subjectName} ({subject.subjectCode})</span>}
+                                                />
+                                                <div className="cx-asd-subject__meta">
+                                                    <span className="is-num">{subject.candidateCount} candidates</span>
+                                                    <span aria-hidden="true">·</span>
+                                                    <span className="is-num">{subject.usedCount} used</span>
                                                 </div>
-                                            ))}
+                                            </div>
+
+                                            {subject.roomError && <Banner tone="danger">{subject.roomError}</Banner>}
+
+                                            <div className="cb-form-grid cb-form-grid--3">
+                                                <Select
+                                                    label="Room no."
+                                                    value={draft.roomNo}
+                                                    onChange={(e) => handleSupplementaryRoomChange(subject._id, e.target.value)}
+                                                    placeholder="Select room"
+                                                    options={subject.roomOptions.map((room) => room.roomNo)}
+                                                />
+                                                <Select
+                                                    label="Roll no."
+                                                    value={draft.rollNo}
+                                                    onChange={(e) => updateSupplementaryDraft(subject._id, (current) => ({
+                                                        ...current,
+                                                        rollNo: e.target.value
+                                                    }))}
+                                                    disabled={!draft.roomNo}
+                                                    placeholder={draft.roomNo ? 'Select roll no' : 'Select room first'}
+                                                    options={selectedRoom?.rollNos || []}
+                                                />
+                                                <TextField
+                                                    label="Sheet numbers"
+                                                    value={draft.serialInput}
+                                                    onChange={(e) => updateSupplementaryDraft(subject._id, (current) => ({
+                                                        ...current,
+                                                        serialInput: e.target.value
+                                                    }))}
+                                                    placeholder="Comma separated"
+                                                />
+                                            </div>
+
+                                            {draft.serials.length > 0 && (
+                                                <div className="cx-asd-tags" aria-label="Sheet numbers to save">
+                                                    {draft.serials.map((serial) => (
+                                                        <span key={serial} className="cx-asd-tag">
+                                                            {serial}
+                                                            <button
+                                                                type="button"
+                                                                className="cx-asd-tag__remove"
+                                                                onClick={() => handleRemoveSupplementarySerial(subject._id, serial)}
+                                                                aria-label={`Remove sheet ${serial}`}
+                                                            >
+                                                                <X size={14} strokeWidth={1.75} aria-hidden="true" />
+                                                            </button>
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            )}
+
+                                            <div className="cb-card-actions">
+                                                <Button size="sm" variant="tertiary" icon={Plus} onClick={() => handleAddSupplementarySerials(subject._id)}>
+                                                    Add sheets
+                                                </Button>
+                                                <Button
+                                                    size="sm"
+                                                    icon={Save}
+                                                    onClick={() => handleSaveSupplementaryUsage(subject)}
+                                                    loading={savingSupplementaryUsage === subject._id}
+                                                    disabled={!!subject.roomError}
+                                                >
+                                                    Save usage
+                                                </Button>
+                                            </div>
+
+                                            {usageRows.length > 0 && (
+                                                <div className="cx-asd-subject__usages">
+                                                    <DataTable
+                                                        columns={usageColumns}
+                                                        rows={usageRows}
+                                                        getRowKey={(row) => row.key}
+                                                        density="compact"
+                                                        caption={`Recorded usage for ${subject.subjectName}`}
+                                                    />
+                                                </div>
+                                            )}
                                         </div>
-                                    )}
-                                </div>
+                                    )
+                                })}
                             </div>
-                        )}
+                        </Card>
+                    )}
 
-                        {/* Date-wise Breakdown Table */}
-                        {isSupplementary && supplementarySubjects.length > 0 && (
-                            <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-100 dark:bg-gray-800 dark:ring-gray-700">
-                                <div className="border-b border-gray-100 px-6 py-4 dark:border-gray-700 flex justify-between items-center">
-                                    <div>
-                                        <h3 className="font-semibold text-gray-900 dark:text-white">Supplementary Usage</h3>
-                                        <p className="text-sm text-gray-500 dark:text-gray-400">Select room, roll no, and one or more sheet numbers for each subject.</p>
-                                    </div>
-                                    <div className="text-sm text-gray-500">
-                                        {supplementarySubjects.length} subjects
-                                    </div>
-                                </div>
-                                <div className="overflow-x-auto">
-                                    <table className="w-full text-left text-sm">
-                                        <thead className="bg-gray-50/50 dark:bg-gray-700/50">
-                                            <tr>
-                                                <th className="px-6 py-3 font-medium text-gray-500 dark:text-gray-400">Date & Subject</th>
-                                                <th className="px-6 py-3 font-medium text-gray-500 dark:text-gray-400">Room No</th>
-                                                <th className="px-6 py-3 font-medium text-gray-500 dark:text-gray-400">Roll No</th>
-                                                <th className="px-6 py-3 font-medium text-gray-500 dark:text-gray-400">Serial No</th>
-                                                <th className="px-6 py-3 text-right font-medium text-gray-500 dark:text-gray-400">Used</th>
-                                                <th className="px-6 py-3 text-center font-medium text-gray-500 dark:text-gray-400">Save</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-gray-100 border-t border-gray-100 dark:divide-gray-700 dark:border-gray-700">
-                                            {supplementarySubjects.map((subject, index) => {
-                                                const draft = usageDrafts[subject._id] || createSupplementaryUsageDraft()
-                                                const selectedRoom = subject.roomOptions.find((option) => option.roomNo === draft.roomNo)
+                    {/* Allocation schedule */}
+                    {!isSupplementary && allocation && allocation.hasSerialNumbers && allocation.allocations.length > 0 && (
+                        <Card
+                            flush
+                            title="Allocation schedule"
+                            subtitle={`Date-wise distribution, skipping discarded sheets · ${allocation.allocations.length} exams`}
+                        >
+                            <DataTable
+                                columns={allocationColumns}
+                                rows={allocation.allocations}
+                                getRowKey={(alloc) => String(alloc._id || `${alloc.examDate}-${alloc.subjectCode}`)}
+                            />
+                        </Card>
+                    )}
 
-                                                return (
-                                                    <React.Fragment key={subject._id || index}>
-                                                        <tr className="group hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors align-top">
-                                                            <td className="px-6 py-4">
-                                                                <div className="flex items-center gap-3">
-                                                                    <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-blue-50 p-2 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400">
-                                                                        <Calendar className="h-5 w-5" />
-                                                                    </div>
-                                                                    <div>
-                                                                        <div className="font-medium text-gray-900 dark:text-white">{formatDate(subject.examDate)}</div>
-                                                                        <div className="text-xs text-gray-500 dark:text-gray-400" title={subject.subjectName}>
-                                                                            {subject.subjectName} ({subject.subjectCode})
-                                                                        </div>
-                                                                        <div className="mt-1 inline-flex items-center gap-1.5 rounded-full bg-gray-100 px-2.5 py-0.5 text-[11px] font-medium text-gray-700 dark:bg-gray-700 dark:text-gray-200">
-                                                                            <Users className="h-3 w-3" />
-                                                                            {subject.candidateCount}
-                                                                        </div>
-                                                                        {subject.roomError && (
-                                                                            <div className="mt-2 text-xs text-red-500">{subject.roomError}</div>
-                                                                        )}
-                                                                    </div>
-                                                                </div>
-                                                            </td>
-                                                            <td className="px-6 py-4 min-w-[160px]">
-                                                                <select
-                                                                    value={draft.roomNo}
-                                                                    onChange={(e) => handleSupplementaryRoomChange(subject._id, e.target.value)}
-                                                                    className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
-                                                                >
-                                                                    <option value="">Select room</option>
-                                                                    {subject.roomOptions.map((room) => (
-                                                                        <option key={room.roomNo} value={room.roomNo}>
-                                                                            {room.roomNo}
-                                                                        </option>
-                                                                    ))}
-                                                                </select>
-                                                            </td>
-                                                            <td className="px-6 py-4 min-w-[180px]">
-                                                                <select
-                                                                    value={draft.rollNo}
-                                                                    onChange={(e) => updateSupplementaryDraft(subject._id, (current) => ({
-                                                                        ...current,
-                                                                        rollNo: e.target.value
-                                                                    }))}
-                                                                    className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
-                                                                    disabled={!draft.roomNo}
-                                                                >
-                                                                    <option value="">{draft.roomNo ? 'Select roll no' : 'Select room first'}</option>
-                                                                    {(selectedRoom?.rollNos || []).map((rollNo) => (
-                                                                        <option key={rollNo} value={rollNo}>
-                                                                            {rollNo}
-                                                                        </option>
-                                                                    ))}
-                                                                </select>
-                                                            </td>
-                                                            <td className="px-6 py-4 min-w-[320px]">
-                                                                <div className="space-y-3">
-                                                                    <div className="flex gap-2">
-                                                                        <input
-                                                                            type="text"
-                                                                            value={draft.serialInput}
-                                                                            onChange={(e) => updateSupplementaryDraft(subject._id, (current) => ({
-                                                                                ...current,
-                                                                                serialInput: e.target.value
-                                                                            }))}
-                                                                            className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-mono shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
-                                                                            placeholder="Enter sheet no(s), comma separated"
-                                                                        />
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={() => handleAddSupplementarySerials(subject._id)}
-                                                                            className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-medium text-blue-700 hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-900/20 dark:text-blue-300"
-                                                                        >
-                                                                            Add
-                                                                        </button>
-                                                                    </div>
-                                                                    {draft.serials.length > 0 && (
-                                                                        <div className="flex flex-wrap gap-2">
-                                                                            {draft.serials.map((serial) => (
-                                                                                <span
-                                                                                    key={serial}
-                                                                                    className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-800 dark:bg-gray-700 dark:text-gray-200"
-                                                                                >
-                                                                                    <span className="font-mono">{serial}</span>
-                                                                                    <button
-                                                                                        type="button"
-                                                                                        onClick={() => handleRemoveSupplementarySerial(subject._id, serial)}
-                                                                                        className="text-gray-400 hover:text-red-500"
-                                                                                    >
-                                                                                        <X className="h-3.5 w-3.5" />
-                                                                                    </button>
-                                                                                </span>
-                                                                            ))}
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                            </td>
-                                                            <td className="px-6 py-4 text-right">
-                                                                <span className="font-bold text-gray-900 dark:text-white">
-                                                                    {subject.usedCount}
-                                                                </span>
-                                                            </td>
-                                                            <td className="px-6 py-4 text-center">
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => handleSaveSupplementaryUsage(subject)}
-                                                                    disabled={savingSupplementaryUsage === subject._id || !!subject.roomError}
-                                                                    className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-xs font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-                                                                >
-                                                                    {savingSupplementaryUsage === subject._id ? (
-                                                                        <Loader2 className="h-4 w-4 animate-spin" />
-                                                                    ) : (
-                                                                        <Save className="h-4 w-4" />
-                                                                    )}
-                                                                    Save
-                                                                </button>
-                                                            </td>
-                                                        </tr>
-                                                        {subject.usages.length > 0 && (
-                                                            <tr className="bg-gray-50/40 dark:bg-gray-900/20">
-                                                                <td colSpan={6} className="px-6 pb-4 pt-1">
-                                                                    <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-700">
-                                                                        <table className="min-w-full text-xs">
-                                                                            <thead className="bg-gray-100/80 dark:bg-gray-800/80">
-                                                                                <tr>
-                                                                                    <th className="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-300">Room No</th>
-                                                                                    <th className="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-300">Roll Number</th>
-                                                                                    <th className="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-300">Sheet No</th>
-                                                                                    <th className="px-3 py-2 text-right font-medium text-gray-600 dark:text-gray-300">Action</th>
-                                                                                </tr>
-                                                                            </thead>
-                                                                            <tbody className="divide-y divide-gray-200 bg-white dark:divide-gray-700 dark:bg-gray-900/40">
-                                                                                {subject.usages.map((usage, usageIndex) => {
-                                                                                    const sheetNo = usage.sheetNo || usage.serials?.[0] || '-'
-                                                                                    return (
-                                                                                        <tr key={`${usage._id}-${sheetNo}-${usageIndex}`}>
-                                                                                            <td className="px-3 py-2 text-gray-900 dark:text-gray-100">{usage.roomNo}</td>
-                                                                                            <td className="px-3 py-2 font-medium text-gray-900 dark:text-gray-100">{usage.rollNo}</td>
-                                                                                            <td className="px-3 py-2 font-mono text-gray-900 dark:text-gray-100">{sheetNo}</td>
-                                                                                            <td className="px-3 py-2 text-right">
-                                                                                                <button
-                                                                                                    type="button"
-                                                                                                    onClick={() => handleRemoveSupplementaryUsage(usage._id, usage.sheetNo || usage.serials?.[0])}
-                                                                                                    className="rounded p-0.5 text-gray-400 hover:text-red-500"
-                                                                                                    title="Remove usage"
-                                                                                                >
-                                                                                                    <X className="h-3.5 w-3.5" />
-                                                                                                </button>
-                                                                                            </td>
-                                                                                        </tr>
-                                                                                    )
-                                                                                })}
-                                                                            </tbody>
-                                                                        </table>
-                                                                    </div>
-                                                                </td>
-                                                            </tr>
-                                                        )}
-                                                    </React.Fragment>
-                                                )
-                                            })}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        )}
+                    {/* Empty states */}
+                    {!loading && isSupplementary && supplementarySubjects.length === 0 && answerSheetSerialRanges.length > 0 && (
+                        <Card>
+                            <EmptyState
+                                title="No subjects available"
+                                body="No class-wise exam subjects were found for manual supplementary usage."
+                            />
+                        </Card>
+                    )}
 
-                        {!isSupplementary && allocation && allocation.hasSerialNumbers && allocation.allocations.length > 0 && (
-                            <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-100 dark:bg-gray-800 dark:ring-gray-700">
-                                <div className="border-b border-gray-100 px-6 py-4 dark:border-gray-700 flex justify-between items-center">
-                                    <div>
-                                        <h3 className="font-semibold text-gray-900 dark:text-white">Allocation Schedule</h3>
-                                        <p className="text-sm text-gray-500 dark:text-gray-400">Date-wise distribution (skips discarded)</p>
-                                    </div>
-                                    <div className="text-sm text-gray-500">
-                                        {allocation.allocations.length} items
-                                    </div>
-                                </div>
-                                <div className="overflow-x-auto">
-                                    <table className="w-full text-left text-sm">
-                                        <thead className="bg-gray-50/50 dark:bg-gray-700/50">
-                                            <tr>
-                                                <th className="px-6 py-3 font-medium text-gray-500 dark:text-gray-400">Date & Subject</th>
-                                                <th className="px-6 py-3 text-center font-medium text-gray-500 dark:text-gray-400">Students</th>
-                                                <th className="px-6 py-3 text-center font-medium text-gray-500 dark:text-gray-400">Serial Range</th>
-                                                <th className="px-6 py-3 text-right font-medium text-gray-500 dark:text-gray-400">Total</th>
-                                                <th className="px-6 py-3 text-center font-medium text-gray-500 dark:text-gray-400">Download</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-gray-100 border-t border-gray-100 dark:divide-gray-700 dark:border-gray-700">
-                                            {allocation.allocations.map((alloc, index) => {
-                                                const hasAllocation = alloc.serialFrom !== 'N/A' && alloc.serialTo !== 'N/A' && alloc.sheetsAllocated > 0
+                    {!loading && !isSupplementary && allocation && allocation.hasSerialNumbers && allocation.allocations.length === 0 && (
+                        <Card>
+                            <EmptyState
+                                title="No exams scheduled"
+                                body="No exams use this answer sheet type yet. Check the datesheet configuration."
+                            />
+                        </Card>
+                    )}
 
-                                                return (
-                                                    <tr key={alloc._id || index} className="group hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
-                                                        <td className="px-6 py-4">
-                                                            <div className="flex items-center gap-3">
-                                                                <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-blue-50 p-2 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400">
-                                                                    <Calendar className="h-5 w-5" />
-                                                                </div>
-                                                                <div>
-                                                                    <div className="font-medium text-gray-900 dark:text-white">{formatDate(alloc.examDate)}</div>
-                                                                    <div className="text-xs text-gray-500 dark:text-gray-400 max-w-[180px] truncate" title={alloc.subjectName}>
-                                                                        {alloc.subjectName} ({alloc.subjectCode})
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        </td>
-                                                        <td className="px-6 py-4 text-center">
-                                                            <div className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-800 dark:bg-gray-700 dark:text-gray-200">
-                                                                <Users className="h-3 w-3" />
-                                                                {alloc.candidateCount}
-                                                            </div>
-                                                        </td>
-                                                        <td className="px-6 py-4 text-center">
-                                                            <div className="font-mono text-xs text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-800/50 rounded px-2 py-1 inline-block border border-gray-100 dark:border-gray-700">
-                                                                <span className="font-medium text-gray-900 dark:text-white">{alloc.serialFrom}</span>
-                                                                <span className="mx-2 text-gray-400">→</span>
-                                                                <span className="font-medium text-gray-900 dark:text-white">{alloc.serialTo}</span>
-                                                            </div>
-                                                        </td>
-                                                        <td className="px-6 py-4 text-right">
-                                                            <span className="font-bold text-gray-900 dark:text-white">
-                                                                {alloc.sheetsAllocated}
-                                                            </span>
-                                                        </td>
-                                                        <td className="px-6 py-4 text-center">
-                                                            <div className="inline-flex">
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => hasAllocation ? openDispatchPreview(alloc) : undefined}
-                                                                    disabled={!hasAllocation || (dispatchPreviewLoading && dispatchPreviewAlloc?._id !== alloc._id)}
-                                                                    className="inline-flex items-center justify-center rounded-lg p-2 text-blue-600 transition hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-40 dark:text-blue-400 dark:hover:bg-blue-900/20 dark:hover:text-blue-300"
-                                                                    title={hasAllocation ? 'Preview and download dispatch record PDF' : 'No allocation available for download'}
-                                                                    aria-label={hasAllocation ? 'Preview and download dispatch record PDF' : 'No allocation available for download'}
-                                                                >
-                                                                    {dispatchPreviewLoading && dispatchPreviewAlloc?._id === alloc._id ? (
-                                                                        <Loader2 className="h-4 w-4 animate-spin" />
-                                                                    ) : (
-                                                                        <Download className="h-4 w-4" />
-                                                                    )}
-                                                                </button>
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                )
-                                            })}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        )}
+                    {!loading && !editMode && (
+                        (!isSupplementary && (!allocation || !allocation.hasSerialNumbers))
+                        || (isSupplementary && answerSheetSerialRanges.length === 0)
+                    ) && (
+                        <Card>
+                            <EmptyState
+                                icon={FileText}
+                                title="Set the serial number range"
+                                body="Enter the range allotted by the board to start tracking usage and distribution across exams."
+                                action={
+                                    <Button variant="primary" icon={Pencil} onClick={() => setEditMode(true)}>
+                                        Set serial numbers
+                                    </Button>
+                                }
+                            />
+                        </Card>
+                    )}
+                </div>
 
-                        {/* Empty States */}
-                        {!loading && isSupplementary && supplementarySubjects.length === 0 && answerSheetSerialRanges.length > 0 && (
-                            <div className="rounded-2xl border-2 border-dashed border-gray-200 bg-gray-50 p-12 text-center dark:border-gray-700 dark:bg-gray-800/50">
-                                <AlertCircle className="mx-auto h-12 w-12 text-gray-400" />
-                                <h3 className="mt-4 text-lg font-medium text-gray-900 dark:text-white">No Subjects Available</h3>
-                                <p className="mt-2 text-gray-500 dark:text-gray-400">
-                                    No class-wise exam subjects were found for manual supplementary usage.
-                                </p>
-                            </div>
-                        )}
+                <div className="cb-stack">
+                    <Card title="Details">
+                        <DetailList
+                            columns={1}
+                            items={[
+                                { label: 'Type', value: typeLabel },
+                                { label: 'Pages', value: answerSheet.pages ? `${answerSheet.pages} pages` : null },
+                                { label: 'Colour', value: answerSheet.colour },
+                                { label: 'Class', value: answerSheet.class ? `Class ${answerSheet.class}` : null },
+                            ]}
+                        />
+                    </Card>
 
-                        {!loading && !isSupplementary && allocation && allocation.hasSerialNumbers && allocation.allocations.length === 0 && (
-                            <div className="rounded-2xl border-2 border-dashed border-gray-200 bg-gray-50 p-12 text-center dark:border-gray-700 dark:bg-gray-800/50">
-                                <AlertCircle className="mx-auto h-12 w-12 text-gray-400" />
-                                <h3 className="mt-4 text-lg font-medium text-gray-900 dark:text-white">No Exams Scheduled</h3>
-                                <p className="mt-2 text-gray-500 dark:text-gray-400">
-                                    No exams were found that use this answer sheet type. Please check your datesheet configuration.
-                                </p>
-                            </div>
-                        )}
-
-                        {/* No Serial Numbers State */}
-                        {!loading && (
-                            (!isSupplementary && (!allocation || !allocation.hasSerialNumbers))
-                            || (isSupplementary && answerSheetSerialRanges.length === 0)
-                        ) && (
-                            <div className="rounded-2xl border border-gray-200 bg-white p-12 text-center shadow-sm dark:border-gray-700 dark:bg-gray-800">
-                                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-blue-50 dark:bg-blue-900/20">
-                                    <TrendingUp className="h-8 w-8 text-blue-600 dark:text-blue-400" />
-                                </div>
-                                <h3 className="mt-4 text-lg font-bold text-gray-900 dark:text-white">Ready to Configure</h3>
-                                <p className="mx-auto mt-2 max-w-md text-gray-500 dark:text-gray-400">
-                                    Set up the serial number range allocated by the board to start tracking usage and distribution across exams.
-                                </p>
-                                <button
-                                    onClick={() => setEditMode(true)}
-                                    className="mt-6 inline-flex items-center gap-2 rounded-lg bg-blue-600 px-6 py-2.5 font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-                                >
-                                    <Edit2 className="h-4 w-4" />
-                                    Set Serial Numbers
-                                </button>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Right Column: Quick Stats / Summary / Guidelines */}
-                    <div className="space-y-6">
-                        <div className="rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 p-6 text-white shadow-lg overflow-hidden relative">
-                            {/* Decorative bubbles */}
-                            <div className="absolute top-0 right-0 -mr-8 -mt-8 h-32 w-32 rounded-full bg-white/10 blur-2xl"></div>
-                            <div className="absolute bottom-0 left-0 -ml-8 -mb-8 h-32 w-32 rounded-full bg-white/10 blur-2xl"></div>
-
-                            <h3 className="text-lg font-semibold mb-2 flex items-center gap-2 relative z-10">
-                                <AlertCircle className="h-5 w-5" />
-                                Pro Tip
-                            </h3>
-                            <p className="text-blue-100 text-sm leading-relaxed relative z-10">
-                                Always ensure the serial number range matches the physical bundles received from the board.
-                                Discrepancies should be reported successfully allocated.
-                            </p>
-                        </div>
-
-                        <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-100 dark:bg-gray-800 dark:ring-gray-700">
-                            <h3 className="font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-                                <BookOpen className="h-5 w-5 text-gray-500" />
-                                Guidelines
-                            </h3>
-                            <ul className="space-y-4">
-                                <li className="flex gap-3 text-sm text-gray-600 dark:text-gray-300">
-                                    <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0" />
-                                    <span>Verify bundle seals before opening packages.</span>
-                                </li>
-                                <li className="flex gap-3 text-sm text-gray-600 dark:text-gray-300">
-                                    <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0" />
-                                    <span>Maintain a daily usage log signed by the Superintendent.</span>
-                                </li>
-                                <li className="flex gap-3 text-sm text-gray-600 dark:text-gray-300">
-                                    <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0" />
-                                    <span>Return unused sheets to the safe storage immediately.</span>
-                                </li>
-                            </ul>
-                        </div>
-                    </div>
+                    <Card title="Guidelines">
+                        <ul className="cx-asd-guidelines">
+                            <li>Check that the serial range matches the physical bundles received from the board, and report any discrepancy before sheets are allocated.</li>
+                            <li>Verify bundle seals before opening packages.</li>
+                            <li>Maintain a daily usage log signed by the Superintendent.</li>
+                            <li>Return unused sheets to safe storage immediately.</li>
+                        </ul>
+                    </Card>
                 </div>
             </div>
 
-            {/* Add Discarded Modal */}
-            {showDiscardedModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-                    <motion.div
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        className="mx-4 w-full max-w-md rounded-2xl bg-white p-6 shadow-xl dark:bg-gray-800"
-                    >
-                        <div className="mb-4 flex items-center justify-between">
-                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Add Discarded Sheets</h3>
-                            <button
-                                type="button"
-                                title="Close"
-                                aria-label="Close"
-                                onClick={() => {
-                                    setShowDiscardedModal(false)
-                                    setDiscardInput({ serial: '', fromSerial: '', toSerial: '', reason: 'Damaged/Misprinted' })
-                                }}
-                                className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700"
-                            >
-                                <X className="h-5 w-5" />
-                            </button>
+            {/* Mark discarded */}
+            <Dialog
+                open={showDiscardedModal}
+                onClose={closeDiscardDialog}
+                title="Mark sheets as discarded"
+                description={`Valid ${answerSheetSerialRanges.length > 1 ? 'ranges' : 'range'}: ${answerSheetSerialRanges.map(formatSerialRangeLabel).join(', ') || '—'}`}
+                footer={
+                    <>
+                        <Button variant="tertiary" onClick={closeDiscardDialog}>
+                            Cancel
+                        </Button>
+                        <Button variant="danger" icon={Trash2} onClick={handleAddDiscarded} loading={savingDiscard}>
+                            Mark as discarded
+                        </Button>
+                    </>
+                }
+            >
+                <div className="cb-form-section">
+                    <Tabs
+                        variant="segmented"
+                        label="Discard a single sheet or a range"
+                        value={discardMode}
+                        onChange={(mode) => setDiscardMode(mode as 'single' | 'range')}
+                        items={[
+                            { id: 'single', label: 'Single serial' },
+                            { id: 'range', label: 'Range' },
+                        ]}
+                    />
+                    {discardMode === 'single' ? (
+                        <TextField
+                            label="Serial number"
+                            value={discardInput.serial}
+                            onChange={(e) => setDiscardInput({ ...discardInput, serial: e.target.value })}
+                            placeholder={`e.g. ${answerSheetSerialRanges[0]?.serialFrom || answerSheet?.serialFrom || '446351'}`}
+                        />
+                    ) : (
+                        <div className="cb-form-grid">
+                            <TextField
+                                label="From serial"
+                                value={discardInput.fromSerial}
+                                onChange={(e) => setDiscardInput({ ...discardInput, fromSerial: e.target.value })}
+                                placeholder={answerSheetSerialRanges[0]?.serialFrom || answerSheet?.serialFrom || '446351'}
+                            />
+                            <TextField
+                                label="To serial"
+                                value={discardInput.toSerial}
+                                onChange={(e) => setDiscardInput({ ...discardInput, toSerial: e.target.value })}
+                                placeholder={answerSheetSerialRanges[answerSheetSerialRanges.length - 1]?.serialTo || answerSheet?.serialTo || '446700'}
+                            />
                         </div>
-
-                        {/* Mode Toggle */}
-                        <div className="mb-4 flex rounded-lg bg-gray-100 p-1 dark:bg-gray-700">
-                            <button
-                                onClick={() => setDiscardMode('single')}
-                                className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-all ${
-                                    discardMode === 'single'
-                                        ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-600 dark:text-white'
-                                        : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white'
-                                }`}
-                            >
-                                Single Serial
-                            </button>
-                            <button
-                                onClick={() => setDiscardMode('range')}
-                                className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-all ${
-                                    discardMode === 'range'
-                                        ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-600 dark:text-white'
-                                        : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white'
-                                }`}
-                            >
-                                Range
-                            </button>
-                        </div>
-
-                        {discardMode === 'single' ? (
-                            <div className="mb-4">
-                                <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                    Serial Number
-                                </label>
-                                <input
-                                    type="text"
-                                    value={discardInput.serial}
-                                    onChange={(e) => setDiscardInput({ ...discardInput, serial: e.target.value })}
-                                    className="w-full rounded-lg border-gray-200 bg-white px-3 py-2 font-mono shadow-sm focus:border-red-500 focus:ring-red-500 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
-                                    placeholder={`e.g. ${answerSheetSerialRanges[0]?.serialFrom || answerSheet?.serialFrom || '446351'}`}
-                                />
-                            </div>
-                        ) : (
-                            <div className="mb-4 grid grid-cols-2 gap-3">
-                                <div>
-                                    <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                        From Serial
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={discardInput.fromSerial}
-                                        onChange={(e) => setDiscardInput({ ...discardInput, fromSerial: e.target.value })}
-                                        className="w-full rounded-lg border-gray-200 bg-white px-3 py-2 font-mono shadow-sm focus:border-red-500 focus:ring-red-500 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
-                                        placeholder={answerSheetSerialRanges[0]?.serialFrom || answerSheet?.serialFrom || '446351'}
-                                    />
-                                </div>
-                                <div>
-                                    <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                        To Serial
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={discardInput.toSerial}
-                                        onChange={(e) => setDiscardInput({ ...discardInput, toSerial: e.target.value })}
-                                        className="w-full rounded-lg border-gray-200 bg-white px-3 py-2 font-mono shadow-sm focus:border-red-500 focus:ring-red-500 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
-                                        placeholder={answerSheetSerialRanges[answerSheetSerialRanges.length - 1]?.serialTo || answerSheet?.serialTo || '446700'}
-                                    />
-                                </div>
-                            </div>
-                        )}
-
-                        <div className="mb-6">
-                            <label htmlFor="discard-reason" className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                Reason
-                            </label>
-                            <select
-                                id="discard-reason"
-                                value={discardInput.reason}
-                                onChange={(e) => setDiscardInput({ ...discardInput, reason: e.target.value })}
-                                className="w-full rounded-lg border-gray-200 bg-white px-3 py-2 shadow-sm focus:border-red-500 focus:ring-red-500 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
-                            >
-                                <option value="Damaged/Misprinted">Damaged/Misprinted</option>
-                                <option value="Received Damaged (Wear/Tear during transport)">Received Damaged (Wear/Tear during transport)</option>
-                                <option value="Torn">Torn</option>
-                                <option value="Water Damage">Water Damage</option>
-                                <option value="Missing Pages">Missing Pages</option>
-                                <option value="Printing Defect">Printing Defect</option>
-                                <option value="Other">Other</option>
-                            </select>
-                        </div>
-
-                        <div className="flex gap-3">
-                            <button
-                                onClick={() => {
-                                    setShowDiscardedModal(false)
-                                    setDiscardInput({ serial: '', fromSerial: '', toSerial: '', reason: 'Damaged/Misprinted' })
-                                }}
-                                className="flex-1 rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={handleAddDiscarded}
-                                disabled={savingDiscard}
-                                className="flex-1 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50 flex items-center justify-center gap-2"
-                            >
-                                {savingDiscard ? (
-                                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                                ) : (
-                                    <>
-                                        <Trash2 className="h-4 w-4" />
-                                        Mark as Discarded
-                                    </>
-                                )}
-                            </button>
-                        </div>
-
-                        <p className="mt-4 text-xs text-gray-500 dark:text-gray-400 text-center">
-                            Valid {answerSheetSerialRanges.length > 1 ? 'ranges' : 'range'}: {answerSheetSerialRanges.map(formatSerialRangeLabel).join(', ')}
-                        </p>
-                    </motion.div>
+                    )}
+                    <Select
+                        id="discard-reason"
+                        label="Reason"
+                        value={discardInput.reason}
+                        onChange={(e) => setDiscardInput({ ...discardInput, reason: e.target.value })}
+                        options={DISCARD_REASONS}
+                    />
                 </div>
-            )}
+            </Dialog>
 
-            {/* Dispatch record PDF preview modal */}
-            {showDispatchPreview && (dispatchPreviewUrl || dispatchPreviewLoading || dispatchPreviewError) && (
-                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4">
-                    <div className="w-full max-w-6xl h-[88vh] bg-white dark:bg-gray-900 rounded-xl shadow-xl overflow-hidden flex flex-col">
-                        <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between flex-shrink-0">
-                            <h4 className="text-sm font-semibold text-gray-900 dark:text-white truncate pr-4">
-                                Dispatch Record PDF Preview
-                                {dispatchPreviewAlloc && (
-                                    <span className="ml-2 text-gray-500 dark:text-gray-400 font-normal">
-                                        {formatDate(dispatchPreviewAlloc.examDate)} — {dispatchPreviewAlloc.subjectName}
-                                    </span>
-                                )}
-                            </h4>
-                            <div className="flex items-center gap-2 flex-shrink-0">
-                                {dispatchPreviewUrl && (
-                                    <>
-                                        <a
-                                            href={dispatchPreviewUrl}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="inline-flex items-center px-3 py-1.5 rounded-md text-xs font-semibold border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
-                                        >
-                                            Open in New Tab
-                                        </a>
-                                        <a
-                                            href={dispatchPreviewUrl}
-                                            download={dispatchPreviewAlloc ? getDispatchFilename(dispatchPreviewAlloc) : 'dispatch-record.pdf'}
-                                            className="inline-flex items-center px-3 py-1.5 rounded-md text-xs font-semibold bg-blue-600 text-white hover:bg-blue-700"
-                                        >
-                                            Download PDF
-                                        </a>
-                                    </>
-                                )}
-                                <button
-                                    type="button"
-                                    onClick={closeDispatchPreview}
-                                    className="inline-flex items-center px-3 py-1.5 rounded-md text-xs font-semibold border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
+            {/* Dispatch record PDF preview */}
+            <Sheet
+                open={showDispatchPreview && Boolean(dispatchPreviewUrl || dispatchPreviewLoading || dispatchPreviewError)}
+                onClose={closeDispatchPreview}
+                size="xl"
+                title="Dispatch record"
+                description={dispatchPreviewAlloc ? `${formatDate(dispatchPreviewAlloc.examDate)} · ${dispatchPreviewAlloc.subjectName}` : undefined}
+                footer={
+                    <>
+                        <Button variant="tertiary" onClick={closeDispatchPreview}>
+                            Close
+                        </Button>
+                        {dispatchPreviewUrl && (
+                            <>
+                                <Button icon={ExternalLink} onClick={() => window.open(dispatchPreviewUrl, '_blank', 'noopener,noreferrer')}>
+                                  Open in new tab
+                                </Button>
+                                <Button
+                                  variant="primary"
+                                  icon={Download}
+                                  onClick={() => {
+                                    const link = document.createElement('a')
+                                    link.href = dispatchPreviewUrl
+                                    link.download = dispatchPreviewAlloc ? getDispatchFilename(dispatchPreviewAlloc) : 'dispatch-record.pdf'
+                                    link.click()
+                                  }}
                                 >
-                                    Close
-                                </button>
-                            </div>
-                        </div>
-                        <div className="w-full flex-1 overflow-auto bg-gray-100 dark:bg-gray-800 p-4 min-h-0">
-                            {dispatchPreviewLoading ? (
-                                <div className="h-full w-full flex flex-col items-center justify-center gap-3 text-sm text-gray-600 dark:text-gray-300">
-                                    <Loader2 className="w-10 h-10 text-blue-500 animate-spin" />
-                                    <p>Generating preview...</p>
-                                </div>
-                            ) : dispatchPreviewError ? (
-                                <div className="h-full w-full flex flex-col items-center justify-center gap-2 p-6 text-center text-sm text-gray-600 dark:text-gray-300">
-                                    <FileText className="w-12 h-12 text-amber-500" />
-                                    <p>{dispatchPreviewError}</p>
-                                    <p className="text-xs">Use Close and try again, or check allocation and rooms.</p>
-                                </div>
-                            ) : dispatchPreviewUrl ? (
-                                <iframe
-                                    src={`${dispatchPreviewUrl}#toolbar=0`}
-                                    className="w-full h-full min-h-[60vh] border-0 rounded-lg bg-white dark:bg-gray-900"
-                                    title="Dispatch record PDF preview"
-                                />
-                            ) : null}
-                        </div>
-                    </div>
+                                  Download PDF
+                                </Button>
+                            </>
+                        )}
+                    </>
+                }
+            >
+                <div className="cx-asd-pdf">
+                    {dispatchPreviewLoading ? (
+                        <CardLoading label="Generating preview…" />
+                    ) : dispatchPreviewError ? (
+                        <EmptyState
+                            icon={FileText}
+                            title={dispatchPreviewError}
+                            body="Close and try again, or check the allocation and rooms."
+                        />
+                    ) : dispatchPreviewUrl ? (
+                        <iframe src={`${dispatchPreviewUrl}#toolbar=0`} title="Dispatch record PDF preview" />
+                    ) : null}
                 </div>
-            )}
-        </motion.div>
+            </Sheet>
+        </Page>
     )
 }
 

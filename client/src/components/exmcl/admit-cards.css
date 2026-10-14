@@ -1,0 +1,18 @@
+/* Exams — admit cards page and admit card format designer. Tokens only; scoped to .cb-app. */
+
+/* Exam picker in the filter bar is wider than the class/section selects. */
+.cb-app .cb-filterbar__filters .cb-field.ex-ac-exam { width: 260px; }
+@media (max-width: 640px) {
+  .cb-app .cb-filterbar__filters .cb-field.ex-ac-exam { width: auto; grid-column: 1 / -1; }
+}
+
+/* Indented options that belong to the checkbox above them. */
+.cb-app .ex-ac-nested { display: flex; flex-direction: column; gap: var(--space-3); margin-left: 28px; }
+
+/* Uploaded signature image. */
+.cb-app .ex-ac-signature { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
+.cb-app .ex-ac-signature img { height: 40px; max-width: 160px; object-fit: contain; padding: var(--space-1); background: #fff; border: 1px solid var(--border); border-radius: var(--radius-sm); }
+.cb-app .ex-ac-signature__hint { font-size: 13px; line-height: 18px; color: var(--ink-muted); }
+
+/* Hidden file input behind a secondary button. */
+.cb-app .ex-ac-file { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }

@@ -1,0 +1,86 @@
+/*
+ * Activities · Clubs (list, detail, add/edit sheet). Tokens only; the club's own colour
+ * arrives as --tone / --tone-ink from entityTone.toneStyle(). Everything sits inside .cb-app.
+ */
+
+/* ---------- Shared bits ---------- */
+.cb-app .ac-file-input { display: none; }
+.cb-app .ac-truncate { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cb-app .ac-count { font: 500 13px/18px var(--font-sans); color: var(--ink-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* Logo tile: uploaded image, or initials on the club colour. Size comes from the container. */
+.cb-app .ac-logo-tile { display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.cb-app .ac-hero-logo .ac-logo-tile,
+.cb-app .ac-logo-preview .ac-logo-tile { width: 100%; height: 100%; }
+.cb-app .ac-logo-tile > img { width: 100%; height: 100%; object-fit: contain; }
+.cb-app .ac-logo-tile__initials { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; font: 600 28px/1 var(--font-sans); letter-spacing: 0.02em; }
+.cb-app .ac-logo-tile--lg { flex: none; width: 88px; height: 88px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); }
+.cb-app .ac-logo-tile--lg > img { padding: 6px; }
+.cb-app .ac-logo-tile--lg .ac-logo-tile__initials { font-size: 26px; }
+
+/* ---------- List: entity cards (shared .actvt-card) ---------- */
+.cb-app .ac-card .actvt-card__band { display: block; flex: none; }
+.cb-app .ac-card .actvt-card__logo { flex: none; }
+.cb-app .ac-card .actvt-card__name,
+.cb-app .ac-card .actvt-card__tagline,
+.cb-app .ac-card .actvt-card__motto { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; }
+.cb-app .ac-card .actvt-card__body { flex: 1; }
+.cb-app .ac-card .actvt-card__meta .cb-badge { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ---------- Add / edit sheet: logo picker ---------- */
+.cb-app .ac-logo-field { display: flex; align-items: center; gap: var(--space-4); }
+.cb-app .ac-logo-field__body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.cb-app .ac-logo-field__label { margin: 0; font: 500 13px/18px var(--font-sans); color: var(--ink); }
+.cb-app .ac-logo-field__hint { margin: 0; font-size: 12px; line-height: 16px; color: var(--ink-muted); }
+.cb-app .ac-logo-field__actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-2); }
+
+/* ---------- Detail: hero ---------- */
+.cb-app .ac-back { display: flex; margin-bottom: calc(var(--space-6) * -1 + var(--space-2)); }
+.cb-app .ac-hero-logo { position: relative; padding: 0; font: inherit; color: inherit; cursor: pointer; appearance: none; }
+.cb-app .ac-hero-logo:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.cb-app .ac-hero-logo__hint { position: absolute; inset: auto 0 0 0; padding: 2px 0; text-align: center; font: 600 11px/16px var(--font-sans); color: var(--ink); background: color-mix(in srgb, var(--surface) 88%, transparent); border-top: 1px solid var(--border); opacity: 0; transition: opacity .12s ease-out; }
+.cb-app .ac-hero-logo:hover .ac-hero-logo__hint,
+.cb-app .ac-hero-logo:focus-visible .ac-hero-logo__hint { opacity: 1; }
+.cb-app .ac-hero-motto { margin: 0; font-size: 13px; line-height: 18px; font-style: italic; color: var(--ink-subtle); }
+.cb-app .ac-hero-facts { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-5); margin-top: var(--space-2); }
+.cb-app .ac-hero-fact { display: inline-flex; align-items: center; gap: 6px; min-width: 0; font: 500 13px/18px var(--font-sans); color: var(--ink); }
+.cb-app .ac-hero-fact > .cb-icon { flex: none; color: var(--ink-muted); }
+
+/* ---------- Detail: stats ---------- */
+.cb-app .ac-stats { display: grid; gap: var(--space-4); grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+/* ---------- Detail: roster ---------- */
+.cb-app .ac-roster { display: flex; flex-direction: column; gap: var(--space-2); }
+.cb-app .ac-roster__title { margin: 0; font: 600 12px/16px var(--font-sans); color: var(--ink-muted); }
+.cb-app .ac-roster__list { list-style: none; margin: 0; padding: var(--space-2); max-height: 176px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface-sunken); }
+.cb-app .ac-roster__item { display: flex; align-items: center; gap: var(--space-2); padding: 2px var(--space-1); font-size: 13px; line-height: 18px; color: var(--ink); overflow-wrap: anywhere; }
+.cb-app .ac-roster__item .actvt-tone-dot { width: 6px; height: 6px; box-shadow: none; }
+
+.cb-app .ac-savebar { display: flex; justify-content: flex-end; margin-top: calc(var(--space-6) * -1 + var(--space-4)); }
+
+/* ---------- Detail: students table ---------- */
+.cb-app .ac-toolbar { padding: 0 var(--space-5) var(--space-3); }
+.cb-app .ac-table { border-top: 1px solid var(--border); }
+.cb-app .ac-student-name { font-weight: 600; color: var(--ink); }
+.cb-app .ac-table .cb-table td { white-space: nowrap; }
+
+/* ---------- Logo dialog ---------- */
+.cb-app .ac-logo-preview { width: min(224px, 100%); aspect-ratio: 1 / 1; margin: 0 auto; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface-sunken); overflow: hidden; }
+.cb-app .ac-logo-preview .ac-logo-tile > img { padding: var(--space-3); }
+.cb-app .ac-logo-preview .ac-logo-tile__initials { font-size: 56px; }
+
+@media (max-width: 1023px) {
+  .cb-app .ac-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-3); }
+}
+
+@media (max-width: 640px) {
+  .cb-app .ac-stats { grid-template-columns: minmax(0, 1fr); }
+  .cb-app .ac-toolbar { padding: 0 var(--space-4) var(--space-3); }
+  .cb-app .ac-savebar > .cb-btn { flex: 1; }
+  .cb-app .ac-back { margin-bottom: calc(var(--space-4) * -1 + var(--space-1)); }
+  .cb-app .actvt-hero.ac-hero { padding: var(--space-4); }
+  .cb-app .ac-hero .actvt-hero__actions { width: 100%; }
+  .cb-app .ac-hero .actvt-hero__actions > .cb-btn { flex: 1; }
+  .cb-app .ac-logo-field { align-items: flex-start; }
+  .cb-app .ac-logo-tile--lg { width: 72px; height: 72px; }
+}

@@ -1,19 +1,47 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
+import { MapPinned, Pencil, Plus, Trash2, X } from 'lucide-react'
 import trnstService, { type RouteShift, type TransportRoute, type TransportStop, type TransportVehicle } from '@/services/trnstService'
+import {
+  Button,
+  Card,
+  DataTable,
+  Dialog,
+  EmptyState,
+  FilterBar,
+  Menu,
+  Page,
+  Select,
+  Sheet,
+  StatCard,
+  TextField,
+  type DataTableColumn,
+} from '@/components/ui'
+import { Entity, SHIFT_LABEL, errorMessage, routeVehicle, vehicleName } from '@/components/trnst/TrnstUi'
 
 const emptyStop = (): TransportStop => ({ name: '', landmark: '', pickupTime: '', dropTime: '' })
 
-const emptyRoute = {
+type RouteForm = {
+  name: string
+  code: string
+  vehicleId: string
+  shift: RouteShift
+  startPoint: string
+  endPoint: string
+  distanceKm: number
+  stops: TransportStop[]
+}
+
+const emptyRoute = (): RouteForm => ({
   name: '',
   code: '',
   vehicleId: '',
-  shift: 'both' as RouteShift,
+  shift: 'both',
   startPoint: '',
   endPoint: '',
   distanceKm: 0,
   stops: [emptyStop()],
-}
+})
 
 const vehicleIdOf = (value: TransportRoute['vehicleId']) => {
   if (!value) return ''
@@ -24,19 +52,24 @@ const vehicleIdOf = (value: TransportRoute['vehicleId']) => {
 const TrnstRoutes: React.FC = () => {
   const [routes, setRoutes] = useState<TransportRoute[]>([])
   const [vehicles, setVehicles] = useState<TransportVehicle[]>([])
-  const [form, setForm] = useState(emptyRoute)
-  const [editingId, setEditingId] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
+  const [shift, setShift] = useState<'all' | RouteShift>('all')
+  const [sheetOpen, setSheetOpen] = useState(false)
+  const [editing, setEditing] = useState<TransportRoute | null>(null)
+  const [form, setForm] = useState<RouteForm>(emptyRoute)
+  const [tried, setTried] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [loading, setLoading] = useState(false)
+  const [removing, setRemoving] = useState<TransportRoute | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
   const loadData = async () => {
-    setLoading(true)
     try {
       const [nextRoutes, nextVehicles] = await Promise.all([trnstService.getRoutes(), trnstService.getVehicles()])
       setRoutes(nextRoutes)
       setVehicles(nextVehicles)
-    } catch (error: any) {
-      toast.error(String(error?.response?.data?.message || error?.message || 'Failed to load routes.'))
+    } catch (error) {
+      toast.error(errorMessage(error, 'Could not load routes.'))
     } finally {
       setLoading(false)
     }
@@ -46,39 +79,35 @@ const TrnstRoutes: React.FC = () => {
     void loadData()
   }, [])
 
-  const updateStop = (index: number, patch: Partial<TransportStop>) => {
-    setForm((prev) => ({
-      ...prev,
-      stops: prev.stops.map((stop, stopIndex) => (stopIndex === index ? { ...stop, ...patch } : stop)),
-    }))
+  const totalStops = routes.reduce((sum, r) => sum + (r.stops?.length || 0), 0)
+  const totalKm = routes.reduce((sum, r) => sum + (r.distanceKm || 0), 0)
+  const unassigned = routes.filter((r) => !vehicleIdOf(r.vehicleId)).length
+
+  const rows = useMemo(() => {
+    const needle = search.trim().toLowerCase()
+    return routes.filter((r) => {
+      if (shift !== 'all' && r.shift !== shift) return false
+      if (!needle) return true
+      return [r.code, r.name, r.startPoint, r.endPoint, vehicleName(routeVehicle(r)), ...(r.stops || []).map((s) => s.name)]
+        .some((value) => String(value || '').toLowerCase().includes(needle))
+    })
+  }, [routes, search, shift])
+
+  const set = (patch: Partial<RouteForm>) => setForm((prev) => ({ ...prev, ...patch }))
+  const updateStop = (index: number, patch: Partial<TransportStop>) =>
+    setForm((prev) => ({ ...prev, stops: prev.stops.map((stop, i) => (i === index ? { ...stop, ...patch } : stop)) }))
+  const removeStop = (index: number) =>
+    setForm((prev) => ({ ...prev, stops: prev.stops.length > 1 ? prev.stops.filter((_, i) => i !== index) : [emptyStop()] }))
+
+  const openAdd = () => {
+    setEditing(null)
+    setForm(emptyRoute())
+    setTried(false)
+    setSheetOpen(true)
   }
 
-  const handleSave = async (event: React.FormEvent) => {
-    event.preventDefault()
-    if (!form.name.trim() || !form.code.trim()) {
-      toast.error('Route name and code are required.')
-      return
-    }
-    setSaving(true)
-    try {
-      await trnstService.saveRoute({
-        ...form,
-        vehicleId: form.vehicleId || null,
-        stops: form.stops.filter((stop) => stop.name.trim()),
-      }, editingId || undefined)
-      toast.success(editingId ? 'Route updated.' : 'Route added.')
-      setForm(emptyRoute)
-      setEditingId('')
-      await loadData()
-    } catch (error: any) {
-      toast.error(String(error?.response?.data?.message || error?.message || 'Failed to save route.'))
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const handleEdit = (route: TransportRoute) => {
-    setEditingId(route._id)
+  const openEdit = (route: TransportRoute) => {
+    setEditing(route)
     setForm({
       name: route.name || '',
       code: route.code || '',
@@ -87,124 +116,306 @@ const TrnstRoutes: React.FC = () => {
       startPoint: route.startPoint || '',
       endPoint: route.endPoint || '',
       distanceKm: route.distanceKm || 0,
-      stops: route.stops?.length ? route.stops : [emptyStop()],
+      stops: route.stops?.length ? route.stops.map((stop) => ({ ...stop })) : [emptyStop()],
     })
+    setTried(false)
+    setSheetOpen(true)
   }
 
-  const handleDelete = async (id: string) => {
-    if (!window.confirm('Remove this route?')) return
+  const save = async () => {
+    setTried(true)
+    if (!form.name.trim() || !form.code.trim()) {
+      toast.error('Enter the route name and code.')
+      return
+    }
+    setSaving(true)
     try {
-      await trnstService.deleteRoute(id)
-      toast.success('Route removed.')
+      await trnstService.saveRoute(
+        { ...form, vehicleId: form.vehicleId || null, stops: form.stops.filter((stop) => stop.name.trim()) },
+        editing?._id
+      )
+      toast.success(editing ? 'Route updated.' : 'Route added.')
+      setSheetOpen(false)
       await loadData()
-    } catch (error: any) {
-      toast.error(String(error?.response?.data?.message || error?.message || 'Failed to remove route.'))
+    } catch (error) {
+      toast.error(errorMessage(error, 'Could not save the route.'))
+    } finally {
+      setSaving(false)
     }
   }
 
-  return (
-    <div className="p-6">
-      <div className="mx-auto grid max-w-[1400px] gap-6 xl:grid-cols-[380px_1fr]">
-        <form onSubmit={handleSave} className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
-          <h2 className="text-lg font-semibold text-slate-900">{editingId ? 'Edit route' : 'Add route'}</h2>
-          <div className="mt-4 space-y-3">
-            <Field label="Route name" value={form.name} onChange={(value) => setForm({ ...form, name: value })} required />
-            <Field label="Code" value={form.code} onChange={(value) => setForm({ ...form, code: value })} required />
-            <label className="block text-sm">
-              <span className="mb-1 block text-slate-600">Vehicle</span>
-              <select value={form.vehicleId} onChange={(event) => setForm({ ...form, vehicleId: event.target.value })} className={inputClass}>
-                <option value="">Unassigned</option>
-                {vehicles.map((vehicle) => (
-                  <option key={vehicle._id} value={vehicle._id}>
-                    Bus {vehicle.busNo || '—'} · {vehicle.registrationNumber} · {vehicle.vehicleType}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="block text-sm">
-              <span className="mb-1 block text-slate-600">Shift</span>
-              <select value={form.shift} onChange={(event) => setForm({ ...form, shift: event.target.value as RouteShift })} className={inputClass}>
-                <option value="morning">Morning</option>
-                <option value="afternoon">Afternoon</option>
-                <option value="both">Both</option>
-              </select>
-            </label>
-            <Field label="Start point" value={form.startPoint} onChange={(value) => setForm({ ...form, startPoint: value })} />
-            <Field label="End point" value={form.endPoint} onChange={(value) => setForm({ ...form, endPoint: value })} />
-            <Field label="Distance (km)" type="number" value={String(form.distanceKm)} onChange={(value) => setForm({ ...form, distanceKm: Number(value) || 0 })} />
-            <div>
-              <div className="mb-2 flex items-center justify-between">
-                <p className="text-sm font-medium text-slate-600">Stops</p>
-                <button type="button" onClick={() => setForm({ ...form, stops: [...form.stops, emptyStop()] })} className="text-xs font-semibold text-indigo-600">Add stop</button>
-              </div>
-              <div className="space-y-2">
-                {form.stops.map((stop, index) => (
-                  <div key={`${index}-${stop.name}`} className="rounded-xl border border-slate-100 p-3">
-                    <input value={stop.name} onChange={(event) => updateStop(index, { name: event.target.value })} placeholder={`Stop ${index + 1} name`} className={`${inputClass} mb-2`} />
-                    <div className="grid grid-cols-2 gap-2">
-                      <input value={stop.pickupTime} onChange={(event) => updateStop(index, { pickupTime: event.target.value })} placeholder="Pickup time" className={inputClass} />
-                      <input value={stop.dropTime} onChange={(event) => updateStop(index, { dropTime: event.target.value })} placeholder="Drop time" className={inputClass} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-          <div className="mt-4 flex gap-2">
-            <button type="submit" disabled={saving} className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60">
-              {saving ? 'Saving...' : editingId ? 'Update route' : 'Add route'}
-            </button>
-            {editingId ? (
-              <button type="button" onClick={() => { setEditingId(''); setForm(emptyRoute) }} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600">Cancel</button>
-            ) : null}
-          </div>
-        </form>
+  const remove = async () => {
+    if (!removing) return
+    setDeleting(true)
+    try {
+      await trnstService.deleteRoute(removing._id)
+      toast.success('Route removed.')
+      setRemoving(null)
+      await loadData()
+    } catch (error) {
+      toast.error(errorMessage(error, 'Could not remove the route.'))
+    } finally {
+      setDeleting(false)
+    }
+  }
 
-        <section className="space-y-4">
-          {loading ? <p className="text-sm text-slate-500">Loading routes...</p> : null}
-          {routes.map((route) => {
-            const vehicle = typeof route.vehicleId === 'object' ? route.vehicleId : null
-            return (
-              <article key={route._id} className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-wide text-amber-600">{route.code} · {route.shift}</p>
-                    <h3 className="text-lg font-semibold text-slate-900">{route.name}</h3>
-                    <p className="text-sm text-slate-500">{route.startPoint || 'Start'} → {route.endPoint || 'End'} · {route.distanceKm || 0} km</p>
-                    <p className="text-sm text-slate-500">
-                      Vehicle: {vehicle?.busNo ? `Bus ${vehicle.busNo}` : vehicle?.registrationNumber || 'Unassigned'}
-                    </p>
-                  </div>
-                  <div className="flex gap-2">
-                    <button type="button" onClick={() => handleEdit(route)} className="text-xs font-semibold text-indigo-600">Edit</button>
-                    <button type="button" onClick={() => handleDelete(route._id)} className="text-xs font-semibold text-rose-600">Remove</button>
-                  </div>
-                </div>
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {(route.stops || []).map((stop, index) => (
-                    <span key={`${route._id}-${index}`} className="rounded-full bg-slate-50 px-3 py-1 text-xs font-medium text-slate-600">
-                      {index + 1}. {stop.name}{stop.pickupTime ? ` · ${stop.pickupTime}` : ''}
-                    </span>
-                  ))}
-                  {(route.stops || []).length === 0 ? <span className="text-xs text-slate-400">No stops added</span> : null}
-                </div>
-              </article>
+  const columns: DataTableColumn<TransportRoute>[] = [
+    {
+      key: 'route',
+      header: 'Route',
+      mobile: 'title',
+      render: (r) => <Entity primary={`${r.code} · ${r.name}`} secondary={`${r.startPoint || 'Start'} → ${r.endPoint || 'End'}`} />,
+    },
+    { key: 'shift', header: 'Shift', mobile: 'subtitle', render: (r) => SHIFT_LABEL[r.shift] || r.shift },
+    { key: 'vehicle', header: 'Vehicle', mobile: 'aside', render: (r) => vehicleName(routeVehicle(r)) || 'Unassigned' },
+    {
+      key: 'stops',
+      header: 'Stops',
+      render: (r) =>
+        r.stops?.length ? (
+          <Entity
+            primary={`${r.stops.length} stop${r.stops.length === 1 ? '' : 's'}`}
+            secondary={r.stops.map((s) => (s.pickupTime ? `${s.name} ${s.pickupTime}` : s.name)).join(' → ')}
+          />
+        ) : (
+          '—'
+        ),
+    },
+    { key: 'distance', header: 'Distance', numeric: true, mobile: 'hidden', render: (r) => (r.distanceKm ? `${r.distanceKm} km` : '—') },
+    {
+      key: 'actions',
+      header: '',
+      headerLabel: 'Actions',
+      align: 'right',
+      width: 48,
+      interactive: true,
+      render: (r) => (
+        <Menu
+          label={`Actions for ${r.code}`}
+          items={[
+            { label: 'Edit route', icon: Pencil, onSelect: () => openEdit(r) },
+            { divider: true },
+            { label: 'Remove route', icon: Trash2, tone: 'danger', onSelect: () => setRemoving(r) },
+          ]}
+        />
+      ),
+    },
+  ]
+
+  const shiftCount = (value: RouteShift) => routes.filter((r) => r.shift === value).length
+  const filtered = Boolean(search.trim() || shift !== 'all')
+
+  return (
+    <Page>
+      <section className="cb-stats" aria-label="Route totals">
+        <StatCard label="Routes" value={routes.length} icon={MapPinned} />
+        <StatCard label="Stops mapped" value={totalStops} />
+        <StatCard label="Without a vehicle" value={unassigned} hint={unassigned ? 'Assign a bus or van' : 'Every route has a vehicle'} />
+        <StatCard label="Distance covered" value={Math.round(totalKm * 10) / 10} unit="km" hint="One way, all routes" />
+      </section>
+
+      <Card flush className="tr-records">
+        <div className="tr-records__toolbar">
+          <FilterBar
+            search={{ placeholder: 'Search route, stop or vehicle', value: search, onChange: setSearch, label: 'Search routes' }}
+            chips={[
+              { id: 'all', label: 'All', count: routes.length, active: shift === 'all' },
+              { id: 'morning', label: 'Morning', count: shiftCount('morning'), active: shift === 'morning' },
+              { id: 'afternoon', label: 'Afternoon', count: shiftCount('afternoon'), active: shift === 'afternoon' },
+              { id: 'both', label: 'Both', count: shiftCount('both'), active: shift === 'both' },
+            ]}
+            onChipClick={(id) => setShift(id as typeof shift)}
+            chipsLabel="Shift"
+            actions={
+              <Button variant="primary" icon={Plus} onClick={openAdd}>
+                Add route
+              </Button>
+            }
+          />
+        </div>
+        <DataTable
+          caption="Routes"
+          columns={columns}
+          rows={rows}
+          getRowKey={(r) => r._id}
+          onRowClick={openEdit}
+          loading={loading}
+          loadingLabel="Loading routes…"
+          empty={
+            routes.length === 0 ? (
+              <EmptyState
+                icon={MapPinned}
+                title="No routes yet"
+                body="Add a pickup route with its stops and timings, then attach the vehicle that runs it."
+                action={
+                  <Button size="sm" icon={Plus} onClick={openAdd}>
+                    Add route
+                  </Button>
+                }
+              />
+            ) : (
+              <EmptyState
+                compact
+                icon={MapPinned}
+                title="No routes match these filters"
+                body="Try another search or shift."
+                action={
+                  filtered ? (
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        setSearch('')
+                        setShift('all')
+                      }}
+                    >
+                      Clear filters
+                    </Button>
+                  ) : undefined
+                }
+              />
             )
-          })}
-          {!loading && routes.length === 0 ? <p className="rounded-[28px] border border-dashed border-slate-200 bg-white px-5 py-10 text-center text-sm text-slate-500">No routes yet.</p> : null}
-        </section>
-      </div>
-    </div>
+          }
+        />
+      </Card>
+
+      <Sheet
+        open={sheetOpen}
+        onClose={() => setSheetOpen(false)}
+        title={editing ? `Edit ${editing.code}` : 'Add route'}
+        description="Where the route runs, the vehicle on it and each stop's timings."
+        icon={MapPinned}
+        size="lg"
+        onSubmit={(event) => {
+          event.preventDefault()
+          if (!saving) void save()
+        }}
+        footer={
+          <>
+            <Button onClick={() => setSheetOpen(false)} disabled={saving}>
+              Cancel
+            </Button>
+            <Button type="submit" variant="primary" loading={saving}>
+              {editing ? 'Save route' : 'Add route'}
+            </Button>
+          </>
+        }
+      >
+        <div className="cb-form-grid">
+          <TextField
+            label="Route name"
+            required
+            autoFocus
+            placeholder="e.g. Sector 14 loop"
+            value={form.name}
+            onChange={(e) => set({ name: e.target.value })}
+            error={tried && !form.name.trim() ? 'Enter the route name.' : undefined}
+          />
+          <TextField
+            label="Code"
+            required
+            placeholder="e.g. R1"
+            value={form.code}
+            onChange={(e) => set({ code: e.target.value })}
+            error={tried && !form.code.trim() ? 'Enter a short code.' : undefined}
+          />
+          <Select
+            label="Vehicle"
+            value={form.vehicleId}
+            onChange={(e) => set({ vehicleId: e.target.value })}
+            placeholder="Unassigned"
+            options={vehicles.map((v) => ({ value: v._id, label: `${vehicleName(v)} · ${v.registrationNumber} · ${v.capacity || 0} seats` }))}
+          />
+          <Select
+            label="Shift"
+            value={form.shift}
+            onChange={(e) => set({ shift: e.target.value as RouteShift })}
+            options={Object.entries(SHIFT_LABEL).map(([value, label]) => ({ value, label }))}
+          />
+          <TextField label="Start point" value={form.startPoint} onChange={(e) => set({ startPoint: e.target.value })} />
+          <TextField label="End point" placeholder="Usually the school" value={form.endPoint} onChange={(e) => set({ endPoint: e.target.value })} />
+          <TextField
+            label="Distance"
+            type="number"
+            inputMode="decimal"
+            min={0}
+            suffix="km"
+            value={form.distanceKm || ''}
+            onChange={(e) => set({ distanceKm: Number(e.target.value) || 0 })}
+          />
+        </div>
+
+        <div className="tr-section">
+          <div className="tr-section__head">
+            <span className="tr-section__title">Stops</span>
+            <span className="tr-section__hint">In pickup order. Empty rows are skipped.</span>
+          </div>
+          <ol className="tr-stops">
+            {form.stops.map((stop, index) => (
+              <li key={index} className="tr-stop">
+                <span className="tr-stop__num">{index + 1}</span>
+                <TextField
+                  className="tr-stop__name"
+                  size="sm"
+                  aria-label={`Stop ${index + 1} name`}
+                  placeholder="Stop name"
+                  value={stop.name}
+                  onChange={(e) => updateStop(index, { name: e.target.value })}
+                />
+                <TextField
+                  className="tr-stop__time"
+                  size="sm"
+                  placeholder="Pickup 07:10"
+                  aria-label={`Stop ${index + 1} pickup time`}
+                  value={stop.pickupTime || ''}
+                  onChange={(e) => updateStop(index, { pickupTime: e.target.value })}
+                />
+                <TextField
+                  className="tr-stop__time"
+                  size="sm"
+                  placeholder="Drop 14:20"
+                  aria-label={`Stop ${index + 1} drop time`}
+                  value={stop.dropTime || ''}
+                  onChange={(e) => updateStop(index, { dropTime: e.target.value })}
+                />
+                <Button
+                  className="tr-stop__remove"
+                  variant="tertiary"
+                  size="sm"
+                  icon={X}
+                  aria-label={`Remove stop ${index + 1}`}
+                  onClick={() => removeStop(index)}
+                />
+              </li>
+            ))}
+          </ol>
+          <div>
+            <Button size="sm" icon={Plus} onClick={() => set({ stops: [...form.stops, emptyStop()] })}>
+              Add stop
+            </Button>
+          </div>
+        </div>
+      </Sheet>
+
+      <Dialog
+        open={Boolean(removing)}
+        onClose={() => setRemoving(null)}
+        tone="danger"
+        size="sm"
+        title={`Remove route ${removing?.code || ''}?`}
+        description="The route and its stops leave the list. The vehicle stays in the fleet."
+        footer={
+          <>
+            <Button onClick={() => setRemoving(null)} disabled={deleting}>
+              Cancel
+            </Button>
+            <Button variant="danger" loading={deleting} onClick={() => void remove()}>
+              Remove route
+            </Button>
+          </>
+        }
+      />
+    </Page>
   )
 }
-
-const inputClass = 'w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none focus:border-indigo-400'
-
-const Field = ({ label, value, onChange, type = 'text', required = false }: { label: string; value: string; onChange: (value: string) => void; type?: string; required?: boolean }) => (
-  <label className="block text-sm">
-    <span className="mb-1 block text-slate-600">{label}</span>
-    <input type={type} value={value} required={required} onChange={(event) => onChange(event.target.value)} className={inputClass} />
-  </label>
-)
 
 export default TrnstRoutes

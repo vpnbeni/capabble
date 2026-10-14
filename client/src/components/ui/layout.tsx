@@ -5,6 +5,7 @@ import {
   ArrowUpRight,
   CheckCircle2,
   ChevronLeft,
+  ChevronRight,
   Info,
   Inbox,
   Search,
@@ -13,7 +14,8 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { cx } from './format'
-import { Icon, Progress, type Tone } from './primitives'
+import { Button, Icon, Progress, type Tone } from './primitives'
+import { Select } from './forms'
 
 /**
  * Root of every redesigned workspace page: applies the Capabble tokens (.cb-app),
@@ -291,4 +293,124 @@ export const DetailList: React.FC<{
       </div>
     ))}
   </dl>
+)
+
+/**
+ * A headline amount with a muted caption beside it — the design system's Fees card
+ * ("₹18,42,500 collected of ₹24,20,000"). Pair it with a Progress underneath.
+ */
+export const Figure: React.FC<{ value: React.ReactNode; caption?: React.ReactNode; className?: string }> = ({
+  value,
+  caption,
+  className,
+}) => (
+  <div className={cx('cb-figure', className)}>
+    <span className="cb-figure__value">{value}</span>
+    {caption ? <span className="cb-figure__caption">{caption}</span> : null}
+  </div>
+)
+
+/**
+ * Small sunken metric inside a Card (Today / Overdue / Due by … in the design system's
+ * Fees card). A tone tints the whole tile; the label always says what it means.
+ * Lay several out with <MetricTiles>.
+ */
+export const MetricTile: React.FC<{
+  label: React.ReactNode
+  value: React.ReactNode
+  hint?: React.ReactNode
+  tone?: Tone
+  className?: string
+}> = ({ label, value, hint, tone = 'neutral', className }) => (
+  <div className={cx('cb-metric', tone !== 'neutral' && `cb-metric--${tone}`, className)}>
+    <span className="cb-metric__label">{label}</span>
+    <span className="cb-metric__value">{value}</span>
+    {hint ? <span className="cb-metric__hint">{hint}</span> : null}
+  </div>
+)
+
+export const MetricTiles: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className }) => (
+  <div className={cx('cb-metrics', className)}>{children}</div>
+)
+
+/** Primary line with a muted second line — the first column of a table or a list row. */
+export const Entity: React.FC<{ primary: React.ReactNode; secondary?: React.ReactNode; className?: string }> = ({
+  primary,
+  secondary,
+  className,
+}) => (
+  <div className={cx('cb-entity', className)}>
+    <span className="cb-entity__primary">{primary}</span>
+    {secondary ? <span className="cb-entity__secondary">{secondary}</span> : null}
+  </div>
+)
+
+/** Padded strip at the top of a flush Card, holding the FilterBar above its DataTable. */
+export const CardToolbar: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className }) => (
+  <div className={cx('cb-card-toolbar', className)}>{children}</div>
+)
+
+/**
+ * Table pagination for a DataTable `footer`: "21–40 of 152", an optional rows-per-page
+ * select, then previous / "Page 2 of 8" / next. Renders the page controls only when
+ * there is more than one page.
+ */
+export const Pagination: React.FC<{
+  page: number
+  pages: number
+  total: number
+  limit: number
+  onPageChange: (page: number) => void
+  pageSize?: number
+  pageSizeOptions?: Array<{ value: number; label: string }>
+  onPageSizeChange?: (size: number) => void
+}> = ({ page, pages, total, limit, onPageChange, pageSize, pageSizeOptions, onPageSizeChange }) => {
+  const from = total === 0 ? 0 : (page - 1) * limit + 1
+  const to = Math.min(page * limit, total)
+  return (
+    <>
+      <div className="cb-pagination">
+        <span className="cb-pagination__range">
+          {from.toLocaleString('en-IN')}–{to.toLocaleString('en-IN')} of {total.toLocaleString('en-IN')}
+        </span>
+        {pageSizeOptions && pageSize !== undefined && onPageSizeChange ? (
+          <Select
+            size="sm"
+            aria-label="Rows per page"
+            value={String(pageSize)}
+            onChange={(e) => onPageSizeChange(Number(e.target.value))}
+            options={pageSizeOptions.map((o) => ({ value: String(o.value), label: `${o.label} per page` }))}
+          />
+        ) : null}
+      </div>
+      {pages > 1 ? (
+        <nav className="cb-pagination" aria-label="Pagination">
+          <Button
+            size="sm"
+            variant="tertiary"
+            icon={ChevronLeft}
+            aria-label="Previous page"
+            disabled={page <= 1}
+            onClick={() => onPageChange(page - 1)}
+          />
+          <span className="cb-pagination__range">
+            Page {page} of {pages}
+          </span>
+          <Button
+            size="sm"
+            variant="tertiary"
+            icon={ChevronRight}
+            aria-label="Next page"
+            disabled={page >= pages}
+            onClick={() => onPageChange(page + 1)}
+          />
+        </nav>
+      ) : null}
+    </>
+  )
+}
+
+/** A PDF preview filling a Sheet or Card body, with the browser's toolbar hidden. */
+export const PdfFrame: React.FC<{ src: string; title: string; toolbar?: boolean }> = ({ src, title, toolbar = false }) => (
+  <iframe src={toolbar || src.includes('#') ? src : `${src}#toolbar=0`} title={title} className="cb-pdf-frame" />
 )

@@ -1,10 +1,33 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
-import { ImagePlus, Pencil, Search, Trash2, Users } from 'lucide-react'
+import { Pencil, Plus, Shield, Trash2, UserCheck, UserX, Users } from 'lucide-react'
 import api from '@/services/api'
 import { ImageCropModal } from '@/components/common/ImageCropModal'
-import { HouseEditModal, type HouseEditRecord } from '@/components/actvt/HouseEditModal'
+import {
+  Badge,
+  Button,
+  Card,
+  Dialog,
+  EmptyState,
+  FilterBar,
+  Menu,
+  Page,
+  Sheet,
+  StatCard,
+  TextField,
+} from '@/components/ui'
+import {
+  DEFAULT_HOUSE_COLOR,
+  HouseColorField,
+  HouseEditModal,
+  HouseLogoField,
+  houseInitials,
+  type HouseEditRecord,
+} from '@/components/actvt/HouseEditModal'
+import { toneStyle } from '@/components/actvt/entityTone'
+import '@/components/actvt/actvt.css'
+import '@/components/actvt/houses.css'
 
 type HouseRecord = HouseEditRecord
 
@@ -40,7 +63,7 @@ type HouseStats = {
 
 const emptyForm = (): HouseFormState => ({
   name: '',
-  color: '#4f46e5',
+  color: DEFAULT_HOUSE_COLOR,
 })
 
 const emptyGenderSplit = (): GenderSplit => ({ boys: 0, girls: 0 })
@@ -53,48 +76,18 @@ const emptyStats = (): HouseStats => ({
   matrix: [],
 })
 
-const initialsOf = (name = '') => {
-  const parts = String(name).trim().split(/\s+/).filter(Boolean)
-  if (parts.length === 0) return 'H'
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
-  return `${parts[0][0] || ''}${parts[1][0] || ''}`.toUpperCase()
-}
-
-const isLikelyColor = (value = '') => /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(value.trim())
-
-const HouseLogoBadge = ({
-  logo,
-  name,
-  tone,
-}: {
-  logo?: string
-  name?: string
-  tone: string
-}) => (
-  <div className="flex aspect-square w-full items-center justify-center rounded-2xl border-4 border-white bg-white p-2 shadow-md">
-    {logo ? (
-      <img
-        src={logo}
-        alt={name || 'House logo'}
-        className="h-full w-full rounded-xl object-contain"
-      />
-    ) : (
-      <div
-        className="flex h-full w-full items-center justify-center rounded-xl text-lg font-bold text-white"
-        style={{ backgroundColor: isLikelyColor(tone) ? tone : '#312e81' }}
-      >
-        {initialsOf(name)}
-      </div>
-    )}
-  </div>
-)
+const percentOf = (value: number, total: number) => (total > 0 ? Math.round((value / total) * 100) : 0)
 
 const ActvtHouses: React.FC = () => {
   const navigate = useNavigate()
   const [records, setRecords] = useState<HouseRecord[]>([])
   const [stats, setStats] = useState<HouseStats>(emptyStats)
   const [form, setForm] = useState<HouseFormState>(emptyForm)
+  const [addOpen, setAddOpen] = useState(false)
+  const [nameError, setNameError] = useState('')
   const [editingHouse, setEditingHouse] = useState<HouseRecord | null>(null)
+  const [removingHouse, setRemovingHouse] = useState<HouseRecord | null>(null)
+  const [removing, setRemoving] = useState(false)
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [query, setQuery] = useState('')
@@ -150,6 +143,24 @@ const ActvtHouses: React.FC = () => {
     )
   }, [query, records])
 
+  const countByHouse = useMemo(() => {
+    const map = new Map<string, number>()
+    stats.byHouse.forEach((entry) => map.set(String(entry.houseId), entry.count))
+    return map
+  }, [stats.byHouse])
+
+  // Stable fallback colour per house (by position in the full list), used only when no colour is saved.
+  const toneIndex = useMemo(() => {
+    const map = new Map<string, number>()
+    records.forEach((house, index) => map.set(String(house._id || house.name), index))
+    return map
+  }, [records])
+
+  const largestHouse = useMemo(
+    () => stats.byHouse.reduce((max, entry) => Math.max(max, entry.count), 0),
+    [stats.byHouse]
+  )
+
   const clearCropSource = () => {
     if (cropSource.startsWith('blob:')) URL.revokeObjectURL(cropSource)
     setCropSource('')
@@ -158,10 +169,17 @@ const ActvtHouses: React.FC = () => {
   const resetForm = () => {
     if (logoPreview.startsWith('blob:')) URL.revokeObjectURL(logoPreview)
     setForm(emptyForm())
+    setNameError('')
     setLogoFile(null)
     setLogoPreview('')
     clearCropSource()
     if (logoInputRef.current) logoInputRef.current.value = ''
+  }
+
+  const closeAdd = () => {
+    if (saving || cropSource) return
+    setAddOpen(false)
+    resetForm()
   }
 
   const handleLogoSelected = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -191,9 +209,17 @@ const ActvtHouses: React.FC = () => {
     if (logoInputRef.current) logoInputRef.current.value = ''
   }
 
+  const handleRemoveLogo = () => {
+    if (logoPreview.startsWith('blob:')) URL.revokeObjectURL(logoPreview)
+    setLogoFile(null)
+    setLogoPreview('')
+    if (logoInputRef.current) logoInputRef.current.value = ''
+  }
+
   const handleSave = async (event: React.FormEvent) => {
     event.preventDefault()
     if (!form.name.trim()) {
+      setNameError('Enter a house name')
       toast.error('House name is required.')
       return
     }
@@ -212,6 +238,7 @@ const ActvtHouses: React.FC = () => {
       })
       toast.success('House saved.')
       resetForm()
+      setAddOpen(false)
       await load()
     } catch (error: any) {
       toast.error(String(error?.response?.data?.message || error?.message || 'Failed to save house.'))
@@ -220,304 +247,315 @@ const ActvtHouses: React.FC = () => {
     }
   }
 
-  const handleRemove = async (item: HouseRecord) => {
-    if (!item._id || !window.confirm(`Remove house "${item.name || 'Untitled'}"?`)) return
+  const handleRemove = async () => {
+    const item = removingHouse
+    if (!item?._id) return
+    setRemoving(true)
     try {
       await api.delete(`/actvt/houses/${item._id}`)
       toast.success('House removed.')
       if (editingHouse?._id === item._id) setEditingHouse(null)
+      setRemovingHouse(null)
       await load()
     } catch (error: any) {
       toast.error(String(error?.response?.data?.message || error?.message || 'Failed to remove house.'))
+    } finally {
+      setRemoving(false)
     }
   }
 
-  const houseCountLabel = `${visible.length} House${visible.length === 1 ? '' : 's'}`
+  const openHouse = (house: HouseRecord) => {
+    if (house._id) navigate(`/actvt/houses/${house._id}`)
+  }
+
+  const assignedPct = percentOf(stats.assignedStudents, stats.totalStudents)
 
   return (
-    <div className="p-6">
-      <div className="mx-auto max-w-[1400px] space-y-6">
-        <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="mb-3 flex items-center gap-2">
-            <Users className="h-4 w-4 text-indigo-600" />
-            <h3 className="text-sm font-semibold text-slate-900">House student stats</h3>
+    <Page>
+      <div className="cb-stack">
+        <div className="cb-stats">
+          <StatCard label="Houses" value={records.length} icon={Shield} />
+          <StatCard label="All students" value={stats.totalStudents} icon={Users} />
+          <StatCard
+            label="Assigned to a house"
+            value={stats.assignedStudents}
+            icon={UserCheck}
+            hint={`${assignedPct}% of students`}
+            progress={assignedPct}
+            progressTone="success"
+          />
+          <StatCard
+            label="Not assigned"
+            value={stats.unassignedStudents}
+            icon={UserX}
+            hint={stats.unassignedStudents > 0 ? 'Assign houses from student records' : 'Every student has a house'}
+          />
+        </div>
+
+        <Card flush className="ah-list">
+          <div className="ah-toolbar">
+            <FilterBar
+              search={{ placeholder: 'Search houses', value: query, onChange: setQuery, label: 'Search houses' }}
+              actions={
+                <Button variant="primary" size="sm" icon={Plus} onClick={() => setAddOpen(true)}>
+                  Add house
+                </Button>
+              }
+            />
           </div>
-          <div className="flex flex-wrap gap-2">
-            <StatPill label="All students" value={stats.totalStudents} tone="bg-slate-900 text-white" />
-            <StatPill label="Assigned" value={stats.assignedStudents} tone="bg-emerald-50 text-emerald-700" />
-            <StatPill label="Not assigned" value={stats.unassignedStudents} tone="bg-amber-50 text-amber-700" />
-            {stats.byHouse.map((house) => (
-              <StatPill
-                key={house.houseId}
-                label={house.houseName}
-                value={house.count}
-                tone="bg-slate-50 text-slate-700"
-                dot={house.color}
-              />
-            ))}
-          </div>
-        </section>
 
-        <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
-          <form
-            onSubmit={handleSave}
-            className="mb-4 flex flex-wrap items-center gap-x-2 gap-y-2"
-          >
-            <h3 className="shrink-0 text-lg font-semibold text-slate-900">{houseCountLabel}</h3>
-
-            <div className="relative shrink-0">
-              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
-              <input
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="Search houses"
-                className="h-9 w-[160px] rounded-lg border border-slate-200 py-1.5 pl-8 pr-2.5 text-sm outline-none focus:border-indigo-400 sm:w-[180px]"
-              />
+          {loading && records.length === 0 ? (
+            <div className="cb-table-state" role="status">
+              <span className="cb-spinner" aria-hidden="true" />
+              Loading houses…
             </div>
-
-            <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
-              <button
-                type="button"
-                onClick={() => logoInputRef.current?.click()}
-                className="flex h-9 shrink-0 items-center justify-center gap-1.5 overflow-hidden rounded-lg border border-slate-200 bg-white px-2.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-50"
-                title="Upload and crop logo"
-              >
-                {logoPreview ? (
-                  <span className="flex h-6 w-6 items-center justify-center overflow-hidden rounded-md bg-white ring-1 ring-slate-200">
-                    <img src={logoPreview} alt="Logo preview" className="h-full w-full object-contain" />
-                  </span>
-                ) : (
-                  <ImagePlus className="h-3.5 w-3.5" />
-                )}
-                <span className="truncate">Logo</span>
-              </button>
-              <input
-                ref={logoInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handleLogoSelected}
-                className="hidden"
-              />
-
-              <input
-                required
-                value={form.name}
-                onChange={(event) => setForm({ ...form, name: event.target.value })}
-                placeholder="House name"
-                className={`${inputClassCompact} min-w-[120px] max-w-[180px] flex-1`}
-              />
-
-              <div className="flex shrink-0 items-center gap-1.5">
-                <input
-                  type="color"
-                  value={isLikelyColor(form.color) ? form.color : '#4f46e5'}
-                  onChange={(event) => setForm({ ...form, color: event.target.value })}
-                  className="h-9 w-9 cursor-pointer rounded-lg border border-slate-200 bg-white p-1"
-                  aria-label="Pick house colour"
-                />
-                <input
-                  value={form.color}
-                  onChange={(event) => setForm({ ...form, color: event.target.value })}
-                  placeholder="#4f46e5"
-                  className={`${inputClassCompact} w-[88px]`}
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={saving}
-                className="h-9 shrink-0 rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
-              >
-                {saving ? 'Saving...' : 'Add'}
-              </button>
-            </div>
-          </form>
-
-          {loading ? <p className="text-sm text-slate-500">Loading houses...</p> : null}
-
-          {!loading && visible.length === 0 ? (
-            <div className="flex min-h-[200px] flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 px-6 text-center">
-              <p className="text-sm font-medium text-slate-700">No houses yet</p>
-              <p className="mt-1 max-w-sm text-sm text-slate-500">
-                Add a house with name, colour, and logo. Tagline and motto can be edited later.
-              </p>
-            </div>
+          ) : records.length === 0 ? (
+            <EmptyState
+              icon={Shield}
+              title="No houses yet"
+              body="Add a house with its name, colour and logo. Tagline, motto, teachers and council can be added from the house page."
+            />
+          ) : visible.length === 0 ? (
+            <EmptyState
+              compact
+              title={`No houses match “${query.trim()}”`}
+              body="Try a different name, tagline or colour code."
+              action={
+                <Button size="sm" onClick={() => setQuery('')}>
+                  Clear search
+                </Button>
+              }
+            />
           ) : (
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
-              {visible.map((house, index) => {
-                const tone = isLikelyColor(house.color || '') ? house.color! : PROFILE_TONES[index % PROFILE_TONES.length]
+            <ul className="actvt-grid ah-grid" aria-label="Houses">
+              {visible.map((house) => {
+                const key = String(house._id || house.name)
+                const count = countByHouse.get(String(house._id || ''))
                 return (
-                  <article
-                    key={house._id || house.name}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => house._id && navigate(`/actvt/houses/${house._id}`)}
-                    onKeyDown={(event) => {
-                      if ((event.key === 'Enter' || event.key === ' ') && house._id) {
-                        event.preventDefault()
-                        navigate(`/actvt/houses/${house._id}`)
-                      }
-                    }}
-                    className="flex cursor-pointer flex-col overflow-hidden rounded-[22px] border border-slate-100 bg-white shadow-[0_16px_36px_-24px_rgba(15,23,42,0.45)] transition hover:-translate-y-0.5 hover:shadow-[0_22px_40px_-20px_rgba(15,23,42,0.5)]"
-                  >
-                    <div
-                      className="h-36 shrink-0"
-                      style={{
-                        backgroundColor: isLikelyColor(tone) ? tone : '#312e81',
-                      }}
-                    />
-
-                    <div className="relative z-[1] -mt-24 px-4">
-                      <HouseLogoBadge logo={house.logo} name={house.name} tone={tone} />
-                    </div>
-
-                    <div className="relative flex flex-1 flex-col px-3 pb-3 pt-3">
-                      <div className="flex flex-1 flex-col text-center">
-                        <p className="line-clamp-2 text-sm font-semibold leading-snug text-slate-900">
-                          {house.name || 'Untitled house'}
-                        </p>
-                        <p className="mt-1 line-clamp-2 min-h-[32px] text-[11px] font-medium text-indigo-600">
-                          {house.tagline || 'No tagline'}
-                        </p>
-                        <p className="mt-2 line-clamp-3 min-h-[48px] text-xs italic leading-relaxed text-slate-600">
-                          {house.motto ? `“${house.motto}”` : 'No motto added'}
-                        </p>
-                      </div>
-
-                      <div className="mt-3 flex items-center justify-between gap-2 border-t border-slate-100 pt-3">
-                        <span className="inline-flex min-w-0 items-center gap-1.5 text-[10px] font-semibold text-slate-600">
-                          <span
-                            className="h-2.5 w-2.5 shrink-0 rounded-full border border-slate-200"
-                            style={{ backgroundColor: isLikelyColor(tone) ? tone : '#94a3b8' }}
-                          />
-                          <span className="truncate">{house.color || 'No colour'}</span>
+                  <li key={key} className="actvt-card" style={toneStyle(house.color, toneIndex.get(key) ?? 0)}>
+                    <button
+                      type="button"
+                      className="actvt-card__open"
+                      onClick={() => openHouse(house)}
+                      aria-label={`Open ${house.name || 'house'}`}
+                    >
+                      <span className="actvt-card__band" aria-hidden="true" />
+                      <span className="actvt-card__logo">
+                        {house.logo ? (
+                          <img src={house.logo} alt="" />
+                        ) : (
+                          <span className="actvt-card__initials" aria-hidden="true">
+                            {houseInitials(house.name)}
+                          </span>
+                        )}
+                      </span>
+                      <span className="actvt-card__body">
+                        <span className="actvt-card__name">{house.name || 'Untitled house'}</span>
+                        <span className="actvt-card__tagline">{house.tagline || 'No tagline yet'}</span>
+                        {house.motto ? <span className="actvt-card__motto">“{house.motto}”</span> : null}
+                        <span className="actvt-card__meta">
+                          <Badge tone="neutral" dot={false}>
+                            {count ?? 0} student{count === 1 ? '' : 's'}
+                          </Badge>
                         </span>
-                        <div className="flex shrink-0 gap-3">
-                          <button
-                            type="button"
-                            onClick={(event) => {
-                              event.stopPropagation()
-                              setEditingHouse(house)
-                            }}
-                            className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-600"
-                          >
-                            <Pencil className="h-3 w-3" />
-                            Edit
-                          </button>
-                          <button
-                            type="button"
-                            onClick={(event) => {
-                              event.stopPropagation()
-                              void handleRemove(house)
-                            }}
-                            className="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-600"
-                          >
-                            <Trash2 className="h-3 w-3" />
-                            Remove
-                          </button>
-                        </div>
-                      </div>
+                      </span>
+                    </button>
+                    <div className="actvt-card__foot">
+                      <span className="actvt-card__swatch">
+                        <span className="actvt-tone-dot" aria-hidden="true" />
+                        <span className="ah-truncate">{house.color || 'No colour set'}</span>
+                      </span>
+                      <span className="actvt-card__actions">
+                        <Menu
+                          label={`More actions for ${house.name || 'house'}`}
+                          items={[
+                            { label: 'Edit house', icon: Pencil, onSelect: () => setEditingHouse(house) },
+                            { divider: true },
+                            {
+                              label: 'Remove house',
+                              icon: Trash2,
+                              tone: 'danger',
+                              onSelect: () => setRemovingHouse(house),
+                            },
+                          ]}
+                        />
+                      </span>
                     </div>
-                  </article>
+                  </li>
                 )
               })}
-            </div>
+            </ul>
           )}
-        </section>
+        </Card>
 
-        <section className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm">
-          <div className="border-b border-slate-100 px-5 py-4">
-            <h3 className="text-lg font-semibold text-slate-900">Class · Section · House count</h3>
-            <p className="mt-1 text-sm text-slate-500">
-              Student distribution across houses for each class and section, split by boys and girls.
-            </p>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
-                <tr>
-                  <th rowSpan={2} className="sticky left-0 z-10 bg-slate-50 px-4 py-3 font-semibold">
-                    Class
-                  </th>
-                  <th rowSpan={2} className="sticky left-[72px] z-10 bg-slate-50 px-4 py-3 font-semibold">
-                    Section
-                  </th>
-                  {records.map((house) => (
-                    <th
-                      key={house._id}
-                      colSpan={2}
-                      className="border-l border-slate-200 px-4 py-2 text-center font-semibold"
-                    >
-                      <span className="inline-flex items-center justify-center gap-1.5">
-                        <span
-                          className="h-2 w-2 rounded-full"
-                          style={{ backgroundColor: isLikelyColor(house.color || '') ? house.color : '#94a3b8' }}
-                        />
-                        {house.name}
-                      </span>
-                    </th>
-                  ))}
-                  <th
-                    colSpan={2}
-                    className="border-l border-slate-200 px-4 py-2 text-center font-semibold text-amber-700"
-                  >
-                    Not assigned
-                  </th>
-                  <th rowSpan={2} className="whitespace-nowrap px-4 py-3 font-semibold">Total</th>
-                </tr>
-                <tr>
-                  {records.map((house) => (
-                    <React.Fragment key={`${house._id}-split`}>
-                      <th className="border-l border-slate-200 px-3 py-2 text-center font-semibold normal-case text-slate-500">
-                        Boys
-                      </th>
-                      <th className="px-3 py-2 text-center font-semibold normal-case text-slate-500">
-                        Girls
-                      </th>
-                    </React.Fragment>
-                  ))}
-                  <th className="border-l border-slate-200 px-3 py-2 text-center font-semibold normal-case text-amber-700">
-                    Boys
-                  </th>
-                  <th className="px-3 py-2 text-center font-semibold normal-case text-amber-700">
-                    Girls
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {stats.matrix.length === 0 ? (
+        {stats.byHouse.length > 0 ? (
+          <Card title="Students per house" subtitle="How evenly students are spread across houses">
+            <ul className="ah-dist">
+              {stats.byHouse.map((entry, index) => (
+                <li
+                  key={entry.houseId}
+                  className="ah-dist__row"
+                  style={toneStyle(entry.color, toneIndex.get(String(entry.houseId)) ?? index)}
+                >
+                  <span className="ah-dist__name">
+                    <span className="actvt-tone-dot" aria-hidden="true" />
+                    <span className="ah-truncate">{entry.houseName}</span>
+                  </span>
+                  <span className="ah-dist__track" aria-hidden="true">
+                    <span
+                      className="ah-dist__fill"
+                      style={{ width: `${largestHouse > 0 ? (entry.count / largestHouse) * 100 : 0}%` }}
+                    />
+                  </span>
+                  <span className="ah-dist__value">
+                    {entry.count}
+                    <span className="ah-dist__pct">{percentOf(entry.count, stats.totalStudents)}%</span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </Card>
+        ) : null}
+
+        <Card
+          flush
+          title="Students by class and section"
+          subtitle="House strength for each class and section, split into boys and girls"
+        >
+          {stats.matrix.length === 0 ? (
+            <EmptyState
+              compact
+              icon={Users}
+              title="No class or section data yet"
+              body="Counts appear here once students with a class and section are added in student records."
+            />
+          ) : (
+            <div className="cb-table-scroll ah-matrix-scroll">
+              <table className="cb-table ah-matrix">
+                <caption className="cb-visually-hidden">Students by class, section and house</caption>
+                <thead>
                   <tr>
-                    <td
-                      colSpan={Math.max(5, records.length * 2 + 5)}
-                      className="px-4 py-8 text-center text-slate-500"
-                    >
-                      No student class/section data available yet.
-                    </td>
+                    <th rowSpan={2} scope="col" className="ah-matrix__sticky ah-matrix__class">
+                      Class
+                    </th>
+                    <th rowSpan={2} scope="col" className="ah-matrix__sticky ah-matrix__section">
+                      Section
+                    </th>
+                    {records.map((house) => {
+                      const key = String(house._id || house.name)
+                      return (
+                        <th
+                          key={key}
+                          colSpan={2}
+                          scope="colgroup"
+                          className="ah-matrix__group"
+                          style={toneStyle(house.color, toneIndex.get(key) ?? 0)}
+                        >
+                          <span className="ah-matrix__house">
+                            <span className="actvt-tone-dot" aria-hidden="true" />
+                            {house.name}
+                          </span>
+                        </th>
+                      )
+                    })}
+                    <th colSpan={2} scope="colgroup" className="ah-matrix__group">
+                      Not assigned
+                    </th>
+                    <th rowSpan={2} scope="col" className="ah-matrix__num">
+                      Total
+                    </th>
                   </tr>
-                ) : (
-                  stats.matrix.map((row) => (
-                    <tr key={`${row.className}-${row.section}`} className="border-t border-slate-100">
-                      <td className="sticky left-0 bg-white px-4 py-3 font-medium text-slate-900">{row.className}</td>
-                      <td className="sticky left-[72px] bg-white px-4 py-3 text-slate-700">{row.section}</td>
+                  <tr>
+                    {records.map((house) => (
+                      <React.Fragment key={`${house._id}-split`}>
+                        <th scope="col" className="ah-matrix__num ah-matrix__first">Boys</th>
+                        <th scope="col" className="ah-matrix__num">Girls</th>
+                      </React.Fragment>
+                    ))}
+                    <th scope="col" className="ah-matrix__num ah-matrix__first">Boys</th>
+                    <th scope="col" className="ah-matrix__num">Girls</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {stats.matrix.map((row) => (
+                    <tr key={`${row.className}-${row.section}`}>
+                      <th scope="row" className="ah-matrix__sticky ah-matrix__class">{row.className}</th>
+                      <td className="ah-matrix__sticky ah-matrix__section">{row.section}</td>
                       {records.map((house) => {
                         const houseId = String(house._id || '')
-                        return (
-                          <GenderSplitCells
-                            key={houseId}
-                            split={row.houses[houseId]}
-                          />
-                        )
+                        return <GenderSplitCells key={houseId} split={row.houses[houseId]} />
                       })}
-                      <GenderSplitCells split={row.unassigned} tone="font-medium text-amber-700" />
-                      <td className="px-4 py-3 font-semibold text-slate-900">{row.total}</td>
+                      <GenderSplitCells split={row.unassigned} warn />
+                      <td className="ah-matrix__num ah-matrix__total">{row.total}</td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </section>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Card>
       </div>
+
+      <Sheet
+        open={addOpen}
+        onClose={closeAdd}
+        title="Add house"
+        description="Pick the colour that matches the house logo. Tagline and motto can be added later."
+        icon={Shield}
+        onSubmit={handleSave}
+        footer={
+          <>
+            <Button size="sm" variant="tertiary" onClick={closeAdd} disabled={saving}>
+              Cancel
+            </Button>
+            <Button size="sm" variant="primary" type="submit" loading={saving}>
+              Add house
+            </Button>
+          </>
+        }
+      >
+        <div className="cb-form-section">
+          <HouseLogoField
+            preview={logoPreview}
+            name={form.name}
+            color={form.color}
+            onPick={() => logoInputRef.current?.click()}
+            onRemove={handleRemoveLogo}
+          />
+          <input ref={logoInputRef} type="file" accept="image/*" hidden onChange={handleLogoSelected} />
+          <TextField
+            label="House name"
+            required
+            value={form.name}
+            placeholder="For example, Mars"
+            error={nameError || undefined}
+            onChange={(event) => {
+              setForm({ ...form, name: event.target.value })
+              if (nameError) setNameError('')
+            }}
+          />
+          <HouseColorField value={form.color} onChange={(color) => setForm({ ...form, color })} />
+        </div>
+      </Sheet>
+
+      <Dialog
+        open={Boolean(removingHouse)}
+        onClose={() => !removing && setRemovingHouse(null)}
+        tone="danger"
+        size="sm"
+        title={`Remove ${removingHouse?.name || 'this house'}?`}
+        description="The house no longer appears in Activities. Student records are not changed."
+        footer={
+          <>
+            <Button variant="tertiary" onClick={() => setRemovingHouse(null)} disabled={removing}>
+              Cancel
+            </Button>
+            <Button variant="danger" icon={Trash2} loading={removing} onClick={() => void handleRemove()}>
+              Remove house
+            </Button>
+          </>
+        }
+      />
 
       <HouseEditModal
         open={Boolean(editingHouse)}
@@ -536,64 +574,21 @@ const ActvtHouses: React.FC = () => {
         onCancel={handleCropCancel}
         onCropped={handleCropped}
       />
-    </div>
+    </Page>
   )
 }
 
-const GenderSplitCells = ({
-  split,
-  tone = 'text-slate-700',
-}: {
-  split?: GenderSplit
-  tone?: string
-}) => {
+const GenderSplitCells = ({ split, warn = false }: { split?: GenderSplit; warn?: boolean }) => {
   const value = split || emptyGenderSplit()
   const empty = value.boys === 0 && value.girls === 0
+  const cls = `ah-matrix__num${warn && !empty ? ' is-warn' : ''}`
 
   return (
     <>
-      <td className={`border-l border-slate-100 px-3 py-3 text-center tabular-nums ${tone}`}>
-        {empty ? '—' : value.boys}
-      </td>
-      <td className={`px-3 py-3 text-center tabular-nums ${tone}`}>
-        {empty ? '—' : value.girls}
-      </td>
+      <td className={`${cls} ah-matrix__first`}>{empty ? '—' : value.boys}</td>
+      <td className={cls}>{empty ? '—' : value.girls}</td>
     </>
   )
 }
-
-const StatPill = ({
-  label,
-  value,
-  tone,
-  dot,
-}: {
-  label: string
-  value: number
-  tone: string
-  dot?: string
-}) => (
-  <div className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold ${tone}`}>
-    {dot ? (
-      <span
-        className="h-2 w-2 rounded-full border border-white/40"
-        style={{ backgroundColor: isLikelyColor(dot) ? dot : '#94a3b8' }}
-      />
-    ) : null}
-    <span>{label}</span>
-    <span className="rounded-full bg-white/25 px-1.5 py-0.5 text-[11px]">{value}</span>
-  </div>
-)
-
-const PROFILE_TONES = [
-  'linear-gradient(135deg, #4f46e5, #7c3aed)',
-  'linear-gradient(135deg, #0f766e, #14b8a6)',
-  'linear-gradient(135deg, #b45309, #f59e0b)',
-  'linear-gradient(135deg, #be123c, #fb7185)',
-  'linear-gradient(135deg, #1d4ed8, #38bdf8)',
-]
-
-const inputClassCompact =
-  'h-9 w-full rounded-lg border border-slate-200 px-3 text-sm text-slate-900 outline-none focus:border-indigo-400'
 
 export default ActvtHouses

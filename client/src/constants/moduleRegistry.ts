@@ -54,7 +54,7 @@ export const MODULE_REGISTRY: ModuleDefinition[] = [
     id: 'timetable',
     abbreviation: 'TMTBL',
     title: 'Timetable Management',
-    defaultRoute: '/school-hub',
+    defaultRoute: '/time-table/classes',
     icon: tmtblIcon,
   },
   {

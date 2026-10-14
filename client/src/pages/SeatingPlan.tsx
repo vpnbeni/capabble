@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
-import { Document, Page, pdfjs } from 'react-pdf'
+import { Document, Page as PdfPage, pdfjs } from 'react-pdf'
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 import toast from 'react-hot-toast'
 import {
@@ -10,6 +10,7 @@ import {
   useUpdateSeatingPlanTemplateSettingsMutation,
   type SeatingPlanFormat,
 } from '../hooks/useSeatingPlan'
+import type { CentreDatesheetEntry } from '../services/centreDatesheetService'
 import {
   seatingPlanService,
   type CBSECopyTemplateSettings,
@@ -19,9 +20,23 @@ import {
   type SeatingPlanMode,
   type SeatingPlanTemplateSettings,
 } from '../services/seatingPlanService'
-import Loader from '../components/common/Loader'
-import { Tabs } from '../components/common/Tabs'
-import './SeatingPlan.css'
+import { AlertCircle, CalendarDays, Download, ExternalLink, FileText } from 'lucide-react'
+import {
+  Badge,
+  Button,
+  Card,
+  CardToolbar,
+  DataTable,
+  EmptyState,
+  Page,
+  RadioGroup,
+  Sheet,
+  Tabs,
+  type DataTableColumn,
+} from '@/components/ui'
+import { PAPER_PAGES_CLASS, Paper, PaperStage } from '@/components/ui'
+import { CardLoading } from '@/components/exmcl/ExmclUi'
+import '@/components/exmcl/centre-seating.css'
 
 pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl
 
@@ -107,6 +122,18 @@ const ROOM_DOOR_INFO_COLUMN_KEYS: Array<
   'infoCol1Width' | 'infoCol2Width' | 'infoCol3Width' | 'infoCol4Width' | 'infoCol5Width' | 'infoCol6Width'
 > = ['infoCol1Width', 'infoCol2Width', 'infoCol3Width', 'infoCol4Width', 'infoCol5Width', 'infoCol6Width']
 const APP_MAIN_SCROLL_ID = 'app-main-scroll'
+
+const FORMAT_ORDER: SeatingPlanFormat[] = ['mainGate', 'roomFolderSlip', 'roomDoorSlip', 'cbseCopy']
+const FORMAT_LABELS: Record<SeatingPlanFormat, string> = {
+  mainGate: 'Main gate',
+  roomFolderSlip: 'Invigilator slip',
+  roomDoorSlip: 'Room door slip',
+  cbseCopy: 'CBSE format',
+}
+
+/** PDF pages fill the preview sheet (760px wide) without spilling past a phone screen. */
+const previewPageWidth = () =>
+  typeof window !== 'undefined' ? Math.max(260, Math.min(680, window.innerWidth - 72)) : 680
 
 const SeatingPlan: React.FC = () => {
   const routerLocation = useLocation()
@@ -330,15 +357,16 @@ const SeatingPlan: React.FC = () => {
       const root = scheduleTableRef.current
       if (!root) return
 
-      const scrollContainer =
-        root.querySelector<HTMLElement>('.seating-table-wrapper') ?? root
+      // The kit DataTable owns the scroll box; its rows render in datesheet order.
+      const scrollContainer = root.querySelector<HTMLElement>('.cb-table-scroll')
+      if (!scrollContainer || scrollContainer.clientHeight === 0) return
 
-      const targetRow =
-        scrollContainer.querySelector<HTMLElement>(`tr[data-date="${todayDateKey}"]`) ||
-        (nextExamDateKey
-          ? scrollContainer.querySelector<HTMLElement>(`tr[data-date="${nextExamDateKey}"]`)
-          : null) ||
-        scrollContainer.querySelector<HTMLElement>('tbody tr')
+      const indexForDate = (dateKey: string | null) =>
+        dateKey ? datesheetEntries.findIndex((entry) => getCalendarDateKey(entry.examDate) === dateKey) : -1
+      let targetIndex = indexForDate(todayDateKey)
+      if (targetIndex < 0) targetIndex = indexForDate(nextExamDateKey)
+      if (targetIndex < 0) targetIndex = 0
+      const targetRow = scrollContainer.querySelectorAll<HTMLElement>('tbody tr')[targetIndex]
 
       if (!targetRow) return
       autoScrolledRef.current = true
@@ -349,7 +377,7 @@ const SeatingPlan: React.FC = () => {
       scrollContainer.scrollTop += offset
     }, 200)
     return () => clearTimeout(timer)
-  }, [loading, datesheetEntries.length, todayDateKey, nextExamDateKey])
+  }, [loading, datesheetEntries, todayDateKey, nextExamDateKey])
 
   const handleDownloadPDF = (datesheetId: string, format: SeatingPlanFormat) => {
     const entry = datesheetEntries.find((item) => item._id === datesheetId)
@@ -851,1037 +879,607 @@ const SeatingPlan: React.FC = () => {
     window.addEventListener('mouseup', onMouseUp)
   }
 
-  const formatTabs = useMemo(
-    () =>
-      [
-        {
-          id: 'mainGate' as const,
-          label: 'Main Gate',
-          color: 'blue' as const,
-          disabled: pdfMutation.isPending && activeTab !== 'mainGate',
-        },
-        {
-          id: 'roomFolderSlip' as const,
-          label: 'Invigilator Slip',
-          color: 'emerald' as const,
-          disabled: pdfMutation.isPending && activeTab !== 'roomFolderSlip',
-        },
-        {
-          id: 'roomDoorSlip' as const,
-          label: 'Room Door Slip',
-          color: 'yellow' as const,
-          disabled: pdfMutation.isPending && activeTab !== 'roomDoorSlip',
-        },
-        {
-          id: 'cbseCopy' as const,
-          label: 'CBSE Format',
-          color: 'purple' as const,
-          disabled: pdfMutation.isPending && activeTab !== 'cbseCopy',
-        },
-      ] as const,
-    [pdfMutation.isPending, activeTab]
+  const formatLabel = FORMAT_LABELS[activeTab]
+
+  const handleFormatChange = (id: string) => {
+    // A plan is being generated for the current format; keep the format until it finishes.
+    if (pdfMutation.isPending && id !== activeTab) return
+    setActiveTab(id as SeatingPlanFormat)
+  }
+
+  const openPreviewInNewTab = () => {
+    if (previewPdfUrl) window.open(previewPdfUrl, '_blank', 'noopener,noreferrer')
+  }
+
+  const downloadPreview = () => {
+    if (!previewPdfUrl) return
+    const link = document.createElement('a')
+    link.href = previewPdfUrl
+    link.download = previewFilename || 'seating-plan.pdf'
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+  }
+
+  const columns: DataTableColumn<CentreDatesheetEntry>[] = [
+    {
+      key: 'sr',
+      header: '#',
+      width: 48,
+      numeric: true,
+      mobile: 'hidden',
+      render: (entry) => String(datesheetEntries.indexOf(entry) + 1).padStart(2, '0'),
+    },
+    {
+      key: 'date',
+      header: 'Date',
+      mobile: 'title',
+      render: (entry) => {
+        const examDateKey = getCalendarDateKey(entry.examDate)
+        const isTodayExam = examDateKey === todayDateKey
+        const isNextExam = !isTodayExam && !!nextExamDateKey && examDateKey === nextExamDateKey
+        return (
+          <span className="cx-seat-date">
+            <span className="cb-strong">{formatDate(entry.examDate)}</span>
+            {isTodayExam ? <Badge tone="accent">Today</Badge> : null}
+            {isNextExam ? <Badge tone="info">Next exam</Badge> : null}
+          </span>
+        )
+      },
+    },
+    { key: 'day', header: 'Day', render: (entry) => entry.dayName || '—' },
+    {
+      key: 'subject',
+      header: 'Subject',
+      mobile: 'subtitle',
+      render: (entry) => (
+        <span className="cx-seat-subject">
+          <span className="cb-strong">{entry.subjectName}</span>
+          <span className="cb-muted">{entry.subjectCode}</span>
+        </span>
+      ),
+    },
+    { key: 'class', header: 'Class', render: (entry) => `Class ${entry.class}` },
+    {
+      key: 'time',
+      header: 'Time',
+      render: (entry) =>
+        entry.timeSlot?.start ? `${formatTime(entry.timeSlot.start)} – ${formatTime(entry.timeSlot.end)}` : '—',
+    },
+    { key: 'candidates', header: 'Candidates', numeric: true, align: 'right', render: (entry) => entry.candidateCount },
+    {
+      key: 'rooms',
+      header: 'Rooms',
+      numeric: true,
+      align: 'right',
+      render: (entry) => (entry.roomsNeeded === 0 ? <span className="cb-muted">Shared</span> : entry.roomsNeeded),
+    },
+    {
+      key: 'generate',
+      header: '',
+      headerLabel: 'Seating plan',
+      align: 'right',
+      interactive: true,
+      mobile: 'aside',
+      render: (entry) => (
+        <Button
+          size="sm"
+          icon={FileText}
+          loading={downloadingId === entry._id}
+          disabled={pdfMutation.isPending && downloadingId !== entry._id}
+          onClick={() => handleDownloadPDF(entry._id, activeTab)}
+          title={`Generate the ${formatLabel.toLowerCase()} for ${entry.subjectName}`}
+        >
+          Generate
+        </Button>
+      ),
+    },
+  ]
+
+  const colWidths = (widths: number[]) => (
+    <colgroup>
+      {widths.map((width, index) => (
+        <col key={index} style={{ width: `${width}%` }} />
+      ))}
+    </colgroup>
   )
 
-  return (
-    <div className="p-8 max-w-[1600px] mx-auto min-h-screen bg-gray-50/50 dark:bg-gray-900">
-      {/* Examination schedule — Datesheets-style shell: format tabs + table */}
+  const colHandles = (
+    boundaries: number[],
+    onStart: (index: number, event: React.MouseEvent<HTMLDivElement>) => void,
+    title: string
+  ) =>
+    boundaries.map((boundary, index) => (
       <div
-        ref={scheduleTableRef}
-        className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden mb-8"
-      >
-        <div className="flex flex-col gap-3 px-4 py-3 bg-gray-50/50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <Tabs<SeatingPlanFormat>
-              tabs={[...formatTabs]}
-              activeTab={activeTab}
-              onChange={setActiveTab}
-              variant="pill"
-              size="sm"
-              ariaLabel="Seating plan format"
-            />
-            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 sm:text-right">
-              Examination Schedule
-            </h3>
-          </div>
-          {isExmclRoute ? (
-            <div className="flex flex-col gap-2 rounded-xl border border-indigo-100 bg-indigo-50/60 px-4 py-3 dark:border-indigo-900/50 dark:bg-indigo-950/20 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <div className="text-sm font-semibold text-slate-900 dark:text-white">Seating plan mode</div>
-                <div className="text-xs text-slate-600 dark:text-slate-400">
-                  {seatingPlanMode === 'same_across_days'
-                    ? 'Each student keeps the same room on every exam day.'
-                    : 'Students are seated in different rooms across exam days.'}
-                </div>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  disabled={loadingSeatingPlanMode || savingSeatingPlanMode}
-                  onClick={() => void handleSeatingPlanModeChange('same_across_days')}
-                  className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
-                    seatingPlanMode === 'same_across_days'
-                      ? 'bg-indigo-600 text-white'
-                      : 'bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 dark:bg-slate-800 dark:text-slate-200 dark:ring-slate-700'
-                  }`}
-                >
-                  Same across all days
-                </button>
-                <button
-                  type="button"
-                  disabled={loadingSeatingPlanMode || savingSeatingPlanMode}
-                  onClick={() => void handleSeatingPlanModeChange('different_per_day')}
-                  className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
-                    seatingPlanMode === 'different_per_day'
-                      ? 'bg-indigo-600 text-white'
-                      : 'bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 dark:bg-slate-800 dark:text-slate-200 dark:ring-slate-700'
-                  }`}
-                >
-                  Different each day
-                </button>
-              </div>
-            </div>
-          ) : null}
-        </div>
+        key={`handle-${index}`}
+        className="cx-seat-col-handle"
+        style={{ left: `${boundary}%` }}
+        onMouseDown={(event) => onStart(index, event)}
+        title={title}
+        aria-hidden="true"
+      />
+    ))
 
-        <div className="overflow-x-auto sp-datesheet-scroll-container">
-          <div className="seating-table-wrapper overflow-x-auto pb-4">
-            {loading ? (
-              <div className="flex justify-center items-center py-12">
-                <Loader size="lg" />
-              </div>
-            ) : error ? (
-              <div className="p-6 text-center">
-                <p className="text-red-600 dark:text-red-400">{error}</p>
-                <button
-                  type="button"
-                  onClick={() => refetch()}
-                  className="mt-4 px-4 py-2 rounded-lg text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
-                >
-                  Retry
-                </button>
-              </div>
-            ) : datesheetEntries.length === 0 ? (
-              <div className="p-12 text-center text-gray-500 dark:text-gray-400">
-                No datesheet entries found. Please import a datesheet first.
-              </div>
-            ) : (
-              <table className="min-w-[1100px] w-full divide-y divide-gray-200 dark:divide-gray-700">
-                <thead className="bg-gray-50/50 dark:bg-gray-900/50">
-                  <tr>
-                    <th className="sticky top-0 z-20 px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider bg-gray-50/95 dark:bg-gray-900/95 backdrop-blur-sm">
-                      Sr No
-                    </th>
-                    <th className="sticky top-0 z-20 px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider bg-gray-50/95 dark:bg-gray-900/95 backdrop-blur-sm">
-                      Date
-                    </th>
-                    <th className="sticky top-0 z-20 px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider bg-gray-50/95 dark:bg-gray-900/95 backdrop-blur-sm">
-                      Day
-                    </th>
-                    <th className="sticky top-0 z-20 px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider bg-gray-50/95 dark:bg-gray-900/95 backdrop-blur-sm">
-                      Subject Code
-                    </th>
-                    <th className="sticky top-0 z-20 px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider bg-gray-50/95 dark:bg-gray-900/95 backdrop-blur-sm">
-                      Subject Name
-                    </th>
-                    <th className="sticky top-0 z-20 px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider bg-gray-50/95 dark:bg-gray-900/95 backdrop-blur-sm">
-                      Class
-                    </th>
-                    <th className="sticky top-0 z-20 px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider bg-gray-50/95 dark:bg-gray-900/95 backdrop-blur-sm">
-                      Time
-                    </th>
-                    <th className="sticky top-0 z-20 px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider bg-gray-50/95 dark:bg-gray-900/95 backdrop-blur-sm">
-                      Candidates
-                    </th>
-                    <th className="sticky top-0 z-20 px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider bg-gray-50/95 dark:bg-gray-900/95 backdrop-blur-sm">
-                      No Of Rooms
-                    </th>
-                    <th className="sticky top-0 z-20 px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider bg-gray-50/95 dark:bg-gray-900/95 backdrop-blur-sm">
-                      Download
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                  {datesheetEntries.map((entry, index) => {
-                    const examDateKey = getCalendarDateKey(entry.examDate)
-                    const isTodayExam = examDateKey === todayDateKey
-                    const isNextExam = !isTodayExam && !!nextExamDateKey && examDateKey === nextExamDateKey
-
-                    let rowClassName =
-                      'hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors'
-
-                    if (isTodayExam) {
-                      rowClassName =
-                        'bg-green-50 dark:bg-green-900/20 hover:bg-green-100/60 dark:hover:bg-green-900/30 transition-colors'
-                    } else if (isNextExam) {
-                      rowClassName =
-                        'bg-yellow-50 dark:bg-yellow-900/20 hover:bg-yellow-100/60 dark:hover:bg-yellow-900/30 transition-colors'
-                    } else if (entry.class === '10') {
-                      rowClassName =
-                        'bg-emerald-50/30 dark:bg-emerald-900/10 hover:bg-emerald-50/50 dark:hover:bg-emerald-900/20 transition-colors'
-                    } else if (entry.class === '12') {
-                      rowClassName =
-                        'bg-violet-50/30 dark:bg-violet-900/10 hover:bg-violet-50/50 dark:hover:bg-violet-900/20 transition-colors'
-                    }
-
-                    const classBadgeClass =
-                      entry.class === '10'
-                        ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300 ring-1 ring-emerald-500/20'
-                        : entry.class === '12'
-                          ? 'bg-violet-100 text-violet-800 dark:bg-violet-900/40 dark:text-violet-300 ring-1 ring-violet-500/20'
-                          : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
-
-                    return (
-                      <tr key={entry._id} data-date={examDateKey} className={rowClassName}>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400 font-mono">
-                          {String(index + 1).padStart(2, '0')}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
-                          <div className="inline-flex items-center gap-2">
-                            <span>{formatDate(entry.examDate)}</span>
-                            {isTodayExam && (
-                              <span className="inline-flex items-center rounded-full bg-green-200 dark:bg-green-800 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-green-900 dark:text-green-100">
-                                Today
-                              </span>
-                            )}
-                            {isNextExam && (
-                              <span className="inline-flex items-center rounded-full bg-yellow-200 dark:bg-yellow-800 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-yellow-900 dark:text-yellow-100">
-                                Next
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                          {entry.dayName || 'Unknown'}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 font-mono">
-                          {entry.subjectCode}
-                        </td>
-                        <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-white">
-                          {entry.subjectName}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span
-                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${classBadgeClass}`}
-                          >
-                            Class {entry.class}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                          {formatTime(entry.timeSlot.start)} - {formatTime(entry.timeSlot.end)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-right text-gray-900 dark:text-white">
-                          {entry.candidateCount}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-500 dark:text-gray-400">
-                          {entry.roomsNeeded === 0 ? (
-                            <span className="italic text-xs text-amber-600 dark:text-amber-400">Shared</span>
-                          ) : (
-                            entry.roomsNeeded
-                          )}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm">
-                          <button
-                            type="button"
-                            onClick={() => handleDownloadPDF(entry._id, activeTab)}
-                            disabled={pdfMutation.isPending}
-                            className={`text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 disabled:opacity-50 ${pdfMutation.isPending && downloadingId !== entry._id ? 'cursor-not-allowed' : ''}`}
-                            title={`Download ${activeTab === 'mainGate' ? 'Main Gate' : activeTab === 'roomFolderSlip' ? 'Invigilator Slip' : activeTab === 'roomDoorSlip' ? 'Room Door Slip' : 'CBSE Format'}`}
-                          >
-                            {downloadingId === entry._id ? (
-                              <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
-                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                              </svg>
-                            ) : (
-                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                              </svg>
-                            )}
-                          </button>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Template preview / layout editor */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-        <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/50">
-          <h3 className="text-base font-semibold text-gray-900 dark:text-white">
-            {activeTab === 'mainGate' && 'Main Gate format preview'}
-            {activeTab === 'roomFolderSlip' && 'Invigilator slip format preview'}
-            {activeTab === 'roomDoorSlip' && 'Room door slip format preview'}
-            {activeTab === 'cbseCopy' && 'CBSE format preview'}
-          </h3>
-        </div>
-
-        <div className="p-6">
-          {activeTab === 'mainGate' && (
-            <div className="space-y-4">
-              {/* Main Gate Preview */}
-              <div className="overflow-x-auto py-2">
-                <div className="border-2 border-gray-300 dark:border-gray-600 rounded-lg p-6 bg-white dark:bg-gray-900 mx-auto seating-plan-preview-page">
-                  {/* Header */}
-                  <div className="text-center mb-4">
-                    <h2 className="text-lg font-bold text-gray-900 dark:text-white">Centre Name</h2>
-                    <p className="text-sm text-gray-700 dark:text-gray-300">Seating Plan CBSE Board Exam</p>
-                    <p className="text-sm text-gray-700 dark:text-gray-300">Centre No: 202601</p>
-                  </div>
-
-                  {/* Exam Details */}
-                  <div className="flex justify-between mb-4 text-sm font-bold text-gray-900 dark:text-white">
-                    <div>
-                      <p>Date: 15.02.2026 (Saturday)</p>
-                      <p>Subject: English (Lang. & Lit.)</p>
-                    </div>
-                    <div className="text-right">
-                      <p>Class: X</p>
-                      <p>Subject Code: 184</p>
-                    </div>
-                  </div>
-
-                  {/* Room Table 1 */}
-                  <style>{`.sp-main-gate-layout { --sp-col1-width: ${mainGateLayoutDraft.col1Width}%; --sp-col2-width: ${mainGateLayoutDraft.col2Width}%; --sp-col3-width: ${mainGateLayoutDraft.col3Width}%; --sp-col4-width: ${mainGateLayoutDraft.col4Width}%; --sp-row-height: ${mainGateLayoutDraft.rowHeight}px; }${mainGateColumnBoundaries.map((b, i) => `.sp-main-gate-boundary-${i} { left: ${b}%; }`).join(' ')}`}</style>
-                  <div className="relative mb-5" ref={mainGateTableWrapperRef}>
-                    <table className="w-full border-collapse seating-plan-table-layout-fixed sp-main-gate-layout">
-                      <colgroup>
-                        <col className="sp-col-1" />
-                        <col className="sp-col-2" />
-                        <col className="sp-col-3" />
-                        <col className="sp-col-4" />
-                      </colgroup>
-                      <caption className="text-sm font-bold text-gray-900 dark:text-white p-2 border border-black dark:border-gray-400 border-b-0 bg-white dark:bg-gray-900">
-                        Room No. 01 - X Rose (First Floor)
-                      </caption>
-                      <thead>
-                        <tr>
-                          <th className="border border-black dark:border-gray-400 p-1.5 font-bold text-gray-900 dark:text-white text-sm">Row</th>
-                          <th className="border border-black dark:border-gray-400 p-1.5 font-bold text-gray-900 dark:text-white text-sm">Row 1</th>
-                          <th className="border border-black dark:border-gray-400 p-1.5 font-bold text-gray-900 dark:text-white text-sm">Row 2</th>
-                          <th className="border border-black dark:border-gray-400 p-1.5 font-bold text-gray-900 dark:text-white text-sm">Row 3</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {[...Array(8)].map((_, i) => (
-                          <tr key={i}>
-                            <td className="sp-row-height-cell border border-black dark:border-gray-400 p-1.5 text-center font-bold text-gray-900 dark:text-white text-sm">Roll No</td>
-                          <td className="sp-row-height-cell border border-black dark:border-gray-400 p-1.5 text-center text-gray-700 dark:text-gray-300 font-mono text-sm">{20261001 + i}</td>
-                          <td className="sp-row-height-cell border border-black dark:border-gray-400 p-1.5 text-center text-gray-700 dark:text-gray-300 font-mono text-sm">{20261009 + i}</td>
-                          <td className="sp-row-height-cell border border-black dark:border-gray-400 p-1.5 text-center text-gray-700 dark:text-gray-300 font-mono text-sm">{20261017 + i}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                    {mainGateColumnBoundaries.map((_, index) => (
-                      <div
-                        key={`main-gate-boundary-${index}`}
-                        className={`sp-main-gate-boundary-${index} absolute top-0 bottom-0 w-2 -ml-1 cursor-col-resize z-20`}
-                        onMouseDown={(event) => startMainGateColumnResize(index, event)}
-                        title="Drag to resize column"
-                      />
-                    ))}
-                  </div>
-
-                  {/* Room Table 2 */}
-                  <table className="w-full border-collapse mb-5 seating-plan-table-layout-fixed sp-main-gate-layout">
-                    <colgroup>
-                      <col className="sp-col-1" />
-                      <col className="sp-col-2" />
-                      <col className="sp-col-3" />
-                      <col className="sp-col-4" />
-                    </colgroup>
-                    <caption className="text-sm font-bold text-gray-900 dark:text-white p-2 border border-black dark:border-gray-400 border-b-0 bg-white dark:bg-gray-900">
-                      Room No. 02 - X Tulip (First Floor)
-                    </caption>
-                    <thead>
-                      <tr>
-                        <th className="border border-black dark:border-gray-400 p-1.5 font-bold text-gray-900 dark:text-white text-sm">Row</th>
-                        <th className="border border-black dark:border-gray-400 p-1.5 font-bold text-gray-900 dark:text-white text-sm">Row 1</th>
-                        <th className="border border-black dark:border-gray-400 p-1.5 font-bold text-gray-900 dark:text-white text-sm">Row 2</th>
-                        <th className="border border-black dark:border-gray-400 p-1.5 font-bold text-gray-900 dark:text-white text-sm">Row 3</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {[...Array(8)].map((_, i) => (
-                        <tr key={i}>
-                          <td className="sp-row-height-cell border border-black dark:border-gray-400 p-1.5 text-center font-bold text-gray-900 dark:text-white text-sm">Roll No</td>
-                          <td className="sp-row-height-cell border border-black dark:border-gray-400 p-1.5 text-center text-gray-700 dark:text-gray-300 font-mono text-sm">{20261025 + i}</td>
-                          <td className="sp-row-height-cell border border-black dark:border-gray-400 p-1.5 text-center text-gray-700 dark:text-gray-300 font-mono text-sm">{20261033 + i}</td>
-                          <td className="sp-row-height-cell border border-black dark:border-gray-400 p-1.5 text-center text-gray-700 dark:text-gray-300 font-mono text-sm">{20261041 + i}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-
-                  {/* Room Table 3 */}
-                  <table className="w-full border-collapse mb-5 seating-plan-table-layout-fixed sp-main-gate-layout">
-                    <colgroup>
-                      <col className="sp-col-1" />
-                      <col className="sp-col-2" />
-                      <col className="sp-col-3" />
-                      <col className="sp-col-4" />
-                    </colgroup>
-                    <caption className="text-sm font-bold text-gray-900 dark:text-white p-2 border border-black dark:border-gray-400 border-b-0 bg-white dark:bg-gray-900">
-                      Room No. 03 - X Lotus (First Floor)
-                    </caption>
-                    <thead>
-                      <tr>
-                        <th className="border border-black dark:border-gray-400 p-1.5 font-bold text-gray-900 dark:text-white text-sm">Row</th>
-                        <th className="border border-black dark:border-gray-400 p-1.5 font-bold text-gray-900 dark:text-white text-sm">Row 1</th>
-                        <th className="border border-black dark:border-gray-400 p-1.5 font-bold text-gray-900 dark:text-white text-sm">Row 2</th>
-                        <th className="border border-black dark:border-gray-400 p-1.5 font-bold text-gray-900 dark:text-white text-sm">Row 3</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {[...Array(8)].map((_, i) => (
-                        <tr key={i}>
-                          <td className="sp-row-height-cell border border-black dark:border-gray-400 p-1.5 text-center font-bold text-gray-900 dark:text-white text-sm">Roll No</td>
-                          <td className="sp-row-height-cell border border-black dark:border-gray-400 p-1.5 text-center text-gray-700 dark:text-gray-300 font-mono text-sm">{20261049 + i}</td>
-                          <td className="sp-row-height-cell border border-black dark:border-gray-400 p-1.5 text-center text-gray-700 dark:text-gray-300 font-mono text-sm">{20261057 + i}</td>
-                          <td className="sp-row-height-cell border border-black dark:border-gray-400 p-1.5 text-center text-gray-700 dark:text-gray-300 font-mono text-sm">{20261065 + i}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-
-                  <div className="flex items-center gap-3 mb-4">
-                    <div
-                      className="h-2 flex-1 rounded bg-blue-100 dark:bg-blue-900/30 cursor-row-resize"
-                      onMouseDown={startMainGateRowHeightResize}
-                      title="Drag up/down to resize row height"
-                    />
-                    <span className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
-                      Row Height: {mainGateLayoutDraft.rowHeight}px
-                    </span>
-                  </div>
-
-                  {/* Footer */}
-                  <p className="mt-16 text-right font-bold text-gray-900 dark:text-white">CENTRE SUPERINTENDENT</p>
-                </div>
-              </div>
-
-              <p className="text-center text-sm text-gray-500 dark:text-gray-400 mt-4">
-                Click the download button next to any exam to generate the Main Gate PDF with actual candidate data.
-              </p>
-            </div>
-          )}
-
-          {activeTab === 'roomFolderSlip' && (
-            <div className="space-y-4">
-              <div className="overflow-x-auto py-2">
-                <div className="border-2 border-gray-300 dark:border-gray-600 rounded-lg p-6 bg-white dark:bg-gray-900 mx-auto seating-plan-preview-page">
-                  <h2 className="text-lg font-bold text-center mb-4 text-gray-900 dark:text-white">SEATING PLAN</h2>
-
-                  <style>{`.sp-room-folder-info-cols { --sp-info-col-1: ${roomFolderLayoutDraft.infoCol1Width}%; --sp-info-col-2: ${roomFolderLayoutDraft.infoCol2Width}%; --sp-info-col-3: ${roomFolderLayoutDraft.infoCol3Width}%; --sp-info-col-4: ${roomFolderLayoutDraft.infoCol4Width}%; --sp-info-col-5: ${roomFolderLayoutDraft.infoCol5Width}%; --sp-info-col-6: ${roomFolderLayoutDraft.infoCol6Width}%; --sp-info-col-7: ${roomFolderLayoutDraft.infoCol7Width}%; } .sp-room-folder-data-cols { --sp-data-col-1: ${roomFolderLayoutDraft.col1Width}%; --sp-data-col-2: ${roomFolderLayoutDraft.col2Width}%; --sp-data-col-3: ${roomFolderLayoutDraft.col3Width}%; --sp-data-col-4: ${roomFolderLayoutDraft.col4Width}%; --sp-data-col-5: ${roomFolderLayoutDraft.col5Width}%; --sp-data-col-6: ${roomFolderLayoutDraft.col6Width}%; --sp-data-col-7: ${roomFolderLayoutDraft.col7Width}%; --sp-data-col-8: ${roomFolderLayoutDraft.col8Width}%; --sp-data-col-9: ${roomFolderLayoutDraft.col9Width}%; --sp-row-height: ${roomFolderLayoutDraft.rowHeight}px; } ${roomFolderInfoColumnBoundaries.map((b, i) => `.sp-rf-info-b-${i} { left: ${b}%; }`).join(' ')} ${roomFolderColumnBoundaries.map((b, i) => `.sp-rf-data-b-${i} { left: ${b}%; }`).join(' ')}`}</style>
-                  <div className="relative mb-4" ref={roomFolderInfoTableWrapperRef}>
-                    <table className="w-full border-collapse text-sm seating-plan-table-layout-fixed sp-room-folder-info-cols">
-                      <colgroup>
-                        <col />
-                        <col />
-                        <col />
-                        <col />
-                        <col />
-                        <col />
-                        <col />
-                      </colgroup>
-                      <tbody>
-                        <tr>
-                          <td className="border-2 border-gray-800 dark:border-gray-400 p-2 font-bold bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white">Name Of Centre</td>
-                          <td className="border-2 border-gray-800 dark:border-gray-400 p-2 text-center text-gray-700 dark:text-gray-300" colSpan={3}>
-                            Centre Name
-                          </td>
-                          <td className="border-2 border-gray-800 dark:border-gray-400 p-2 font-bold bg-gray-50 dark:bg-gray-800 text-center text-gray-900 dark:text-white">Centre No</td>
-                          <td className="border-2 border-gray-800 dark:border-gray-400 p-2 text-center font-bold text-gray-900 dark:text-white">202601</td>
-                          <td className="border-2 border-gray-800 dark:border-gray-400 p-2 font-bold bg-gray-50 dark:bg-gray-800 text-center text-gray-900 dark:text-white">Class: XII</td>
-                        </tr>
-                        <tr>
-                          <td className="border-2 border-gray-800 dark:border-gray-400 p-2 font-bold bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white">Name Of Examination</td>
-                          <td className="border-2 border-gray-800 dark:border-gray-400 p-2 text-center text-gray-700 dark:text-gray-300" colSpan={3}>
-                            Senior School Certificate Examinations - 2026
-                          </td>
-                          <td className="border-2 border-gray-800 dark:border-gray-400 p-2 font-bold bg-gray-50 dark:bg-gray-800 text-center text-gray-900 dark:text-white">Subject</td>
-                          <td className="border-2 border-gray-800 dark:border-gray-400 p-2 text-center text-gray-700 dark:text-gray-300" colSpan={2}>
-                            048 ; PHYSICAL EDUCATION
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="border-2 border-gray-800 dark:border-gray-400 p-2 font-bold bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white">Date</td>
-                          <td className="border-2 border-gray-800 dark:border-gray-400 p-2 text-center text-gray-700 dark:text-gray-300" colSpan={3}>18.02.2026 (Wednesday)</td>
-                          <td className="border-2 border-gray-800 dark:border-gray-400 p-2 font-bold bg-gray-50 dark:bg-gray-800 text-center text-gray-900 dark:text-white">Room No.</td>
-                          <td className="border-2 border-gray-800 dark:border-gray-400 p-2 text-center text-gray-900 dark:text-white font-bold" colSpan={2}>02 - XII A</td>
-                        </tr>
-                      </tbody>
-                    </table>
-                    {roomFolderInfoColumnBoundaries.map((_, index) => (
-                      <div
-                        key={`room-folder-info-boundary-${index}`}
-                        className={`absolute top-0 bottom-0 w-2 -ml-1 cursor-col-resize z-20 sp-rf-info-b-${index}`}
-                        onMouseDown={(event) => startRoomFolderInfoColumnResize(index, event)}
-                        title="Drag to resize info table columns"
-                      />
-                    ))}
-                  </div>
-
-                  <div className="relative" ref={roomFolderTableWrapperRef}>
-                    <table className="w-full border-collapse text-xs seating-plan-table-layout-fixed sp-room-folder-data-cols">
-                      <colgroup>
-                        <col />
-                        <col />
-                        <col />
-                        <col />
-                        <col />
-                        <col />
-                        <col />
-                        <col />
-                        <col />
-                      </colgroup>
-                      <thead>
-                        <tr>
-                          <th className="border border-gray-800 dark:border-gray-400 p-2" colSpan={3}>Row 1</th>
-                          <th className="border border-gray-800 dark:border-gray-400 p-2" colSpan={3}>Row 2</th>
-                          <th className="border border-gray-800 dark:border-gray-400 p-2" colSpan={3}>Row 3</th>
-                        </tr>
-                        <tr>
-                          <th className="border border-gray-800 dark:border-gray-400 p-1.5">Roll No</th>
-                          <th className="border border-gray-800 dark:border-gray-400 p-1.5">QP Code</th>
-                          <th className="border border-gray-800 dark:border-gray-400 p-1.5">Sheet No</th>
-                          <th className="border border-gray-800 dark:border-gray-400 p-1.5">Roll No</th>
-                          <th className="border border-gray-800 dark:border-gray-400 p-1.5">QP Code</th>
-                          <th className="border border-gray-800 dark:border-gray-400 p-1.5">Sheet No</th>
-                          <th className="border border-gray-800 dark:border-gray-400 p-1.5">Roll No</th>
-                          <th className="border border-gray-800 dark:border-gray-400 p-1.5">QP Code</th>
-                          <th className="border border-gray-800 dark:border-gray-400 p-1.5">Sheet No</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {[...Array(8)].map((_, i) => (
-                          <tr key={i}>
-                            <td className="border border-gray-800 dark:border-gray-400 p-1.5 text-center sp-row-height-cell">{20261025 + i}</td>
-                            <td className="border border-gray-800 dark:border-gray-400 p-1.5 text-center sp-row-height-cell">{(i % 3) + 1}</td>
-                            <td className="border border-gray-800 dark:border-gray-400 p-1.5 text-center sp-row-height-cell">A00{41 + i}</td>
-                            <td className="border border-gray-800 dark:border-gray-400 p-1.5 text-center sp-row-height-cell">{20261033 + i}</td>
-                            <td className="border border-gray-800 dark:border-gray-400 p-1.5 text-center sp-row-height-cell">{((i + 1) % 3) + 1}</td>
-                            <td className="border border-gray-800 dark:border-gray-400 p-1.5 text-center sp-row-height-cell">A00{49 + i}</td>
-                            <td className="border border-gray-800 dark:border-gray-400 p-1.5 text-center sp-row-height-cell">{20261041 + i}</td>
-                            <td className="border border-gray-800 dark:border-gray-400 p-1.5 text-center sp-row-height-cell">{((i + 2) % 3) + 1}</td>
-                            <td className="border border-gray-800 dark:border-gray-400 p-1.5 text-center sp-row-height-cell">A00{57 + i}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                      <tfoot>
-                        <tr className="font-semibold">
-                          <td className="border border-gray-800 dark:border-gray-400 p-2" colSpan={2}>Registered:</td>
-                          <td className="border border-gray-800 dark:border-gray-400 p-2 text-center">24</td>
-                          <td className="border border-gray-800 dark:border-gray-400 p-2" colSpan={2}>Present:</td>
-                          <td className="border border-gray-800 dark:border-gray-400 p-2"></td>
-                          <td className="border border-gray-800 dark:border-gray-400 p-2" colSpan={2}>Absent:</td>
-                          <td className="border border-gray-800 dark:border-gray-400 p-2"></td>
-                        </tr>
-                      </tfoot>
-                    </table>
-                    {roomFolderColumnBoundaries.map((_, index) => (
-                      <div
-                        key={`room-folder-boundary-${index}`}
-                        className={`absolute top-0 bottom-0 w-2 -ml-1 cursor-col-resize z-20 sp-rf-data-b-${index}`}
-                        onMouseDown={(event) => startRoomFolderColumnResize(index, event)}
-                        title="Drag to resize column"
-                      />
-                    ))}
-                  </div>
-                  <div className="flex items-center gap-3 mt-3 mb-1">
-                    <div
-                      className="h-2 flex-1 rounded bg-green-100 dark:bg-green-900/30 cursor-row-resize"
-                      onMouseDown={startRoomFolderRowHeightResize}
-                      title="Drag up/down to resize row height"
-                    />
-                    <span className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
-                      Row Height: {roomFolderLayoutDraft.rowHeight}px
-                    </span>
-                  </div>
-                  <div className="my-4 border-t border-dashed border-gray-400 dark:border-gray-500" />
-
-                  <table className="w-full border-collapse mb-4 text-sm seating-plan-table-layout-fixed sp-room-folder-info-cols">
-                    <colgroup>
-                      <col />
-                      <col />
-                      <col />
-                      <col />
-                      <col />
-                      <col />
-                      <col />
-                    </colgroup>
-                    <tbody>
-                      <tr>
-                        <td className="border-2 border-gray-800 dark:border-gray-400 p-2 font-bold bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white">Name Of Centre</td>
-                        <td className="border-2 border-gray-800 dark:border-gray-400 p-2 text-center text-gray-700 dark:text-gray-300" colSpan={3}>
-                          Centre Name
-                        </td>
-                        <td className="border-2 border-gray-800 dark:border-gray-400 p-2 font-bold bg-gray-50 dark:bg-gray-800 text-center text-gray-900 dark:text-white">Centre No</td>
-                        <td className="border-2 border-gray-800 dark:border-gray-400 p-2 text-center font-bold text-gray-900 dark:text-white">202601</td>
-                        <td className="border-2 border-gray-800 dark:border-gray-400 p-2 font-bold bg-gray-50 dark:bg-gray-800 text-center text-gray-900 dark:text-white">Class: XII</td>
-                      </tr>
-                      <tr>
-                        <td className="border-2 border-gray-800 dark:border-gray-400 p-2 font-bold bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white">Name Of Examination</td>
-                        <td className="border-2 border-gray-800 dark:border-gray-400 p-2 text-center text-gray-700 dark:text-gray-300" colSpan={3}>
-                          Senior School Certificate Examinations - 2026
-                        </td>
-                        <td className="border-2 border-gray-800 dark:border-gray-400 p-2 font-bold bg-gray-50 dark:bg-gray-800 text-center text-gray-900 dark:text-white">Subject</td>
-                        <td className="border-2 border-gray-800 dark:border-gray-400 p-2 text-center text-gray-700 dark:text-gray-300" colSpan={2}>
-                          048 ; PHYSICAL EDUCATION
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="border-2 border-gray-800 dark:border-gray-400 p-2 font-bold bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white">Date</td>
-                        <td className="border-2 border-gray-800 dark:border-gray-400 p-2 text-center text-gray-700 dark:text-gray-300" colSpan={3}>18.02.2026 (Wednesday)</td>
-                        <td className="border-2 border-gray-800 dark:border-gray-400 p-2 font-bold bg-gray-50 dark:bg-gray-800 text-center text-gray-900 dark:text-white">Room No.</td>
-                        <td className="border-2 border-gray-800 dark:border-gray-400 p-2 text-center text-gray-900 dark:text-white font-bold" colSpan={2}>03 - XII B</td>
-                      </tr>
-                    </tbody>
-                  </table>
-
-                  <table className="w-full border-collapse text-xs seating-plan-table-layout-fixed sp-room-folder-data-cols">
-                    <colgroup>
-                      <col />
-                      <col />
-                      <col />
-                      <col />
-                      <col />
-                      <col />
-                      <col />
-                      <col />
-                      <col />
-                    </colgroup>
-                    <thead>
-                      <tr>
-                        <th className="border border-gray-800 dark:border-gray-400 p-2" colSpan={3}>Row 1</th>
-                        <th className="border border-gray-800 dark:border-gray-400 p-2" colSpan={3}>Row 2</th>
-                        <th className="border border-gray-800 dark:border-gray-400 p-2" colSpan={3}>Row 3</th>
-                      </tr>
-                      <tr>
-                        <th className="border border-gray-800 dark:border-gray-400 p-1.5">Roll No</th>
-                        <th className="border border-gray-800 dark:border-gray-400 p-1.5">QP Code</th>
-                        <th className="border border-gray-800 dark:border-gray-400 p-1.5">Sheet No</th>
-                        <th className="border border-gray-800 dark:border-gray-400 p-1.5">Roll No</th>
-                        <th className="border border-gray-800 dark:border-gray-400 p-1.5">QP Code</th>
-                        <th className="border border-gray-800 dark:border-gray-400 p-1.5">Sheet No</th>
-                        <th className="border border-gray-800 dark:border-gray-400 p-1.5">Roll No</th>
-                        <th className="border border-gray-800 dark:border-gray-400 p-1.5">QP Code</th>
-                        <th className="border border-gray-800 dark:border-gray-400 p-1.5">Sheet No</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {[...Array(8)].map((_, i) => (
-                        <tr key={`second-slip-row-${i}`}>
-                          <td className="border border-gray-800 dark:border-gray-400 p-1.5 text-center sp-row-height-cell">{20261049 + i}</td>
-                          <td className="border border-gray-800 dark:border-gray-400 p-1.5 text-center sp-row-height-cell">{(i % 3) + 1}</td>
-                          <td className="border border-gray-800 dark:border-gray-400 p-1.5 text-center sp-row-height-cell">A10{41 + i}</td>
-                          <td className="border border-gray-800 dark:border-gray-400 p-1.5 text-center sp-row-height-cell">{20261057 + i}</td>
-                          <td className="border border-gray-800 dark:border-gray-400 p-1.5 text-center sp-row-height-cell">{((i + 1) % 3) + 1}</td>
-                          <td className="border border-gray-800 dark:border-gray-400 p-1.5 text-center sp-row-height-cell">A10{49 + i}</td>
-                          <td className="border border-gray-800 dark:border-gray-400 p-1.5 text-center sp-row-height-cell">{20261065 + i}</td>
-                          <td className="border border-gray-800 dark:border-gray-400 p-1.5 text-center sp-row-height-cell">{((i + 2) % 3) + 1}</td>
-                          <td className="border border-gray-800 dark:border-gray-400 p-1.5 text-center sp-row-height-cell">A10{57 + i}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'roomDoorSlip' && (
-            <div className="space-y-4">
-              <div className="overflow-x-auto py-2">
-                <div className="border-2 border-gray-300 dark:border-gray-600 rounded-lg p-6 bg-white dark:bg-gray-900 mx-auto seating-plan-preview-page">
-                  <h2 className="text-xl font-bold text-center mb-4 text-gray-900 dark:text-white">SEATING PLAN</h2>
-
-                  <style>{`.sp-room-door-info-cols { --sp-door-info-col-1: ${roomDoorLayoutDraft.infoCol1Width}%; --sp-door-info-col-2: ${roomDoorLayoutDraft.infoCol2Width}%; --sp-door-info-col-3: ${roomDoorLayoutDraft.infoCol3Width}%; --sp-door-info-col-4: ${roomDoorLayoutDraft.infoCol4Width}%; --sp-door-info-col-5: ${roomDoorLayoutDraft.infoCol5Width}%; --sp-door-info-col-6: ${roomDoorLayoutDraft.infoCol6Width}%; } .sp-room-door-data-cols { --sp-door-data-col-1: ${roomDoorLayoutDraft.col1Width}%; --sp-door-data-col-2: ${roomDoorLayoutDraft.col2Width}%; --sp-door-data-col-3: ${roomDoorLayoutDraft.col3Width}%; --sp-door-row-height: ${roomDoorLayoutDraft.rowHeight}px; } ${roomDoorInfoColumnBoundaries.map((b, i) => `.sp-rd-info-b-${i} { left: ${b}%; }`).join(' ')} ${roomDoorColumnBoundaries.map((b, i) => `.sp-rd-data-b-${i} { left: ${b}%; }`).join(' ')}`}</style>
-                  <div className="relative mb-4" ref={roomDoorInfoTableWrapperRef}>
-                    <table className="w-full border-collapse text-sm seating-plan-table-layout-fixed sp-room-door-info-cols">
-                      <colgroup>
-                        <col />
-                        <col />
-                        <col />
-                        <col />
-                        <col />
-                        <col />
-                      </colgroup>
-                      <tbody>
-                        <tr>
-                          <td className="border-2 border-gray-800 dark:border-gray-400 p-2 font-bold bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white">Name Of Centre</td>
-                          <td className="border-2 border-gray-800 dark:border-gray-400 p-2 text-center text-gray-700 dark:text-gray-300" colSpan={2}>
-                            Centre Name
-                          </td>
-                          <td className="border-2 border-gray-800 dark:border-gray-400 p-2 font-bold bg-gray-50 dark:bg-gray-800 text-center text-gray-900 dark:text-white">Centre No</td>
-                          <td className="border-2 border-gray-800 dark:border-gray-400 p-2 text-center font-bold text-gray-900 dark:text-white">202601</td>
-                          <td className="border-2 border-gray-800 dark:border-gray-400 p-2 font-bold bg-gray-50 dark:bg-gray-800 text-center text-gray-900 dark:text-white">Class: XII</td>
-                        </tr>
-                        <tr>
-                          <td className="border-2 border-gray-800 dark:border-gray-400 p-2 font-bold bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white">Name Of Examination</td>
-                          <td className="border-2 border-gray-800 dark:border-gray-400 p-2 text-center text-gray-700 dark:text-gray-300" colSpan={2}>
-                            Senior School Certificate Examinations - 2026
-                          </td>
-                          <td className="border-2 border-gray-800 dark:border-gray-400 p-2 font-bold bg-gray-50 dark:bg-gray-800 text-center text-gray-900 dark:text-white">Subject</td>
-                          <td className="border-2 border-gray-800 dark:border-gray-400 p-2 text-center text-gray-700 dark:text-gray-300" colSpan={2}>
-                            048 ; PHYSICAL EDUCATION
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="border-2 border-gray-800 dark:border-gray-400 p-2 font-bold bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white">Date</td>
-                          <td className="border-2 border-gray-800 dark:border-gray-400 p-2 text-center text-gray-700 dark:text-gray-300" colSpan={2}>18.02.2026 (Wednesday)</td>
-                          <td className="border-2 border-gray-800 dark:border-gray-400 p-2 font-bold bg-gray-50 dark:bg-gray-800 text-center text-gray-900 dark:text-white">Room No.</td>
-                          <td className="border-2 border-gray-800 dark:border-gray-400 p-2 text-center text-gray-900 dark:text-white font-bold" colSpan={2}>02 - XII A</td>
-                        </tr>
-                      </tbody>
-                    </table>
-                    {roomDoorInfoColumnBoundaries.map((_, index) => (
-                      <div
-                        key={`room-door-info-boundary-${index}`}
-                        className={`absolute top-0 bottom-0 w-2 -ml-1 cursor-col-resize z-20 sp-rd-info-b-${index}`}
-                        onMouseDown={(event) => startRoomDoorInfoColumnResize(index, event)}
-                        title="Drag to resize info table columns"
-                      />
-                    ))}
-                  </div>
-
-                  <div className="relative" ref={roomDoorTableWrapperRef}>
-                    <table className="w-full border-collapse text-sm seating-plan-table-layout-fixed sp-room-door-data-cols">
-                      <colgroup>
-                        <col />
-                        <col />
-                        <col />
-                      </colgroup>
-                      <thead>
-                        <tr>
-                          <th className="border-2 border-gray-800 dark:border-gray-400 p-2">Row 1</th>
-                          <th className="border-2 border-gray-800 dark:border-gray-400 p-2">Row 2</th>
-                          <th className="border-2 border-gray-800 dark:border-gray-400 p-2">Row 3</th>
-                        </tr>
-                        <tr>
-                          <th className="border-2 border-gray-800 dark:border-gray-400 p-2">Roll No</th>
-                          <th className="border-2 border-gray-800 dark:border-gray-400 p-2">Roll No</th>
-                          <th className="border-2 border-gray-800 dark:border-gray-400 p-2">Roll No</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {[...Array(8)].map((_, i) => (
-                          <tr key={i}>
-                            <td className="border-2 border-gray-800 dark:border-gray-400 p-2 text-center sp-row-height-cell">{20261025 + i}</td>
-                            <td className="border-2 border-gray-800 dark:border-gray-400 p-2 text-center sp-row-height-cell">{20261033 + i}</td>
-                            <td className="border-2 border-gray-800 dark:border-gray-400 p-2 text-center sp-row-height-cell">{20261041 + i}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                    {roomDoorColumnBoundaries.map((_, index) => (
-                      <div
-                        key={`room-door-boundary-${index}`}
-                        className={`absolute top-0 bottom-0 w-2 -ml-1 cursor-col-resize z-20 sp-rd-data-b-${index}`}
-                        onMouseDown={(event) => startRoomDoorColumnResize(index, event)}
-                        title="Drag to resize column"
-                      />
-                    ))}
-                  </div>
-                  <div className="flex items-center gap-3 mt-3 mb-1">
-                    <div
-                      className="h-2 flex-1 rounded bg-yellow-100 dark:bg-yellow-900/30 cursor-row-resize"
-                      onMouseDown={startRoomDoorRowHeightResize}
-                      title="Drag up/down to resize row height"
-                    />
-                    <span className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
-                      Row Height: {roomDoorLayoutDraft.rowHeight}px
-                    </span>
-                  </div>
-
-                  <div className="my-4 border-t border-dashed border-gray-400 dark:border-gray-500" />
-
-                  <table className="w-full border-collapse mb-4 text-sm seating-plan-table-layout-fixed sp-room-door-info-cols">
-                    <colgroup>
-                      <col />
-                      <col />
-                      <col />
-                      <col />
-                      <col />
-                      <col />
-                    </colgroup>
-                    <tbody>
-                      <tr>
-                        <td className="border-2 border-gray-800 dark:border-gray-400 p-2 font-bold bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white">Name Of Centre</td>
-                        <td className="border-2 border-gray-800 dark:border-gray-400 p-2 text-center text-gray-700 dark:text-gray-300" colSpan={2}>Centre Name</td>
-                        <td className="border-2 border-gray-800 dark:border-gray-400 p-2 font-bold bg-gray-50 dark:bg-gray-800 text-center text-gray-900 dark:text-white">Centre No</td>
-                        <td className="border-2 border-gray-800 dark:border-gray-400 p-2 text-center font-bold text-gray-900 dark:text-white">202601</td>
-                        <td className="border-2 border-gray-800 dark:border-gray-400 p-2 font-bold bg-gray-50 dark:bg-gray-800 text-center text-gray-900 dark:text-white">Class: XII</td>
-                      </tr>
-                      <tr>
-                        <td className="border-2 border-gray-800 dark:border-gray-400 p-2 font-bold bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white">Name Of Examination</td>
-                        <td className="border-2 border-gray-800 dark:border-gray-400 p-2 text-center text-gray-700 dark:text-gray-300" colSpan={2}>Senior School Certificate Examinations - 2026</td>
-                        <td className="border-2 border-gray-800 dark:border-gray-400 p-2 font-bold bg-gray-50 dark:bg-gray-800 text-center text-gray-900 dark:text-white">Subject</td>
-                        <td className="border-2 border-gray-800 dark:border-gray-400 p-2 text-center text-gray-700 dark:text-gray-300" colSpan={2}>048 ; PHYSICAL EDUCATION</td>
-                      </tr>
-                      <tr>
-                        <td className="border-2 border-gray-800 dark:border-gray-400 p-2 font-bold bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white">Date</td>
-                        <td className="border-2 border-gray-800 dark:border-gray-400 p-2 text-center text-gray-700 dark:text-gray-300" colSpan={2}>18.02.2026 (Wednesday)</td>
-                        <td className="border-2 border-gray-800 dark:border-gray-400 p-2 font-bold bg-gray-50 dark:bg-gray-800 text-center text-gray-900 dark:text-white">Room No.</td>
-                        <td className="border-2 border-gray-800 dark:border-gray-400 p-2 text-center text-gray-900 dark:text-white font-bold" colSpan={2}>03 - XII B</td>
-                      </tr>
-                    </tbody>
-                  </table>
-
-                  <table className="w-full border-collapse text-sm seating-plan-table-layout-fixed sp-room-door-data-cols">
-                    <colgroup>
-                      <col />
-                      <col />
-                      <col />
-                    </colgroup>
-                    <thead>
-                      <tr>
-                        <th className="border-2 border-gray-800 dark:border-gray-400 p-2">Row 1</th>
-                        <th className="border-2 border-gray-800 dark:border-gray-400 p-2">Row 2</th>
-                        <th className="border-2 border-gray-800 dark:border-gray-400 p-2">Row 3</th>
-                      </tr>
-                      <tr>
-                        <th className="border-2 border-gray-800 dark:border-gray-400 p-2">Roll No</th>
-                        <th className="border-2 border-gray-800 dark:border-gray-400 p-2">Roll No</th>
-                        <th className="border-2 border-gray-800 dark:border-gray-400 p-2">Roll No</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {[...Array(8)].map((_, i) => (
-                        <tr key={`second-door-row-${i}`}>
-                          <td className="border-2 border-gray-800 dark:border-gray-400 p-2 text-center sp-row-height-cell">{20261049 + i}</td>
-                          <td className="border-2 border-gray-800 dark:border-gray-400 p-2 text-center sp-row-height-cell">{20261057 + i}</td>
-                          <td className="border-2 border-gray-800 dark:border-gray-400 p-2 text-center sp-row-height-cell">{20261065 + i}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'cbseCopy' && (
-            <div className="space-y-4">
-              {/* CBSE Format Preview */}
-              <div className="overflow-x-auto py-2">
-                <style>{`.sp-cbse-info-cols { --sp-cbse-info-col-1: ${cbseLayoutDraft.infoCol1Width}%; --sp-cbse-info-col-2: ${cbseLayoutDraft.infoCol2Width}%; --sp-cbse-info-col-3: ${cbseLayoutDraft.infoCol3Width}%; --sp-cbse-info-col-4: ${cbseLayoutDraft.infoCol4Width}%; --sp-cbse-info-col-5: ${cbseLayoutDraft.infoCol5Width}%; } .sp-cbse-data-cols { --sp-cbse-data-col-1: ${cbseLayoutDraft.col1Width}%; --sp-cbse-data-col-2: ${cbseLayoutDraft.col2Width}%; --sp-cbse-data-col-3: ${cbseLayoutDraft.col3Width}%; --sp-cbse-data-col-4: ${cbseLayoutDraft.col4Width}%; --sp-cbse-data-col-5: ${cbseLayoutDraft.col5Width}%; --sp-cbse-data-col-6: ${cbseLayoutDraft.col6Width}%; --sp-cbse-header-font-size: ${cbseLayoutDraft.headerFontSize}pt; --sp-cbse-subheader-font-size: ${cbseLayoutDraft.subHeaderFontSize}pt; --sp-cbse-row-height: ${cbseLayoutDraft.rowHeight}px; --sp-cbse-cell-padding-y: ${cbseLayoutDraft.cellPaddingY}px; --sp-cbse-cell-padding-x: ${cbseLayoutDraft.cellPaddingX}px; --sp-cbse-body-font-size: ${cbseLayoutDraft.bodyFontSize}pt; } ${cbseInfoColumnBoundaries.map((b, i) => `.sp-cbse-info-b-${i} { left: ${b}%; }`).join(' ')} ${cbseColumnBoundaries.map((b, i) => `.sp-cbse-data-b-${i} { left: ${b}%; }`).join(' ')}`}</style>
-                <div className="border-2 border-gray-300 dark:border-gray-600 rounded-lg p-6 bg-white dark:bg-gray-900 mx-auto sp-preview-page-size">
-                  {/* Header */}
-                  <h2 className="text-xl font-bold text-center mb-4 text-gray-900 dark:text-white">SEATING PLAN</h2>
-
-                  {/* Info Table */}
-                  <div className="relative mb-4" ref={cbseInfoTableWrapperRef}>
-                    <table className="w-full border-collapse seating-plan-table-layout-fixed sp-cbse-info-cols">
-                      <colgroup>
-                        <col />
-                        <col />
-                        <col />
-                        <col />
-                        <col />
-                      </colgroup>
-                      <tbody>
-                        <tr>
-                          <td className="border-2 border-gray-800 dark:border-gray-400 p-2 font-bold text-gray-900 dark:text-white">Name Of Centre</td>
-                          <td className="border-2 border-gray-800 dark:border-gray-400 p-2 text-center text-gray-700 dark:text-gray-300" colSpan={2}>
-                            Centre Name
-                          </td>
-                          <td className="border-2 border-gray-800 dark:border-gray-400 p-2 font-bold text-center text-gray-900 dark:text-white">Centre No</td>
-                          <td className="border-2 border-gray-800 dark:border-gray-400 p-2 text-center font-bold text-gray-900 dark:text-white">202601</td>
-                        </tr>
-                        <tr>
-                          <td className="border-2 border-gray-800 dark:border-gray-400 p-2 font-bold text-gray-900 dark:text-white">Name Of<br />Examination</td>
-                          <td className="border-2 border-gray-800 dark:border-gray-400 p-2 text-center text-gray-700 dark:text-gray-300" colSpan={2}>
-                            Senior School Certificate Examinations - 2026
-                          </td>
-                          <td className="border-2 border-gray-800 dark:border-gray-400 p-2 font-bold text-center text-gray-900 dark:text-white">Subject</td>
-                          <td className="border-2 border-gray-800 dark:border-gray-400 p-2 text-center font-bold text-sm text-gray-900 dark:text-white">184 ; ENGLISH (LANG. & LIT.)</td>
-                        </tr>
-                        <tr>
-                          <td className="border-2 border-gray-800 dark:border-gray-400 p-2 font-bold text-gray-900 dark:text-white">Date</td>
-                          <td className="border-2 border-gray-800 dark:border-gray-400 p-2 text-center text-gray-700 dark:text-gray-300" colSpan={2}>15.02.2026</td>
-                          <td className="border-2 border-gray-800 dark:border-gray-400 p-2 font-bold text-center text-gray-900 dark:text-white">Room No.</td>
-                          <td className="border-2 border-gray-800 dark:border-gray-400 p-2 text-center font-bold text-gray-900 dark:text-white">01</td>
-                        </tr>
-                      </tbody>
-                    </table>
-
-                    {cbseInfoColumnBoundaries.map((_, index) => (
-                      <div
-                        key={`cbse-info-boundary-${index}`}
-                        className={`absolute top-0 bottom-0 w-2 -ml-1 cursor-col-resize z-20 sp-cbse-info-b-${index}`}
-                        onMouseDown={(event) => startInfoColumnResize(index, event)}
-                        title="Drag to resize info table columns"
-                      />
-                    ))}
-                  </div>
-
-                  {/* Seating Table */}
-                  <div className="relative" ref={cbseTableWrapperRef}>
-                    <table className="w-full border-collapse mb-4 seating-plan-table-layout-fixed sp-cbse-data-cols">
-                      <colgroup>
-                        <col />
-                        <col />
-                        <col />
-                        <col />
-                        <col />
-                        <col />
-                      </colgroup>
-                      <thead>
-                        <tr>
-                          <th className="border-2 border-gray-800 dark:border-gray-400 p-2 font-bold text-gray-900 dark:text-white sp-cbse-header-font" colSpan={2}>Row 1</th>
-                          <th className="border-2 border-gray-800 dark:border-gray-400 p-2 font-bold text-gray-900 dark:text-white sp-cbse-header-font" colSpan={2}>Row 2</th>
-                          <th className="border-2 border-gray-800 dark:border-gray-400 p-2 font-bold text-gray-900 dark:text-white sp-cbse-header-font" colSpan={2}>Row 3</th>
-                        </tr>
-                        <tr>
-                          <td className="border-2 border-gray-800 dark:border-gray-400 p-2 font-bold text-center text-gray-900 dark:text-white sp-cbse-subheader-font">Roll No</td>
-                          <td className="border-2 border-gray-800 dark:border-gray-400 p-2 font-bold text-center text-gray-900 dark:text-white sp-cbse-subheader-font">Q.P. Code</td>
-                          <td className="border-2 border-gray-800 dark:border-gray-400 p-2 font-bold text-center text-gray-900 dark:text-white sp-cbse-subheader-font">Roll No</td>
-                          <td className="border-2 border-gray-800 dark:border-gray-400 p-2 font-bold text-center text-gray-900 dark:text-white sp-cbse-subheader-font">Q.P. Code</td>
-                          <td className="border-2 border-gray-800 dark:border-gray-400 p-2 font-bold text-center text-gray-900 dark:text-white sp-cbse-subheader-font">Roll No</td>
-                          <td className="border-2 border-gray-800 dark:border-gray-400 p-2 font-bold text-center text-gray-900 dark:text-white sp-cbse-subheader-font">Q.P. Code</td>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {[...Array(8)].map((_, i) => (
-                          <tr key={i}>
-                            <td className="border-2 border-gray-800 dark:border-gray-400 text-center text-gray-700 dark:text-gray-300 sp-cbse-body-cell">{20261001 + i}</td>
-                            <td className="border-2 border-gray-800 dark:border-gray-400 text-center text-gray-400 dark:text-gray-500 sp-cbse-body-cell" />
-                            <td className="border-2 border-gray-800 dark:border-gray-400 text-center text-gray-700 dark:text-gray-300 sp-cbse-body-cell">{20261009 + i}</td>
-                            <td className="border-2 border-gray-800 dark:border-gray-400 text-center text-gray-400 dark:text-gray-500 sp-cbse-body-cell" />
-                            <td className="border-2 border-gray-800 dark:border-gray-400 text-center text-gray-700 dark:text-gray-300 sp-cbse-body-cell">{20261017 + i}</td>
-                            <td className="border-2 border-gray-800 dark:border-gray-400 text-center text-gray-400 dark:text-gray-500 sp-cbse-body-cell" />
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-
-                    {cbseColumnBoundaries.map((_, index) => (
-                      <div
-                        key={`cbse-boundary-${index}`}
-                        className={`absolute top-0 bottom-0 w-2 -ml-1 cursor-col-resize z-20 sp-cbse-data-b-${index}`}
-                        onMouseDown={(event) => startColumnResize(index, event)}
-                        title="Drag to resize column"
-                      />
-                    ))}
-                  </div>
-
-                  <div className="flex items-center gap-3 mb-4">
-                    <div
-                      className="h-2 flex-1 rounded bg-purple-100 dark:bg-purple-900/30 cursor-row-resize"
-                      onMouseDown={startRowHeightResize}
-                      title="Drag up/down to resize row height"
-                    />
-                    <span className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
-                      Row Height: {cbseLayoutDraft.rowHeight}px
-                    </span>
-                  </div>
-
-                  {/* Footer Section */}
-                  <div className="flex justify-between mb-6 text-sm">
-                    <div className="w-1/2 leading-relaxed">
-                      <p className="font-bold text-gray-900 dark:text-white">Signature of Assistant</p>
-                      <p className="font-bold text-gray-900 dark:text-white mb-3">Superintendent</p>
-                      <p className="text-gray-700 dark:text-gray-300 mt-2">1. ______________</p>
-                      <p className="text-gray-700 dark:text-gray-300 mt-3">2. ______________</p>
-                    </div>
-                    <div className="w-1/2 text-left pl-10 leading-relaxed">
-                      <p className="font-bold text-gray-900 dark:text-white">Total Students</p>
-                      <p className="text-gray-700 dark:text-gray-300 mt-2"><span className="font-bold text-gray-900 dark:text-white">Registered:</span> 24</p>
-                      <p className="text-gray-700 dark:text-gray-300 mt-3"><span className="font-bold text-gray-900 dark:text-white">Present:</span> ________</p>
-                      <p className="text-gray-700 dark:text-gray-300 mt-3"><span className="font-bold text-gray-900 dark:text-white">Absent:</span> ________</p>
-                    </div>
-                  </div>
-
-                  <p className="text-right font-bold text-gray-900 dark:text-white">Signature of Centre Superintendent</p>
-                </div>
-              </div>
-
-              <p className="text-center text-sm text-gray-500 dark:text-gray-400 mt-4">
-                Click the download button next to any exam to generate the CBSE Format PDF with actual candidate data.
-              </p>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {showPreviewDialog && previewPdfUrl && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4">
-          <div className="w-full max-w-6xl h-[88vh] bg-white dark:bg-gray-900 rounded-xl shadow-xl overflow-hidden flex flex-col">
-            <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-              <h4 className="text-sm font-semibold text-gray-900 dark:text-white">
-                Seating Plan PDF Preview
-              </h4>
-              <div className="flex items-center gap-2">
-                <a
-                  href={previewPdfUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center px-3 py-1.5 rounded-md text-xs font-semibold border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
-                >
-                  Open in New Tab
-                </a>
-                <a
-                  href={previewPdfUrl}
-                  download={previewFilename || 'seating-plan.pdf'}
-                  className="inline-flex items-center px-3 py-1.5 rounded-md text-xs font-semibold bg-blue-600 text-white hover:bg-blue-700"
-                >
-                  Download PDF
-                </a>
-                <button
-                  type="button"
-                  onClick={closePreviewDialog}
-                  className="inline-flex items-center px-3 py-1.5 rounded-md text-xs font-semibold border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-            <div className="w-full flex-1 overflow-auto bg-gray-100 dark:bg-gray-800 p-4">
-              {previewRenderError ? (
-                <div className="h-full w-full flex items-center justify-center p-6 text-center text-sm text-gray-600 dark:text-gray-300">
-                  {previewRenderError}
-                </div>
-              ) : (
-                <Document
-                  file={previewPdfUrl}
-                  loading={
-                    <div className="h-full w-full flex items-center justify-center text-sm text-gray-600 dark:text-gray-300">
-                      Loading PDF preview...
-                    </div>
-                  }
-                  onLoadSuccess={({ numPages }) => {
-                    setPreviewPageCount(numPages)
-                    setPreviewRenderError(null)
-                  }}
-                  onLoadError={(error) => {
-                    console.error('Failed to render seating plan preview:', error)
-                    const message = (error as Error)?.message || 'Unknown PDF render error'
-                    setPreviewRenderError(`Failed to render preview in dialog (${message}). Use "Open in New Tab" or "Download PDF".`)
-                  }}
-                  className="flex flex-col items-center gap-4"
-                >
-                  {Array.from({ length: previewPageCount }).map((_, index) => (
-                    <Page
-                      key={`seating-preview-page-${index + 1}`}
-                      pageNumber={index + 1}
-                      width={980}
-                      renderTextLayer={false}
-                      renderAnnotationLayer={false}
-                    />
-                  ))}
-                </Document>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+  const rowHandle = (onStart: (event: React.MouseEvent<HTMLDivElement>) => void, height: number) => (
+    <div className="cx-seat-row-handle">
+      <div className="cx-seat-row-handle__bar" onMouseDown={onStart} title="Drag up or down to change the row height" aria-hidden="true" />
+      <span className="cx-seat-row-handle__label">Row height {height}px</span>
     </div>
+  )
+
+  const rowHeightStyle = (height: number) => ({ '--cx-row-h': `${height}px` }) as React.CSSProperties
+
+  const mainGateRoomTable = (caption: string, firstRoll: number) => (
+    <table className="cx-seat-table" style={rowHeightStyle(mainGateLayoutDraft.rowHeight)}>
+      {colWidths(mainGateColumnWidths)}
+      <caption>{caption}</caption>
+      <thead>
+        <tr>
+          <th>Row</th>
+          <th>Row 1</th>
+          <th>Row 2</th>
+          <th>Row 3</th>
+        </tr>
+      </thead>
+      <tbody>
+        {[...Array(8)].map((_, i) => (
+          <tr key={i}>
+            <th scope="row" className="cx-seat-cell">Roll No</th>
+            <td className="cx-seat-cell cx-seat-num">{firstRoll + i}</td>
+            <td className="cx-seat-cell cx-seat-num">{firstRoll + 8 + i}</td>
+            <td className="cx-seat-cell cx-seat-num">{firstRoll + 16 + i}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  )
+
+  const roomFolderInfoTable = (roomLabel: string) => (
+    <table className="cx-seat-table cx-seat-table--info">
+      {colWidths(roomFolderInfoColumnWidths)}
+      <tbody>
+        <tr>
+          <th scope="row">Name Of Centre</th>
+          <td colSpan={3}>Centre Name</td>
+          <th scope="row">Centre No</th>
+          <td className="cx-seat-strong">202601</td>
+          <th scope="row">Class: XII</th>
+        </tr>
+        <tr>
+          <th scope="row">Name Of Examination</th>
+          <td colSpan={3}>Senior School Certificate Examinations - 2026</td>
+          <th scope="row">Subject</th>
+          <td colSpan={2}>048 ; PHYSICAL EDUCATION</td>
+        </tr>
+        <tr>
+          <th scope="row">Date</th>
+          <td colSpan={3}>18.02.2026 (Wednesday)</td>
+          <th scope="row">Room No.</th>
+          <td colSpan={2} className="cx-seat-strong">{roomLabel}</td>
+        </tr>
+      </tbody>
+    </table>
+  )
+
+  const roomFolderDataTable = (firstRoll: number, sheetPrefix: string, withTotals: boolean) => (
+    <table className="cx-seat-table cx-seat-table--small" style={rowHeightStyle(roomFolderLayoutDraft.rowHeight)}>
+      {colWidths(roomFolderColumnWidths)}
+      <thead>
+        <tr>
+          <th colSpan={3}>Row 1</th>
+          <th colSpan={3}>Row 2</th>
+          <th colSpan={3}>Row 3</th>
+        </tr>
+        <tr>
+          {[0, 1, 2].map((group) => (
+            <React.Fragment key={group}>
+              <th>Roll No</th>
+              <th>QP Code</th>
+              <th>Sheet No</th>
+            </React.Fragment>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {[...Array(8)].map((_, i) => (
+          <tr key={i}>
+            {[0, 1, 2].map((group) => (
+              <React.Fragment key={group}>
+                <td className="cx-seat-cell cx-seat-num">{firstRoll + group * 8 + i}</td>
+                <td className="cx-seat-cell cx-seat-num">{((i + group) % 3) + 1}</td>
+                <td className="cx-seat-cell cx-seat-num">{sheetPrefix}{41 + group * 8 + i}</td>
+              </React.Fragment>
+            ))}
+          </tr>
+        ))}
+      </tbody>
+      {withTotals ? (
+        <tfoot>
+          <tr>
+            <th colSpan={2}>Registered:</th>
+            <td className="cx-seat-num">24</td>
+            <th colSpan={2}>Present:</th>
+            <td />
+            <th colSpan={2}>Absent:</th>
+            <td />
+          </tr>
+        </tfoot>
+      ) : null}
+    </table>
+  )
+
+  const roomDoorInfoTable = (roomLabel: string) => (
+    <table className="cx-seat-table cx-seat-table--info">
+      {colWidths(roomDoorInfoColumnWidths)}
+      <tbody>
+        <tr>
+          <th scope="row">Name Of Centre</th>
+          <td colSpan={2}>Centre Name</td>
+          <th scope="row">Centre No</th>
+          <td className="cx-seat-strong">202601</td>
+          <th scope="row">Class: XII</th>
+        </tr>
+        <tr>
+          <th scope="row">Name Of Examination</th>
+          <td colSpan={2}>Senior School Certificate Examinations - 2026</td>
+          <th scope="row">Subject</th>
+          <td colSpan={2}>048 ; PHYSICAL EDUCATION</td>
+        </tr>
+        <tr>
+          <th scope="row">Date</th>
+          <td colSpan={2}>18.02.2026 (Wednesday)</td>
+          <th scope="row">Room No.</th>
+          <td colSpan={2} className="cx-seat-strong">{roomLabel}</td>
+        </tr>
+      </tbody>
+    </table>
+  )
+
+  const roomDoorDataTable = (firstRoll: number) => (
+    <table className="cx-seat-table cx-seat-table--info" style={rowHeightStyle(roomDoorLayoutDraft.rowHeight)}>
+      {colWidths(roomDoorColumnWidths)}
+      <thead>
+        <tr>
+          <th>Row 1</th>
+          <th>Row 2</th>
+          <th>Row 3</th>
+        </tr>
+        <tr>
+          <th>Roll No</th>
+          <th>Roll No</th>
+          <th>Roll No</th>
+        </tr>
+      </thead>
+      <tbody>
+        {[...Array(8)].map((_, i) => (
+          <tr key={i}>
+            <td className="cx-seat-cell cx-seat-num">{firstRoll + i}</td>
+            <td className="cx-seat-cell cx-seat-num">{firstRoll + 8 + i}</td>
+            <td className="cx-seat-cell cx-seat-num">{firstRoll + 16 + i}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  )
+
+  const cbseStyle = {
+    '--cx-cbse-head': `${cbseLayoutDraft.headerFontSize}pt`,
+    '--cx-cbse-subhead': `${cbseLayoutDraft.subHeaderFontSize}pt`,
+    '--cx-cbse-body': `${cbseLayoutDraft.bodyFontSize}pt`,
+    '--cx-row-h': `${cbseLayoutDraft.rowHeight}px`,
+    '--cx-cbse-pad-y': `${cbseLayoutDraft.cellPaddingY}px`,
+    '--cx-cbse-pad-x': `${cbseLayoutDraft.cellPaddingX}px`,
+  } as React.CSSProperties
+
+  const renderTemplate = () => {
+    if (activeTab === 'mainGate') {
+      return (
+        <>
+          <div className="cx-seat-title">
+            <strong>Centre Name</strong>
+            <span>Seating Plan CBSE Board Exam</span>
+            <span>Centre No: 202601</span>
+          </div>
+          <div className="cx-seat-meta">
+            <div>
+              <p>Date: 15.02.2026 (Saturday)</p>
+              <p>Subject: English (Lang. &amp; Lit.)</p>
+            </div>
+            <div className="cx-seat-meta__end">
+              <p>Class: X</p>
+              <p>Subject Code: 184</p>
+            </div>
+          </div>
+          <div className="cx-seat-resize" ref={mainGateTableWrapperRef}>
+            {mainGateRoomTable('Room No. 01 - X Rose (First Floor)', 20261001)}
+            {colHandles(mainGateColumnBoundaries, startMainGateColumnResize, 'Drag to resize column')}
+          </div>
+          {mainGateRoomTable('Room No. 02 - X Tulip (First Floor)', 20261025)}
+          {mainGateRoomTable('Room No. 03 - X Lotus (First Floor)', 20261049)}
+          {rowHandle(startMainGateRowHeightResize, mainGateLayoutDraft.rowHeight)}
+          <p className="cx-seat-sign">CENTRE SUPERINTENDENT</p>
+        </>
+      )
+    }
+
+    if (activeTab === 'roomFolderSlip') {
+      return (
+        <>
+          <p className="cx-seat-heading">SEATING PLAN</p>
+          <div className="cx-seat-resize" ref={roomFolderInfoTableWrapperRef}>
+            {roomFolderInfoTable('02 - XII A')}
+            {colHandles(roomFolderInfoColumnBoundaries, startRoomFolderInfoColumnResize, 'Drag to resize info table columns')}
+          </div>
+          <div className="cx-seat-resize" ref={roomFolderTableWrapperRef}>
+            {roomFolderDataTable(20261025, 'A00', true)}
+            {colHandles(roomFolderColumnBoundaries, startRoomFolderColumnResize, 'Drag to resize column')}
+          </div>
+          {rowHandle(startRoomFolderRowHeightResize, roomFolderLayoutDraft.rowHeight)}
+          <div className="cx-seat-cut" />
+          {roomFolderInfoTable('03 - XII B')}
+          {roomFolderDataTable(20261049, 'A10', false)}
+        </>
+      )
+    }
+
+    if (activeTab === 'roomDoorSlip') {
+      return (
+        <>
+          <p className="cx-seat-heading">SEATING PLAN</p>
+          <div className="cx-seat-resize" ref={roomDoorInfoTableWrapperRef}>
+            {roomDoorInfoTable('02 - XII A')}
+            {colHandles(roomDoorInfoColumnBoundaries, startRoomDoorInfoColumnResize, 'Drag to resize info table columns')}
+          </div>
+          <div className="cx-seat-resize" ref={roomDoorTableWrapperRef}>
+            {roomDoorDataTable(20261025)}
+            {colHandles(roomDoorColumnBoundaries, startRoomDoorColumnResize, 'Drag to resize column')}
+          </div>
+          {rowHandle(startRoomDoorRowHeightResize, roomDoorLayoutDraft.rowHeight)}
+          <div className="cx-seat-cut" />
+          {roomDoorInfoTable('03 - XII B')}
+          {roomDoorDataTable(20261049)}
+        </>
+      )
+    }
+
+    return (
+      <div className="cx-seat-cbse" style={cbseStyle}>
+        <p className="cx-seat-heading">SEATING PLAN</p>
+        <div className="cx-seat-resize" ref={cbseInfoTableWrapperRef}>
+          <table className="cx-seat-table cx-seat-table--info">
+            {colWidths(cbseInfoColumnWidths)}
+            <tbody>
+              <tr>
+                <th scope="row">Name Of Centre</th>
+                <td colSpan={2}>Centre Name</td>
+                <th scope="row">Centre No</th>
+                <td className="cx-seat-strong">202601</td>
+              </tr>
+              <tr>
+                <th scope="row">
+                  Name Of
+                  <br />
+                  Examination
+                </th>
+                <td colSpan={2}>Senior School Certificate Examinations - 2026</td>
+                <th scope="row">Subject</th>
+                <td className="cx-seat-strong">184 ; ENGLISH (LANG. &amp; LIT.)</td>
+              </tr>
+              <tr>
+                <th scope="row">Date</th>
+                <td colSpan={2}>15.02.2026</td>
+                <th scope="row">Room No.</th>
+                <td className="cx-seat-strong">01</td>
+              </tr>
+            </tbody>
+          </table>
+          {colHandles(cbseInfoColumnBoundaries, startInfoColumnResize, 'Drag to resize info table columns')}
+        </div>
+
+        <div className="cx-seat-resize" ref={cbseTableWrapperRef}>
+          <table className="cx-seat-table cx-seat-table--info">
+            {colWidths(cbseColumnWidths)}
+            <thead>
+              <tr>
+                <th colSpan={2} className="cx-seat-cbse__head">Row 1</th>
+                <th colSpan={2} className="cx-seat-cbse__head">Row 2</th>
+                <th colSpan={2} className="cx-seat-cbse__head">Row 3</th>
+              </tr>
+              <tr>
+                {[0, 1, 2].map((group) => (
+                  <React.Fragment key={group}>
+                    <th className="cx-seat-cbse__subhead">Roll No</th>
+                    <th className="cx-seat-cbse__subhead">Q.P. Code</th>
+                  </React.Fragment>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {[...Array(8)].map((_, i) => (
+                <tr key={i}>
+                  {[0, 1, 2].map((group) => (
+                    <React.Fragment key={group}>
+                      <td className="cx-seat-cbse__cell cx-seat-num">{20261001 + group * 8 + i}</td>
+                      <td className="cx-seat-cbse__cell" />
+                    </React.Fragment>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {colHandles(cbseColumnBoundaries, startColumnResize, 'Drag to resize column')}
+        </div>
+
+        {rowHandle(startRowHeightResize, cbseLayoutDraft.rowHeight)}
+
+        <div className="cx-seat-cbse__foot">
+          <div>
+            <p className="cx-seat-strong">Signature of Assistant</p>
+            <p className="cx-seat-strong">Superintendent</p>
+            <p>1. ______________</p>
+            <p>2. ______________</p>
+          </div>
+          <div>
+            <p className="cx-seat-strong">Total Students</p>
+            <p>
+              <span className="cx-seat-strong">Registered:</span> 24
+            </p>
+            <p>
+              <span className="cx-seat-strong">Present:</span> ________
+            </p>
+            <p>
+              <span className="cx-seat-strong">Absent:</span> ________
+            </p>
+          </div>
+        </div>
+        <p className="cx-seat-sign">Signature of Centre Superintendent</p>
+      </div>
+    )
+  }
+
+  return (
+    <Page>
+      {isExmclRoute ? (
+        <Card title="Seating plan mode" subtitle="Applies to every exam in this session's datesheet.">
+          <RadioGroup
+            label="Seating plan mode"
+            orientation="horizontal"
+            variant="cards"
+            value={seatingPlanMode}
+            onChange={(mode) => void handleSeatingPlanModeChange(mode as SeatingPlanMode)}
+            options={[
+              {
+                value: 'same_across_days',
+                label: 'Same room every day',
+                description: 'Each student keeps the same room on every exam day.',
+                disabled: loadingSeatingPlanMode || savingSeatingPlanMode,
+              },
+              {
+                value: 'different_per_day',
+                label: 'Different each day',
+                description: 'Students are seated in different rooms across exam days.',
+                disabled: loadingSeatingPlanMode || savingSeatingPlanMode,
+              },
+            ]}
+          />
+        </Card>
+      ) : null}
+
+      <div ref={scheduleTableRef}>
+        <Card flush title="Examination schedule" subtitle="Pick a format, then generate the seating plan for an exam to preview and download it.">
+          <CardToolbar>
+            <Tabs
+              variant="segmented"
+              label="Seating plan format"
+              value={activeTab}
+              onChange={handleFormatChange}
+              items={FORMAT_ORDER.map((id) => ({ id, label: FORMAT_LABELS[id] }))}
+            />
+          </CardToolbar>
+          <DataTable
+            caption="Examination schedule"
+            columns={columns}
+            rows={error ? [] : datesheetEntries}
+            getRowKey={(entry) => entry._id}
+            loading={loading}
+            loadingLabel="Loading the examination schedule…"
+            maxHeight="max(360px, calc(100vh - 320px))"
+            empty={
+              error ? (
+                <EmptyState
+                  icon={AlertCircle}
+                  title="The examination schedule didn’t load"
+                  body={error}
+                  action={
+                    <Button size="sm" onClick={() => void refetch()}>
+                      Try again
+                    </Button>
+                  }
+                />
+              ) : (
+                <EmptyState
+                  icon={CalendarDays}
+                  title="No exams in the datesheet yet"
+                  body="Import a datesheet first. Each exam then gets its own seating plan here."
+                />
+              )
+            }
+          />
+        </Card>
+      </div>
+
+      <Card
+        flush
+        title={`${formatLabel} layout`}
+        subtitle="Sample data. Drag a column edge or the row-height bar to adjust the printed layout; changes save automatically."
+      >
+        <PaperStage flush>
+          <Paper pageSize="A4" width={794}>
+            <div className="cx-seat-sheet">{renderTemplate()}</div>
+          </Paper>
+        </PaperStage>
+      </Card>
+
+      <Sheet
+        open={showPreviewDialog && !!previewPdfUrl}
+        onClose={closePreviewDialog}
+        size="xl"
+        icon={FileText}
+        title="Seating plan preview"
+        description={previewFilename ? previewFilename.replace(/\.pdf$/i, '') : undefined}
+        footer={
+          <>
+            <Button onClick={closePreviewDialog}>Close</Button>
+            <Button icon={ExternalLink} onClick={openPreviewInNewTab}>
+              Open in new tab
+            </Button>
+            <Button variant="primary" icon={Download} onClick={downloadPreview}>
+              Download PDF
+            </Button>
+          </>
+        }
+      >
+        <PaperStage
+          state={
+            previewRenderError ? (
+              <EmptyState
+                icon={AlertCircle}
+                title="The preview couldn’t be shown"
+                body={previewRenderError}
+              />
+            ) : undefined
+          }
+        >
+          {previewPdfUrl ? (
+            <Document
+              file={previewPdfUrl}
+              className={PAPER_PAGES_CLASS}
+              loading={<CardLoading label="Rendering preview…" />}
+              onLoadSuccess={({ numPages }) => {
+                setPreviewPageCount(numPages)
+                setPreviewRenderError(null)
+              }}
+              onLoadError={(error) => {
+                console.error('Failed to render seating plan preview:', error)
+                const message = (error as Error)?.message || 'Unknown PDF render error'
+                setPreviewRenderError(`The PDF didn’t render here (${message}). Open it in a new tab or download it instead.`)
+              }}
+            >
+              {Array.from({ length: previewPageCount }).map((_, index) => (
+                <Paper key={`seating-preview-page-${index + 1}`}>
+                  <PdfPage
+                    pageNumber={index + 1}
+                    width={previewPageWidth()}
+                    renderTextLayer={false}
+                    renderAnnotationLayer={false}
+                  />
+                </Paper>
+              ))}
+            </Document>
+          ) : null}
+        </PaperStage>
+      </Sheet>
+    </Page>
   )
 }
 
