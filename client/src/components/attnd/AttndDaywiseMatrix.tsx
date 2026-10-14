@@ -4,6 +4,8 @@ import { CalendarX, Save, SearchX } from 'lucide-react'
 import { DateSwitcher } from '@/components/attnd/DateSwitcher'
 import { AttndDayMatrix, AttndSummary, pluralize, type DayColumn } from '@/components/attnd/AttndMatrix'
 import { Button, Card, FilterBar, Page } from '@/components/ui'
+import { addMark, emptyCounts, isSundayDate, todayDateKey, markState, useAttndSettings } from '@/components/attnd/attndSettings'
+import { AttndSettingsButton } from '@/components/attnd/AttndSettingsDialog'
 import { sortClassNames, sortSectionNames } from '@/constants/studentClasses'
 import attndService, {
   type StudentClassOption,
@@ -13,14 +15,10 @@ import attndService, {
 type DayCategory = 'academic' | 'non-academic'
 type ClassSectionColumn = { className: string; section: string; key: string }
 
-const todayDateKey = () => {
-  const now = new Date()
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
-}
 
-const isSundayDate = (dateKey: string) => new Date(`${dateKey}T00:00:00`).getDay() === 0
 
-const defaultDayCategory = (dateKey: string): DayCategory => (isSundayDate(dateKey) ? 'non-academic' : 'academic')
+const defaultDayCategory = (dateKey: string, sundayHoliday: boolean): DayCategory =>
+  sundayHoliday && isSundayDate(dateKey) ? 'non-academic' : 'academic'
 
 const isNonAcademicCategory = (category?: string) => {
   const value = String(category || '').toLowerCase()
@@ -37,7 +35,9 @@ const studentMatchesQuery = (item: StudentDirectoryItem, query: string) => {
 }
 
 export const AttndDaywiseMatrix = () => {
+  const settings = useAttndSettings()
   const [selectedDate, setSelectedDate] = useState(todayDateKey)
+  const isFuture = selectedDate > todayDateKey()
   const [classOptions, setClassOptions] = useState<StudentClassOption[]>([])
   const [studentRows, setStudentRows] = useState<StudentDirectoryItem[]>([])
   const [absenceMap, setAbsenceMap] = useState<Record<string, boolean>>({})
@@ -85,12 +85,14 @@ export const AttndDaywiseMatrix = () => {
   const isHoliday = (columnKey: string) =>
     Object.prototype.hasOwnProperty.call(holidayMap, columnKey)
       ? Boolean(holidayMap[columnKey])
-      : defaultDayCategory(selectedDate) === 'non-academic'
+      : defaultDayCategory(selectedDate, settings.sundayHoliday) === 'non-academic'
 
   const workingColumns = columns.filter((column) => !isHoliday(column.key))
   const visibleStudents = workingColumns.flatMap((column) => studentsByColumn[column.key] || [])
-  const absentCount = visibleStudents.filter((item) => Boolean(absenceMap[item._id])).length
-  const presentCount = visibleStudents.length - absentCount
+  const counts = visibleStudents.reduce(
+    (next, item) => addMark(next, markState(settings, { holiday: false, future: isFuture, absent: Boolean(absenceMap[item._id]) })),
+    emptyCounts()
+  )
 
   useEffect(() => {
     const loadFilters = async () => {
@@ -233,23 +235,25 @@ export const AttndDaywiseMatrix = () => {
             }}
             filters={<DateSwitcher value={selectedDate} onChange={setSelectedDate} />}
             actions={
-              <Button
-                variant="primary"
-                size="sm"
-                icon={Save}
-                onClick={handleSave}
-                loading={saving}
-                disabled={loading || columns.length === 0}
-              >
-                Save attendance
-              </Button>
+              <>
+                <AttndSettingsButton />
+                <Button
+                  variant="primary"
+                  size="sm"
+                  icon={Save}
+                  onClick={handleSave}
+                  loading={saving}
+                  disabled={loading || columns.length === 0}
+                >
+                  Save attendance
+                </Button>
+              </>
             }
           />
           <AttndSummary
             working={workingColumns.length}
             workingLabel="working class"
-            present={presentCount}
-            absent={absentCount}
+            counts={counts}
             holidayHint="Click a class to switch working day or holiday."
           />
         </div>
@@ -258,6 +262,7 @@ export const AttndDaywiseMatrix = () => {
           peopleByColumn={studentsByColumn}
           isAbsent={(id) => Boolean(absenceMap[id])}
           onToggleAbsent={toggleAbsent}
+          future={isFuture}
           loading={loading}
           loadingLabel="Loading students"
           empty={empty}
