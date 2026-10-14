@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react'
 import { Pencil } from 'lucide-react'
+import { useUrlSearchQuery } from '@/hooks/useUrlSearchQuery'
 import SubjectsImportModal from '../components/subjects/ImportModal'
 import { Tabs } from '../components/common/Tabs'
 import { Dropdown } from '../components/common/Dropdown'
@@ -34,8 +35,9 @@ const PAGE_SIZE_OPTIONS = [
 const SEARCH_DEBOUNCE_MS = 300
 
 const Subjects: React.FC = () => {
-  const [searchInput, setSearchInput] = useState('')
-  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('')
+  const initialSearch = useUrlSearchQuery((value) => setSearchInput(value))
+  const [searchInput, setSearchInput] = useState(initialSearch)
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(initialSearch)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [editingSubject, setEditingSubject] = useState<Subject | null>(null)

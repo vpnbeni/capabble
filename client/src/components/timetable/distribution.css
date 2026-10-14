@@ -1,0 +1,82 @@
+/* Timetable › Period distribution and Timetable › Departments — dense grids on top of the Capabble design system. Tokens only. */
+
+/* ---------- Card header actions ---------- */
+.cb-app .tpd-actions { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-2); flex-wrap: wrap; }
+.cb-app .tpd-card > .cb-card__head { flex-wrap: wrap; }
+@media (max-width: 760px) {
+  .cb-app .tpd-card > .cb-card__head > .cb-card__action { flex: 1 1 100%; }
+  .cb-app .tpd-card .tpd-actions { justify-content: flex-start; }
+}
+
+/* Short explanatory line under a card head (legend, search). */
+.cb-app .tpd-toolbar { padding: 0 var(--space-5) var(--space-3); }
+.cb-app .tpd-legend { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; margin: 0; padding: 0 var(--space-5) var(--space-3); color: var(--ink-muted); font: 400 12px/16px var(--font-sans); }
+@media (max-width: 640px) {
+  .cb-app .tpd-toolbar, .cb-app .tpd-legend { padding-left: var(--space-4); padding-right: var(--space-4); }
+}
+
+/* ---------- Grid (scrolls inside its own container) ---------- */
+.cb-app .tpd-scroll { overflow: auto; border-top: 1px solid var(--border); -webkit-overflow-scrolling: touch; }
+.cb-app .tpd-scroll--tall { max-height: 460px; }
+.cb-app .tpd-grid { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; line-height: 18px; color: var(--ink); font-variant-numeric: tabular-nums; }
+.cb-app .tpd-grid th, .cb-app .tpd-grid td { border-bottom: 1px solid var(--border); background: var(--surface); }
+.cb-app .tpd-grid tbody tr:last-child > * { border-bottom: 0; }
+.cb-app .tpd-grid thead th { background: var(--surface-sunken); color: var(--ink-subtle); font: 500 12px/16px var(--font-sans); padding: var(--space-2) var(--space-3); vertical-align: bottom; white-space: nowrap; text-align: center; }
+.cb-app .tpd-scroll--tall .tpd-grid thead th { position: sticky; top: 0; z-index: 2; }
+.cb-app .tpd-grid tbody th, .cb-app .tpd-grid tbody td { height: var(--row-compact); padding: var(--space-1) var(--space-3); vertical-align: middle; font-weight: 400; text-align: center; }
+.cb-app .tpd-grid tbody tr:hover > * { background: var(--surface-hover); }
+
+/* Sticky first column so the row label stays in view while columns scroll sideways. */
+.cb-app .tpd-grid .tpd-sticky { position: sticky; left: 0; z-index: 1; text-align: left; padding-left: var(--space-5); border-right: 1px solid var(--border); min-width: 168px; }
+.cb-app .tpd-grid thead .tpd-sticky { z-index: 3; }
+.cb-app .tpd-grid .tpd-end { padding-right: var(--space-5); border-left: 1px solid var(--border); }
+.cb-app .tpd-grid .tpd-left { text-align: left; }
+@media (max-width: 640px) {
+  .cb-app .tpd-grid .tpd-sticky { padding-left: var(--space-4); min-width: 128px; }
+  .cb-app .tpd-grid .tpd-end { padding-right: var(--space-4); }
+}
+
+/* Row label: name plus a quieter second line. */
+.cb-app .tpd-rowlabel { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
+.cb-app .tpd-rowlabel__text { display: flex; flex-direction: column; min-width: 0; }
+.cb-app .tpd-rowlabel__name { font-weight: 500; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cb-app .tpd-rowlabel__meta { font-size: 12px; line-height: 16px; color: var(--ink-muted); white-space: nowrap; }
+.cb-app .tpd-sr { color: var(--ink-subtle); font-size: 12px; min-width: 20px; }
+
+/* Column head with a second line (periods per section, "Parallel"). */
+.cb-app .tpd-colhead { display: inline-flex; flex-direction: column; align-items: center; gap: 2px; }
+.cb-app .tpd-colhead__name { color: var(--ink); font-weight: 500; }
+.cb-app .tpd-colhead__meta { color: var(--ink-muted); font-weight: 400; }
+
+/* Parallel subjects: tinted column so the shared periods are easy to spot. */
+.cb-app .tpd-grid thead th.is-parallel { background: var(--info-soft); }
+.cb-app .tpd-grid thead th.is-parallel .tpd-colhead__meta { color: var(--info-ink); font-weight: 500; }
+.cb-app .tpd-grid tbody td.is-parallel { background: var(--info-soft); }
+.cb-app .tpd-grid tbody tr:hover > td.is-parallel { background: var(--info-soft); }
+.cb-app .tpd-swatch { display: inline-block; width: 12px; height: 12px; border-radius: var(--radius-sm); background: var(--info-soft); border: 1px solid var(--info-border); }
+
+/* Period count input: reads as a number until hovered or focused. */
+.cb-app .tpd-num { box-sizing: border-box; width: 52px; height: var(--control-sm); padding: 0 var(--space-1); border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink); font: 500 13px/18px var(--font-sans); font-variant-numeric: tabular-nums; text-align: center; outline: 0; -moz-appearance: textfield; appearance: textfield; }
+.cb-app .tpd-num::-webkit-outer-spin-button, .cb-app .tpd-num::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.cb-app .tpd-num::placeholder { color: var(--ink-subtle); font-weight: 400; }
+.cb-app .tpd-num:hover { border-color: var(--border-control); }
+.cb-app .tpd-num:focus { border-color: var(--accent-strong); outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+.cb-app .tpd-num.is-filled { font-weight: 600; }
+.cb-app td.is-parallel .tpd-num { border-color: var(--info-border); }
+
+/* Total column: count plus a status badge in words. */
+.cb-app .tpd-total { display: inline-flex; align-items: center; justify-content: flex-end; gap: var(--space-2); white-space: nowrap; }
+.cb-app .tpd-total__count { font-weight: 600; color: var(--ink); min-width: 52px; text-align: right; }
+.cb-app .tpd-total__count span { color: var(--ink-muted); font-weight: 400; }
+.cb-app .tpd-grid th.tpd-totalhead, .cb-app .tpd-grid td.tpd-totalcell { text-align: right; min-width: 176px; }
+
+/* Matrix checkboxes centred in their cell. */
+.cb-app .tpd-cell .cb-check { justify-content: center; align-items: center; }
+.cb-app .tpd-cell .cb-check__box { margin-top: 0; }
+
+/* Workload column. */
+.cb-app .tpd-workload { font-weight: 600; color: var(--ink); white-space: nowrap; }
+.cb-app .tpd-workload span { color: var(--ink-muted); font-weight: 400; }
+
+/* Department list. */
+.cb-app .tpd-dept-list { display: flex; flex-direction: column; gap: var(--space-4); }

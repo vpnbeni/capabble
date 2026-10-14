@@ -10,6 +10,7 @@ import { useOnboardingStatus } from '@/hooks/useOnboarding'
 import { AttndModeSwitch } from '@/components/attnd/AttndModeSwitch'
 import { Bell, CalendarDays, PanelLeft, Search } from 'lucide-react'
 import { Badge, Button } from '@/components/ui'
+import { isMacPlatform, useCommandPalette } from '@/components/commandPalette/CommandPaletteProvider'
 
 /** "2026-2027" → "2026–27", as schools write it. */
 const formatSessionLabel = (session: string) => {
@@ -25,7 +26,8 @@ type HeaderProps = {
 
 const Header: React.FC<HeaderProps> = ({ isSidebarCollapsed, onToggleSidebar }) => {
   const [notificationsOpen, setNotificationsOpen] = useState(false)
-  const [genericSearchValue, setGenericSearchValue] = useState('')
+  const { openPalette } = useCommandPalette()
+  const shortcutLabel = useMemo(() => (isMacPlatform() ? '⌘K' : 'Ctrl K'), [])
   const location = useLocation()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -231,22 +233,24 @@ const Header: React.FC<HeaderProps> = ({ isSidebarCollapsed, onToggleSidebar }) 
         }
       case 'time-table': {
         const subPage = segments[1] || ''
+        const distribution = { title: 'Period distribution', subtitle: 'How many periods each subject gets per week, class by class.' }
         const titleMap: Record<string, { title: string; subtitle: string }> = {
-          'teachers': { title: 'Teachers', subtitle: 'Manage the teacher directory used in timetable planning' },
-          'classes': { title: 'Classes', subtitle: 'Manage classes and sections for timetable scheduling' },
-          'subjects': { title: 'Subjects', subtitle: 'Manage subjects taught in the classes.' },
-          'departments': { title: 'Departments', subtitle: 'Map staff with subjects and assign subject workload by class-section' },
-          'bell-timings': { title: 'Bell Timings', subtitle: 'Configure school bell timings, period durations, and break schedules' },
-          'class-wise': { title: 'Class Wise Timetable', subtitle: 'View and manage timetables organized by class and section' },
-          'teacher-wise': { title: 'Teacher Wise Timetable', subtitle: 'View and manage timetables organized by teacher' },
-          'substitution': { title: 'Substitution', subtitle: 'Manage same-day teacher substitutions and temporary adjustments' },
-          'versions': { title: 'Versions', subtitle: 'Review draft, published, and archived timetable versions' },
-          'formats': { title: 'Formats', subtitle: 'Download saved timetable versions in the selected file format' },
-          'period-distribution': { title: 'Period Distribution', subtitle: 'Distribute periods among subjects for each class' },
-          'distribution': { title: 'Period Distribution', subtitle: 'Distribute periods among subjects for each class' },
-          'period-allocation': { title: 'Period Distribution', subtitle: 'Distribute periods among subjects for each class' },
+          'teachers': { title: 'Teachers', subtitle: 'Teachers available for timetable planning.' },
+          'classes': { title: 'Classes', subtitle: 'Classes and sections to schedule.' },
+          'subjects': { title: 'Subjects', subtitle: 'Subjects taught in each class.' },
+          'departments': { title: 'Departments', subtitle: 'Who teaches which subject, and their load by class and section.' },
+          'bell-timings': { title: 'Bell timings', subtitle: 'Periods, breaks and the school day schedule.' },
+          'class-wise': { title: 'Class timetables', subtitle: 'The week for each class and section.' },
+          'teacher-wise': { title: 'Teacher timetables', subtitle: 'The week for each teacher.' },
+          'substitution': { title: 'Substitution', subtitle: 'Cover today\'s periods for absent teachers.' },
+          'versions': { title: 'Versions', subtitle: 'Draft, published and archived timetables.' },
+          'formats': { title: 'Formats', subtitle: 'Download a saved timetable in the format you need.' },
+          'generate': { title: 'Generate', subtitle: 'Build a timetable from your classes, teachers and periods.' },
+          'period-distribution': distribution,
+          'distribution': distribution,
+          'period-allocation': distribution,
         }
-        const info = titleMap[subPage] || { title: 'Time Table', subtitle: 'School timetable management' }
+        const info = titleMap[subPage] || { title: 'Timetable', subtitle: 'School timetable for this session.' }
         return {
           pageTitle: info.title,
           pageSubtitle: info.subtitle,
@@ -552,13 +556,10 @@ const Header: React.FC<HeaderProps> = ({ isSidebarCollapsed, onToggleSidebar }) 
 
   const headerSearchValue = headerSearchConfig.enabled
     ? searchParams.get(headerSearchConfig.paramKey || '') || ''
-    : genericSearchValue
+    : ''
 
   const handleHeaderSearchChange = (value: string) => {
-    if (!headerSearchConfig.enabled || !headerSearchConfig.paramKey) {
-      setGenericSearchValue(value)
-      return
-    }
+    if (!headerSearchConfig.enabled || !headerSearchConfig.paramKey) return
 
     const nextParams = new URLSearchParams(searchParams)
     if (value.trim()) {
@@ -761,18 +762,37 @@ const Header: React.FC<HeaderProps> = ({ isSidebarCollapsed, onToggleSidebar }) 
                 </span>
               </div>
             )}
-            {/* Search */}
-            <div className="hidden md:block cb-shellhead__search">
-              <div className="cb-input cb-input--sm">
-                <Search size={16} strokeWidth={1.75} className="cb-icon cb-input__icon" aria-hidden />
-                <input
-                  type="search"
-                  value={headerSearchValue}
-                  onChange={(event) => handleHeaderSearchChange(event.target.value)}
-                  placeholder={headerSearchConfig.placeholder}
-                  aria-label={headerSearchConfig.placeholder || 'Search'}
-                />
+            {/* Search: a page-level filter on pages that have one, otherwise the ⌘K command palette */}
+            {headerSearchConfig.enabled ? (
+              <div className="hidden md:block cb-shellhead__search">
+                <div className="cb-input cb-input--sm">
+                  <Search size={16} strokeWidth={1.75} className="cb-icon cb-input__icon" aria-hidden />
+                  <input
+                    type="search"
+                    value={headerSearchValue}
+                    onChange={(event) => handleHeaderSearchChange(event.target.value)}
+                    placeholder={headerSearchConfig.placeholder}
+                    aria-label={headerSearchConfig.placeholder || 'Search'}
+                  />
+                </div>
               </div>
+            ) : (
+              <div className="hidden md:block cb-shellhead__search">
+                <button
+                  type="button"
+                  className="cb-input cb-input--sm cb-shellhead__searchbtn"
+                  onClick={openPalette}
+                  aria-label={`Search (${shortcutLabel})`}
+                  aria-keyshortcuts="Meta+K Control+K"
+                >
+                  <Search size={16} strokeWidth={1.75} className="cb-icon cb-input__icon" aria-hidden />
+                  <span className="cb-shellhead__searchtext">Search…</span>
+                  <kbd className="cb-shellhead__searchkbd">{shortcutLabel}</kbd>
+                </button>
+              </div>
+            )}
+            <div className="md:hidden">
+              <Button variant="tertiary" icon={Search} onClick={openPalette} aria-label="Search" title="Search" />
             </div>
 
             {/* Notifications */}

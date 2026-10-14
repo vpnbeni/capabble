@@ -1,6 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { FileSpreadsheet, FileText, History, Sparkles, Users } from 'lucide-react'
 import timetableService, { type TimetableVersionSummary } from '@/services/timetableService'
 import toast from 'react-hot-toast'
+import { Badge, Button, Card, DetailList, EmptyState, Page, Select, formatDate, type Tone } from '@/components/ui'
+import '@/components/timetable/generate.css'
 
 type FormatType = 'excel' | 'class-pdf' | 'teacher-pdf'
 
@@ -22,9 +26,24 @@ const FORMAT_OPTIONS: Array<{ value: FormatType; label: string; helper: string }
   },
 ]
 
+const FORMAT_ICON = {
+  excel: FileSpreadsheet,
+  'class-pdf': FileText,
+  'teacher-pdf': Users,
+} as const
+
+const VERSION_STATUS: Record<string, { label: string; tone: Tone }> = {
+  draft: { label: 'Draft', tone: 'neutral' },
+  published: { label: 'Published', tone: 'success' },
+  archived: { label: 'Archived', tone: 'warning' },
+}
+
+const STATUS_WORD: Record<string, string> = { draft: 'draft', published: 'published', archived: 'archived' }
+
 const toSafeName = (value: string) => value.replace(/[^a-zA-Z0-9-]/g, '_')
 
 const Formats: React.FC = () => {
+  const navigate = useNavigate()
   const [versions, setVersions] = useState<TimetableVersionSummary[]>([])
   const [loadingVersions, setLoadingVersions] = useState(true)
   const [selectedVersionId, setSelectedVersionId] = useState('')
@@ -81,80 +100,101 @@ const Formats: React.FC = () => {
     }
   }
 
+  const selectedFormatOption = FORMAT_OPTIONS.find((item) => item.value === selectedFormat)
+  const selectedStatus = selectedVersion ? VERSION_STATUS[selectedVersion.status] ?? VERSION_STATUS.draft : null
+
+  let body: React.ReactNode
+  if (loadingVersions) {
+    body = (
+      <div className="cb-table-state" role="status">
+        <span className="cb-spinner" aria-hidden="true" />
+        Loading versions…
+      </div>
+    )
+  } else if (versions.length === 0) {
+    body = (
+      <EmptyState
+        compact
+        icon={History}
+        title="No saved timetable versions"
+        body="Generate a timetable first, then come back here to download it."
+        action={
+          <Button icon={Sparkles} onClick={() => navigate('/time-table/generate')}>
+            Go to generate
+          </Button>
+        }
+      />
+    )
+  } else {
+    body = (
+      <>
+        <div className="cb-form-grid">
+          <Select
+            id="format-version"
+            label="Version"
+            value={selectedVersionId}
+            onChange={(event) => setSelectedVersionId(event.target.value)}
+            options={versions.map((version) => ({
+              value: version._id,
+              label: `${version.name} (${STATUS_WORD[version.status] ?? version.status})`,
+            }))}
+          />
+          <Select
+            id="format-type"
+            label="Format"
+            value={selectedFormat}
+            onChange={(event) => setSelectedFormat(event.target.value as FormatType)}
+            options={FORMAT_OPTIONS.map((item) => ({ value: item.value, label: item.label }))}
+            hint={selectedFormatOption?.helper}
+          />
+        </div>
+
+        {selectedVersion && selectedStatus ? (
+          <DetailList
+            className="tg-format-summary"
+            columns={3}
+            items={[
+              { label: 'Status', value: <Badge tone={selectedStatus.tone}>{selectedStatus.label}</Badge> },
+              { label: 'Generated', value: formatDate(selectedVersion.generatedAt) },
+              {
+                label: 'Conflicts',
+                value:
+                  selectedVersion.conflictCount > 0 ? (
+                    <Badge tone="warning">{selectedVersion.conflictCount} unresolved</Badge>
+                  ) : (
+                    <Badge tone="success">None</Badge>
+                  ),
+              },
+            ]}
+          />
+        ) : null}
+      </>
+    )
+  }
+
   return (
-    <div className="space-y-6">
-      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800">
-        <h2 className="text-base font-semibold text-slate-900 dark:text-white">
-          Timetable Formats
-        </h2>
-        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-          Choose a saved timetable version and format type, then download in one click.
-        </p>
-
-        <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
-          <div>
-            <label
-              htmlFor="format-version"
-              className="block text-sm font-medium text-slate-700 dark:text-slate-300"
+    <Page>
+      <Card
+        className="tg-formats"
+        title="Download timetable"
+        subtitle="Choose a saved version and a format, then download in one click."
+        footer={
+          versions.length > 0 ? (
+            <Button
+              variant="primary"
+              icon={FORMAT_ICON[selectedFormat]}
+              loading={downloading}
+              disabled={loadingVersions || !selectedVersion}
+              onClick={() => void handleDownload()}
             >
-              Version
-            </label>
-            <select
-              id="format-version"
-              value={selectedVersionId}
-              onChange={(event) => setSelectedVersionId(event.target.value)}
-              disabled={loadingVersions || versions.length === 0}
-              className="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:bg-slate-700 dark:text-white"
-            >
-              {versions.length === 0 ? (
-                <option value="">No versions found</option>
-              ) : (
-                versions.map((version) => (
-                  <option key={version._id} value={version._id}>
-                    {version.name} ({version.status})
-                  </option>
-                ))
-              )}
-            </select>
-          </div>
-
-          <div>
-            <label
-              htmlFor="format-type"
-              className="block text-sm font-medium text-slate-700 dark:text-slate-300"
-            >
-              Format Type
-            </label>
-            <select
-              id="format-type"
-              value={selectedFormat}
-              onChange={(event) => setSelectedFormat(event.target.value as FormatType)}
-              className="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-slate-600 dark:bg-slate-700 dark:text-white"
-            >
-              {FORMAT_OPTIONS.map((item) => (
-                <option key={item.value} value={item.value}>
-                  {item.label}
-                </option>
-              ))}
-            </select>
-            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-              {FORMAT_OPTIONS.find((item) => item.value === selectedFormat)?.helper}
-            </p>
-          </div>
-        </div>
-
-        <div className="mt-5">
-          <button
-            type="button"
-            onClick={handleDownload}
-            disabled={downloading || loadingVersions || !selectedVersion}
-            className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 dark:disabled:bg-slate-700 dark:disabled:text-slate-400"
-          >
-            {downloading ? 'Preparing download...' : 'Download Timetable'}
-          </button>
-        </div>
-      </section>
-    </div>
+              {downloading ? 'Preparing download…' : 'Download timetable'}
+            </Button>
+          ) : null
+        }
+      >
+        {body}
+      </Card>
+    </Page>
   )
 }
 

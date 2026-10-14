@@ -1,0 +1,103 @@
+/* Timetable › Class-wise: one class's week as a period grid. Tokens only; everything sits inside .cb-app. */
+
+/* ---------- Toolbar ---------- */
+.cb-app .tcw-toolbar { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-4) var(--space-5); }
+@media (max-width: 640px) { .cb-app .tcw-toolbar { padding: var(--space-3) var(--space-4); } }
+
+/* ---------- Class header: name, summary, mode and actions ---------- */
+.cb-app .tcw-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3) var(--space-4); flex-wrap: wrap; padding: var(--space-4) var(--space-5); border-top: 1px solid var(--border); }
+.cb-app .tcw-head__titles { flex: 1 1 280px; min-width: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.cb-app .tcw-head__title { margin: 0; font: 600 16px/22px var(--font-sans); color: var(--ink); }
+.cb-app .tcw-head__hint { margin: 0; font-size: 13px; line-height: 18px; color: var(--ink-muted); }
+.cb-app .tcw-head__summary { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+.cb-app .tcw-head__summary .cb-badge { font-variant-numeric: tabular-nums; }
+.cb-app .tcw-head__actions { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-3); flex-wrap: wrap; }
+.cb-app .tcw-head__actions .cb-switch { flex: none; }
+@media (max-width: 640px) {
+  .cb-app .tcw-head { padding: var(--space-3) var(--space-4); }
+  .cb-app .tcw-head__actions { width: 100%; justify-content: flex-start; }
+}
+
+/* ---------- Notices ---------- */
+.cb-app .tcw-notices { display: flex; flex-direction: column; gap: var(--space-2); padding: 0 var(--space-5) var(--space-4); }
+@media (max-width: 640px) { .cb-app .tcw-notices { padding: 0 var(--space-4) var(--space-3); } }
+
+/* ---------- Period bulk editor (inline panel above the grid) ---------- */
+.cb-app .tcw-period { margin: 0 var(--space-5) var(--space-4); padding: var(--space-4); border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface-sunken); display: flex; flex-direction: column; gap: var(--space-4); }
+.cb-app .tcw-period__head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-2); flex-wrap: wrap; }
+.cb-app .tcw-period__title { margin: 0; font: 600 14px/20px var(--font-sans); color: var(--ink); }
+.cb-app .tcw-period__time { margin: 0; font-size: 12px; line-height: 16px; color: var(--ink-muted); font-variant-numeric: tabular-nums; }
+.cb-app .tcw-period__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4) var(--space-6); }
+.cb-app .tcw-period__col { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
+.cb-app .tcw-period__days { margin: 0; padding: 0; border: 0; min-width: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.cb-app .tcw-period__days > legend { padding: 0; margin-bottom: var(--space-2); }
+.cb-app .tcw-weekdays { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-2) var(--space-4); }
+.cb-app .tcw-period__hint { margin: 0; font-size: 12px; line-height: 16px; color: var(--ink-muted); }
+.cb-app .tcw-period__actions { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-2); flex-wrap: wrap; }
+.cb-app .tcw-period__spacer { flex: 1; }
+@media (max-width: 760px) {
+  .cb-app .tcw-period__grid { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 640px) {
+  .cb-app .tcw-period { margin: 0 var(--space-4) var(--space-3); padding: var(--space-3); }
+  .cb-app .tcw-weekdays { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* ---------- Week grid ---------- */
+.cb-app .tcw-grid-scroll { overflow-x: auto; border-top: 1px solid var(--border); overscroll-behavior-x: contain; }
+.cb-app .tcw-grid { --tcw-day-col: 72px; --tcw-period-col: 116px; width: 100%; min-width: calc(var(--tcw-day-col) + var(--tcw-periods, 8) * var(--tcw-period-col)); table-layout: fixed; border-collapse: separate; border-spacing: 0; font-size: 13px; line-height: 18px; color: var(--ink); }
+.cb-app .tcw-grid th, .cb-app .tcw-grid td { background: var(--surface); border-bottom: 1px solid var(--border); border-right: 1px solid var(--border); }
+.cb-app .tcw-grid tr > :last-child { border-right: 0; }
+.cb-app .tcw-grid tbody tr:last-child > * { border-bottom: 0; }
+.cb-app .tcw-grid thead th { background: var(--surface-sunken); padding: var(--space-1); vertical-align: middle; font: 500 12px/16px var(--font-sans); color: var(--ink-subtle); }
+
+/* Sticky day column so the weekday stays in view while periods scroll sideways. */
+.cb-app .tcw-grid__day { position: sticky; left: 0; z-index: 1; width: var(--tcw-day-col); text-align: left; padding: 0 var(--space-3) 0 var(--space-5) !important; white-space: nowrap; }
+.cb-app .tcw-grid thead .tcw-grid__day { z-index: 2; }
+.cb-app .tcw-grid tbody .tcw-grid__day { background: var(--surface-sunken); font: 600 13px/18px var(--font-sans); color: var(--ink); }
+@media (max-width: 640px) {
+  .cb-app .tcw-grid { --tcw-day-col: 60px; --tcw-period-col: 104px; }
+  .cb-app .tcw-grid__day { padding-left: var(--space-4) !important; }
+}
+
+/* Period header: opens the bulk editor for that period. */
+.cb-app .tcw-period-btn { display: flex; flex-direction: column; align-items: center; gap: 1px; width: 100%; padding: 6px var(--space-2); border: 0; border-radius: var(--radius-sm); background: none; color: inherit; font: inherit; cursor: pointer; }
+.cb-app .tcw-period-btn:hover { background: var(--surface-hover); }
+.cb-app .tcw-period-btn:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+.cb-app .tcw-period-btn__name { font: 600 12px/16px var(--font-sans); color: var(--ink); }
+.cb-app .tcw-period-btn__time { font: 500 11px/14px var(--font-sans); color: var(--ink-subtle); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cb-app .tcw-period-btn.is-active { background: var(--accent-soft); box-shadow: inset 0 -2px 0 var(--accent); }
+.cb-app .tcw-period-btn.is-active .tcw-period-btn__name, .cb-app .tcw-period-btn.is-active .tcw-period-btn__time { color: var(--accent-soft-ink); }
+
+/* Cells. */
+.cb-app .tcw-grid td.tcw-grid__cell { padding: 3px; vertical-align: middle; }
+.cb-app .tcw-cell { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; width: 100%; min-height: 56px; padding: var(--space-1) var(--space-2); border: 1px dashed transparent; border-radius: var(--radius-sm); background: transparent; color: var(--ink); font: inherit; text-align: center; cursor: pointer; transition: background-color .1s, border-color .1s; }
+.cb-app .tcw-cell:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+.cb-app .tcw-cell--empty { color: var(--ink-disabled); }
+.cb-app .tcw-cell--empty:hover { background: var(--surface-hover); border-color: var(--border-strong); color: var(--accent-strong); }
+.cb-app .tcw-cell--filled { border-style: solid; border-color: transparent; box-shadow: inset 3px 0 0 var(--tile); }
+.cb-app .tcw-cell--filled:hover { background: color-mix(in srgb, var(--tile) 26%, var(--surface)); }
+.cb-app .tcw-cell.is-editing { border-color: var(--accent); border-style: solid; }
+.cb-app .tcw-cell__subject { max-width: 100%; font: 600 12px/16px var(--font-sans); color: var(--ink); overflow-wrap: anywhere; }
+.cb-app .tcw-cell__teacher { max-width: 100%; font: 400 11px/14px var(--font-sans); color: var(--ink-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Subject identity tints (same recipe as the staff and student overviews). */
+.cb-app .tcw-tint--c1 { --tile: var(--chart-1); background: color-mix(in srgb, var(--chart-1) 14%, var(--surface)); }
+.cb-app .tcw-tint--c2 { --tile: var(--chart-2); background: color-mix(in srgb, var(--chart-2) 16%, var(--surface)); }
+.cb-app .tcw-tint--c3 { --tile: var(--chart-3); background: color-mix(in srgb, var(--chart-3) 18%, var(--surface)); }
+.cb-app .tcw-tint--c4 { --tile: var(--chart-4); background: color-mix(in srgb, var(--chart-4) 14%, var(--surface)); }
+.cb-app .tcw-tint--c5 { --tile: var(--chart-5); background: color-mix(in srgb, var(--chart-5) 14%, var(--surface)); }
+.cb-app .tcw-tint--c6 { --tile: var(--chart-6); background: color-mix(in srgb, var(--chart-6) 14%, var(--surface)); }
+
+/* ---------- Subject legend ---------- */
+.cb-app .tcw-legend { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; padding: var(--space-3) var(--space-5) var(--space-4); border-top: 1px solid var(--border); }
+.cb-app .tcw-legend__title { margin-right: var(--space-2); font: 500 12px/16px var(--font-sans); color: var(--ink-subtle); }
+.cb-app .tcw-legend__item { display: inline-flex; align-items: center; gap: 6px; padding: 2px var(--space-2); border-radius: var(--radius-full); font: 500 12px/16px var(--font-sans); color: var(--ink); }
+.cb-app .tcw-legend__swatch { width: 8px; height: 8px; border-radius: var(--radius-full); background: var(--tile); flex: none; }
+.cb-app .tcw-legend__count { font-weight: 600; color: var(--ink-muted); font-variant-numeric: tabular-nums; }
+@media (max-width: 640px) { .cb-app .tcw-legend { padding: var(--space-3) var(--space-4); } }
+
+/* ---------- Cell editor dialog ---------- */
+.cb-app .tcw-editor { display: flex; flex-direction: column; gap: var(--space-4); }
+.cb-app .tcw-editor-foot { display: flex; align-items: center; gap: var(--space-2); width: 100%; flex-wrap: wrap; }
+.cb-app .tcw-editor-foot__spacer { flex: 1; }

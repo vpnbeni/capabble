@@ -1,10 +1,16 @@
 import React, { useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { ArrowRight, BookOpen, LayoutGrid, Layers, Link2, Search, Users } from 'lucide-react'
 import {
   useTimetable,
   type TimetableClass,
   type TimetableTeacher,
   type TeacherSubjectAllocation,
 } from '@/contexts/TimetableContext'
+import { Avatar, Badge, Button, Card, Checkbox, EmptyState, FilterBar, Page, StatCard, cx } from '@/components/ui'
+import '@/components/timetable/distribution.css'
+
+const plural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`
 
 const normalize = (value: string) => value.trim().toLowerCase()
 
@@ -69,6 +75,7 @@ const removeSubjectFromTeacherAllocations = (
 
 const Departments: React.FC = () => {
   const {
+    isHydrated,
     classes,
     subjects,
     teachers,
@@ -318,181 +325,251 @@ const Departments: React.FC = () => {
     })
   }, [subjectNames, matrixTeachers, classesBySubject])
 
-  return (
-    <div className="p-4 md:p-6 max-w-[1700px] mx-auto space-y-5">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <div className="rounded-xl border border-secondary-200 bg-white px-4 py-3">
-          <div className="text-xs text-secondary-500">Teachers</div>
-          <div className="text-xl font-semibold text-secondary-900">{matrixTeachers.length}</div>
-        </div>
-        <div className="rounded-xl border border-secondary-200 bg-white px-4 py-3">
-          <div className="text-xs text-secondary-500">Subject Links</div>
-          <div className="text-xl font-semibold text-secondary-900">{matrixLinkCount}</div>
-        </div>
-        <div className="rounded-xl border border-secondary-200 bg-white px-4 py-3">
-          <div className="text-xs text-secondary-500">Departments</div>
-          <div className="text-xl font-semibold text-secondary-900">
-            {departmentCards.filter((card) => card.members.length > 0).length}
+  const navigate = useNavigate()
+  const activeDepartments = departmentCards.filter((card) => card.members.length > 0).length
+  const subjectsWithoutTeachers = departmentCards.length - activeDepartments
+
+  if (!isHydrated) {
+    return (
+      <Page width="full">
+        <Card flush>
+          <div className="cb-table-state" role="status">
+            <span className="cb-spinner" aria-hidden="true" />
+            Loading departments …
           </div>
+        </Card>
+      </Page>
+    )
+  }
+
+  return (
+    <Page width="full">
+      <div className="cb-stack">
+        <div className="cb-stats">
+          <StatCard label="Teachers" value={matrixTeachers.length} icon={Users} />
+          <StatCard label="Subject links" value={matrixLinkCount} hint="Teacher and subject pairs" icon={Link2} />
+          <StatCard
+            label="Departments"
+            value={activeDepartments}
+            hint={`of ${plural(subjectNames.length, 'subject', 'subjects')}`}
+            icon={Layers}
+          />
+          <StatCard
+            label="Subjects without teachers"
+            value={subjectsWithoutTeachers}
+            hint={subjectsWithoutTeachers > 0 ? 'Tick teachers in the matrix' : 'Every subject has a teacher'}
+            icon={BookOpen}
+          />
+        </div>
+
+        <Card
+          flush
+          className="tpd-card"
+          title="Teacher subject matrix"
+          subtitle="Teachers in rows, timetable subjects in columns. Tick the subjects each teacher can teach to build departments."
+        >
+          {subjectNames.length > 0 && matrixTeachers.length > 0 ? (
+            <div className="tpd-toolbar">
+              <FilterBar
+                search={{
+                  placeholder: 'Search teachers',
+                  value: searchText,
+                  onChange: setSearchText,
+                  label: 'Search teachers by name or short name',
+                }}
+              />
+            </div>
+          ) : null}
+
+          {subjectNames.length === 0 ? (
+            <EmptyState
+              compact
+              icon={BookOpen}
+              title="There are no timetable subjects yet"
+              body="Add subjects first, then tick which teachers teach them."
+              action={
+                <Button icon={ArrowRight} onClick={() => navigate('/time-table/subjects')}>
+                  Go to subjects
+                </Button>
+              }
+            />
+          ) : matrixTeachers.length === 0 ? (
+            <EmptyState
+              compact
+              icon={Users}
+              title="There are no timetable teachers yet"
+              body="Add teachers first, then tick the subjects each one teaches."
+              action={
+                <Button icon={ArrowRight} onClick={() => navigate('/time-table/teachers')}>
+                  Go to teachers
+                </Button>
+              }
+            />
+          ) : searchableTeachers.length === 0 ? (
+            <EmptyState
+              compact
+              icon={Search}
+              title={`No teachers match “${searchText.trim()}”`}
+              body="Check the spelling or search by short name."
+              action={
+                <Button variant="tertiary" onClick={() => setSearchText('')}>
+                  Clear search
+                </Button>
+              }
+            />
+          ) : (
+            <div className="tpd-scroll tpd-scroll--tall">
+              <table className="tpd-grid">
+                <caption className="cb-visually-hidden">Teacher subject matrix</caption>
+                <thead>
+                  <tr>
+                    <th scope="col" className="tpd-sticky">Teacher</th>
+                    {subjectNames.map((subjectName, index) => (
+                      <th
+                        key={subjectName}
+                        scope="col"
+                        className={index === subjectNames.length - 1 ? 'tpd-end' : undefined}
+                      >
+                        {subjectName}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {searchableTeachers.map((teacher) => (
+                    <tr key={teacher.id}>
+                      <th scope="row" className="tpd-sticky">
+                        <span className="tpd-rowlabel">
+                          <Avatar name={toTitleCase(teacher.name)} size="sm" />
+                          <span className="tpd-rowlabel__text">
+                            <span className="tpd-rowlabel__name">{toTitleCase(teacher.name)}</span>
+                            <span className="tpd-rowlabel__meta">{teacher.shortName || 'Functionary'}</span>
+                          </span>
+                        </span>
+                      </th>
+                      {subjectNames.map((subjectName, index) => {
+                        const checked = teacher.subjects.some(
+                          (subject) => normalize(subject) === normalize(subjectName)
+                        )
+                        return (
+                          <td
+                            key={`${teacher.id}-${subjectName}`}
+                            className={cx('tpd-cell', index === subjectNames.length - 1 && 'tpd-end')}
+                          >
+                            <Checkbox
+                              checked={checked}
+                              onChange={() => handleToggleMatrix(teacher.id, subjectName)}
+                              aria-label={`${toTitleCase(teacher.name)} teaches ${subjectName}`}
+                            />
+                          </td>
+                        )
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Card>
+
+        <div className="tpd-dept-list">
+          {departmentCards.map((card) => (
+            <Card
+              key={card.subjectName}
+              flush
+              className="tpd-card"
+              title={`${card.subjectName} department`}
+              subtitle={`${plural(card.members.length, 'teacher', 'teachers')} · ${plural(card.classRows.length, 'class-section', 'class-sections')}`}
+              action={
+                card.members.length === 0 ? (
+                  <Badge tone="warning">No teachers</Badge>
+                ) : card.classRows.length === 0 ? (
+                  <Badge tone="neutral">Not taught in any class</Badge>
+                ) : null
+              }
+            >
+              {card.members.length === 0 ? (
+                <EmptyState
+                  compact
+                  icon={Users}
+                  title={`No teacher is linked to ${card.subjectName}`}
+                  body="Tick this subject for one or more teachers in the matrix above."
+                />
+              ) : card.classRows.length === 0 ? (
+                <EmptyState
+                  compact
+                  icon={LayoutGrid}
+                  title={`No class-section teaches ${card.subjectName}`}
+                  body="Add this subject to a class on the Classes page to assign teachers to it."
+                />
+              ) : (
+                <div className="tpd-scroll">
+                  <table className="tpd-grid">
+                    <caption className="cb-visually-hidden">
+                      {card.subjectName} teachers by class-section
+                    </caption>
+                    <thead>
+                      <tr>
+                        <th scope="col" className="tpd-sticky">Teacher</th>
+                        {card.classRows.map((row) => (
+                          <th key={row.id} scope="col">
+                            <span className="tpd-colhead">
+                              <span className="tpd-colhead__name">
+                                {row.className}-{row.section}
+                              </span>
+                              <span className="tpd-colhead__meta is-num">
+                                {plural(getClassPeriodCount(row.id, card.subjectName), 'period', 'periods')}
+                              </span>
+                            </span>
+                          </th>
+                        ))}
+                        <th scope="col" className="tpd-end">Workload</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {card.members.map((teacher) => {
+                        const assignedClassIds = getTeacherSubjectAssignments(teacher.id, card.subjectName)
+                        const workload = getTeacherWorkload(teacher.id, card.subjectName)
+
+                        return (
+                          <tr key={`${card.subjectName}-${teacher.id}`}>
+                            <th scope="row" className="tpd-sticky">
+                              <span className="tpd-rowlabel">
+                                <Avatar name={toTitleCase(teacher.name)} size="sm" />
+                                <span className="tpd-rowlabel__text">
+                                  <span className="tpd-rowlabel__name">{toTitleCase(teacher.name)}</span>
+                                  <span className="tpd-rowlabel__meta">
+                                    {plural(assignedClassIds.size, 'class', 'classes')} assigned
+                                  </span>
+                                </span>
+                              </span>
+                            </th>
+                            {card.classRows.map((classRow) => (
+                              <td key={`${teacher.id}-${classRow.id}`} className="tpd-cell">
+                                <Checkbox
+                                  checked={assignedClassIds.has(classRow.id)}
+                                  onChange={() => handleToggleDepartmentClass(teacher, card.subjectName, classRow)}
+                                  aria-label={`${toTitleCase(teacher.name)} teaches ${card.subjectName} to ${classRow.className}-${classRow.section}`}
+                                />
+                              </td>
+                            ))}
+                            <td className="tpd-end">
+                              <span className="tpd-workload is-num">
+                                {workload} <span>{workload === 1 ? 'period' : 'periods'}</span>
+                              </span>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </Card>
+          ))}
         </div>
       </div>
-
-      <section className="rounded-2xl border border-secondary-200 bg-white overflow-hidden">
-        <div className="px-5 py-4 border-b border-secondary-200 bg-secondary-50 flex items-start justify-between gap-4 flex-wrap">
-          <div>
-            <h3 className="text-base font-semibold text-secondary-900">Teacher Subject Matrix</h3>
-            <p className="text-xs text-secondary-500 mt-1">
-              Staff teachers in rows and timetable subjects in columns. Select subjects to build departments.
-            </p>
-          </div>
-
-          <div className="flex items-center justify-end pt-1">
-            <input
-              value={searchText}
-              onChange={(e) => setSearchText(e.target.value)}
-              placeholder="Search teacher..."
-              className="w-full md:w-[320px] px-3 py-2 rounded-lg border border-secondary-300 text-sm bg-white"
-            />
-          </div>
-        </div>
-
-        {subjectNames.length === 0 ? (
-          <div className="px-5 py-8 text-sm text-secondary-500">
-            Add timetable subjects first in Time Table &gt; Subjects.
-          </div>
-        ) : matrixTeachers.length === 0 ? (
-          <div className="px-5 py-8 text-sm text-secondary-500">
-            Add timetable teachers first in Time Table &gt; Teachers.
-          </div>
-        ) : searchableTeachers.length === 0 ? (
-          <div className="px-5 py-8 text-sm text-secondary-500">No matching teachers found.</div>
-        ) : (
-          <div className="max-h-[430px] overflow-auto">
-            <table className="min-w-[920px] w-full text-sm">
-              <thead className="bg-secondary-50 text-secondary-700 dark:bg-secondary-900 dark:text-secondary-100">
-                <tr>
-                  <th className="px-3 py-2 text-left font-semibold border-b border-secondary-200 sticky top-0 left-0 bg-secondary-50 dark:bg-secondary-900 z-30">
-                    Teacher
-                  </th>
-                  {subjectNames.map((subjectName) => (
-                    <th
-                      key={subjectName}
-                      className="px-3 py-2 text-center font-semibold border-b border-secondary-200 sticky top-0 bg-secondary-50 z-20"
-                    >
-                      {subjectName}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {searchableTeachers.map((teacher) => (
-                  <tr key={teacher.id} className="odd:bg-white even:bg-secondary-50/40 dark:odd:bg-secondary-900 dark:even:bg-secondary-800/60">
-                    <td className="px-3 py-2 border-b border-secondary-100 sticky left-0 z-20 bg-white dark:bg-secondary-900">
-                      <div className="font-medium text-secondary-900">{toTitleCase(teacher.name)}</div>
-                      <div className="text-xs text-secondary-500">{teacher.shortName || 'Functionary'}</div>
-                    </td>
-                    {subjectNames.map((subjectName) => {
-                      const checked = teacher.subjects.some(
-                        (subject) => normalize(subject) === normalize(subjectName)
-                      )
-                      return (
-                        <td key={`${teacher.id}-${subjectName}`} className="px-3 py-2 border-b border-secondary-100 text-center">
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            onChange={() => handleToggleMatrix(teacher.id, subjectName)}
-                            className="h-4 w-4 accent-primary-600"
-                            aria-label={`Toggle ${toTitleCase(teacher.name)} for ${subjectName}`}
-                          />
-                        </td>
-                      )
-                    })}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
-
-      <section className="space-y-4">
-        {departmentCards.map((card) => (
-          <div key={card.subjectName} className="rounded-2xl border border-secondary-200 bg-white overflow-hidden">
-            <div className="px-5 py-4 border-b border-secondary-200 bg-primary-50/40 flex items-center justify-between gap-3 flex-wrap">
-              <div>
-                <h3 className="text-base font-semibold text-secondary-900">
-                  Department - {card.subjectName}
-                </h3>
-                <p className="text-xs text-secondary-500 mt-1">
-                  {card.members.length} teacher{card.members.length === 1 ? '' : 's'} | {card.classRows.length} class-section
-                  {card.classRows.length === 1 ? '' : 's'}
-                </p>
-              </div>
-            </div>
-
-            {card.members.length === 0 ? (
-              <div className="px-5 py-6 text-sm text-secondary-500">
-                No teachers selected for this subject in the matrix above.
-              </div>
-            ) : card.classRows.length === 0 ? (
-              <div className="px-5 py-6 text-sm text-secondary-500">
-                No class-section currently teaches this subject.
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-[980px] w-full text-sm">
-                  <thead className="bg-secondary-50 text-secondary-700 dark:bg-secondary-900 dark:text-secondary-100">
-                    <tr>
-                      <th className="px-3 py-2 text-left font-semibold border-b border-secondary-200 sticky left-0 bg-secondary-50 dark:bg-secondary-900 z-20">
-                        Teacher
-                      </th>
-                      {card.classRows.map((row) => (
-                        <th key={row.id} className="px-3 py-2 text-center font-semibold border-b border-secondary-200">
-                          <div>{row.className}-{row.section}</div>
-                          <div className="text-[10px] font-normal text-secondary-500">
-                            {getClassPeriodCount(row.id, card.subjectName)} periods
-                          </div>
-                        </th>
-                      ))}
-                      <th className="px-3 py-2 text-center font-semibold border-b border-secondary-200">Workload</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {card.members.map((teacher) => {
-                      const assignedClassIds = getTeacherSubjectAssignments(teacher.id, card.subjectName)
-                      const workload = getTeacherWorkload(teacher.id, card.subjectName)
-
-                      return (
-                        <tr key={`${card.subjectName}-${teacher.id}`} className="odd:bg-white even:bg-secondary-50/30 dark:odd:bg-secondary-900 dark:even:bg-secondary-800/60">
-                          <td className="px-3 py-2 border-b border-secondary-100 sticky left-0 z-10 bg-white dark:bg-secondary-900">
-                            <div className="font-medium text-secondary-900">{toTitleCase(teacher.name)}</div>
-                            <div className="text-xs text-secondary-500">{assignedClassIds.size} classes assigned</div>
-                          </td>
-                          {card.classRows.map((classRow) => (
-                            <td key={`${teacher.id}-${classRow.id}`} className="px-3 py-2 border-b border-secondary-100 text-center">
-                              <input
-                                type="checkbox"
-                                checked={assignedClassIds.has(classRow.id)}
-                                onChange={() => handleToggleDepartmentClass(teacher, card.subjectName, classRow)}
-                                className="h-4 w-4 accent-emerald-600"
-                                aria-label={`Toggle ${toTitleCase(teacher.name)} for ${card.subjectName} - ${classRow.className}-${classRow.section}`}
-                              />
-                            </td>
-                          ))}
-                          <td className="px-3 py-2 border-b border-secondary-100 text-center font-semibold text-emerald-700">
-                            {workload}
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        ))}
-      </section>
-    </div>
+    </Page>
   )
 }
 

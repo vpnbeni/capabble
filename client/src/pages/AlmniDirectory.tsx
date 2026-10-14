@@ -3,6 +3,7 @@ import toast from 'react-hot-toast'
 import { CalendarRange, GraduationCap, Layers, Search, SearchX, Users } from 'lucide-react'
 import { sectionLabel } from '@/components/students/studentFormat'
 import almniService, { type AlumniProfile } from '@/services/almniService'
+import { useUrlSearchQuery } from '@/hooks/useUrlSearchQuery'
 import {
   Avatar,
   Badge,
@@ -41,7 +42,16 @@ const AlmniDirectory: React.FC = () => {
   const [sections, setSections] = useState<string[]>([])
   const [total, setTotal] = useState(0)
   const [currentSession, setCurrentSession] = useState('')
-  const [searchQuery, setSearchQuery] = useState('')
+  // A search term in the URL (e.g. from the ⌘K palette) filters the directory.
+  const initialSearch = useUrlSearchQuery((value) => {
+    setSearchQuery(value)
+    void loadAlumni({
+      search: value.trim() || undefined,
+      batchSession: selectedBatch || undefined,
+      section: selectedSection || undefined,
+    })
+  })
+  const [searchQuery, setSearchQuery] = useState(initialSearch)
   const [selectedBatch, setSelectedBatch] = useState('')
   const [selectedSection, setSelectedSection] = useState('')
   const [loading, setLoading] = useState(false)

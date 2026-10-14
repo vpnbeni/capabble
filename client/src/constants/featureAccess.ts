@@ -84,3 +84,23 @@ export const getFirstEnabledPathForModule = (module: string, toggles: TenantFeat
   const firstEnabled = moduleEntries.find((entry) => isFeatureEnabledForPath(entry.path, toggles))
   return firstEnabled?.path ?? null
 }
+
+const CORE_ALLOWED_PREFIXES = [
+  '/',
+  '/dashboard',
+  '/candidate-details',
+  '/candidates',
+  '/subjects',
+  '/datesheets',
+  '/billing',
+]
+
+// Pages still reachable when billing restricts the tenant to core features (accessMode 'core_only').
+export const isCoreAllowedPath = (pathname: string): boolean => {
+  return CORE_ALLOWED_PREFIXES.some((prefix) => {
+    if (prefix === '/') {
+      return pathname === '/'
+    }
+    return pathname === prefix || pathname.startsWith(`${prefix}/`)
+  })
+}

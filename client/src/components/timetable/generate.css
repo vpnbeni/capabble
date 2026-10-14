@@ -1,0 +1,46 @@
+/* Timetable › Generate and Timetable › Formats — page layout on top of the Capabble design system. Tokens only. */
+
+/* ---------- Card header actions ---------- */
+.cb-app .tg-actions { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-2); flex-wrap: wrap; }
+@media (max-width: 640px) {
+  .cb-app .tg-check-card > .cb-card__head,
+  .cb-app .tg-result-card > .cb-card__head { flex-wrap: wrap; }
+  .cb-app .tg-check-card > .cb-card__head > .cb-card__action,
+  .cb-app .tg-result-card > .cb-card__head > .cb-card__action { flex: 1 1 100%; }
+  .cb-app .tg-check-card .tg-actions,
+  .cb-app .tg-result-card .tg-actions { justify-content: flex-start; }
+}
+
+/* ---------- Configuration check: issue list ---------- */
+.cb-app .tg-issue-summary { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; margin-bottom: var(--space-3); }
+.cb-app .tg-issues { list-style: none; margin: 0; padding: 0; max-height: 264px; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius-md); }
+.cb-app .tg-issue { display: flex; align-items: flex-start; gap: var(--space-3); padding: var(--space-2) var(--space-3); font-size: 13px; line-height: 18px; color: var(--ink); }
+.cb-app .tg-issue + .tg-issue { border-top: 1px solid var(--border); }
+.cb-app .tg-issue .cb-badge { flex: none; }
+.cb-app .tg-issue__text { min-width: 0; overflow-wrap: anywhere; padding-top: 1px; }
+
+/* ---------- Generate card ---------- */
+.cb-app .tg-generate { display: flex; flex-direction: column; gap: var(--space-4); }
+.cb-app .tg-generate__note { font-size: 13px; line-height: 18px; color: var(--ink-muted); }
+
+/* ---------- Result metrics ---------- */
+.cb-app .tg-metrics { display: grid; gap: var(--space-3); grid-template-columns: repeat(4, minmax(0, 1fr)); margin-bottom: var(--space-4); }
+@media (max-width: 760px) { .cb-app .tg-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.cb-app .tg-metric { display: flex; flex-direction: column; gap: var(--space-1); padding: var(--space-3) var(--space-4); border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface-sunken); min-width: 0; }
+.cb-app .tg-metric__label { font: 500 12px/16px var(--font-sans); color: var(--ink-muted); }
+.cb-app .tg-metric__value { font: 600 20px/28px var(--font-sans); color: var(--ink); font-variant-numeric: tabular-nums; }
+.cb-app .tg-metric .cb-badge { align-self: flex-start; }
+
+.cb-app .tg-result-body { display: flex; flex-direction: column; gap: var(--space-4); }
+.cb-app .tg-conflicts { border: 1px solid var(--border); border-radius: var(--radius-md); overflow: hidden; }
+.cb-app .tg-conflicts__head { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; font: 600 13px/18px var(--font-sans); color: var(--ink); }
+
+/* ---------- Saved versions table ---------- */
+.cb-app .tg-fill { width: 128px; max-width: 100%; gap: var(--space-1); }
+.cb-app .tg-fill .cb-progress__head { font-size: 12px; line-height: 16px; color: var(--ink-muted); }
+.cb-app .tg-row-actions { display: inline-flex; align-items: center; gap: var(--space-1); }
+.cb-app .tg-version-name { font-weight: 500; color: var(--ink); }
+
+/* ---------- Formats ---------- */
+.cb-app .tg-formats { max-width: 720px; }
+.cb-app .tg-format-summary { margin-top: var(--space-4); }

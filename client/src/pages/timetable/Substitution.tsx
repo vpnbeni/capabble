@@ -1,5 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react'
+import { Users } from 'lucide-react'
 import { useTimetable, type TimetableTeacher, type TimetableSubject } from '@/contexts/TimetableContext'
+import { Badge, Card, Checkbox, EmptyState, Page } from '@/components/ui'
+import '@/components/timetable/teacherwise.css'
 
 const Substitution: React.FC = () => {
   const normalize = (value: string) => value.trim().toLowerCase()
@@ -84,85 +87,75 @@ const Substitution: React.FC = () => {
     })
   }
 
+  const markedCount = useMemo(
+    () => Object.values(periodByTeacherId).reduce((sum, row) => sum + row.filter(Boolean).length, 0),
+    [periodByTeacherId]
+  )
+
   return (
-      <section className="rounded-3xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-        <div className="px-6 py-5 border-b border-slate-200 bg-sky-50/40">
-          <h2 className="text-base font-semibold text-slate-900">Substitution Schedule</h2>
-          <p className="mt-1 text-xs text-slate-600">
-            Enter a substitute teacher name per row and mark the periods (I to VIII) they will handle.
-          </p>
-        </div>
-
-        <div className="p-6 overflow-x-auto">
-          <table className="min-w-[920px] w-full text-sm">
-            <thead className="bg-secondary-50 text-secondary-700 dark:bg-secondary-900 dark:text-secondary-100">
-              <tr>
-                <th className="px-3 py-2 text-left font-semibold border-b border-secondary-200 sticky top-0 left-0 bg-secondary-50 z-30">
-                  Sr No
-                </th>
-                <th className="px-3 py-2 text-left font-semibold border-b border-secondary-200 sticky top-0 left-[92px] bg-secondary-50 z-20">
-                  Teacher Name
-                </th>
-                {PERIODS.map((p) => (
-                  <th
-                    key={p}
-                    className="px-3 py-2 text-center font-semibold border-b border-secondary-200"
-                  >
-                    {p}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-
-            <tbody>
-              {matrixTeachers.length === 0 ? (
+    <Page width="full">
+      <Card
+        flush
+        title="Substitution schedule"
+        subtitle="Mark the periods (I to VIII) each teacher will cover as a substitute today."
+        action={
+          markedCount > 0 ? (
+            <Badge tone="accent">
+              {markedCount} {markedCount === 1 ? 'period' : 'periods'} marked
+            </Badge>
+          ) : null
+        }
+      >
+        {matrixTeachers.length === 0 ? (
+          <EmptyState
+            icon={Users}
+            title="No timetable teachers yet"
+            body="Add teachers to the timetable to see one substitution row per teacher."
+          />
+        ) : (
+          <div className="ttw-subs-scroll">
+            <table className="ttw-subs">
+              <thead>
                 <tr>
-                  <td className="px-3 py-8 text-center text-slate-600" colSpan={PERIODS.length + 2}>
-                    Add timetable teachers to see substitution rows.
-                  </td>
+                  <th scope="col" className="ttw-subs__no">Sr no</th>
+                  <th scope="col" className="ttw-subs__name">Teacher</th>
+                  {PERIODS.map((p) => (
+                    <th key={p} scope="col">{p}</th>
+                  ))}
                 </tr>
-              ) : (
-                matrixTeachers.map((teacher, rowIdx) => (
-                  <tr
-                    key={teacher.id}
-                    className="odd:bg-white even:bg-secondary-50/30 dark:odd:bg-secondary-900 dark:even:bg-secondary-800/60"
-                  >
-                    <td className="px-3 py-3 border-b border-secondary-100 sticky left-0 bg-white dark:bg-secondary-900 z-10">
-                      {rowIdx + 1}
-                    </td>
-
-                    <td className="px-3 py-3 border-b border-secondary-100 sticky left-[92px] bg-white dark:bg-secondary-900 z-10">
-                      <div className="font-medium text-slate-900">{teacher.name}</div>
-                      {teacher.shortName ? (
-                        <div className="text-xs text-slate-500">{teacher.shortName}</div>
-                      ) : null}
-                    </td>
-
-                    {PERIODS.map((_, periodIdx) => {
-                      const enabled = periodByTeacherId[teacher.id]?.[periodIdx] ?? false
-                      return (
-                        <td
-                          key={periodIdx}
-                          className="px-3 py-3 border-b border-secondary-100 text-center"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={enabled}
-                            onChange={(e) => setPeriodEnabled(teacher.id, periodIdx, e.target.checked)}
-                            title={`Teacher ${rowIdx + 1} Period ${PERIODS[periodIdx]}`}
-                            aria-label={`Teacher ${rowIdx + 1} Period ${PERIODS[periodIdx]}`}
-                            className="h-4 w-4 accent-emerald-600"
-                          />
-                        </td>
-                      )
-                    })}
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
+              </thead>
+              <tbody>
+                {matrixTeachers.map((teacher, rowIdx) => {
+                  const row = periodByTeacherId[teacher.id]
+                  const anyMarked = Boolean(row?.some(Boolean))
+                  return (
+                    <tr key={teacher.id} className={anyMarked ? 'is-marked' : undefined}>
+                      <td className="ttw-subs__no">{rowIdx + 1}</td>
+                      <th scope="row" className="ttw-subs__name">
+                        <div className="ttw-subs__teacher">{teacher.name}</div>
+                        {teacher.shortName ? <div className="ttw-subs__short">{teacher.shortName}</div> : null}
+                      </th>
+                      {PERIODS.map((_, periodIdx) => {
+                        const enabled = row?.[periodIdx] ?? false
+                        return (
+                          <td key={periodIdx} title={`Teacher ${rowIdx + 1} Period ${PERIODS[periodIdx]}`}>
+                            <Checkbox
+                              checked={enabled}
+                              onChange={(checked) => setPeriodEnabled(teacher.id, periodIdx, checked)}
+                              aria-label={`${teacher.name}, period ${PERIODS[periodIdx]}`}
+                            />
+                          </td>
+                        )
+                      })}
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+    </Page>
   )
 }
 
