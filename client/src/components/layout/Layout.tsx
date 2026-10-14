@@ -5,10 +5,10 @@ import Header from './Header'
 import BillingBanner from './BillingBanner'
 import { AttndMatrixModeProvider } from '@/contexts/AttndMatrixModeContext'
 
-const SIDEBAR_EXPANDED_DEFAULT = 208
-const SIDEBAR_EXPANDED_MIN = 176
+const SIDEBAR_EXPANDED_DEFAULT = 248
+const SIDEBAR_EXPANDED_MIN = 232
 const SIDEBAR_EXPANDED_MAX = 420
-const SIDEBAR_COLLAPSED_WIDTH = 80
+const SIDEBAR_COLLAPSED_WIDTH = 64
 const SIDEBAR_WIDTH_STORAGE_KEY = 'layout:sidebarWidth:v2'
 const SIDEBAR_WIDTH_MANUAL_KEY = 'layout:sidebarWidthManual:v2'
 
@@ -28,6 +28,17 @@ const Layout: React.FC = () => {
   fitToContentRef.current = fitToContent
   isSidebarCollapsedRef.current = isSidebarCollapsed
   isResizingSidebarRef.current = isResizingSidebar
+
+  // Below 1024px the sidebar shows icons only, so pages keep their width on tablets and phones.
+  useEffect(() => {
+    const query = window.matchMedia('(max-width: 1023px)')
+    const apply = () => {
+      if (query.matches) setIsSidebarCollapsed(true)
+    }
+    apply()
+    query.addEventListener('change', apply)
+    return () => query.removeEventListener('change', apply)
+  }, [])
 
   useEffect(() => {
     const manual = window.localStorage.getItem(SIDEBAR_WIDTH_MANUAL_KEY) === '1'
@@ -101,7 +112,7 @@ const Layout: React.FC = () => {
 
   return (
     <AttndMatrixModeProvider>
-    <div className="relative flex h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="cb-shell relative flex h-screen overflow-hidden">
       {/* Sidebar */}
       <Sidebar
         isCollapsed={isSidebarCollapsed}
@@ -125,14 +136,14 @@ const Layout: React.FC = () => {
         }`}
       >
         <div
-          className={`absolute inset-y-0 left-0 w-[3px] bg-blue-500/80 transition-opacity ${
+          className={`absolute inset-y-0 left-0 w-[3px] bg-[color:var(--accent)] transition-opacity ${
             isResizingSidebar ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
           }`}
         />
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="relative min-w-0 flex-1 flex flex-col overflow-hidden">
         {/* Header */}
         <Header
           isSidebarCollapsed={isSidebarCollapsed}
@@ -143,7 +154,7 @@ const Layout: React.FC = () => {
         {/* Page Content */}
         <main
           id="app-main-scroll"
-          className="flex-1 overflow-x-hidden overflow-y-auto animate-page-enter"
+          className="relative flex-1 overflow-x-hidden overflow-y-auto animate-page-enter"
         >
           <Outlet />
         </main>

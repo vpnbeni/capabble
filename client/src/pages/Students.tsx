@@ -2,32 +2,71 @@ import React, { useDeferredValue, useEffect, useMemo, useRef, useState } from 'r
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
 import toast from 'react-hot-toast'
-import { Download, Filter, LayoutGrid, RefreshCw, Search, Trash2, Upload, UserPlus, Users } from 'lucide-react'
+import {
+  ChevronDown,
+  Download,
+  FileSpreadsheet,
+  ImagePlus,
+  LayoutGrid,
+  Pencil,
+  SearchX,
+  Trash2,
+  Upload,
+  UserPlus,
+  UserRound,
+  Users,
+  X,
+} from 'lucide-react'
 import type { AppDispatch, RootState } from '../redux/store'
 import { createStudent, bulkDeleteStudents, fetchStudentStats, fetchStudents, updateStudent } from '../redux/slices/studentSlice'
 import api from '../services/api'
 import studentService from '../services/studentService'
 import timetableService from '../services/timetableService'
 import { makeRecordService } from '../services/recordService'
-import { resolveApiBaseUrl } from '../utils/tenantRuntime'
 import { sortSectionNames } from '../constants/studentClasses'
 import {
-  getSectionDisplayName,
   normalizeAllowedSections,
   normalizeSectionKey,
   resolveSectionAgainstAllowed,
 } from '../constants/sectionMetadata'
-import { getHouseHeadingTextColor, normalizeHouseColorKey } from '../constants/houseColorMetadata'
+import { normalizeHouseColorKey } from '../constants/houseColorMetadata'
+import {
+  Avatar,
+  Badge,
+  Banner,
+  Button,
+  Card,
+  Checkbox,
+  DataTable,
+  Dialog,
+  EmptyState,
+  FilterBar,
+  Menu,
+  Page,
+  Progress,
+  Select,
+  Sheet,
+  StatCard,
+  TextArea,
+  TextField,
+  formatDate,
+  orDash,
+  type DataTableColumn,
+} from '@/components/ui'
+import {
+  classLabel,
+  classSectionLabel as classSectionLabelText,
+  formatAddress,
+  formatCount,
+  normalizeGender,
+  sectionLabel,
+  studentPhotoUrl,
+} from '@/components/students/studentFormat'
+import '@/components/students/students.css'
 
 const STUDENTS_PAGE_SIZE = 250
 const BULK_DELETE_TOAST_ID = 'stdnt-bulk-delete'
 const BULK_DELETE_BATCH_SIZE = 50
-
-const getStudentProfileImageUrl = (profileImage?: string) => {
-  if (!profileImage) return null
-  if (profileImage.startsWith('http')) return profileImage
-  return `${resolveApiBaseUrl().replace(/\/api\/?$/, '')}${profileImage}`
-}
 
 type StudentFormState = {
   rollNumber: string
@@ -104,61 +143,6 @@ const createInitialFormState = (): StudentFormState => ({
   notes: '',
   isActive: true,
 })
-
-const formatDate = (value?: string) => {
-  if (!value) return '-'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '-'
-  return date.toLocaleDateString('en-GB')
-}
-
-const formatGender = (value?: string) => {
-  const normalized = String(value || '').trim().toLowerCase()
-  if (normalized === 'male') return 'Boy'
-  if (normalized === 'female') return 'Girl'
-  if (normalized === 'boy') return 'Boy'
-  if (normalized === 'girl') return 'Girl'
-  if (normalized === 'other') return 'Other'
-  if (normalized === 'unspecified' || !normalized) return 'Unspecified'
-  return value || 'Unspecified'
-}
-
-const formatStudentAddress = (address?: { street?: string; city?: string; state?: string; pincode?: string } | null) => {
-  if (!address) return '-'
-  const parts = [address.street, address.city, address.state, address.pincode]
-    .map((part) => String(part || '').trim())
-    .filter(Boolean)
-  return parts.length ? parts.join(', ') : '-'
-}
-
-const getStudentBloodGroup = (student: { medicalInfo?: { bloodGroup?: string } } | null | undefined) => (
-  String(student?.medicalInfo?.bloodGroup || '').trim() || '-'
-)
-
-const BloodGroupDrop: React.FC<{ value?: string }> = ({ value }) => {
-  const label = String(value || '').trim()
-  if (!label || label === '-') {
-    return <span className="text-slate-400">-</span>
-  }
-
-  return (
-    <span
-      className="relative inline-flex h-6 w-[18px] shrink-0 items-center justify-center"
-      title={`Blood group ${label}`}
-      aria-label={`Blood group ${label}`}
-    >
-      <svg viewBox="0 0 24 32" className="absolute inset-0 h-full w-full" aria-hidden>
-        <path
-          d="M12 1.5C12 1.5 3.5 13.2 3.5 20.2a8.5 8.5 0 0017 0C20.5 13.2 12 1.5 12 1.5z"
-          fill="#e11d48"
-        />
-      </svg>
-      <span className={`relative z-[1] mt-1 font-bold leading-none text-white ${label.length > 2 ? 'text-[7px]' : 'text-[8px]'}`}>
-        {label}
-      </span>
-    </span>
-  )
-}
 
 const normalizeHouseLookupKey = (value = '') => (
   String(value || '')
@@ -299,7 +283,7 @@ const Students: React.FC = () => {
   const [showAddForm, setShowAddForm] = useState(false)
   const [editingStudentId, setEditingStudentId] = useState<string | null>(null)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
-  const [viewingStudent, setViewingStudent] = useState<any | null>(null)
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
   const [tableSortField, setTableSortField] = useState<
     | 'rollNumber'
     | 'classRollNo'
@@ -330,8 +314,8 @@ const Students: React.FC = () => {
   const [selectedPhotoPreview, setSelectedPhotoPreview] = useState<string | null>(null)
   const [isPhotoDragActive, setIsPhotoDragActive] = useState(false)
 
-  const addFormRef = useRef<HTMLDivElement | null>(null)
   const photoInputRef = useRef<HTMLInputElement | null>(null)
+  const templateInputRef = useRef<HTMLInputElement | null>(null)
   const bulkDeleteCancelRef = useRef(false)
   const deferredSearch = useDeferredValue(searchTerm)
 
@@ -506,16 +490,6 @@ const Students: React.FC = () => {
     ),
     [stats]
   )
-  const totalSections = useMemo(
-    () => (
-      new Set(
-        (stats?.byClassSection || [])
-          .map((entry) => String(entry?._id?.section || '').trim())
-          .filter(Boolean)
-      ).size
-    ),
-    [stats]
-  )
   const totalClassSections = useMemo(
     () => (
       new Set(
@@ -583,7 +557,7 @@ const Students: React.FC = () => {
         return String(student?.medicalInfo?.bloodGroup || '').toLowerCase()
       }
       if (tableSortField === 'address') {
-        return formatStudentAddress(student?.address).toLowerCase()
+        return formatAddress(student?.address).toLowerCase()
       }
       return String(student?.[tableSortField] ?? '').toLowerCase()
     }
@@ -653,30 +627,30 @@ const Students: React.FC = () => {
   const validateForm = () => {
     const nextErrors: Record<string, string> = {}
 
-    if (!formData.rollNumber.trim()) nextErrors.rollNumber = 'Admission number is required.'
-    if (!formData.name.trim()) nextErrors.name = 'Student name is required.'
-    if (!formData.fatherName.trim()) nextErrors.fatherName = 'Father name is required.'
-    if (!formData.motherName.trim()) nextErrors.motherName = 'Mother name is required.'
-    if (!formData.guardianPhone.trim()) nextErrors.guardianPhone = 'Guardian phone is required.'
-    if (!/^\d{10}$/.test(formData.guardianPhone.trim())) nextErrors.guardianPhone = 'Enter a valid 10-digit guardian phone.'
-    if (formData.phone.trim() && !/^\d{10}$/.test(formData.phone.trim())) nextErrors.phone = 'Enter a valid 10-digit contact number.'
-    if (!formData.dateOfBirth) nextErrors.dateOfBirth = 'Date of birth is required.'
-    if (!formData.admissionDate) nextErrors.admissionDate = 'Admission date is required.'
-    if (!formData.address.street.trim()) nextErrors['address.street'] = 'Street address is required.'
-    if (!formData.address.city.trim()) nextErrors['address.city'] = 'City is required.'
-    if (!formData.address.state.trim()) nextErrors['address.state'] = 'State is required.'
-    if (!/^\d{6}$/.test(formData.address.pincode.trim())) nextErrors['address.pincode'] = 'Enter a valid 6-digit pincode.'
+    if (!formData.rollNumber.trim()) nextErrors.rollNumber = 'Enter the admission number.'
+    if (!formData.name.trim()) nextErrors.name = 'Enter the student’s name.'
+    if (!formData.fatherName.trim()) nextErrors.fatherName = 'Enter the father’s name.'
+    if (!formData.motherName.trim()) nextErrors.motherName = 'Enter the mother’s name.'
+    if (!formData.guardianPhone.trim()) nextErrors.guardianPhone = 'Enter a phone number for the guardian.'
+    if (!/^\d{10}$/.test(formData.guardianPhone.trim())) nextErrors.guardianPhone = 'Guardian’s phone must be 10 digits.'
+    if (formData.phone.trim() && !/^\d{10}$/.test(formData.phone.trim())) nextErrors.phone = 'Student’s phone must be 10 digits.'
+    if (!formData.dateOfBirth) nextErrors.dateOfBirth = 'Choose the date of birth.'
+    if (!formData.admissionDate) nextErrors.admissionDate = 'Choose the admission date.'
+    if (!formData.address.street.trim()) nextErrors['address.street'] = 'Enter the street address.'
+    if (!formData.address.city.trim()) nextErrors['address.city'] = 'Enter the city.'
+    if (!formData.address.state.trim()) nextErrors['address.state'] = 'Enter the state.'
+    if (!/^\d{6}$/.test(formData.address.pincode.trim())) nextErrors['address.pincode'] = 'Pincode must be 6 digits.'
     if (formData.aadharNumber.trim() && !/^\d{12}$/.test(formData.aadharNumber.trim())) {
-      nextErrors.aadharNumber = 'Enter a valid 12-digit Aadhar number.'
+      nextErrors.aadharNumber = 'Aadhaar number must be 12 digits.'
     }
-    if (!formData.class.trim()) nextErrors.class = 'Class is required.'
-    if (!formData.section.trim()) nextErrors.section = 'Section is required.'
+    if (!formData.class.trim()) nextErrors.class = 'Choose a class.'
+    if (!formData.section.trim()) nextErrors.section = 'Choose a section.'
     const allowedSections = classSectionOptions.find((option) => option.className === formData.class)?.sections || []
     if (allowedSections.length > 0) {
       const resolvedSection = resolveSectionAgainstAllowed(formData.section, allowedSections)
       if (resolvedSection.error) nextErrors.section = resolvedSection.error
     } else if (formData.class.trim()) {
-      nextErrors.section = 'Configure sections for this class in Class Section Matrix.'
+      nextErrors.section = 'This class has no sections yet. Add them under Classes first.'
     }
 
     setFormErrors(nextErrors)
@@ -737,7 +711,12 @@ const Students: React.FC = () => {
     event.preventDefault()
     setPageMessage(null)
 
-    if (!validateForm()) return
+    if (!validateForm()) {
+      window.requestAnimationFrame(() => {
+        document.querySelector<HTMLElement>('.cb-sheet [aria-invalid="true"]')?.focus()
+      })
+      return
+    }
 
     setIsSubmitting(true)
     try {
@@ -790,10 +769,8 @@ const Students: React.FC = () => {
       setPageMessage({
         tone: 'success',
         text: editingStudentId
-          ? 'Student record updated successfully.'
-          : (selectedPhoto
-            ? 'Student record created successfully with photograph.'
-            : 'Student record created successfully.'),
+          ? `${payload.name}’s details are saved.`
+          : `${payload.name} is added to ${classSectionLabelText(payload.class, payload.section)}.`,
       })
       resetForm({ keepMessage: true })
       refreshStudentData(1)
@@ -806,7 +783,7 @@ const Students: React.FC = () => {
         text:
           error?.response?.data?.message ||
           error?.response?.data?.error ||
-          (typeof error === 'string' ? error : (editingStudentId ? 'Failed to update student.' : 'Failed to create student.')),
+          (typeof error === 'string' ? error : (editingStudentId ? 'The changes weren’t saved. Try again.' : 'The student wasn’t added. Try again.')),
       })
     } finally {
       setIsSubmitting(false)
@@ -815,12 +792,12 @@ const Students: React.FC = () => {
 
   const selectPhotoFile = (file: File) => {
     if (!file.type.startsWith('image/')) {
-      setPageMessage({ tone: 'error', text: 'Please select an image file for the photograph.' })
+      setPageMessage({ tone: 'error', text: 'Choose an image file (JPEG, PNG or WebP) for the photograph.' })
       return false
     }
 
     if (file.size > 5 * 1024 * 1024) {
-      setPageMessage({ tone: 'error', text: 'Photograph size must be less than 5MB.' })
+      setPageMessage({ tone: 'error', text: 'Photograph must be 5 MB or smaller.' })
       return false
     }
 
@@ -874,7 +851,7 @@ const Students: React.FC = () => {
       link.remove()
       window.URL.revokeObjectURL(url)
     } catch (_error) {
-      setPageMessage({ tone: 'error', text: 'Failed to download the student template.' })
+      setPageMessage({ tone: 'error', text: 'The template didn’t download. Try again.' })
     } finally {
       setIsTemplateDownloading(false)
     }
@@ -896,7 +873,7 @@ const Students: React.FC = () => {
       const errorPreview = errors.slice(0, 2).map((entry: any) => `Row ${entry?.row}: ${entry?.message}`).join(' | ')
       setPageMessage({
         tone: errors.length > 0 && createdCount === 0 ? 'error' : 'success',
-        text: `Import completed. Created: ${createdCount}, Skipped (already exist): ${skippedCount}, Errors: ${errors.length}, Warnings: ${warnings.length}.${errorPreview ? ` ${errorPreview}` : ''}`,
+        text: `Import finished: ${createdCount} added, ${skippedCount} skipped because their admission no. already exists, ${errors.length} with errors, ${warnings.length} with warnings.${errorPreview ? ` ${errorPreview}` : ''}`,
       })
       refreshStudentData(1)
       setPage(1)
@@ -905,7 +882,7 @@ const Students: React.FC = () => {
         error?.response?.data?.message ||
         error?.response?.data?.error ||
         error?.message ||
-        'Failed to upload student template file.'
+        'The file didn’t import. Check it is the filled template and try again.'
 
       setPageMessage({ tone: 'error', text: message })
     } finally {
@@ -928,19 +905,14 @@ const Students: React.FC = () => {
     ))
   }
 
-  const handleAddStudentClick = () => {
-    setEditingStudentId(null)
-    setIsEditModalOpen(false)
-    setShowAddForm((prev) => {
-      const next = !prev
-      if (next) {
-        resetForm({ keepMessage: true })
-        window.requestAnimationFrame(() => {
-          addFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-        })
-      }
-      return next
-    })
+  const openAddForm = () => {
+    resetForm({ keepMessage: true })
+    setShowAddForm(true)
+  }
+
+  const closeForm = () => {
+    resetForm({ keepMessage: true })
+    setShowAddForm(false)
   }
 
   const handleBulkDelete = async () => {
@@ -967,40 +939,38 @@ const Students: React.FC = () => {
 
       toast.custom(
         () => (
-          <div className="flex min-w-[280px] flex-col gap-2 rounded-xl bg-slate-800 px-4 py-3 text-white shadow-lg">
-            <div className="flex items-center justify-between gap-3 text-sm font-medium">
-              <span>
-                {cancelling && !complete
-                  ? `Stopping… ${done} of ${total} deleted`
-                  : `${done} of ${total} deleted`}
-              </span>
-              <div className="flex items-center gap-2">
-                {failed > 0 ? <span className="text-rose-300">{failed} failed</span> : null}
+          <div className="cb-app cb-toast-host">
+            <div className="cb-toast" role="status" style={{ minWidth: 300, flexDirection: 'column', alignItems: 'stretch' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                <span className="cb-toast__title">
+                  {cancelling && !complete
+                    ? `Stopping… ${done} of ${total} deleted`
+                    : complete
+                      ? `${done} of ${total} deleted`
+                      : `Deleting ${done} of ${total}`}
+                </span>
                 {!complete && !cancelling ? (
-                  <button
-                    type="button"
+                  <Button
+                    variant="tertiary"
+                    size="sm"
                     onClick={() => {
                       bulkDeleteCancelRef.current = true
                       renderProgressToast(done, failed, { cancelling: true })
                     }}
-                    className="rounded-md px-2 py-0.5 text-xs font-semibold text-slate-300 transition hover:bg-slate-700 hover:text-white"
                   >
-                    Cancel
-                  </button>
+                    Stop deleting
+                  </Button>
                 ) : null}
               </div>
-            </div>
-            <div className="h-1.5 overflow-hidden rounded-full bg-slate-600">
-              <div
-                className={`h-full rounded-full transition-all ${
-                  stoppedEarly && complete
-                    ? 'bg-amber-400'
-                    : failed > 0 && complete
-                      ? 'bg-amber-400'
-                      : 'bg-emerald-400'
-                }`}
-                style={{ width: `${percent}%` }}
+              <Progress
+                value={percent}
+                size="sm"
+                showValue={false}
+                tone={complete ? (stoppedEarly || failed > 0 ? 'warning' : 'success') : 'accent'}
               />
+              {failed > 0 ? (
+                <span className="cb-toast__desc">{failed} could not be deleted</span>
+              ) : null}
             </div>
           </div>
         ),
@@ -1062,8 +1032,8 @@ const Students: React.FC = () => {
       setPageMessage({
         tone: deletedCount > 0 ? 'success' : 'error',
         text: deletedCount > 0
-          ? `Deletion stopped. ${deletedCount} student record${deletedCount === 1 ? '' : 's'} deleted${remainingCount > 0 ? `; ${remainingCount} remaining.` : '.'}`
-          : 'Deletion cancelled before any records were removed.',
+          ? `Deleting stopped. ${deletedCount} ${deletedCount === 1 ? 'student' : 'students'} deleted${remainingCount > 0 ? `; ${remainingCount} still selected.` : '.'}`
+          : 'Deleting stopped before any students were removed.',
       })
       return
     }
@@ -1071,13 +1041,10 @@ const Students: React.FC = () => {
     setPageMessage({
       tone: deletedCount > 0 ? 'success' : 'error',
       text: deletedCount > 0
-        ? `${deletedCount} student record${deletedCount === 1 ? '' : 's'} deleted successfully.`
-        : 'No selected students could be deleted.',
+        ? `${deletedCount} ${deletedCount === 1 ? 'student' : 'students'} deleted.`
+        : 'None of the selected students could be deleted. Try again.',
     })
   }
-
-  const renderFieldError = (field: string) =>
-    formErrors[field] ? <p className="mt-1 text-xs font-medium text-rose-600">{formErrors[field]}</p> : null
 
   const handleEditStudentRow = (student: any) => {
     setEditingStudentId(student._id)
@@ -1103,14 +1070,14 @@ const Students: React.FC = () => {
     try {
       await api.put(`/students/${studentId}`, { class: className, section: normalizedSection })
       setSectionOverrideByStudentId((prev) => ({ ...prev, [studentId]: normalizedSection }))
-      setPageMessage({ tone: 'success', text: `Section updated to ${getSectionDisplayName(normalizedSection)}.` })
+      setPageMessage({ tone: 'success', text: `Section changed to ${sectionLabel(normalizedSection)}.` })
       refreshStudentData(page)
     } catch (error: any) {
       const message =
         error?.response?.data?.message ||
         error?.response?.data?.error ||
         error?.message ||
-        'Failed to update section.'
+        'The section didn’t change. Try again.'
       setPageMessage({ tone: 'error', text: message })
     } finally {
       setSectionUpdateLoadingById((prev) => {
@@ -1122,1064 +1089,763 @@ const Students: React.FC = () => {
     }
   }
 
-  return (
-    <div className="space-y-3">
-      {pageMessage ? (
-        <div
-          className={`rounded-2xl border px-4 py-3 text-sm font-medium ${
-            pageMessage.tone === 'success'
-              ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-              : 'border-rose-200 bg-rose-50 text-rose-700'
-          }`}
-        >
-          {pageMessage.text}
-        </div>
-      ) : null}
+  const isFormOpen = showAddForm || isEditModalOpen
+  const hasFilters = Boolean(classFilter || sectionFilter || searchTerm.trim())
+  const activeCount = stats?.activeTotal ?? 0
+  const totalCount = stats?.total ?? 0
+  const fieldError = (field: string) => formErrors[field] || undefined
 
-      <div className="space-y-2">
-      <section className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
-        <div className="flex min-w-0 items-center gap-2 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 shadow-sm">
-          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
-            <Users className="h-4 w-4" />
-          </div>
-          <div>
-            <p className="text-[11px] font-medium leading-tight text-slate-500">Total Students</p>
-            <p className="text-lg font-semibold leading-tight tracking-tight text-slate-900">{stats?.total ?? 0}</p>
-          </div>
-        </div>
+  const setActive = (checked: boolean) => {
+    setFormData((prev) => ({ ...prev, isActive: checked }))
+  }
 
-        <div className="flex min-w-0 items-center gap-2 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 shadow-sm">
-          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">
-            <RefreshCw className="h-4 w-4" />
-          </div>
-          <div>
-            <p className="text-[11px] font-medium leading-tight text-slate-500">Active Students</p>
-            <p className="text-lg font-semibold leading-tight tracking-tight text-slate-900">{stats?.activeTotal ?? 0}</p>
-          </div>
-        </div>
+  const selectHouse = (houseId: string) => {
+    const house = activityHouses.find((item) => item._id === houseId)
+    setFormData((prev) => ({ ...prev, houseId: house?._id || '', house: house?.name || '' }))
+    setFormErrors((prev) => {
+      if (!prev.house && !prev.houseId) return prev
+      const next = { ...prev }
+      delete next.house
+      delete next.houseId
+      return next
+    })
+  }
 
-        <div className="flex min-w-0 items-center gap-2 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 shadow-sm">
-          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-sky-50 text-sky-600">
-            <Users className="h-4 w-4" />
-          </div>
-          <div>
-            <p className="text-[11px] font-medium leading-tight text-slate-500">Boys</p>
-            <p className="text-lg font-semibold leading-tight tracking-tight text-slate-900">{boysCount}</p>
-          </div>
-        </div>
+  const clearFilters = () => {
+    setSearchTerm('')
+    setClassFilter('')
+    setSectionFilter('')
+  }
 
-        <div className="flex min-w-0 items-center gap-2 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 shadow-sm">
-          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-pink-50 text-pink-600">
-            <Users className="h-4 w-4" />
-          </div>
-          <div>
-            <p className="text-[11px] font-medium leading-tight text-slate-500">Girls</p>
-            <p className="text-lg font-semibold leading-tight tracking-tight text-slate-900">{girlsCount}</p>
-          </div>
-        </div>
+  const renderHouse = (student: any) => {
+    const houseRecord = resolveStudentHouse(student, activityHouses)
+    const name = houseRecord?.name || student.house || ''
+    const label = getHouseShortName(name)
+    if (label === '-') return <span className="cb-subtle">—</span>
+    const swatch = normalizeHouseColorKey(houseRecord?.color || '')
+    return (
+      <span className="stdnt-house" title={name}>
+        {swatch ? <span className="stdnt-house__swatch" style={{ background: swatch }} aria-hidden="true" /> : null}
+        {label}
+      </span>
+    )
+  }
 
-        <div className="flex min-w-0 items-center gap-2 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 shadow-sm">
-          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-violet-50 text-violet-600">
-            <LayoutGrid className="h-4 w-4" />
-          </div>
-          <div>
-            <p className="text-[11px] font-medium leading-tight text-slate-500">Classes</p>
-            <p className="text-lg font-semibold leading-tight tracking-tight text-slate-900">{totalClasses}</p>
-          </div>
-        </div>
+  const renderClassSection = (student: any) => {
+    const className = String(student.class || '')
+    const displaySection = sectionOverrideByStudentId[student._id] ?? student.section
+    const saving = Boolean(sectionUpdateLoadingById[student._id])
 
-        <div className="flex min-w-0 items-center gap-2 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 shadow-sm">
-          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-amber-50 text-amber-600">
-            <Filter className="h-4 w-4" />
-          </div>
-          <div>
-            <p className="text-[11px] font-medium leading-tight text-slate-500">Sections</p>
-            <p className="text-lg font-semibold leading-tight tracking-tight text-slate-900">{totalSections}</p>
-          </div>
-        </div>
-
-        <div className="flex min-w-0 items-center gap-2 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 shadow-sm">
-          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
-            <LayoutGrid className="h-4 w-4" />
-          </div>
-          <div>
-            <p className="text-[11px] font-medium leading-tight text-slate-500">Class × Section</p>
-            <p className="text-lg font-semibold leading-tight tracking-tight text-slate-900">{totalClassSections}</p>
-          </div>
-        </div>
-      </section>
-
-      <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <div className="border-b border-slate-200 px-4 py-2.5">
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="relative w-full max-w-[85px] shrink-0 sm:w-[85px]">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
-              <input
-                value={searchTerm}
-                onChange={(event) => setSearchTerm(event.target.value)}
-                placeholder="Search students..."
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 py-1.5 pl-9 pr-3 text-xs text-slate-900 outline-none transition focus:border-blue-400 focus:bg-white"
-              />
-            </div>
-
-            <select
-              value={classFilter}
-              onChange={(event) => {
-                setClassFilter(event.target.value)
-                setSectionFilter('')
-              }}
-              className="w-[108px] rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs text-slate-900 outline-none transition focus:border-blue-400 focus:bg-white"
-            >
-              <option value="">All Classes</option>
-              {classOptions.map((option) => (
-                <option key={option} value={option}>{option}</option>
-              ))}
-            </select>
-
-            <select
-              value={sectionFilter}
-              onChange={(event) => setSectionFilter(event.target.value)}
-              className="w-[108px] rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs text-slate-900 outline-none transition focus:border-blue-400 focus:bg-white"
-            >
-              <option value="">All Sections</option>
-              {filterSectionOptions.map((option) => (
-                <option key={option} value={option}>{getSectionDisplayName(option)}</option>
-              ))}
-            </select>
-
-            <button
-              type="button"
-              onClick={() => {
-                setClassFilter('')
-                setSectionFilter('')
-              }}
-              disabled={!classFilter && !sectionFilter}
-              className="inline-flex items-center rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-blue-300 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Clear Filters
-            </button>
-
-            <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
-              <input
-                type="file"
-                accept=".csv,.xlsx"
-                id="student-template-upload-input"
-                title="Upload student template file"
-                aria-label="Upload student template file"
-                onChange={handleUploadTemplate}
-                className="hidden"
-              />
-
+    if (editingSectionStudentId === student._id) {
+      const available = getSectionsForClass(className)
+      return (
+        <span className="stdnt-section-pick" role="group" aria-label={`Choose a section for ${student.name}`}>
+          {available.map((sectionName) => {
+            const isCurrent = normalizeSectionKey(sectionName) === normalizeSectionKey(String(displaySection || ''))
+            return (
               <button
-                onClick={handleDownloadTemplate}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-blue-300 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
-                disabled={loading || isTemplateDownloading || isTemplateUploading}
-                title="Download the import template. Existing Admission Nos are skipped; only new students are added."
-              >
-                <Download className="h-3.5 w-3.5" />
-                {isTemplateDownloading ? 'Downloading...' : 'Template'}
-              </button>
-
-              <button
-                onClick={() => document.getElementById('student-template-upload-input')?.click()}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-blue-300 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
-                disabled={loading || isTemplateDownloading || isTemplateUploading}
-                title="Upload template — existing Admission Nos are skipped; only new students are added"
-              >
-                <Upload className="h-3.5 w-3.5" />
-                {isTemplateUploading ? 'Uploading...' : 'Upload'}
-              </button>
-
-              <button
-                onClick={handleAddStudentClick}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-700"
-              >
-                <UserPlus className="h-3.5 w-3.5" />
-                {showAddForm ? 'Hide Form' : 'Add Student'}
-              </button>
-
-              <button
-                onClick={handleBulkDelete}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-rose-500 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-rose-600 disabled:cursor-not-allowed disabled:opacity-60"
-                disabled={loading || isBulkDeleting || selectedCount === 0}
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-                {isBulkDeleting ? 'Deleting...' : `Delete${selectedCount > 0 ? ` (${selectedCount})` : ''}`}
-              </button>
-            </div>
-          </div>
-
-        </div>
-      </section>
-      </div>
-
-      {(showAddForm || isEditModalOpen) ? (
-        <div
-          className={isEditModalOpen ? 'fixed inset-0 z-50 overflow-y-auto bg-black/40 p-3' : ''}
-          onClick={() => {
-            if (isEditModalOpen) resetForm({ keepMessage: true })
-          }}
-        >
-          <section
-            ref={addFormRef}
-            className={`rounded-2xl border border-slate-200 bg-white shadow-sm ${isEditModalOpen ? 'mx-auto mt-3 max-w-4xl' : ''}`}
-            onClick={(event) => event.stopPropagation()}
-          >
-          <div className="border-b border-slate-200 px-4 py-2.5">
-            <div className="flex items-center justify-between gap-3">
-              <h2 className="text-base font-semibold tracking-tight text-slate-900">{editingStudentId ? 'Edit Student Record' : 'Add Student Record'}</h2>
-              {isEditModalOpen ? (
-                <button
-                  type="button"
-                  onClick={() => resetForm({ keepMessage: true })}
-                  className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
-                >
-                  Close
-                </button>
-              ) : null}
-            </div>
-            <p className="mt-0.5 text-xs text-slate-500">
-              Capture student details manually, or use the template import for bulk onboarding.
-            </p>
-          </div>
-
-          <form onSubmit={handleSubmit} className="space-y-3 px-4 py-3">
-            <div
-              onDragOver={(event) => {
-                event.preventDefault()
-                setIsPhotoDragActive(true)
-              }}
-              onDragLeave={(event) => {
-                if (event.currentTarget === event.target) setIsPhotoDragActive(false)
-              }}
-              onDrop={handlePhotoDrop}
-              className={`rounded-xl border border-dashed bg-slate-50/70 p-2.5 transition ${isPhotoDragActive ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-100' : 'border-slate-200'}`}
-            >
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <h3 className="text-xs font-semibold text-slate-900">Photograph</h3>
-                  <p className="text-[11px] text-slate-500">
-                    JPEG, PNG, GIF, or WebP up to 5MB. You can also drag and drop a photo here.
-                  </p>
-                </div>
-
-                <div className="flex flex-wrap gap-2">
-                  <input
-                    ref={photoInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={handlePhotoSelect}
-                    className="hidden"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => photoInputRef.current?.click()}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-blue-300 hover:text-blue-700"
-                  >
-                    <Upload className="h-3.5 w-3.5" />
-                    {selectedPhoto ? 'Change Photo' : 'Upload Photo'}
-                  </button>
-                  {selectedPhoto ? (
-                    <button
-                      type="button"
-                      onClick={clearSelectedPhoto}
-                      className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
-                    >
-                      Remove
-                    </button>
-                  ) : null}
-                </div>
-              </div>
-
-              {selectedPhoto ? (
-                <div className="mt-2 flex items-center gap-3">
-                  <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-                    {selectedPhotoPreview ? (
-                      <img
-                        src={selectedPhotoPreview}
-                        alt="Selected student photograph preview"
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      <span className="text-[10px] font-medium text-slate-400">Preview</span>
-                    )}
-                  </div>
-                  <div className="min-w-0 text-xs text-slate-500">
-                    <p className="truncate font-medium text-slate-700">{selectedPhoto.name}</p>
-                    <p className="mt-0.5">{Math.max(1, Math.round(selectedPhoto.size / 1024))} KB</p>
-                  </div>
-                </div>
-              ) : null}
-            </div>
-
-            <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700">Admission No.</label>
-                <input
-                  name="rollNumber"
-                  value={formData.rollNumber}
-                  onChange={handleFieldChange}
-                  placeholder="e.g. 4959"
-                  className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-sm text-slate-900 outline-none transition focus:border-blue-400 focus:bg-white"
-                />
-                {renderFieldError('rollNumber')}
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700">Roll No</label>
-                <input
-                  value={formData.classRollNo || (editingStudentId ? '—' : 'Auto-assigned')}
-                  readOnly
-                  disabled
-                  title="Assigned automatically by class and section (alphabetical)"
-                  className="mt-1 w-full cursor-not-allowed rounded-lg border border-slate-200 bg-slate-100 px-2.5 py-1.5 text-sm font-semibold text-slate-700 outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700">Status</label>
-                <label className="mt-1 flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs text-slate-700">
-                  <input
-                    type="checkbox"
-                    name="isActive"
-                    checked={formData.isActive}
-                    onChange={handleFieldChange}
-                    className="h-3.5 w-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                  />
-                  Active
-                </label>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700">Student Name</label>
-                <input
-                  name="name"
-                  value={formData.name}
-                  onChange={handleFieldChange}
-                  className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-sm text-slate-900 outline-none transition focus:border-blue-400 focus:bg-white"
-                />
-                {renderFieldError('name')}
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700">Gender</label>
-                <select
-                  name="gender"
-                  value={formData.gender}
-                  onChange={handleFieldChange}
-                  className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-sm text-slate-900 outline-none transition focus:border-blue-400 focus:bg-white"
-                >
-                  {GENDER_OPTIONS.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700">Class</label>
-                <select
-                  name="class"
-                  value={formData.class}
-                  onChange={handleFieldChange}
-                  disabled={classOptions.length === 0}
-                  className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-sm text-slate-900 outline-none transition focus:border-blue-400 focus:bg-white"
-                >
-                  {classOptions.length === 0 ? (
-                    <option value="">No classes configured</option>
-                  ) : (
-                    classOptions.map((option) => (
-                      <option key={option} value={option}>
-                        {option}
-                      </option>
-                    ))
-                  )}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700">Section</label>
-                <select
-                  name="section"
-                  value={formData.section}
-                  onChange={handleFieldChange}
-                  disabled={sectionOptionsForSelectedClass.length === 0}
-                  className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-sm text-slate-900 outline-none transition focus:border-blue-400 focus:bg-white"
-                >
-                  {sectionOptionsForSelectedClass.length === 0 ? (
-                    <option value="">No sections available</option>
-                  ) : (
-                    sectionOptionsForSelectedClass.map((option) => (
-                      <option key={option} value={option}>
-                        {getSectionDisplayName(option)}
-                      </option>
-                    ))
-                  )}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700">Date of Birth</label>
-                <input
-                  type="date"
-                  name="dateOfBirth"
-                  value={formData.dateOfBirth}
-                  onChange={handleFieldChange}
-                  className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-sm text-slate-900 outline-none transition focus:border-blue-400 focus:bg-white"
-                />
-                {renderFieldError('dateOfBirth')}
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700">Admission Date</label>
-                <input
-                  type="date"
-                  name="admissionDate"
-                  value={formData.admissionDate}
-                  onChange={handleFieldChange}
-                  className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-sm text-slate-900 outline-none transition focus:border-blue-400 focus:bg-white"
-                />
-                {renderFieldError('admissionDate')}
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700">Category</label>
-                <select
-                  name="category"
-                  value={formData.category}
-                  onChange={handleFieldChange}
-                  className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-sm text-slate-900 outline-none transition focus:border-blue-400 focus:bg-white"
-                >
-                  {CATEGORY_OPTIONS.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700">Email</label>
-                <input
-                  type="email"
-                  name="email"
-                  value={formData.email}
-                  onChange={handleFieldChange}
-                  className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-sm text-slate-900 outline-none transition focus:border-blue-400 focus:bg-white"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700">Student Phone</label>
-                <input
-                  name="phone"
-                  value={formData.phone}
-                  onChange={handleFieldChange}
-                  inputMode="numeric"
-                  maxLength={10}
-                  className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-sm text-slate-900 outline-none transition focus:border-blue-400 focus:bg-white"
-                />
-                {renderFieldError('phone')}
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700">PEN No.</label>
-                <input
-                  name="penNumber"
-                  value={formData.penNumber}
-                  onChange={handleFieldChange}
-                  className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-sm text-slate-900 outline-none transition focus:border-blue-400 focus:bg-white"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700">Father Name</label>
-                <input
-                  name="fatherName"
-                  value={formData.fatherName}
-                  onChange={handleFieldChange}
-                  className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-sm text-slate-900 outline-none transition focus:border-blue-400 focus:bg-white"
-                />
-                {renderFieldError('fatherName')}
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700">Mother Name</label>
-                <input
-                  name="motherName"
-                  value={formData.motherName}
-                  onChange={handleFieldChange}
-                  className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-sm text-slate-900 outline-none transition focus:border-blue-400 focus:bg-white"
-                />
-                {renderFieldError('motherName')}
-              </div>
-
-              <div className="relative">
-                <label className="block text-xs font-semibold text-slate-700">House (ACTVT)</label>
-                <details className="group relative mt-1">
-                  <summary className="flex cursor-pointer list-none items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-sm text-slate-900 outline-none transition hover:border-slate-300 [&::-webkit-details-marker]:hidden">
-                    {(() => {
-                      const selectedHouse = activityHouses.find((house) => house._id === formData.houseId)
-                      if (!selectedHouse) {
-                        return <span className="text-slate-500">No house</span>
-                      }
-                      const tone = normalizeHouseColorKey(selectedHouse.color || '')
-                      const label = getHouseShortName(selectedHouse.name)
-                      if (!tone) {
-                        return (
-                          <span className="inline-flex items-center rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-700">
-                            {label}
-                          </span>
-                        )
-                      }
-                      return (
-                        <span
-                          className="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold"
-                          style={{ backgroundColor: tone, color: getHouseHeadingTextColor(tone) }}
-                        >
-                          {label}
-                        </span>
-                      )
-                    })()}
-                    <span className="text-[10px] text-slate-400 group-open:rotate-180">▼</span>
-                  </summary>
-
-                  <div className="absolute left-0 right-0 z-30 mt-1 max-h-48 overflow-auto rounded-lg border border-slate-200 bg-white p-1.5 shadow-lg">
-                    <button
-                      type="button"
-                      onClick={(event) => {
-                        const details = (event.currentTarget.closest('details') as HTMLDetailsElement | null)
-                        setFormData((prev) => ({ ...prev, houseId: '', house: '' }))
-                        setFormErrors((prev) => {
-                          if (!prev.house && !prev.houseId) return prev
-                          const next = { ...prev }
-                          delete next.house
-                          delete next.houseId
-                          return next
-                        })
-                        if (details) details.open = false
-                      }}
-                      className={`flex w-full items-center rounded-md px-2 py-1.5 text-left text-xs font-medium transition hover:bg-slate-50 ${
-                        !formData.houseId ? 'bg-slate-100 text-slate-900' : 'text-slate-600'
-                      }`}
-                    >
-                      No house
-                    </button>
-                    {activityHouses.map((house) => {
-                      const tone = normalizeHouseColorKey(house.color || '')
-                      const label = getHouseShortName(house.name)
-                      const isSelected = formData.houseId === house._id
-                      return (
-                        <button
-                          key={house._id}
-                          type="button"
-                          onClick={(event) => {
-                            const details = (event.currentTarget.closest('details') as HTMLDetailsElement | null)
-                            setFormData((prev) => ({
-                              ...prev,
-                              houseId: house._id,
-                              house: house.name,
-                            }))
-                            setFormErrors((prev) => {
-                              if (!prev.house && !prev.houseId) return prev
-                              const next = { ...prev }
-                              delete next.house
-                              delete next.houseId
-                              return next
-                            })
-                            if (details) details.open = false
-                          }}
-                          className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left transition hover:bg-slate-50 ${
-                            isSelected ? 'bg-slate-100' : ''
-                          }`}
-                        >
-                          {tone ? (
-                            <span
-                              className="inline-flex min-w-[4.5rem] items-center justify-center rounded-full px-2 py-0.5 text-[11px] font-semibold"
-                              style={{ backgroundColor: tone, color: getHouseHeadingTextColor(tone) }}
-                              title={house.name}
-                            >
-                              {label}
-                            </span>
-                          ) : (
-                            <span className="inline-flex min-w-[4.5rem] items-center justify-center rounded-full border border-slate-200 bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-700">
-                              {label}
-                            </span>
-                          )}
-                          <span className="truncate text-[11px] text-slate-500">{house.name}</span>
-                        </button>
-                      )
-                    })}
-                  </div>
-                </details>
-                {activityHouses.length === 0 ? (
-                  <p className="mt-1 text-xs text-slate-500">
-                    Add houses in ACTVT → Houses for inter-house competitions.
-                  </p>
-                ) : null}
-                {renderFieldError('house')}
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700">Bus No</label>
-                <input
-                  name="busNo"
-                  value={formData.busNo}
-                  onChange={handleFieldChange}
-                  placeholder="e.g. 12"
-                  className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-sm text-slate-900 outline-none transition focus:border-blue-400 focus:bg-white"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700">Blood Group</label>
-                <select
-                  name="bloodGroup"
-                  value={formData.bloodGroup}
-                  onChange={handleFieldChange}
-                  className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-sm text-slate-900 outline-none transition focus:border-blue-400 focus:bg-white"
-                >
-                  <option value="">Select</option>
-                  {BLOOD_GROUP_OPTIONS.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700">Guardian Phone</label>
-                <input
-                  name="guardianPhone"
-                  value={formData.guardianPhone}
-                  onChange={handleFieldChange}
-                  inputMode="numeric"
-                  maxLength={10}
-                  className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-sm text-slate-900 outline-none transition focus:border-blue-400 focus:bg-white"
-                />
-                {renderFieldError('guardianPhone')}
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700">Religion</label>
-                <input
-                  name="religion"
-                  value={formData.religion}
-                  onChange={handleFieldChange}
-                  className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-sm text-slate-900 outline-none transition focus:border-blue-400 focus:bg-white"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700">Nationality</label>
-                <input
-                  name="nationality"
-                  value={formData.nationality}
-                  onChange={handleFieldChange}
-                  className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-sm text-slate-900 outline-none transition focus:border-blue-400 focus:bg-white"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700">Aadhar Number</label>
-                <input
-                  name="aadharNumber"
-                  value={formData.aadharNumber}
-                  onChange={handleFieldChange}
-                  inputMode="numeric"
-                  maxLength={12}
-                  className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-sm text-slate-900 outline-none transition focus:border-blue-400 focus:bg-white"
-                />
-                {renderFieldError('aadharNumber')}
-              </div>
-
-              <div className="sm:col-span-2 lg:col-span-3 xl:col-span-4">
-                <label className="block text-xs font-semibold text-slate-700">Street Address</label>
-                <input
-                  name="address.street"
-                  value={formData.address.street}
-                  onChange={handleFieldChange}
-                  className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-sm text-slate-900 outline-none transition focus:border-blue-400 focus:bg-white"
-                />
-                {renderFieldError('address.street')}
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700">City</label>
-                <input
-                  name="address.city"
-                  value={formData.address.city}
-                  onChange={handleFieldChange}
-                  className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-sm text-slate-900 outline-none transition focus:border-blue-400 focus:bg-white"
-                />
-                {renderFieldError('address.city')}
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700">State</label>
-                <input
-                  name="address.state"
-                  value={formData.address.state}
-                  onChange={handleFieldChange}
-                  className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-sm text-slate-900 outline-none transition focus:border-blue-400 focus:bg-white"
-                />
-                {renderFieldError('address.state')}
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700">Pincode</label>
-                <input
-                  name="address.pincode"
-                  value={formData.address.pincode}
-                  onChange={handleFieldChange}
-                  inputMode="numeric"
-                  maxLength={6}
-                  className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-sm text-slate-900 outline-none transition focus:border-blue-400 focus:bg-white"
-                />
-                {renderFieldError('address.pincode')}
-              </div>
-
-              <div className="sm:col-span-2 lg:col-span-3 xl:col-span-4">
-                <label className="block text-xs font-semibold text-slate-700">Notes</label>
-                <textarea
-                  name="notes"
-                  value={formData.notes}
-                  onChange={handleFieldChange}
-                  rows={2}
-                  className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-sm text-slate-900 outline-none transition focus:border-blue-400 focus:bg-white"
-                  placeholder="Optional notes about the student record."
-                />
-              </div>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2 border-t border-slate-200 pt-2.5">
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <UserPlus className="h-3.5 w-3.5" />
-                {isSubmitting ? (editingStudentId ? 'Updating...' : 'Saving...') : (editingStudentId ? 'Update Student' : 'Save Student')}
-              </button>
-
-              <button
+                key={sectionName}
                 type="button"
-                onClick={() => resetForm()}
-                className="rounded-lg border border-slate-200 px-3.5 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+                className={`cb-chip${isCurrent ? ' is-active' : ''}`}
+                aria-pressed={isCurrent}
+                disabled={saving}
+                onClick={() =>
+                  isCurrent ? setEditingSectionStudentId(null) : handleSectionChange(student._id, className, sectionName)
+                }
               >
-                Reset
+                {sectionLabel(sectionName)}
               </button>
-            </div>
-          </form>
-          </section>
-        </div>
-      ) : null}
+            )
+          })}
+          <Button
+            variant="tertiary"
+            size="sm"
+            icon={X}
+            aria-label="Keep the current section"
+            onClick={() => setEditingSectionStudentId(null)}
+          />
+        </span>
+      )
+    }
 
-      {viewingStudent ? (
-        <div
-          className="fixed inset-0 z-50 overflow-y-auto bg-black/40 p-3"
-          onClick={() => setViewingStudent(null)}
+    return (
+      <span className="stdnt-name">
+        <span>{className || '—'}</span>
+        <Button
+          variant="tertiary"
+          size="sm"
+          iconRight={ChevronDown}
+          loading={saving}
+          onClick={() => setEditingSectionStudentId(student._id)}
+          aria-label={`Change section for ${student.name}, now ${sectionLabel(displaySection) || 'not set'}`}
         >
-          <section
-            className="mx-auto mt-6 max-w-3xl rounded-2xl border border-slate-200 bg-white shadow-xl"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4">
-              <div className="flex min-w-0 items-center gap-3">
-                <div className="relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-blue-50 text-xl font-semibold text-blue-600">
-                  <span>{String(viewingStudent.name || '?').trim().charAt(0).toUpperCase() || '?'}</span>
-                  {getStudentProfileImageUrl(viewingStudent.profileImage) ? (
-                    <img
-                      src={getStudentProfileImageUrl(viewingStudent.profileImage) || ''}
-                      alt={`${viewingStudent.name || 'Student'} photograph`}
-                      className="absolute h-full w-full object-cover"
-                      onError={(event) => { event.currentTarget.style.display = 'none' }}
-                    />
-                  ) : null}
-                </div>
-                <div className="min-w-0">
-                  <p className="truncate text-lg font-semibold text-slate-900">{viewingStudent.name || 'Student Profile'}</p>
-                  <p className="mt-0.5 text-sm text-slate-500">
-                    Class {viewingStudent.class || '—'} · {getSectionDisplayName(viewingStudent.section) || '—'} · Roll {viewingStudent.classRollNo || '—'}
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setViewingStudent(null)}
-                className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
-              >
-                Close
-              </button>
-            </div>
+          {saving ? 'Saving' : sectionLabel(displaySection) || 'Set section'}
+        </Button>
+      </span>
+    )
+  }
 
-            <div className="grid gap-x-6 gap-y-4 px-5 py-5 sm:grid-cols-2 lg:grid-cols-3">
-              {[
-                ['Admission No.', viewingStudent.rollNumber],
-                ['Gender', viewingStudent.gender],
-                ['Date of Birth', formatDate(viewingStudent.dateOfBirth)],
-                ['Admission Date', formatDate(viewingStudent.admissionDate)],
-                ['Category', viewingStudent.category],
-                ['Blood Group', viewingStudent.medicalInfo?.bloodGroup],
-                ['Father Name', viewingStudent.fatherName],
-                ['Mother Name', viewingStudent.motherName],
-                ['Guardian Phone', viewingStudent.guardianPhone],
-                ['Student Phone', viewingStudent.phone],
-                ['Email', viewingStudent.email],
-                ['PEN No.', viewingStudent.penNumber],
-                ['Aadhaar Number', viewingStudent.aadharNumber],
-                ['House', viewingStudent.house],
-                ['Bus No.', viewingStudent.busNo],
-                ['Religion', viewingStudent.religion],
-                ['Nationality', viewingStudent.nationality],
-                ['Address', formatStudentAddress(viewingStudent.address)],
-              ].map(([label, value]) => (
-                <div key={label} className={label === 'Address' ? 'sm:col-span-2 lg:col-span-3' : ''}>
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{label}</p>
-                  <p className="mt-1 break-words text-sm font-medium text-slate-800">{value || '—'}</p>
-                </div>
-              ))}
-            </div>
-
-            <div className="flex justify-end gap-2 border-t border-slate-200 px-5 py-3">
-              <button
-                type="button"
-                onClick={() => {
-                  const student = viewingStudent
-                  setViewingStudent(null)
-                  handleEditStudentRow(student)
-                }}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3.5 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-700"
-              >
-                <UserPlus className="h-3.5 w-3.5" />
-                Edit Profile
-              </button>
-            </div>
-          </section>
-        </div>
-      ) : null}
-
-      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <div className="max-h-[min(720px,calc(100vh-260px))] overflow-auto">
-          <table className="w-max border-separate border-spacing-0 text-xs leading-snug">
-            <thead>
-              <tr className="text-left text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-                <th className="sticky top-0 z-20 whitespace-nowrap border-b border-slate-200 bg-slate-50 px-2 py-2">
-                  <input
-                    type="checkbox"
-                    checked={allVisibleSelected}
-                    onChange={handleToggleSelectAll}
-                    aria-label="Select all visible students"
-                    className="h-3.5 w-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                  />
-                </th>
-                {[
-                  { label: 'Adm No.', field: 'rollNumber' as const },
-                  { label: 'Roll', field: 'classRollNo' as const },
-                  { label: 'Photo', field: 'photo' as const },
-                  { label: 'Name', field: 'name' as const },
-                  { label: 'Class', field: 'class' as const },
-                  { label: 'Sec', field: 'section' as const },
-                  { label: 'Father', field: 'fatherName' as const },
-                  { label: 'Mother', field: 'motherName' as const },
-                  { label: 'DOB', field: 'dateOfBirth' as const },
-                  { label: 'Gender', field: 'gender' as const },
-                  { label: 'House', field: 'house' as const },
-                  { label: 'Bus', field: 'busNo' as const },
-                  { label: 'Blood', field: 'bloodGroup' as const },
-                  { label: 'Cat', field: 'category' as const },
-                  { label: 'Mobile', field: 'phone' as const },
-                  { label: 'PEN', field: 'penNumber' as const },
-                  { label: 'Address', field: 'address' as const },
-                ].map(({ label, field }) => (
-                  <th
-                    key={field}
-                    className={`sticky top-0 z-20 whitespace-nowrap border-b border-slate-200 bg-slate-50 px-2 py-2 select-none ${field === 'photo' ? '' : 'cursor-pointer hover:text-slate-700'}`}
-                    onClick={field === 'photo' ? undefined : () => handleSort(field)}
-                    title={field === 'photo' ? undefined : `Sort by ${label}`}
-                  >
-                    <span className="inline-flex items-center gap-0.5">
-                      {label}
-                      {tableSortField === field ? (tableSortDirection === 'asc' ? '▲' : '▼') : ''}
-                    </span>
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="bg-white text-xs text-slate-700">
-              {loading ? (
-                <tr>
-                  <td colSpan={18} className="px-1.5 py-8 text-center text-slate-500">
-                    Loading student records...
-                  </td>
-                </tr>
-              ) : students.length === 0 ? (
-                <tr>
-                  <td colSpan={18} className="px-1.5 py-8 text-center text-slate-500">
-                    No students found for the current filters.
-                  </td>
-                </tr>
-              ) : (
-                sortedStudents.map((student) => (
-                  <tr
-                    key={student._id}
-                    className="cursor-pointer hover:bg-slate-50/80"
-                    onClick={() => handleViewStudentProfile(student)}
-                  >
-                    {(() => {
-                      const displaySection = sectionOverrideByStudentId[student._id] ?? student.section
-                      const cell = 'whitespace-nowrap border-b border-slate-100 px-2 py-2.5 align-middle'
-                      return (
-                        <>
-                    <td className={cell} onClick={(event) => event.stopPropagation()}>
-                      <input
-                        type="checkbox"
-                        checked={selectedIds.includes(student._id)}
-                        onChange={() => handleToggleSelect(student._id)}
-                        aria-label={`Select ${student.name}`}
-                        className="h-3.5 w-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                      />
-                    </td>
-                    <td className={`${cell} font-semibold text-slate-900`}>{student.rollNumber}</td>
-                    <td className={cell}>{student.classRollNo || '-'}</td>
-                    <td className={cell}>
-                      <div className="relative flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-blue-50 text-xs font-semibold text-blue-600">
-                        <span>{String(student.name || '?').trim().charAt(0).toUpperCase() || '?'}</span>
-                        {getStudentProfileImageUrl(student.profileImage) ? (
-                          <img
-                            src={getStudentProfileImageUrl(student.profileImage) || ''}
-                            alt={`${student.name || 'Student'} photograph`}
-                            className="absolute h-10 w-10 rounded-full object-cover"
-                            onError={(event) => { event.currentTarget.style.display = 'none' }}
-                          />
-                        ) : null}
-                      </div>
-                    </td>
-                    <td className={`${cell} font-semibold text-slate-900`}>{student.name}</td>
-                    <td className={cell}>{student.class}</td>
-                    <td className={cell} onClick={(event) => event.stopPropagation()}>
-                      {editingSectionStudentId === student._id ? (
-                        (() => {
-                          const availableSections = getSectionsForClass(String(student.class || ''))
-
-                          return (
-                            <div className="flex flex-nowrap gap-0.5">
-                              {availableSections.map((sectionName) => {
-                                const isCurrent = normalizeSectionKey(sectionName) === normalizeSectionKey(String(displaySection || ''))
-                                return (
-                                  <button
-                                    key={sectionName}
-                                    type="button"
-                                    onClick={() => handleSectionChange(student._id, String(student.class || ''), sectionName)}
-                                    disabled={Boolean(sectionUpdateLoadingById[student._id])}
-                                    className={`inline-flex items-center rounded-full border px-1.5 py-0 text-[10px] font-semibold transition ${
-                                      isCurrent
-                                        ? 'border-blue-300 bg-blue-600 text-white'
-                                        : 'border-blue-200 bg-white text-blue-800 hover:border-blue-300 hover:bg-blue-50'
-                                    } disabled:cursor-not-allowed disabled:opacity-60`}
-                                    title={`Set section ${getSectionDisplayName(sectionName)} for ${student.name}`}
-                                    aria-label={`Set section ${getSectionDisplayName(sectionName)} for ${student.name}`}
-                                  >
-                                    {getSectionDisplayName(sectionName)}
-                                  </button>
-                                )
-                              })}
-                            </div>
-                          )
-                        })()
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => setEditingSectionStudentId(student._id)}
-                          disabled={Boolean(sectionUpdateLoadingById[student._id])}
-                          className="inline-flex items-center rounded-full border border-blue-200 bg-blue-100 px-1.5 py-0 text-[10px] font-semibold text-blue-800 transition hover:border-blue-300 hover:bg-blue-200 disabled:cursor-not-allowed disabled:opacity-60"
-                          title={`Change section for ${student.name}`}
-                          aria-label={`Change section for ${student.name}`}
-                        >
-                          {sectionUpdateLoadingById[student._id] ? 'Saving...' : (getSectionDisplayName(String(displaySection || '')) || '-')}
-                        </button>
-                      )}
-                    </td>
-                    <td className={cell}>{student.fatherName || '-'}</td>
-                    <td className={cell}>{student.motherName || '-'}</td>
-                    <td className={cell}>{formatDate(student.dateOfBirth)}</td>
-                    <td className={cell}>{formatGender(student.gender)}</td>
-                    <td className={cell}>
-                      {(() => {
-                        const houseRecord = resolveStudentHouse(student, activityHouses)
-                        const houseLabel = getHouseShortName(houseRecord?.name || student.house || '')
-                        if (houseLabel === '-') return '-'
-                        const tone = normalizeHouseColorKey(houseRecord?.color || '') || ''
-                        if (!tone) {
-                          return (
-                            <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-100 px-1.5 py-0 text-[10px] font-semibold text-slate-700">
-                              {houseLabel}
-                            </span>
-                          )
-                        }
-                        return (
-                          <span
-                            className="inline-flex items-center rounded-full px-1.5 py-0 text-[10px] font-semibold"
-                            style={{
-                              backgroundColor: tone,
-                              color: getHouseHeadingTextColor(tone),
-                            }}
-                            title={houseRecord?.name || student.house}
-                          >
-                            {houseLabel}
-                          </span>
-                        )
-                      })()}
-                    </td>
-                    <td className={cell}>{student.busNo || '-'}</td>
-                    <td className={cell}>
-                      <BloodGroupDrop value={getStudentBloodGroup(student)} />
-                    </td>
-                    <td className={cell}>{student.category || '-'}</td>
-                    <td className={cell}>{student.phone || '-'}</td>
-                    <td className={cell}>{student.penNumber || '-'}</td>
-                    <td className="max-w-[140px] border-b border-slate-100 px-2 py-1.5 align-middle">
-                      <span className="line-clamp-1 whitespace-normal" title={formatStudentAddress(student.address)}>
-                        {formatStudentAddress(student.address)}
-                      </span>
-                    </td>
-                        </>
-                      )
-                    })()}
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="flex items-center justify-between border-t border-slate-200 px-4 py-2.5 text-xs text-slate-500">
-          <span>
-            Page {pagination.currentPage} of {pagination.totalPages} · {pagination.totalItems} students
+  const columns: DataTableColumn<any>[] = [
+    {
+      key: 'name',
+      header: 'Student',
+      sortable: true,
+      mobile: 'title',
+      render: (student) => (
+        <span className="stdnt-name">
+          <Avatar name={student.name || 'Student'} src={studentPhotoUrl(student.profileImage)} size="md" />
+          <span className="stdnt-name__text">
+            <span className="stdnt-name__primary">{student.name || '—'}</span>
+            <span className="stdnt-name__secondary is-num">Adm. no. {orDash(student.rollNumber)}</span>
           </span>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
-              disabled={!pagination.hasPrevPage}
-              className="rounded-xl border border-slate-200 px-3 py-2 font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+        </span>
+      ),
+    },
+    {
+      key: 'class',
+      header: 'Class and section',
+      headerLabel: 'Class and section',
+      sortable: true,
+      interactive: true,
+      mobile: 'subtitle',
+      render: renderClassSection,
+    },
+    {
+      key: 'classRollNo',
+      header: 'Roll no.',
+      sortable: true,
+      numeric: true,
+      align: 'right',
+      render: (student) => orDash(student.classRollNo),
+    },
+    { key: 'fatherName', header: "Father's name", sortable: true, render: (s) => orDash(s.fatherName) },
+    {
+      key: 'motherName',
+      header: "Mother's name",
+      sortable: true,
+      mobile: 'hidden',
+      render: (s) => orDash(s.motherName),
+    },
+    {
+      key: 'dateOfBirth',
+      header: 'Date of birth',
+      sortable: true,
+      numeric: true,
+      render: (s) => formatDate(s.dateOfBirth),
+    },
+    { key: 'gender', header: 'Gender', sortable: true, render: (s) => normalizeGender(s.gender) },
+    { key: 'house', header: 'House', sortable: true, render: renderHouse },
+    { key: 'phone', header: 'Mobile', sortable: true, numeric: true, render: (s) => orDash(s.phone || s.guardianPhone) },
+    { key: 'busNo', header: 'Bus', sortable: true, mobile: 'hidden', render: (s) => orDash(s.busNo) },
+    {
+      key: 'bloodGroup',
+      header: 'Blood group',
+      sortable: true,
+      mobile: 'hidden',
+      render: (s) => orDash(s?.medicalInfo?.bloodGroup),
+    },
+    { key: 'category', header: 'Category', sortable: true, mobile: 'hidden', render: (s) => orDash(s.category) },
+    { key: 'penNumber', header: 'PEN no.', sortable: true, mobile: 'hidden', render: (s) => orDash(s.penNumber) },
+    {
+      key: 'address',
+      header: 'Address',
+      sortable: true,
+      mobile: 'hidden',
+      render: (s) => {
+        const address = formatAddress(s.address)
+        return address ? (
+          <span className="stdnt-address" title={address}>
+            {address}
+          </span>
+        ) : (
+          '—'
+        )
+      },
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      mobile: 'aside',
+      render: (s) =>
+        s.isActive === false ? <Badge tone="neutral">Inactive</Badge> : <Badge tone="success">Active</Badge>,
+    },
+    {
+      key: 'actions',
+      header: <span className="cb-visually-hidden">Actions</span>,
+      headerLabel: 'Actions',
+      interactive: true,
+      mobile: 'hidden',
+      width: 48,
+      render: (student) => (
+        <Menu
+          label={`Actions for ${student.name}`}
+          items={[
+            { label: 'Open profile', icon: UserRound, onSelect: () => handleViewStudentProfile(student) },
+            { label: 'Edit details', icon: Pencil, onSelect: () => handleEditStudentRow(student) },
+          ]}
+        />
+      ),
+    },
+  ]
+
+  const formFooter = (
+    <>
+      <Button onClick={closeForm} disabled={isSubmitting}>
+        Cancel
+      </Button>
+      <Button type="submit" variant="primary" loading={isSubmitting}>
+        {isSubmitting ? 'Saving' : editingStudentId ? 'Save changes' : 'Add student'}
+      </Button>
+    </>
+  )
+
+  return (
+    <Page width="full">
+      {pageMessage && !isFormOpen ? (
+        <Banner tone={pageMessage.tone === 'success' ? 'success' : 'danger'} onDismiss={() => setPageMessage(null)}>
+          {pageMessage.text}
+        </Banner>
+      ) : null}
+
+      <section className="cb-stats" aria-label="Student totals">
+        <StatCard
+          label="Students"
+          value={formatCount(totalCount)}
+          icon={Users}
+          hint={`${formatCount(activeCount)} active`}
+        />
+        <StatCard label="Boys" value={formatCount(boysCount)} hint={`${totalCount ? Math.round((boysCount / totalCount) * 100) : 0}% of students`} />
+        <StatCard label="Girls" value={formatCount(girlsCount)} hint={`${totalCount ? Math.round((girlsCount / totalCount) * 100) : 0}% of students`} />
+        <StatCard
+          label="Classes"
+          value={formatCount(totalClasses)}
+          icon={LayoutGrid}
+          hint={`${formatCount(totalClassSections)} class sections`}
+        />
+      </section>
+
+      <Card flush className="stdnt-list-card">
+        <div className="stdnt-toolbar">
+          <FilterBar
+            search={{
+              placeholder: 'Search name, admission no. or phone',
+              value: searchTerm,
+              onChange: setSearchTerm,
+              label: 'Search students',
+            }}
+            filters={
+              <>
+                <Select
+                  aria-label="Class"
+                  size="sm"
+                  value={classFilter}
+                  onChange={(event) => {
+                    setClassFilter(event.target.value)
+                    setSectionFilter('')
+                  }}
+                  placeholder="All classes"
+                  options={classOptions.map((option) => ({ value: option, label: classLabel(option) }))}
+                />
+                <Select
+                  aria-label="Section"
+                  size="sm"
+                  value={sectionFilter}
+                  onChange={(event) => setSectionFilter(event.target.value)}
+                  placeholder="All sections"
+                  options={filterSectionOptions.map((option) => ({ value: option, label: sectionLabel(option) }))}
+                />
+                {hasFilters ? (
+                  <Button variant="tertiary" size="sm" onClick={clearFilters}>
+                    Clear filters
+                  </Button>
+                ) : null}
+              </>
+            }
+            actions={
+              <>
+                <input
+                  ref={templateInputRef}
+                  type="file"
+                  accept=".csv,.xlsx"
+                  aria-label="Upload filled student template"
+                  onChange={handleUploadTemplate}
+                  hidden
+                />
+                <Menu
+                  align="end"
+                  items={[
+                    {
+                      label: isTemplateDownloading ? 'Downloading template…' : 'Download template',
+                      icon: Download,
+                      disabled: isTemplateDownloading || isTemplateUploading,
+                      onSelect: handleDownloadTemplate,
+                    },
+                    {
+                      label: isTemplateUploading ? 'Importing…' : 'Import filled template',
+                      icon: Upload,
+                      hint: '.xlsx or .csv',
+                      disabled: isTemplateDownloading || isTemplateUploading,
+                      onSelect: () => templateInputRef.current?.click(),
+                    },
+                  ]}
+                  trigger={(props) => (
+                    <Button
+                      size="sm"
+                      icon={FileSpreadsheet}
+                      iconRight={ChevronDown}
+                      loading={isTemplateUploading || isTemplateDownloading}
+                      {...props}
+                    >
+                      Import
+                    </Button>
+                  )}
+                />
+                <Button variant="primary" size="sm" icon={UserPlus} onClick={openAddForm}>
+                  Add student
+                </Button>
+              </>
+            }
+          />
+          {selectedCount > 0 ? (
+            <div className="stdnt-bulkbar" role="region" aria-label="Bulk actions">
+              <span className="is-num">
+                {selectedCount} {selectedCount === 1 ? 'student' : 'students'} selected
+              </span>
+              <span className="stdnt-bulkbar__spacer" />
+              <Button variant="tertiary" size="sm" onClick={() => setSelectedIds([])} disabled={isBulkDeleting}>
+                Clear selection
+              </Button>
+              <Button
+                size="sm"
+                icon={Trash2}
+                loading={isBulkDeleting}
+                onClick={() => setConfirmDeleteOpen(true)}
+              >
+                {isBulkDeleting ? 'Deleting' : 'Delete'}
+              </Button>
+            </div>
+          ) : null}
+        </div>
+
+        <DataTable
+          caption="Students"
+          columns={columns}
+          rows={sortedStudents as any[]}
+          getRowKey={(student) => student._id}
+          onRowClick={handleViewStudentProfile}
+          loading={loading}
+          loadingLabel="Loading students"
+          maxHeight="min(720px, calc(100vh - 300px))"
+          sort={tableSortField ? { key: tableSortField, direction: tableSortDirection } : null}
+          onSort={(key) => handleSort(key as NonNullable<typeof tableSortField>)}
+          selection={{
+            isSelected: (student) => selectedIds.includes(student._id),
+            onToggle: (student) => handleToggleSelect(student._id),
+            allSelected: allVisibleSelected,
+            someSelected: visibleStudentIds.some((id) => selectedIds.includes(id)),
+            onToggleAll: handleToggleSelectAll,
+            rowLabel: (student) => `Select ${student.name}`,
+          }}
+          empty={
+            hasFilters ? (
+              <EmptyState
+                compact
+                icon={SearchX}
+                title="No students match these filters"
+                body="Try another name or admission number, or clear the filters."
+                action={
+                  <Button size="sm" onClick={clearFilters}>
+                    Clear filters
+                  </Button>
+                }
+              />
+            ) : (
+              <EmptyState
+                compact
+                icon={Users}
+                title="No students added yet"
+                body="Add students one at a time, or download the template and import the whole school at once."
+                action={
+                  <>
+                    <Button size="sm" icon={Download} onClick={handleDownloadTemplate} loading={isTemplateDownloading}>
+                      Download template
+                    </Button>
+                    <Button variant="primary" size="sm" icon={UserPlus} onClick={openAddForm}>
+                      Add student
+                    </Button>
+                  </>
+                }
+              />
+            )
+          }
+          footer={
+            pagination.totalItems > 0 ? (
+              <>
+                <span className="is-num">
+                  {formatCount(pagination.totalItems)} students · page {pagination.currentPage} of {pagination.totalPages}
+                </span>
+                <span className="stdnt-pager">
+                  <Button
+                    size="sm"
+                    onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
+                    disabled={!pagination.hasPrevPage}
+                  >
+                    Previous
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={() => setPage((prev) => (pagination.hasNextPage ? prev + 1 : prev))}
+                    disabled={!pagination.hasNextPage}
+                  >
+                    Next
+                  </Button>
+                </span>
+              </>
+            ) : null
+          }
+        />
+      </Card>
+
+      <Dialog
+        open={confirmDeleteOpen}
+        onClose={() => setConfirmDeleteOpen(false)}
+        tone="danger"
+        size="sm"
+        title={`Delete ${selectedCount} ${selectedCount === 1 ? 'student' : 'students'}?`}
+        description="Their records are removed from this session, including class, section and contact details. This can't be undone."
+        footer={
+          <>
+            <Button onClick={() => setConfirmDeleteOpen(false)}>Keep students</Button>
+            <Button
+              variant="danger"
+              icon={Trash2}
+              onClick={() => {
+                setConfirmDeleteOpen(false)
+                handleBulkDelete()
+              }}
             >
-              Previous
-            </button>
-            <button
-              type="button"
-              onClick={() => setPage((prev) => (pagination.hasNextPage ? prev + 1 : prev))}
-              disabled={!pagination.hasNextPage}
-              className="rounded-xl border border-slate-200 px-3 py-2 font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Next
-            </button>
+              Delete {selectedCount} {selectedCount === 1 ? 'student' : 'students'}
+            </Button>
+          </>
+        }
+      />
+
+      <Sheet
+        open={isFormOpen}
+        onClose={closeForm}
+        size="xl"
+        title={editingStudentId ? `Edit ${formData.name || 'student'}` : 'Add student'}
+        description={
+          editingStudentId
+            ? 'Changes apply to this session’s record.'
+            : 'Fields marked * are required. To add many students, use Import instead.'
+        }
+        onSubmit={handleSubmit}
+        footer={formFooter}
+      >
+        {pageMessage?.tone === 'error' ? (
+          <Banner tone="danger" onDismiss={() => setPageMessage(null)}>
+            {pageMessage.text}
+          </Banner>
+        ) : null}
+
+        <div
+          className={`stdnt-photo${isPhotoDragActive ? ' is-dragging' : ''}`}
+          onDragOver={(event) => {
+            event.preventDefault()
+            setIsPhotoDragActive(true)
+          }}
+          onDragLeave={(event) => {
+            if (event.currentTarget === event.target) setIsPhotoDragActive(false)
+          }}
+          onDrop={handlePhotoDrop}
+        >
+          <span className="stdnt-photo__preview">
+            {selectedPhotoPreview ? <img src={selectedPhotoPreview} alt="Selected photograph" /> : <ImagePlus size={22} strokeWidth={1.75} aria-hidden />}
+          </span>
+          <span className="stdnt-photo__text">
+            <span className="stdnt-photo__title">{selectedPhoto ? selectedPhoto.name : 'Photograph'}</span>
+            <span className="stdnt-photo__hint">
+              {selectedPhoto
+                ? `${Math.max(1, Math.round(selectedPhoto.size / 1024))} KB`
+                : 'JPEG, PNG or WebP up to 5 MB. Drag a photo here or choose one.'}
+            </span>
+          </span>
+          <span className="stdnt-photo__actions">
+            <input ref={photoInputRef} type="file" accept="image/*" onChange={handlePhotoSelect} hidden />
+            <Button size="sm" icon={Upload} onClick={() => photoInputRef.current?.click()}>
+              {selectedPhoto ? 'Change photo' : 'Choose photo'}
+            </Button>
+            {selectedPhoto ? (
+              <Button variant="tertiary" size="sm" onClick={clearSelectedPhoto}>
+                Remove
+              </Button>
+            ) : null}
+          </span>
+        </div>
+
+        <div className="cb-form-section">
+          <h3 className="cb-form-section__title">Student</h3>
+          <div className="cb-form-grid">
+            <TextField
+              label="Student name"
+              required
+              name="name"
+              value={formData.name}
+              onChange={handleFieldChange}
+              error={fieldError('name')}
+              autoComplete="off"
+              className="is-wide"
+            />
+            <TextField
+              label="Admission no."
+              required
+              name="rollNumber"
+              value={formData.rollNumber}
+              onChange={handleFieldChange}
+              error={fieldError('rollNumber')}
+              placeholder="e.g. 4959"
+            />
+            <TextField
+              label="Roll no."
+              value={formData.classRollNo || (editingStudentId ? '—' : '')}
+              placeholder="Assigned automatically"
+              readOnly
+              hint="Set by class and section, in alphabetical order."
+            />
+            <Select
+              label="Class"
+              required
+              name="class"
+              value={formData.class}
+              onChange={handleFieldChange}
+              disabled={classOptions.length === 0}
+              error={fieldError('class')}
+              options={
+                classOptions.length === 0
+                  ? [{ value: '', label: 'No classes set up yet' }]
+                  : classOptions.map((option) => ({ value: option, label: classLabel(option) }))
+              }
+            />
+            <Select
+              label="Section"
+              required
+              name="section"
+              value={formData.section}
+              onChange={handleFieldChange}
+              disabled={sectionOptionsForSelectedClass.length === 0}
+              error={fieldError('section')}
+              options={
+                sectionOptionsForSelectedClass.length === 0
+                  ? [{ value: '', label: 'No sections for this class' }]
+                  : sectionOptionsForSelectedClass.map((option) => ({ value: option, label: sectionLabel(option) }))
+              }
+            />
+            <Select
+              label="Gender"
+              name="gender"
+              value={formData.gender}
+              onChange={handleFieldChange}
+              options={GENDER_OPTIONS.map((option) => ({
+                value: option,
+                label: option === 'Unspecified' ? 'Not recorded' : option,
+              }))}
+            />
+            <TextField
+              label="Date of birth"
+              required
+              type="date"
+              name="dateOfBirth"
+              value={formData.dateOfBirth}
+              onChange={handleFieldChange}
+              error={fieldError('dateOfBirth')}
+            />
+            <TextField
+              label="Admission date"
+              required
+              type="date"
+              name="admissionDate"
+              value={formData.admissionDate}
+              onChange={handleFieldChange}
+              error={fieldError('admissionDate')}
+            />
+            <Checkbox
+              className="is-wide"
+              label="Active student"
+              description="Inactive students stay on record but are left out of class lists and counts of active students."
+              checked={formData.isActive}
+              onChange={setActive}
+            />
           </div>
         </div>
-      </section>
-    </div>
+
+        <div className="cb-form-section">
+          <h3 className="cb-form-section__title">Family and contact</h3>
+          <div className="cb-form-grid">
+            <TextField
+              label="Father's name"
+              required
+              name="fatherName"
+              value={formData.fatherName}
+              onChange={handleFieldChange}
+              error={fieldError('fatherName')}
+            />
+            <TextField
+              label="Mother's name"
+              required
+              name="motherName"
+              value={formData.motherName}
+              onChange={handleFieldChange}
+              error={fieldError('motherName')}
+            />
+            <TextField
+              label="Guardian's phone"
+              required
+              name="guardianPhone"
+              type="tel"
+              inputMode="numeric"
+              maxLength={10}
+              value={formData.guardianPhone}
+              onChange={handleFieldChange}
+              error={fieldError('guardianPhone')}
+              hint="10 digits"
+            />
+            <TextField
+              label="Student's phone"
+              name="phone"
+              type="tel"
+              inputMode="numeric"
+              maxLength={10}
+              value={formData.phone}
+              onChange={handleFieldChange}
+              error={fieldError('phone')}
+            />
+            <TextField
+              label="Email"
+              type="email"
+              name="email"
+              value={formData.email}
+              onChange={handleFieldChange}
+              className="is-wide"
+            />
+          </div>
+        </div>
+
+        <div className="cb-form-section">
+          <h3 className="cb-form-section__title">Address</h3>
+          <div className="cb-form-grid">
+            <TextField
+              label="Street address"
+              required
+              name="address.street"
+              value={formData.address.street}
+              onChange={handleFieldChange}
+              error={fieldError('address.street')}
+              className="is-wide"
+            />
+            <TextField
+              label="City"
+              required
+              name="address.city"
+              value={formData.address.city}
+              onChange={handleFieldChange}
+              error={fieldError('address.city')}
+            />
+            <TextField
+              label="State"
+              required
+              name="address.state"
+              value={formData.address.state}
+              onChange={handleFieldChange}
+              error={fieldError('address.state')}
+            />
+            <TextField
+              label="Pincode"
+              required
+              name="address.pincode"
+              inputMode="numeric"
+              maxLength={6}
+              value={formData.address.pincode}
+              onChange={handleFieldChange}
+              error={fieldError('address.pincode')}
+            />
+          </div>
+        </div>
+
+        <div className="cb-form-section">
+          <h3 className="cb-form-section__title">Other details</h3>
+          <div className="cb-form-grid">
+            <div className="cb-field is-wide" role="group" aria-labelledby="stdnt-house-label">
+              <span id="stdnt-house-label" className="cb-field__label">
+                House
+              </span>
+              {activityHouses.length === 0 ? (
+                <span className="cb-field__hint">No houses yet. Add them under Activities, then pick one here.</span>
+              ) : (
+                <span className="stdnt-houses">
+                  {[{ _id: '', name: 'No house', color: undefined as string | undefined }, ...activityHouses].map((house) => {
+                    const on = formData.houseId === house._id
+                    const swatch = normalizeHouseColorKey(house.color || '')
+                    return (
+                      <button
+                        key={house._id || 'none'}
+                        type="button"
+                        className={`cb-chip${on ? ' is-active' : ''}`}
+                        aria-pressed={on}
+                        onClick={() => selectHouse(house._id)}
+                        title={house.name}
+                      >
+                        {swatch ? <span className="stdnt-house__swatch" style={{ background: swatch }} aria-hidden="true" /> : null}
+                        {house._id ? getHouseShortName(house.name) : house.name}
+                      </button>
+                    )
+                  })}
+                </span>
+              )}
+              {fieldError('house') ? <span className="cb-field__error">{fieldError('house')}</span> : null}
+            </div>
+            <Select
+              label="Category"
+              name="category"
+              value={formData.category}
+              onChange={handleFieldChange}
+              options={[...CATEGORY_OPTIONS]}
+            />
+            <Select
+              label="Blood group"
+              name="bloodGroup"
+              value={formData.bloodGroup}
+              onChange={handleFieldChange}
+              placeholder="Not recorded"
+              options={[...BLOOD_GROUP_OPTIONS]}
+            />
+            <TextField label="Bus no." name="busNo" value={formData.busNo} onChange={handleFieldChange} placeholder="e.g. 12" />
+            <TextField label="PEN no." name="penNumber" value={formData.penNumber} onChange={handleFieldChange} />
+            <TextField
+              label="Aadhaar number"
+              name="aadharNumber"
+              inputMode="numeric"
+              maxLength={12}
+              value={formData.aadharNumber}
+              onChange={handleFieldChange}
+              error={fieldError('aadharNumber')}
+              hint="12 digits"
+            />
+            <TextField label="Religion" name="religion" value={formData.religion} onChange={handleFieldChange} />
+            <TextField label="Nationality" name="nationality" value={formData.nationality} onChange={handleFieldChange} />
+            <TextArea
+              label="Notes"
+              name="notes"
+              rows={3}
+              value={formData.notes}
+              onChange={handleFieldChange}
+              placeholder="Anything the office should know about this student."
+              className="is-wide"
+            />
+          </div>
+        </div>
+      </Sheet>
+    </Page>
   )
 }
 

@@ -299,35 +299,35 @@
 
 /* ---------- Text field ---------- */
 
-.cb-field {
+.cb-auth .cb-field {
   display: flex;
   flex-direction: column;
   gap: 6px;
   min-width: 0;
 }
-.cb-field-head {
+.cb-auth .cb-field-head {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: var(--space-3);
 }
-.cb-field-label {
+.cb-auth .cb-field-label {
   font-size: 13px;
   line-height: 18px;
   font-weight: 500;
   color: var(--ink);
 }
-.cb-field-head a {
+.cb-auth .cb-field-head a {
   font-size: 13px;
   line-height: 18px;
   font-weight: 500;
 }
-.cb-field-control {
+.cb-auth .cb-field-control {
   position: relative;
   display: flex;
   align-items: center;
 }
-.cb-field-icon {
+.cb-auth .cb-field-icon {
   position: absolute;
   left: 12px;
   display: inline-flex;
@@ -379,13 +379,13 @@
   letter-spacing: 0.3em;
   font-variant-numeric: tabular-nums;
 }
-.cb-field-hint {
+.cb-auth .cb-field-hint {
   margin: 0;
   font-size: 13px;
   line-height: 18px;
   color: var(--ink-muted);
 }
-.cb-field-error {
+.cb-auth .cb-field-error {
   display: flex;
   gap: 6px;
   align-items: flex-start;
@@ -394,14 +394,14 @@
   line-height: 18px;
   color: var(--danger-ink);
 }
-.cb-field-error svg {
+.cb-auth .cb-field-error svg {
   flex: 0 0 auto;
   margin-top: 1px;
 }
 
 /* ---------- Checkbox ---------- */
 
-.cb-check {
+.cb-auth .cb-check {
   display: inline-flex;
   align-items: center;
   gap: 10px;
@@ -438,19 +438,19 @@
   margin: -8px 0;
 }
 
-.cb-check[data-described] {
+.cb-auth .cb-check[data-described] {
   align-items: flex-start;
   min-height: 0;
 }
-.cb-check[data-described] input {
+.cb-auth .cb-check[data-described] input {
   margin-top: 1px;
 }
-.cb-check-text {
+.cb-auth .cb-check-text {
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
-.cb-check-desc {
+.cb-auth .cb-check-desc {
   font-size: 13px;
   line-height: 18px;
   color: var(--ink-muted);
@@ -471,7 +471,7 @@
 
 /* ---------- Badges ---------- */
 
-.cb-badge {
+.cb-auth .cb-badge {
   display: inline-flex;
   align-items: center;
   height: 22px;
@@ -484,7 +484,7 @@
   background: var(--neutral-soft);
   color: var(--neutral-ink);
 }
-.cb-badge[data-tone="info"] {
+.cb-auth .cb-badge[data-tone="info"] {
   background: var(--info-soft);
   color: var(--info-ink);
 }
@@ -562,7 +562,7 @@
 
 /* ---------- Buttons ---------- */
 
-.cb-btn {
+.cb-auth .cb-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -576,28 +576,28 @@
   cursor: pointer;
   transition: background-color 0.12s ease, border-color 0.12s ease;
 }
-.cb-btn-primary {
+.cb-auth .cb-btn-primary {
   background: var(--accent-strong);
   color: var(--on-accent);
 }
-.cb-btn-primary:hover:not(:disabled) {
+.cb-auth .cb-btn-primary:hover:not(:disabled) {
   background: var(--accent-strong-hover);
 }
-.cb-btn-secondary {
+.cb-auth .cb-btn-secondary {
   background: var(--surface);
   color: var(--ink);
   border-color: var(--border-control);
 }
-.cb-btn-secondary:hover:not(:disabled) {
+.cb-auth .cb-btn-secondary:hover:not(:disabled) {
   background: var(--surface-hover);
 }
-.cb-btn-tertiary {
+.cb-auth .cb-btn-tertiary {
   width: auto;
   align-self: flex-start;
   background: transparent;
   color: var(--accent-strong);
 }
-.cb-btn-tertiary:hover:not(:disabled) {
+.cb-auth .cb-btn-tertiary:hover:not(:disabled) {
   background: var(--surface-hover);
   color: var(--accent-strong-hover);
 }
@@ -605,15 +605,15 @@
 .cb-auth a.cb-btn-primary:hover {
   color: var(--on-accent);
 }
-.cb-btn:disabled {
+.cb-auth .cb-btn:disabled {
   cursor: not-allowed;
   opacity: 0.8;
 }
-.cb-btn:focus-visible {
+.cb-auth .cb-btn:focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
-.cb-btn-link {
+.cb-auth .cb-btn-link {
   align-self: center;
   padding: 10px 4px;
   font: 500 14px/20px var(--font-sans);
@@ -622,10 +622,10 @@
   border: 0;
   cursor: pointer;
 }
-.cb-btn-link:hover {
+.cb-auth .cb-btn-link:hover {
   color: var(--accent-strong-hover);
 }
-.cb-spinner {
+.cb-auth .cb-spinner {
   width: 16px;
   height: 16px;
   border: 2px solid currentColor;
@@ -639,42 +639,42 @@
 
 /* ---------- Strength meter ---------- */
 
-.cb-progress {
+.cb-auth .cb-progress {
   display: flex;
   flex-direction: column;
   gap: 6px;
   margin-top: 4px;
   animation: cb-auth-fade 0.15s ease-out both;
 }
-.cb-progress-head {
+.cb-auth .cb-progress-head {
   display: flex;
   justify-content: space-between;
   font-size: 13px;
   line-height: 18px;
   color: var(--ink-muted);
 }
-.cb-progress-value {
+.cb-auth .cb-progress-value {
   font-weight: 600;
   color: var(--ink);
 }
-.cb-progress-track {
+.cb-auth .cb-progress-track {
   height: 4px;
   border-radius: 9999px;
   background: var(--surface-sunken);
   overflow: hidden;
 }
-.cb-progress-fill {
+.cb-auth .cb-progress-fill {
   height: 100%;
   border-radius: 9999px;
   transition: width 0.2s ease-out;
 }
-.cb-progress-fill[data-tone="danger"] { background: var(--danger-solid); }
-.cb-progress-fill[data-tone="warning"] { background: var(--warning-solid); }
-.cb-progress-fill[data-tone="success"] { background: var(--success-solid); }
+.cb-auth .cb-progress-fill[data-tone="danger"] { background: var(--danger-solid); }
+.cb-auth .cb-progress-fill[data-tone="warning"] { background: var(--warning-solid); }
+.cb-auth .cb-progress-fill[data-tone="success"] { background: var(--success-solid); }
 
 /* ---------- Callout ---------- */
 
-.cb-callout {
+.cb-auth .cb-callout {
   display: flex;
   gap: 10px;
   align-items: flex-start;
@@ -686,16 +686,16 @@
   background: var(--danger-soft);
   color: var(--danger-ink);
 }
-.cb-callout[data-tone="success"] {
+.cb-auth .cb-callout[data-tone="success"] {
   border-color: var(--success-border);
   background: var(--success-soft);
   color: var(--success-ink);
 }
-.cb-callout svg {
+.cb-auth .cb-callout svg {
   flex: 0 0 auto;
   margin-top: 2px;
 }
-.cb-callout p {
+.cb-auth .cb-callout p {
   margin: 0;
 }
 
@@ -753,11 +753,11 @@
 
 @media (prefers-reduced-motion: reduce) {
   .cb-auth-photo img,
-  .cb-progress,
-  .cb-spinner {
+  .cb-auth .cb-progress,
+  .cb-auth .cb-spinner {
     animation: none;
   }
-  .cb-progress-fill {
+  .cb-auth .cb-progress-fill {
     transition: none;
   }
 }

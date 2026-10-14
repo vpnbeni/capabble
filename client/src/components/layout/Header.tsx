@@ -8,6 +8,15 @@ import { isFeatureEnabledForPath } from '@/constants/featureAccess'
 import { useCentreDetails } from '@/hooks/useCentreDetails'
 import { useOnboardingStatus } from '@/hooks/useOnboarding'
 import { AttndModeSwitch } from '@/components/attnd/AttndModeSwitch'
+import { Bell, CalendarDays, PanelLeft, Search } from 'lucide-react'
+import { Badge, Button } from '@/components/ui'
+
+/** "2026-2027" → "2026–27", as schools write it. */
+const formatSessionLabel = (session: string) => {
+  const match = String(session).match(/^(\d{4})\s*[-–]\s*(\d{2,4})$/)
+  if (!match) return session
+  return `${match[1]}–${match[2].slice(-2)}`
+}
 
 type HeaderProps = {
   isSidebarCollapsed: boolean
@@ -248,14 +257,14 @@ const Header: React.FC<HeaderProps> = ({ isSidebarCollapsed, onToggleSidebar }) 
       case 'stdnt': {
         const subPage = segments[1] || ''
         const titleMap: Record<string, { title: string; subtitle: string }> = {
-          'classes': { title: 'Classes', subtitle: 'Manage classes and sections for student record organization.' },
-          stdntboard: { title: 'Stdntboard', subtitle: 'Dashboard view of student counts, sections, gender split, and age distribution.' },
-          'student-info': { title: 'Stdntboard', subtitle: 'Dashboard view of student counts, sections, gender split, and age distribution.' },
-          'students': { title: 'Students', subtitle: 'Create, import, filter, and manage student records stored in the database.' },
-          alumni: { title: 'Alumni Directory', subtitle: 'Passed-out Class XII students, kept across sessions' },
-          'subjects': { title: 'Subjects', subtitle: 'Manage subjects taught in the classes.' },
+          'classes': { title: 'Classes', subtitle: 'Classes and the sections in each, for this session.' },
+          stdntboard: { title: 'Overview', subtitle: 'Student strength by class and section, gender split and ages.' },
+          'student-info': { title: 'Overview', subtitle: 'Student strength by class and section, gender split and ages.' },
+          'students': { title: 'Students', subtitle: 'Add, import and manage student records for this session.' },
+          alumni: { title: 'Alumni', subtitle: 'Students who passed out of Class 12, kept across sessions.' },
+          'subjects': { title: 'Subjects', subtitle: 'Subjects taught in each class this session.' },
         }
-        const info = titleMap[subPage] || { title: 'STDNT', subtitle: 'Student management workspace' }
+        const info = titleMap[subPage] || { title: 'Students', subtitle: 'Student records for this session.' }
         return {
           pageTitle: info.title,
           pageSubtitle: info.subtitle,
@@ -600,27 +609,21 @@ const Header: React.FC<HeaderProps> = ({ isSidebarCollapsed, onToggleSidebar }) 
 
   return (
     <header
-      className="h-16 flex-shrink-0 sticky top-0 z-40 transition-all duration-300 bg-white dark:bg-secondary-900 border-b border-secondary-200 dark:border-secondary-700"
+      className="cb-app cb-shellhead"
     >
-      <div className="h-full px-2 md:px-4 flex items-center">
+      <div className="h-full px-3 md:px-6 flex items-center">
         <div className="flex items-center justify-between w-full gap-6">
           {/* Left: Page context + optional back */}
           <div className="min-w-0 flex-1 flex items-center gap-2.5">
-            <button
-              type="button"
+            <Button
+              variant="tertiary"
+              size="sm"
+              icon={PanelLeft}
               onClick={onToggleSidebar}
-              className="p-1.5 transition-colors duration-200 flex-shrink-0 text-secondary-600 dark:text-secondary-400 hover:text-primary-600 dark:hover:text-primary-400"
               aria-label={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
               title={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <rect x="3" y="5" width="18" height="14" rx="2" strokeWidth={1.8} />
-                <path d="M9 5v14" strokeWidth={1.8} />
-              </svg>
-            </button>
-            <span
-              className="h-6 w-px flex-shrink-0 mr-1 bg-secondary-200 dark:bg-secondary-700"
             />
+            <span className="cb-shellhead__divider" aria-hidden="true" />
             {showBackButton && backTo && (
               <button
                 type="button"
@@ -656,16 +659,8 @@ const Header: React.FC<HeaderProps> = ({ isSidebarCollapsed, onToggleSidebar }) 
               ) : null
             ) : (
               <div className="min-w-0">
-                <h1
-                  className="text-lg md:text-xl font-bold truncate tracking-tight text-gray-900 dark:text-white"
-                >
-                  {pageTitle}
-                </h1>
-                <p
-                  className="hidden sm:block text-[11px] md:text-xs truncate mt-0.5 font-medium text-gray-500 dark:text-gray-400"
-                >
-                  {pageSubtitle}
-                </p>
+                <h1 className="cb-shellhead__title truncate">{pageTitle}</h1>
+                <p className="cb-shellhead__subtitle hidden sm:block truncate">{pageSubtitle}</p>
               </div>
             )}
             {isStudentAttendanceRoute || isStaffAttendanceRoute ? <AttndModeSwitch /> : null}
@@ -737,35 +732,19 @@ const Header: React.FC<HeaderProps> = ({ isSidebarCollapsed, onToggleSidebar }) 
               <button
                 type="button"
                 onClick={() => navigate('/onboarding')}
-                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 text-amber-800 dark:text-amber-300 text-xs font-semibold hover:bg-amber-100 dark:hover:bg-amber-900/40 transition-colors whitespace-nowrap"
+                className="cb-btn cb-btn--secondary cb-btn--sm hidden sm:inline-flex"
               >
-                <span className="relative flex h-2 w-2 flex-shrink-0">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500" />
-                </span>
-                Complete Onboarding
+                <span className="cb-shellhead__warndot" aria-hidden="true" />
+                Finish setting up
               </button>
             )}
 
-            {/* Academic Session Badge */}
+            {/* Academic Session */}
             {currentSession && (
-              <div
-                className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-primary-50 dark:bg-primary-900/20 border border-primary-200/60 dark:border-primary-800/40"
-              >
-                <svg
-                  className="w-3.5 h-3.5 text-primary-500 dark:text-primary-400"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-                <span
-                  className="text-xs font-semibold text-primary-700 dark:text-primary-300"
-                >
-                  {currentSession}
-                </span>
-              </div>
+              <span className="cb-shellhead__session hidden sm:inline-flex" title="Academic session">
+                <CalendarDays size={16} strokeWidth={1.75} aria-hidden />
+                Session {formatSessionLabel(currentSession)}
+              </span>
             )}
             {isDashboardRoute && (
               <div className="hidden lg:block">
@@ -775,78 +754,57 @@ const Header: React.FC<HeaderProps> = ({ isSidebarCollapsed, onToggleSidebar }) 
               </div>
             )}
             {/* Search */}
-            <div className="hidden md:block">
-              <div className="relative group">
-                <div
-                  className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none transition-colors text-secondary-400 group-focus-within:text-primary-500"
-                >
-                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-                </div>
+            <div className="hidden md:block cb-shellhead__search">
+              <div className="cb-input cb-input--sm">
+                <Search size={16} strokeWidth={1.75} className="cb-icon cb-input__icon" aria-hidden />
                 <input
-                  type="text"
+                  type="search"
                   value={headerSearchValue}
                   onChange={(event) => handleHeaderSearchChange(event.target.value)}
                   placeholder={headerSearchConfig.placeholder}
-                  className="pl-9 pr-4 py-2 w-28 sm:w-32 text-sm rounded-xl focus:ring-0 transition-all duration-200 bg-gray-50/80 dark:bg-gray-800/60 border border-gray-200/80 dark:border-gray-700/80 focus:border-primary-400 focus:bg-white dark:focus:bg-gray-800 focus:shadow-[0_0_0_3px_rgba(59,130,246,0.08)] placeholder:text-gray-400 dark:text-white"
+                  aria-label={headerSearchConfig.placeholder || 'Search'}
                 />
               </div>
             </div>
 
             {/* Notifications */}
             <div className="relative">
-              <button
+              <Button
+                variant="tertiary"
+                icon={Bell}
                 onClick={() => setNotificationsOpen(!notificationsOpen)}
-                aria-label="Toggle notifications"
+                aria-label="Notifications, 3 new"
+                aria-expanded={notificationsOpen}
                 title="Notifications"
-                className={`relative p-2 rounded-xl transition-all duration-200 focus:outline-none focus:ring-2 ${
-                  notificationsOpen
-                    ? 'bg-primary-50 text-primary-600 dark:bg-primary-900/30 dark:text-primary-400 focus:ring-primary-500/20'
-                    : 'text-secondary-500 hover:text-secondary-700 dark:text-secondary-400 dark:hover:text-secondary-200 hover:bg-secondary-50 dark:hover:bg-secondary-800 focus:ring-primary-500/20'
-                }`}
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                </svg>
-                <span className="absolute top-1.5 right-1.5 flex h-2.5 w-2.5">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-error-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-error-500 border border-white dark:border-secondary-800"></span>
-                </span>
-              </button>
+                className={`cb-shellhead__bell${notificationsOpen ? ' is-open' : ''}`}
+              />
+              <span className="cb-shellhead__belldot" aria-hidden="true" />
 
               {/* Notifications Dropdown */}
               {notificationsOpen && (
-                <div className="absolute right-0 mt-3 w-80 bg-white dark:bg-secondary-900 rounded-2xl shadow-elegant border border-secondary-100 dark:border-secondary-700 z-50 animate-fade-in-down origin-top-right ring-1 ring-black/5">
-                  <div className="p-4 border-b border-secondary-100 dark:border-secondary-800 flex justify-between items-center bg-secondary-50/50 dark:bg-secondary-800/50 rounded-t-2xl">
-                    <h3 className="text-sm font-bold text-secondary-900 dark:text-white">Notifications</h3>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-primary-100 text-primary-700 dark:bg-primary-900/50 dark:text-primary-300">
-                      3 New
-                    </span>
+                <div className="cb-menu__panel cb-menu__panel--end cb-shellhead__notifications" role="dialog" aria-label="Notifications">
+                  <div className="cb-shellhead__notifhead">
+                    <span className="cb-card__title">Notifications</span>
+                    <Badge tone="accent" dot={false}>3 new</Badge>
                   </div>
-                  <div className="max-h-[24rem] overflow-y-auto custom-scrollbar">
+                  <ul className="cb-shellhead__notiflist">
                     {notifications.map((notification) => (
-                      <div key={notification.id} className="p-4 border-b border-secondary-100 dark:border-secondary-800 last:border-b-0 hover:bg-secondary-50 dark:hover:bg-secondary-800/50 transition-colors group cursor-pointer">
-                        <div className="flex items-start gap-3">
-                          <div className={`mt-0.5 w-2 h-2 rounded-full flex-shrink-0 ${notification.type === 'info' ? 'bg-primary-500' :
-                            notification.type === 'warning' ? 'bg-warning-500' : 'bg-success-500'
-                            }`} />
-                          <div>
-                            <p className="text-sm font-medium text-secondary-900 dark:text-gray-100 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">
-                              {notification.message}
-                            </p>
-                            <p className="text-xs text-secondary-500 dark:text-secondary-400 mt-1 font-medium">
-                              {notification.time}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
+                      <li key={notification.id}>
+                        <span
+                          className={`cb-shellhead__notifdot is-${notification.type === 'info' ? 'info' : notification.type === 'warning' ? 'warning' : 'success'}`}
+                          aria-hidden="true"
+                        />
+                        <span>
+                          <span className="cb-shellhead__notiftext">{notification.message}</span>
+                          <span className="cb-shellhead__notiftime">{notification.time}</span>
+                        </span>
+                      </li>
                     ))}
-                  </div>
-                  <div className="p-2 border-t border-secondary-100 dark:border-secondary-800 bg-secondary-50/30 dark:bg-secondary-800/30 rounded-b-2xl">
-                    <button className="w-full py-2 text-xs font-semibold text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 hover:bg-primary-50 dark:hover:bg-primary-900/30 rounded-xl transition-colors">
+                  </ul>
+                  <div className="cb-shellhead__notiffoot">
+                    <Button variant="tertiary" size="sm" fullWidth>
                       View all notifications
-                    </button>
+                    </Button>
                   </div>
                 </div>
               )}

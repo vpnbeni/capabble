@@ -1,6 +1,25 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
+import { BookOpen, CalendarClock, Pencil, Plus, Save, SearchX, Split, Trash2 } from 'lucide-react'
 import { useTimetable, type TimetableSubject } from '@/contexts/TimetableContext'
+import { sectionLabel } from '@/components/students/studentFormat'
+import {
+  Badge,
+  Banner,
+  Button,
+  Card,
+  Checkbox,
+  DataTable,
+  Dialog,
+  EmptyState,
+  FilterBar,
+  Menu,
+  Page,
+  Select,
+  TextField,
+  type DataTableColumn,
+} from '@/components/ui'
+import '@/components/timetable/subjects.css'
 
 const SUBJECT_TYPES = ['Language', 'Skill', 'Core', 'Elective', 'Co-Curricular', 'Other']
 
@@ -18,17 +37,10 @@ const EMPTY_PAIR_FORM = {
   subjectB: '',
 }
 
-const TYPE_COLORS: Record<
-  string,
-  { bg: string; color: string; border: string; icon: string; chip: string; darkBg: string; darkColor: string }
-> = {
-  Language: { bg: '#eff6ff', color: '#1d4ed8', border: '#bfdbfe', icon: '#2563eb', chip: '#eff6ff', darkBg: '#1e3a5f33', darkColor: '#93c5fd' },
-  Skill: { bg: '#ecfdf5', color: '#047857', border: '#a7f3d0', icon: '#059669', chip: '#ecfdf5', darkBg: '#064e3b33', darkColor: '#6ee7b7' },
-  Core: { bg: '#eef2ff', color: '#4338ca', border: '#c7d2fe', icon: '#4f46e5', chip: '#eef2ff', darkBg: '#312e8133', darkColor: '#a5b4fc' },
-  Elective: { bg: '#fffbeb', color: '#b45309', border: '#fde68a', icon: '#d97706', chip: '#fffbeb', darkBg: '#78350f33', darkColor: '#fcd34d' },
-  'Co-Curricular': { bg: '#f5f3ff', color: '#6d28d9', border: '#ddd6fe', icon: '#7c3aed', chip: '#f5f3ff', darkBg: '#4c1d9533', darkColor: '#c4b5fd' },
-  Other: { bg: '#f8fafc', color: '#475569', border: '#e2e8f0', icon: '#64748b', chip: '#f8fafc', darkBg: '#33415533', darkColor: '#94a3b8' },
-}
+const ADD_SUBJECT_FORM_ID = 'tt-subject-add-form'
+const EDIT_SUBJECT_FORM_ID = 'tt-subject-edit-form'
+const PAIR_FORM_ID = 'tt-subject-pair-form'
+const COMMON_PERIOD_FORM_ID = 'tt-subject-common-period-form'
 
 const ROMAN_CLASS_LEVELS: Record<string, number> = {
   i: 1,
@@ -75,6 +87,19 @@ const getSeniorSectionOrder = (section: string) => {
   if (normalized.startsWith('hum') || normalized.startsWith('humanities')) return 2
   return 99
 }
+
+/** "7" → "Class 7", "XI-Science" → "Class XI-Science"; names that aren't class levels stay as they are. */
+const classLabel = (className: string) => {
+  const trimmed = className.trim()
+  if (!trimmed) return '—'
+  if (/^class\b/i.test(trimmed)) return trimmed
+  const [base, ...rest] = trimmed.split('-')
+  if (parseClassLevel(base) === null) return trimmed
+  const section = sectionLabel(rest.join('-'))
+  return section ? `Class ${base} · ${section}` : `Class ${base}`
+}
+
+const plural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`
 
 interface SubjectMatrixColumn {
   key: string
@@ -124,8 +149,13 @@ const TimetableSubjects: React.FC<TimetableSubjectsProps> = ({
     subject: '',
   })
   const [selectedCommonPeriodSections, setSelectedCommonPeriodSections] = useState<string[]>([])
-  const [isCommonPeriodSectionsOpen, setIsCommonPeriodSectionsOpen] = useState(false)
-  const matrixTableRef = useRef<HTMLTableElement | null>(null)
+  // View-only state for the redesigned layout (search, type filter, confirmations, inline form errors).
+  const [subjectSearch, setSubjectSearch] = useState('')
+  const [subjectTypeFilter, setSubjectTypeFilter] = useState('all')
+  const [subjectDeleteIds, setSubjectDeleteIds] = useState<string[] | null>(null)
+  const [pairDeleteId, setPairDeleteId] = useState<string | null>(null)
+  const [pairError, setPairError] = useState('')
+  const [commonPeriodError, setCommonPeriodError] = useState('')
   type CommonPeriodRow = {
     id: string
     className: string
@@ -184,8 +214,17 @@ const TimetableSubjects: React.FC<TimetableSubjectsProps> = ({
     [subjects]
   )
 
+  const visibleSubjects = useMemo(() => {
+    const query = subjectSearch.trim().toLowerCase()
+    return sortedSubjects.filter((s) => {
+      if (subjectTypeFilter !== 'all' && s.type !== subjectTypeFilter) return false
+      if (query && !s.name.toLowerCase().includes(query)) return false
+      return true
+    })
+  }, [sortedSubjects, subjectSearch, subjectTypeFilter])
+
   const selectAllOnPage = () => {
-    const ids = sortedSubjects.map((s) => s.id)
+    const ids = visibleSubjects.map((s) => s.id)
     const allSelected = ids.length > 0 && ids.every((id) => selectedIds.has(id))
     if (allSelected) {
       setSelectedIds((prev) => {
@@ -202,15 +241,26 @@ const TimetableSubjects: React.FC<TimetableSubjectsProps> = ({
     }
   }
 
+  // Opens the confirmation; the delete itself runs from the danger Dialog (was window.confirm).
   const handleDeleteSelected = () => {
     if (selectedIds.size === 0) return
-    if (!window.confirm(`Delete ${selectedIds.size} selected subject(s)? This cannot be undone.`)) return
-    deleteSubjects(Array.from(selectedIds))
-    setSelectedIds(new Set())
+    setSubjectDeleteIds(Array.from(selectedIds))
   }
 
-  const allOnPageSelected = sortedSubjects.length > 0 && sortedSubjects.every((s) => selectedIds.has(s.id))
-  const someOnPageSelected = sortedSubjects.some((s) => selectedIds.has(s.id))
+  const handleConfirmDeleteSubjects = () => {
+    const ids = subjectDeleteIds
+    setSubjectDeleteIds(null)
+    if (!ids || ids.length === 0) return
+    deleteSubjects(ids)
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      ids.forEach((id) => next.delete(id))
+      return next
+    })
+  }
+
+  const allOnPageSelected = visibleSubjects.length > 0 && visibleSubjects.every((s) => selectedIds.has(s.id))
+  const someOnPageSelected = visibleSubjects.some((s) => selectedIds.has(s.id))
 
   const classOptions = useMemo(() => {
     const deduped = new Set<string>()
@@ -253,27 +303,6 @@ const TimetableSubjects: React.FC<TimetableSubjectsProps> = ({
     })
     setClassSubjectDraft(nextDraft)
   }, [classes, hasPendingMatrixChanges])
-
-  useEffect(() => {
-    const table = matrixTableRef.current
-    if (!table) return
-
-    const syncStickyOffsets = () => {
-      const nameCell = table.querySelector('.ts-sticky-col-3') as HTMLElement | null
-      const typeCell = table.querySelector('.ts-sticky-col-4') as HTMLElement | null
-      if (!nameCell || !typeCell) return
-
-      const left4 = 78 + nameCell.offsetWidth
-      const left5 = left4 + typeCell.offsetWidth
-      table.style.setProperty('--ts-sticky-left-4', `${left4}px`)
-      table.style.setProperty('--ts-sticky-left-5', `${left5}px`)
-    }
-
-    syncStickyOffsets()
-    const observer = new ResizeObserver(syncStickyOffsets)
-    observer.observe(table)
-    return () => observer.disconnect()
-  }, [subjects, isAddingNew, editingId])
 
   const matrixColumns = useMemo<SubjectMatrixColumn[]>(() => {
     const groupedColumns = new Map<string, SubjectMatrixColumn>()
@@ -428,9 +457,9 @@ const TimetableSubjects: React.FC<TimetableSubjectsProps> = ({
     const subjectA = pairData.subjectA.trim()
     const subjectB = pairData.subjectB.trim()
 
-    if (!className) return 'Select class first.'
-    if (!subjectA || !subjectB) return 'Select both parallel subjects.'
-    if (subjectA.toLowerCase() === subjectB.toLowerCase()) return 'Both subjects cannot be same.'
+    if (!className) return 'Choose a class first.'
+    if (!subjectA || !subjectB) return 'Choose both subjects for the pair.'
+    if (subjectA.toLowerCase() === subjectB.toLowerCase()) return 'Choose two different subjects.'
 
     const duplicate = parallelSubjectPairs.find((pair) => {
       if (excludeId && pair.id === excludeId) return false
@@ -441,16 +470,17 @@ const TimetableSubjects: React.FC<TimetableSubjectsProps> = ({
       return existing === incoming
     })
 
-    if (duplicate) return 'This parallel pair already exists for the selected class.'
+    if (duplicate) return `${classLabel(className)} already has this pair. Choose different subjects.`
     return ''
   }
 
   const handleAddPair = () => {
     const validationError = getPairValidationError(newPair, null)
     if (validationError) {
-      window.alert(validationError)
+      setPairError(validationError)
       return
     }
+    setPairError('')
 
     setParallelSubjectPairs([
       ...parallelSubjectPairs,
@@ -480,9 +510,10 @@ const TimetableSubjects: React.FC<TimetableSubjectsProps> = ({
   const handleSavePair = (pairId: string) => {
     const validationError = getPairValidationError(editingPairData, pairId)
     if (validationError) {
-      window.alert(validationError)
+      setPairError(validationError)
       return
     }
+    setPairError('')
 
     setParallelSubjectPairs(
       parallelSubjectPairs.map((pair) =>
@@ -500,12 +531,17 @@ const TimetableSubjects: React.FC<TimetableSubjectsProps> = ({
     setEditingPairData({ ...EMPTY_PAIR_FORM })
   }
 
+  // Opens the confirmation; the delete itself runs from the danger Dialog (was window.confirm).
   const handleDeletePair = (pairId: string) => {
     const pair = parallelSubjectPairs.find((item) => item.id === pairId)
     if (!pair) return
-    if (!window.confirm(`Delete parallel pair "${pair.subjectA} + ${pair.subjectB}" from class ${pair.className}?`)) {
-      return
-    }
+    setPairDeleteId(pair.id)
+  }
+
+  const handleConfirmDeletePair = () => {
+    const pairId = pairDeleteId
+    setPairDeleteId(null)
+    if (!pairId) return
     setParallelSubjectPairs(parallelSubjectPairs.filter((item) => item.id !== pairId))
   }
 
@@ -514,20 +550,21 @@ const TimetableSubjects: React.FC<TimetableSubjectsProps> = ({
     setEditingPairData({ ...EMPTY_PAIR_FORM })
     setIsAddingPair(false)
     setNewPair({ ...EMPTY_PAIR_FORM })
+    setPairError('')
   }
 
   const handleOpenAddCommonPeriod = () => {
     setIsAddingCommonPeriod(true)
     setNewCommonPeriod({ className: '', subject: '' })
     setSelectedCommonPeriodSections([])
-    setIsCommonPeriodSectionsOpen(false)
+    setCommonPeriodError('')
   }
 
   const handleCancelAddCommonPeriod = () => {
     setIsAddingCommonPeriod(false)
     setNewCommonPeriod({ className: '', subject: '' })
     setSelectedCommonPeriodSections([])
-    setIsCommonPeriodSectionsOpen(false)
+    setCommonPeriodError('')
   }
 
   const classMetaById = useMemo(() => {
@@ -687,7 +724,7 @@ const TimetableSubjects: React.FC<TimetableSubjectsProps> = ({
       .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
 
     if (nextSections.length === 0) {
-      window.alert('Select at least one section to save the common period.')
+      setCommonPeriodError('Choose at least one section for this common period.')
       return
     }
 
@@ -706,1250 +743,696 @@ const TimetableSubjects: React.FC<TimetableSubjectsProps> = ({
     setIsAddingCommonPeriod(false)
     setNewCommonPeriod({ className: '', subject: '' })
     setSelectedCommonPeriodSections([])
-    setIsCommonPeriodSectionsOpen(false)
+    setCommonPeriodError('')
   }
 
   // ── Stats ──
   const typeCounts: Record<string, number> = {}
   subjects.forEach((s) => { typeCounts[s.type] = (typeCounts[s.type] || 0) + 1 })
 
+
+  // ── View helpers (presentation only) ──
+  const typeChips = Object.entries(typeCounts).sort(([a], [b]) => {
+    const ai = SUBJECT_TYPES.indexOf(a)
+    const bi = SUBJECT_TYPES.indexOf(b)
+    return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi) || a.localeCompare(b)
+  })
+  const hasSubjectFilters = subjectSearch.trim() !== '' || subjectTypeFilter !== 'all'
+  const clearSubjectFilters = () => {
+    setSubjectSearch('')
+    setSubjectTypeFilter('all')
+  }
+  const selectedCount = selectedIds.size
+  const editingSubject = editingId ? subjects.find((s) => s.id === editingId) : undefined
+  const subjectsPendingDelete = (subjectDeleteIds ?? [])
+    .map((id) => subjects.find((s) => s.id === id))
+    .filter((s): s is TimetableSubject => Boolean(s))
+  const subjectNameOptions = Array.from(new Set(sortedSubjects.map((s) => s.name)))
+
+  const isEditingPairDialog = !isAddingPair && editingPairId !== null
+  const pairForm = isEditingPairDialog ? editingPairData : newPair
+  const pairSubjectOptions = classSubjectsMap.get(pairForm.className) || []
+  const updatePairForm = (patch: Partial<typeof EMPTY_PAIR_FORM>) => {
+    setPairError('')
+    if (isEditingPairDialog) setEditingPairData((prev) => ({ ...prev, ...patch }))
+    else setNewPair((prev) => ({ ...prev, ...patch }))
+  }
+  const pairPendingDelete = pairDeleteId ? parallelSubjectPairs.find((p) => p.id === pairDeleteId) : undefined
+
+  const commonPeriodCanSave = Boolean(
+    newCommonPeriod.subject && newCommonPeriod.className && selectedCommonPeriodSections.length > 0
+  )
+  const commonPeriodSectionsHint = !newCommonPeriod.subject || !newCommonPeriod.className
+    ? 'Choose a subject and class to see their sections.'
+    : matrixAssignedSectionsForSelection.length === 0
+      ? 'No section of this class takes this subject in the subject matrix yet.'
+      : candidateCommonMatches.length === 0
+        ? 'No matching periods in the current timetable yet.'
+        : `${plural(candidateCommonMatches.length, 'matching period', 'matching periods')} found in the current timetable.`
+
+  const submitWith = (handler: () => void) => (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    handler()
+  }
+
+  const subjectColumns: DataTableColumn<TimetableSubject>[] = [
+    {
+      key: 'name',
+      header: 'Subject',
+      mobile: 'title',
+      render: (item) => (
+        <span className="tt-subj-name" title={item.name}>
+          {item.name}
+        </span>
+      ),
+    },
+    {
+      key: 'type',
+      header: 'Type',
+      mobile: 'subtitle',
+      render: (item) =>
+        item.type ? (
+          <Badge tone="neutral" dot={false}>
+            {item.type}
+          </Badge>
+        ) : (
+          '—'
+        ),
+    },
+    {
+      key: 'actions',
+      header: <span className="cb-visually-hidden">Actions</span>,
+      headerLabel: 'Actions',
+      interactive: true,
+      mobile: 'aside',
+      render: (item) => (
+        <Menu
+          label={`Actions for ${item.name}`}
+          items={[
+            { label: 'Edit subject', icon: Pencil, onSelect: () => handleEdit(item) },
+            { divider: true },
+            { label: 'Delete subject', icon: Trash2, tone: 'danger', onSelect: () => setSubjectDeleteIds([item.id]) },
+          ]}
+        />
+      ),
+    },
+    ...matrixColumns.map(
+      (column): DataTableColumn<TimetableSubject> => ({
+        key: column.key,
+        header: classLabel(column.label),
+        headerLabel: classLabel(column.label),
+        align: 'center',
+        interactive: true,
+        render: (item) => (
+          <Checkbox
+            checked={isSubjectAssignedToColumn(item.name, column)}
+            onChange={(checked) => toggleSubjectAssignment(item.name, column, checked)}
+            aria-label={`Teach ${item.name} in ${classLabel(column.label)}`}
+          />
+        ),
+      })
+    ),
+  ]
+
+  type ParallelPairRow = (typeof parallelSubjectPairs)[number]
+  const pairColumns: DataTableColumn<ParallelPairRow>[] = [
+    {
+      key: 'className',
+      header: 'Class',
+      mobile: 'title',
+      render: (pair) => <span className="cb-strong">{classLabel(pair.className)}</span>,
+    },
+    {
+      key: 'subjectA',
+      header: 'First subject',
+      render: (pair) => (
+        <Badge tone="neutral" dot={false}>
+          {pair.subjectA}
+        </Badge>
+      ),
+    },
+    {
+      key: 'subjectB',
+      header: 'Second subject',
+      render: (pair) => (
+        <Badge tone="neutral" dot={false}>
+          {pair.subjectB}
+        </Badge>
+      ),
+    },
+    {
+      key: 'actions',
+      header: <span className="cb-visually-hidden">Actions</span>,
+      headerLabel: 'Actions',
+      interactive: true,
+      mobile: 'aside',
+      align: 'right',
+      width: 56,
+      render: (pair) => (
+        <Menu
+          label={`Actions for ${pair.subjectA} and ${pair.subjectB}`}
+          items={[
+            {
+              label: 'Edit pair',
+              icon: Pencil,
+              onSelect: () => {
+                setPairError('')
+                handleEditPair(pair.id)
+              },
+            },
+            { divider: true },
+            { label: 'Delete pair', icon: Trash2, tone: 'danger', onSelect: () => handleDeletePair(pair.id) },
+          ]}
+        />
+      ),
+    },
+  ]
+
+  const commonPeriodColumns: DataTableColumn<CommonPeriodRow>[] = [
+    {
+      key: 'subject',
+      header: 'Subject',
+      mobile: 'title',
+      render: (row) => (
+        <Badge tone="neutral" dot={false}>
+          {row.subject}
+        </Badge>
+      ),
+    },
+    {
+      key: 'className',
+      header: 'Class',
+      mobile: 'subtitle',
+      render: (row) => classLabel(row.className),
+    },
+    {
+      key: 'sections',
+      header: 'Sections',
+      render: (row) =>
+        row.sections.length ? (
+          <span className="tt-subj-badges">
+            {row.sections.map((section) => (
+              <Badge key={section} tone="neutral" dot={false}>
+                {section}
+              </Badge>
+            ))}
+          </span>
+        ) : (
+          '—'
+        ),
+    },
+  ]
+
   return (
-    <div className="ts-page">
-      <style>{`
-        /* ───────── Page ───────── */
-        .ts-page {
-          padding: 12px 32px 32px;
-          max-width: 1600px;
-          margin: 0 auto;
-        }
-
-        /* ───────── Card ───────── */
-        .ts-card {
-          background: #fff;
-          border-radius: 12px;
-          box-shadow: none;
-          overflow: hidden;
-          margin-bottom: 24px;
-          border: 1px solid #e5e7eb;
-        }
-        .ts-card:hover {
-          box-shadow: none;
-          border-color: #d4d4d8;
-        }
-        .dark .ts-card {
-          background: #1e293b;
-          border-color: #334155;
-        }
-
-        /* ───────── Header ───────── */
-        .ts-card-header {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          padding: 14px 20px;
-          background: linear-gradient(180deg, #f8faff 0%, #ffffff 55%);
-          border-bottom: 1px solid #e2e8f0;
-          position: relative;
-        }
-        .ts-card-header::before {
-          content: '';
-          position: absolute;
-          left: 0;
-          top: 0;
-          bottom: 0;
-          width: 3px;
-          background: linear-gradient(180deg, #2563eb 0%, #6366f1 100%);
-          border-radius: 0 2px 2px 0;
-        }
-        .dark .ts-card-header {
-          background: linear-gradient(180deg, #1e293b 0%, #1a2332 100%);
-          border-color: #334155;
-        }
-        .ts-card-header h3 {
-          font-size: 0.95rem;
-          font-weight: 650;
-          color: #1e293b;
-          margin: 0;
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          letter-spacing: -0.01em;
-        }
-        .dark .ts-card-header h3 {
-          color: #f1f5f9;
-        }
-        .ts-header-icon {
-          width: 26px;
-          height: 26px;
-          border-radius: 7px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          flex-shrink: 0;
-          background: linear-gradient(135deg, #2563eb 0%, #6366f1 100%);
-        }
-        .ts-header-icon svg {
-          width: 14px;
-          height: 14px;
-          color: #fff;
-        }
-
-        /* ───────── Header stats ───────── */
-        .ts-header-stats {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          flex: 1;
-          justify-content: center;
-          min-width: 0;
-          overflow-x: auto;
-          padding: 2px 8px;
-        }
-        .ts-stat-card-inline {
-          min-width: 72px;
-          flex: 0 0 auto;
-          padding: 5px 8px;
-          border-radius: 8px;
-          gap: 6px;
-          display: flex;
-          align-items: center;
-          border: 1px solid #e2e8f0;
-        }
-        .dark .ts-stat-card-inline {
-          border-color: #334155;
-        }
-        .ts-stat-icon {
-          width: 20px;
-          height: 20px;
-          border-radius: 5px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          flex-shrink: 0;
-        }
-        .ts-stat-icon svg { width: 11px; height: 11px; color: #fff; }
-        .ts-stat-value {
-          font-size: 0.9rem;
-          line-height: 1.05;
-          font-weight: 700;
-          color: #1e293b;
-          letter-spacing: -0.02em;
-        }
-        .dark .ts-stat-value { color: #f1f5f9; }
-        .ts-stat-label {
-          font-size: 0.55rem;
-          letter-spacing: 0.06em;
-          font-weight: 600;
-          color: #64748b;
-          text-transform: uppercase;
-        }
-
-        .ts-bg-indigo-soft { background: #eff6ff; border-color: #bfdbfe; }
-        .ts-bg-green-soft { background: #ecfdf5; border-color: #a7f3d0; }
-        .ts-bg-amber-soft { background: #fffbeb; border-color: #fde68a; }
-        .ts-bg-indigo-grad { background: linear-gradient(135deg, #2563eb, #4f46e5); }
-        .ts-bg-green-grad { background: linear-gradient(135deg, #059669, #047857); }
-        .ts-bg-amber-grad { background: linear-gradient(135deg, #d97706, #b45309); }
-
-        .dark .ts-bg-indigo-soft { background: #1e3a5f33; border-color: #1e40af; }
-        .dark .ts-bg-green-soft { background: #064e3b33; border-color: #047857; }
-        .dark .ts-bg-amber-soft { background: #78350f33; border-color: #b45309; }
-
-        /* ───────── Buttons ───────── */
-        .ts-btn-group {
-          display: flex;
-          gap: 8px;
-          align-items: center;
-          flex-wrap: wrap;
-        }
-        .ts-btn {
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          padding: 7px 14px;
-          border-radius: 8px;
-          font-size: 0.78rem;
-          font-weight: 600;
-          border: 1px solid transparent;
-          cursor: pointer;
-          transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
-          white-space: nowrap;
-          box-shadow: none;
-        }
-        .ts-btn svg { width: 14px; height: 14px; }
-        .ts-btn:disabled { opacity: 0.45; cursor: not-allowed; }
-        .ts-btn-primary {
-          background: linear-gradient(135deg, #2563eb 0%, #4f46e5 100%);
-          color: #fff;
-        }
-        .ts-btn-primary:hover:not(:disabled) {
-          background: linear-gradient(135deg, #1d4ed8 0%, #4338ca 100%);
-        }
-        .ts-btn-success {
-          background: #fff;
-          color: #047857;
-          border-color: #6ee7b7;
-        }
-        .ts-btn-success:hover:not(:disabled) {
-          background: #ecfdf5;
-          border-color: #34d399;
-        }
-        .ts-btn-danger {
-          background: #fff;
-          color: #b91c1c;
-          border-color: #e5e7eb;
-        }
-        .ts-btn-danger:hover:not(:disabled) {
-          background: #fafafa;
-          border-color: #fca5a5;
-        }
-
-        /* ───────── Table ───────── */
-        .ts-table-wrap { overflow-x: auto; }
-        .ts-matrix-vert-scroll {
-          --ts-matrix-row-height: 44px;
-          /* Show ~10 subject rows, then allow vertical scrolling */
-          max-height: calc(var(--ts-matrix-row-height) * 10 + 44px);
-          overflow-y: auto;
-        }
-        .ts-table {
-          width: 100%;
-          border-collapse: collapse;
-          border-spacing: 0;
-        }
-        .ts-subject-matrix-table {
-          width: max-content;
-          table-layout: auto;
-        }
-        .ts-table thead th {
-          padding: 10px 14px;
-          font-size: 0.68rem;
-          font-weight: 600;
-          text-transform: uppercase;
-          letter-spacing: 0.08em;
-          color: #52525b;
-          background: #fafafa;
-          border-bottom: 1px solid #e5e7eb;
-          border-top: none;
-          text-align: left;
-          white-space: nowrap;
-        }
-        .ts-th-matrix {
-          text-align: center !important;
-          width: 1%;
-          min-width: 0;
-          padding: 8px 6px !important;
-          font-size: 0.65rem;
-          letter-spacing: 0.06em;
-          color: #4338ca;
-          background: #f5f7ff !important;
-          border-bottom-color: #c7d2fe;
-        }
-        .dark .ts-th-matrix {
-          color: #a5b4fc;
-          background: #1e1b4b !important;
-          border-bottom-color: #4338ca;
-        }
-        .dark .ts-table thead th {
-          background: #0f172a;
-          color: #a1a1aa;
-          border-color: #334155;
-        }
-        .ts-table tbody tr { transition: background 0.12s ease; }
-        .ts-table tbody tr:hover { background: #fafafa; }
-        .dark .ts-table tbody tr:hover { background: #283548; }
-        .ts-table tbody tr:nth-child(even) { background: #fff; }
-        .dark .ts-table tbody tr:nth-child(even) { background: #1a2536; }
-        .ts-table tbody tr:nth-child(even):hover { background: #fafafa; }
-        .dark .ts-table tbody tr:nth-child(even):hover { background: #283548; }
-        .ts-table tbody td {
-          padding: 8px 14px;
-          font-size: 0.84rem;
-          color: #27272a;
-          border-top: none;
-          border-bottom: 1px solid #f4f4f5;
-          white-space: nowrap;
-        }
-        .ts-td-matrix {
-          text-align: center;
-          width: 1%;
-          min-width: 0;
-          padding: 6px !important;
-        }
-        .ts-td-matrix .ts-checkbox {
-          width: 15px;
-          height: 15px;
-        }
-        .ts-matrix-note {
-          font-size: 0.75rem;
-          color: #94a3b8;
-        }
-        .dark .ts-matrix-note { color: #64748b; }
-        .dark .ts-table tbody td {
-          color: #e2e8f0;
-          border-color: #1e293b;
-        }
-        .ts-table tbody tr:first-child td {
-          border-top: none;
-        }
-        .ts-table thead th:first-child,
-        .ts-table tbody td:first-child {
-          width: 36px;
-          padding-left: 10px;
-          padding-right: 6px;
-        }
-        .ts-subject-matrix-table .ts-sticky-col {
-          position: sticky;
-          width: 1%;
-          padding-left: 8px !important;
-          padding-right: 8px !important;
-        }
-        .ts-subject-matrix-table thead .ts-sticky-col {
-          z-index: 8;
-          background: #fafafa;
-        }
-        .dark .ts-subject-matrix-table thead .ts-sticky-col {
-          background: #0f172a;
-        }
-        /* Freeze header while scrolling vertically */
-        .ts-subject-matrix-table thead th {
-          position: sticky;
-          top: 0;
-          z-index: 20;
-          background: #fafafa;
-        }
-        .dark .ts-subject-matrix-table thead th {
-          background: #0f172a;
-        }
-        .ts-subject-matrix-table tbody .ts-sticky-col {
-          z-index: 4;
-          background: #fff;
-        }
-        .ts-subject-matrix-table tbody tr:nth-child(even) .ts-sticky-col {
-          background: #fff;
-        }
-        .ts-subject-matrix-table tbody tr:hover .ts-sticky-col {
-          background: #fafafa;
-        }
-        .dark .ts-subject-matrix-table tbody .ts-sticky-col {
-          background: #1e293b;
-        }
-        .dark .ts-subject-matrix-table tbody tr:nth-child(even) .ts-sticky-col {
-          background: #1a2536;
-        }
-        .dark .ts-subject-matrix-table tbody tr:hover .ts-sticky-col {
-          background: #283548;
-        }
-        .ts-subject-matrix-table .ts-sticky-col-1 {
-          left: 0;
-          width: 36px;
-          min-width: 36px;
-          max-width: 36px;
-          padding-left: 10px !important;
-          padding-right: 6px !important;
-          text-align: center;
-        }
-        .ts-subject-matrix-table .ts-sticky-col-2 {
-          left: 36px;
-          width: 42px;
-          min-width: 42px;
-          max-width: 42px;
-          padding-left: 4px !important;
-          padding-right: 4px !important;
-          text-align: center;
-        }
-        .ts-subject-matrix-table .ts-sticky-col-3 {
-          left: 78px;
-          width: auto;
-          min-width: 0;
-          max-width: none;
-        }
-        .ts-subject-matrix-table .ts-sticky-col-4 {
-          left: var(--ts-sticky-left-4, 170px);
-          width: auto;
-          min-width: 0;
-          max-width: none;
-        }
-        .ts-subject-matrix-table .ts-sticky-col-5 {
-          left: var(--ts-sticky-left-5, 250px);
-          width: auto;
-          min-width: 0;
-          max-width: none;
-          text-align: center;
-        }
-        .ts-subject-matrix-table .ts-sticky-col-5 .ts-action-group {
-          justify-content: center;
-        }
-        .ts-subject-matrix-table .ts-sticky-divider {
-          box-shadow: 1px 0 0 #e5e7eb;
-        }
-        .dark .ts-subject-matrix-table .ts-sticky-divider {
-          box-shadow: 1px 0 0 #334155;
-        }
-
-        /* ───────── Serial number ───────── */
-        .ts-sr {
-          font-weight: 600;
-          color: #a1a1aa;
-          font-size: 0.78rem;
-          display: inline-block;
-        }
-
-        /* ───────── Value styles ───────── */
-        .ts-subject-name {
-          font-weight: 600;
-          color: #18181b;
-          font-size: 0.84rem;
-          letter-spacing: -0.01em;
-        }
-        .dark .ts-subject-name { color: #f1f5f9; }
-
-        /* ───────── Type badge ───────── */
-        .ts-type-badge {
-          display: inline-flex;
-          align-items: center;
-          gap: 4px;
-          padding: 2px 8px;
-          border-radius: 6px;
-          font-size: 0.68rem;
-          font-weight: 600;
-          letter-spacing: 0.04em;
-          text-transform: uppercase;
-        }
-
-        /* ───────── Action links ───────── */
-        .ts-action-link {
-          font-size: 0.75rem;
-          font-weight: 600;
-          padding: 2px 6px;
-          border-radius: 6px;
-          border: none;
-          background: none;
-          cursor: pointer;
-          transition: all 0.15s ease;
-          white-space: nowrap;
-        }
-        .ts-action-edit { color: #2563eb; }
-        .ts-action-edit:hover { background: #eff6ff; color: #1d4ed8; }
-        .dark .ts-action-edit { color: #60a5fa; }
-        .dark .ts-action-edit:hover { background: #1e3a5f33; }
-        .ts-action-save { color: #059669; }
-        .ts-action-save:hover { background: #ecfdf5; color: #047857; }
-        .ts-action-cancel { color: #94a3b8; }
-        .ts-action-cancel:hover { background: #f1f5f9; color: #64748b; }
-        .ts-action-group { display: flex; gap: 8px; }
-        .ts-edit-icon {
-          width: 14px;
-          height: 14px;
-          display: inline;
-          margin-right: 4px;
-          vertical-align: -2px;
-        }
-
-        /* ───────── Checkbox ───────── */
-        .ts-checkbox-label {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          cursor: pointer;
-        }
-        .ts-checkbox {
-          width: 15px;
-          height: 15px;
-          border-radius: 4px;
-          accent-color: #4f46e5;
-        }
-
-        /* ───────── New row ───────── */
-        .ts-new-row {
-          background: #fafafa !important;
-        }
-        .dark .ts-new-row {
-          background: #0f172a !important;
-        }
-
-        /* ───────── Input ───────── */
-        .ts-input {
-          width: 100%;
-          padding: 6px 12px;
-          border: 1px solid #e5e7eb;
-          border-radius: 8px;
-          font-size: 0.85rem;
-          transition: border-color 0.15s ease, box-shadow 0.15s ease;
-          outline: none;
-          background: #fff;
-          color: #334155;
-        }
-        .dark .ts-input {
-          background: #1e293b;
-          border-color: #475569;
-          color: #e2e8f0;
-        }
-        .ts-input:focus {
-          border-color: #6366f1;
-          box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.12);
-        }
-
-        /* ───────── Empty state ───────── */
-        .ts-empty {
-          padding: 48px 24px;
-          text-align: center;
-        }
-        .ts-empty-icon {
-          width: 64px;
-          height: 64px;
-          margin: 0 auto 16px;
-          border-radius: 16px;
-          background: #f4f4f5;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-        .ts-empty-icon svg {
-          width: 32px;
-          height: 32px;
-          color: #94a3b8;
-        }
-        .ts-empty h3 {
-          font-size: 1.05rem;
-          font-weight: 700;
-          color: #334155;
-          margin: 0 0 6px;
-        }
-        .dark .ts-empty h3 { color: #f1f5f9; }
-        .ts-empty p {
-          color: #94a3b8;
-          font-size: 0.88rem;
-          margin: 0 0 20px;
-        }
-      `}</style>
-
-      <div className="mb-6" />
-
-      <div className="ts-card">
-        {/* ── Header ── */}
-        <div className="ts-card-header">
-          <div>
-            <h3>
-              <span className="ts-header-icon">
-                <svg fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25" />
-                </svg>
-              </span>
-              Subjects
-            </h3>
-          </div>
-          <div className="ts-header-stats">
-            <div className="ts-stat-card-inline ts-bg-indigo-soft">
-              <div className="ts-stat-icon ts-bg-indigo-grad">
-                <svg fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25" />
-                </svg>
-              </div>
-              <div>
-                <div className="ts-stat-value">{subjects.length}</div>
-                <div className="ts-stat-label">Total</div>
-              </div>
-            </div>
-            {Object.entries(typeCounts).map(([type, count]) => {
-              const colors = TYPE_COLORS[type] || TYPE_COLORS.Other
-              return (
-                <div
-                  key={type}
-                  className="ts-stat-card-inline"
-                  style={{ background: colors.chip, borderColor: colors.border }}
-                >
-                  <div className="ts-stat-icon" style={{ background: colors.icon }}>
-                    <svg fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 6h.008v.008H6V6z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <div className="ts-stat-value">{count}</div>
-                    <div className="ts-stat-label">{type}</div>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-          <div className="ts-btn-group">
-            {selectedIds.size > 0 && (
-              <button onClick={handleDeleteSelected} className="ts-btn ts-btn-danger">
-                <svg fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
-                </svg>
-                Delete {selectedIds.size}
-              </button>
-            )}
-            <button
-              onClick={() => setIsAddingNew(true)}
-              disabled={isAddingNew}
-              className="ts-btn ts-btn-primary"
-            >
-              <svg fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m6-6H6" />
-              </svg>
-              Add Subject
-            </button>
-            <button
+    <Page width="full">
+      <Card
+        flush
+        className="tt-subj-card"
+        title="Subjects"
+        subtitle="Tick the classes that take each subject, then save the matrix. Classes up to 10 are set class-wise; classes 11 and 12 section-wise."
+        action={
+          <div className="tt-subj-card__actions">
+            {hasPendingMatrixChanges ? <Badge tone="warning">Unsaved changes</Badge> : null}
+            <Button
+              size="sm"
+              variant={hasPendingMatrixChanges ? 'primary' : 'secondary'}
+              icon={Save}
               onClick={handleSaveSubjectMatrix}
               disabled={!hasPendingMatrixChanges}
-              className="ts-btn ts-btn-success"
             >
-              <svg fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-              </svg>
-              Save Matrix{hasPendingMatrixChanges ? ' changes' : ''}
-            </button>
+              Save matrix
+            </Button>
+            <Button
+              size="sm"
+              variant={hasPendingMatrixChanges ? 'secondary' : 'primary'}
+              icon={Plus}
+              onClick={() => setIsAddingNew(true)}
+              disabled={isAddingNew}
+            >
+              Add subject
+            </Button>
           </div>
+        }
+      >
+        <div className="tt-subj-toolbar">
+          <FilterBar
+            search={{
+              placeholder: 'Search subjects',
+              value: subjectSearch,
+              onChange: setSubjectSearch,
+              label: 'Search subjects',
+            }}
+            chips={
+              subjects.length
+                ? [
+                    { id: 'all', label: 'All', count: subjects.length, active: subjectTypeFilter === 'all' },
+                    ...typeChips.map(([type, count]) => ({
+                      id: type,
+                      label: type || 'No type',
+                      count,
+                      active: subjectTypeFilter === type,
+                    })),
+                  ]
+                : undefined
+            }
+            chipsLabel="Filter by type"
+            onChipClick={(id) => setSubjectTypeFilter((prev) => (prev === id && id !== 'all' ? 'all' : id))}
+          />
+          {selectedCount > 0 ? (
+            <div className="tt-subj-bulkbar" role="region" aria-label="Bulk actions">
+              <span className="is-num">{plural(selectedCount, 'subject', 'subjects')} selected</span>
+              <span className="tt-subj-bulkbar__spacer" />
+              <Button variant="tertiary" size="sm" onClick={() => setSelectedIds(new Set())}>
+                Clear selection
+              </Button>
+              <Button size="sm" icon={Trash2} onClick={handleDeleteSelected}>
+                Delete {plural(selectedCount, 'subject', 'subjects')}
+              </Button>
+            </div>
+          ) : null}
         </div>
 
-        {/* ── Table ── */}
-        <div className="px-6 py-3 text-xs text-secondary-500 dark:text-secondary-400 border-b border-secondary-100 dark:border-secondary-800">
-          Subject Selection Matrix: classes up to 10 are grouped class-wise, while classes 11 and 12 are shown class-section wise. Use Save Matrix to persist checkbox changes.
-        </div>
-        <div className="ts-table-wrap ts-matrix-vert-scroll">
-          <table className="ts-table ts-subject-matrix-table" ref={matrixTableRef}>
-            <thead>
-              <tr>
-                <th className="ts-sticky-col ts-sticky-col-1">
-                  <label className="ts-checkbox-label">
-                    <input
-                      type="checkbox"
-                      checked={allOnPageSelected}
-                      ref={(el) => {
-                        if (el) el.indeterminate = someOnPageSelected && !allOnPageSelected
-                      }}
-                      onChange={selectAllOnPage}
-                      className="ts-checkbox"
-                      aria-label="Select all"
-                    />
-                  </label>
-                </th>
-                <th className="ts-sticky-col ts-sticky-col-2">Sr No</th>
-                <th className="ts-sticky-col ts-sticky-col-3">Name</th>
-                <th className="ts-sticky-col ts-sticky-col-4">Type</th>
-                <th className="ts-sticky-col ts-sticky-col-5 ts-sticky-divider">Actions</th>
-                {matrixColumns.map((column) => (
-                  <th key={column.key} className="ts-th-matrix">{column.label}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {/* Add new row */}
-              {isAddingNew && (
-                <tr className="ts-new-row">
-                  <td className="ts-sticky-col ts-sticky-col-1" />
-                  <td className="ts-sticky-col ts-sticky-col-2"><span className="ts-sr">-</span></td>
-                  <td className="ts-sticky-col ts-sticky-col-3">
-                    <input
-                      type="text"
-                      title="Subject name"
-                      value={newItem.name}
-                      onChange={(e) => setNewItem({ ...newItem, name: e.target.value })}
-                      placeholder="e.g. Mathematics"
-                      className="ts-input"
-                    />
-                  </td>
-                  <td className="ts-sticky-col ts-sticky-col-4">
-                    <select
-                      title="Subject type"
-                      value={newItem.type}
-                      onChange={(e) => setNewItem({ ...newItem, type: e.target.value })}
-                      className="ts-input"
-                    >
-                      <option value="">Select Type</option>
-                      {SUBJECT_TYPES.map((t) => (
-                        <option key={t} value={t}>{t}</option>
-                      ))}
-                    </select>
-                  </td>
-                  <td className="ts-sticky-col ts-sticky-col-5 ts-sticky-divider">
-                    <div className="ts-action-group">
-                      <button onClick={handleAdd} className="ts-action-link ts-action-save">Save</button>
-                      <button onClick={handleCancelEdit} className="ts-action-link ts-action-cancel">Cancel</button>
-                    </div>
-                  </td>
-                  {matrixColumns.length > 0 && (
-                    <td colSpan={matrixColumns.length}>
-                      <span className="ts-matrix-note">Save subject first, then assign to classes.</span>
-                    </td>
-                  )}
-                </tr>
-              )}
-
-              {/* Rows */}
-              {sortedSubjects.map((item, index) => {
-                const isEditing = editingId === item.id
-                const colors = TYPE_COLORS[item.type] || TYPE_COLORS.Other
-
-                if (isEditing) {
-                  return (
-                    <tr key={item.id}>
-                      <td className="ts-sticky-col ts-sticky-col-1">
-                        <label className="ts-checkbox-label">
-                          <input
-                            type="checkbox"
-                            checked={selectedIds.has(item.id)}
-                            onChange={() => toggleSelection(item.id)}
-                            className="ts-checkbox"
-                            aria-label={`Select ${item.name}`}
-                            title={`Select ${item.name}`}
-                          />
-                        </label>
-                      </td>
-                      <td className="ts-sticky-col ts-sticky-col-2"><span className="ts-sr">{index + 1}</span></td>
-                      <td className="ts-sticky-col ts-sticky-col-3">
-                        <input
-                          type="text"
-                          title="Edit subject name"
-                          value={editingData.name}
-                          onChange={(e) => setEditingData({ ...editingData, name: e.target.value })}
-                          placeholder="Subject name"
-                          className="ts-input"
-                        />
-                      </td>
-                      <td className="ts-sticky-col ts-sticky-col-4">
-                        <select
-                          title="Edit subject type"
-                          value={editingData.type}
-                          onChange={(e) => setEditingData({ ...editingData, type: e.target.value })}
-                          className="ts-input"
-                        >
-                          {SUBJECT_TYPES.map((t) => (
-                            <option key={t} value={t}>{t}</option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className="ts-sticky-col ts-sticky-col-5 ts-sticky-divider">
-                        <div className="ts-action-group">
-                          <button onClick={() => handleSave(item.id)} className="ts-action-link ts-action-save">Save</button>
-                          <button onClick={handleCancelEdit} className="ts-action-link ts-action-cancel">Cancel</button>
-                        </div>
-                      </td>
-                      {matrixColumns.length > 0 && (
-                        <td colSpan={matrixColumns.length}>
-                          <span className="ts-matrix-note">Update name/type and save. Matrix checkboxes stay in normal view.</span>
-                        </td>
-                      )}
-                    </tr>
-                  )
+        <DataTable
+          className="tt-subj-matrix"
+          caption="Subjects and the classes that take them"
+          columns={subjectColumns}
+          rows={visibleSubjects}
+          getRowKey={(item) => item.id}
+          maxHeight="min(560px, calc(100vh - 280px))"
+          selection={{
+            isSelected: (item) => selectedIds.has(item.id),
+            onToggle: (item) => toggleSelection(item.id),
+            allSelected: allOnPageSelected,
+            someSelected: someOnPageSelected,
+            onToggleAll: selectAllOnPage,
+            rowLabel: (item) => `Select ${item.name}`,
+          }}
+          empty={
+            hasSubjectFilters && subjects.length > 0 ? (
+              <EmptyState
+                compact
+                icon={SearchX}
+                title="No subjects match these filters"
+                body="Try another name or type, or clear the filters."
+                action={
+                  <Button size="sm" onClick={clearSubjectFilters}>
+                    Clear filters
+                  </Button>
                 }
-
-                return (
-                  <tr key={item.id}>
-                    <td className="ts-sticky-col ts-sticky-col-1">
-                      <label className="ts-checkbox-label">
-                        <input
-                          type="checkbox"
-                          checked={selectedIds.has(item.id)}
-                          onChange={() => toggleSelection(item.id)}
-                          className="ts-checkbox"
-                          aria-label={`Select ${item.name}`}
-                        />
-                      </label>
-                    </td>
-                    <td className="ts-sticky-col ts-sticky-col-2"><span className="ts-sr">{index + 1}</span></td>
-                    <td className="ts-sticky-col ts-sticky-col-3"><span className="ts-subject-name">{item.name}</span></td>
-                    <td className="ts-sticky-col ts-sticky-col-4">
-                      <span
-                        className="ts-type-badge"
-                        style={{ background: colors.bg, color: colors.color, border: `1px solid ${colors.border}` }}
-                      >
-                        {item.type}
-                      </span>
-                    </td>
-                    <td className="ts-sticky-col ts-sticky-col-5 ts-sticky-divider">
-                      <button onClick={() => handleEdit(item)} className="ts-action-link ts-action-edit">
-                        <svg className="ts-edit-icon" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" />
-                        </svg>
-                        Edit
-                      </button>
-                    </td>
-                    {matrixColumns.map((column) => (
-                      <td key={`${item.id}-${column.key}`} className="ts-td-matrix">
-                        <input
-                          type="checkbox"
-                          className="ts-checkbox"
-                          checked={isSubjectAssignedToColumn(item.name, column)}
-                          onChange={(e) => toggleSubjectAssignment(item.name, column, e.target.checked)}
-                          aria-label={`Assign ${item.name} to ${column.label}`}
-                        />
-                      </td>
-                    ))}
-                  </tr>
-                )
-              })}
-
-              {/* Empty state */}
-              {subjects.length === 0 && !isAddingNew && (
-                <tr>
-                  <td colSpan={5 + matrixColumns.length}>
-                    <div className="ts-empty">
-                      <div className="ts-empty-icon">
-                        <svg fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25" />
-                        </svg>
-                      </div>
-                      <h3>No Subjects Added</h3>
-                      <p>Add subjects to define what is taught in your school for timetable generation.</p>
-                      <button onClick={() => setIsAddingNew(true)} className="ts-btn ts-btn-primary">
-                        <svg fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m6-6H6" />
-                        </svg>
-                        Add Subject
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+              />
+            ) : (
+              <EmptyState
+                compact
+                icon={BookOpen}
+                title="No subjects added yet"
+                body="Add the subjects your school teaches, then tick the classes that take each one."
+                action={
+                  <Button variant="primary" size="sm" icon={Plus} onClick={() => setIsAddingNew(true)}>
+                    Add subject
+                  </Button>
+                }
+              />
+            )
+          }
+          footer={
+            subjects.length > 0 ? (
+              <>
+                <span className="is-num">
+                  {visibleSubjects.length === subjects.length
+                    ? plural(subjects.length, 'subject', 'subjects')
+                    : `${visibleSubjects.length} of ${plural(subjects.length, 'subject', 'subjects')}`}
+                  {matrixColumns.length > 0 ? ` · ${plural(matrixColumns.length, 'class column', 'class columns')}` : ''}
+                </span>
+                {matrixColumns.length === 0 ? <span>Add classes to assign subjects to them.</span> : null}
+              </>
+            ) : null
+          }
+        />
+      </Card>
 
       {showParallelSubjectPairs && (
-        <div className="ts-card">
-        <div className="ts-card-header">
-          <div>
-            <h3>
-              <span className="ts-header-icon">
-                <svg fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 6.75h7.5M8.25 12h7.5m-7.5 5.25h7.5M3.75 5.25A2.25 2.25 0 016 3h12a2.25 2.25 0 012.25 2.25v13.5A2.25 2.25 0 0118 21H6a2.25 2.25 0 01-2.25-2.25V5.25z" />
-                </svg>
-              </span>
-              Parallel Subject Pairs
-            </h3>
-          </div>
-          <div className="ts-header-stats">
-            <div className="ts-stat-card-inline ts-bg-indigo-soft">
-              <div className="ts-stat-icon ts-bg-indigo-grad">
-                <svg fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 6.75h7.5M8.25 12h7.5m-7.5 5.25h7.5M3.75 5.25A2.25 2.25 0 016 3h12a2.25 2.25 0 012.25 2.25v13.5A2.25 2.25 0 0118 21H6a2.25 2.25 0 01-2.25-2.25V5.25z" />
-                </svg>
-              </div>
-              <div>
-                <div className="ts-stat-value">{parallelSubjectPairs.length}</div>
-                <div className="ts-stat-label">Pairs</div>
-              </div>
-            </div>
-          </div>
-          <div className="ts-btn-group">
-            <button
-              onClick={() => setIsAddingPair(true)}
+        <Card
+          flush
+          className="tt-subj-card"
+          title="Parallel subject pairs"
+          subtitle="Subjects in a pair share one timetable slot. Period distribution counts each pair as one period, not two."
+          action={
+            <Button
+              size="sm"
+              icon={Plus}
+              onClick={() => {
+                setPairError('')
+                setIsAddingPair(true)
+              }}
               disabled={isAddingPair || classOptions.length === 0}
-              className="ts-btn ts-btn-primary"
-              title={classOptions.length === 0 ? 'Add classes and subjects first' : 'Add parallel pair'}
+              title={classOptions.length === 0 ? 'Add classes and subjects first' : undefined}
             >
-              <svg fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m6-6H6" />
-              </svg>
-              Add Pair
-            </button>
-          </div>
-        </div>
-
-        <div className="px-6 py-3 text-xs text-secondary-500 dark:text-secondary-400 border-b border-secondary-100 dark:border-secondary-800">
-          Parallel subjects share the same timetable slot. In Period Distribution, paired subjects are counted as one shared period, not two.
-        </div>
-
-        <div className="ts-table-wrap">
-          <table className="ts-table">
-            <thead>
-              <tr>
-                <th>Sr No</th>
-                <th>Class</th>
-                <th>Subject A</th>
-                <th>Subject B</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {isAddingPair && (
-                <tr className="ts-new-row">
-                  <td><span className="ts-sr">-</span></td>
-                  <td>
-                    <select
-                      title="Class"
-                      value={newPair.className}
-                      onChange={(e) =>
-                        setNewPair({ className: e.target.value, subjectA: '', subjectB: '' })
-                      }
-                      className="ts-input"
-                    >
-                      <option value="">Select class</option>
-                      {classOptions.map((className) => (
-                        <option key={className} value={className}>{className}</option>
-                      ))}
-                    </select>
-                  </td>
-                  <td>
-                    <select
-                      title="Subject A"
-                      value={newPair.subjectA}
-                      onChange={(e) => setNewPair((prev) => ({ ...prev, subjectA: e.target.value }))}
-                      className="ts-input"
-                      disabled={!newPair.className}
-                    >
-                      <option value="">Select subject</option>
-                      {(classSubjectsMap.get(newPair.className) || []).map((subject) => (
-                        <option key={subject} value={subject}>{subject}</option>
-                      ))}
-                    </select>
-                  </td>
-                  <td>
-                    <select
-                      title="Subject B"
-                      value={newPair.subjectB}
-                      onChange={(e) => setNewPair((prev) => ({ ...prev, subjectB: e.target.value }))}
-                      className="ts-input"
-                      disabled={!newPair.className}
-                    >
-                      <option value="">Select subject</option>
-                      {(classSubjectsMap.get(newPair.className) || []).map((subject) => (
-                        <option key={subject} value={subject}>{subject}</option>
-                      ))}
-                    </select>
-                  </td>
-                  <td>
-                    <div className="ts-action-group">
-                      <button onClick={handleAddPair} className="ts-action-link ts-action-save">Save</button>
-                      <button onClick={handleCancelPairEdit} className="ts-action-link ts-action-cancel">Cancel</button>
-                    </div>
-                  </td>
-                </tr>
-              )}
-
-              {parallelSubjectPairs.map((pair, index) => {
-                const isEditingPair = editingPairId === pair.id
-                if (isEditingPair) {
-                  return (
-                    <tr key={pair.id}>
-                      <td><span className="ts-sr">{index + 1}</span></td>
-                      <td>
-                        <select
-                          title="Class"
-                          value={editingPairData.className}
-                          onChange={(e) =>
-                            setEditingPairData({ className: e.target.value, subjectA: '', subjectB: '' })
-                          }
-                          className="ts-input"
-                        >
-                          <option value="">Select class</option>
-                          {classOptions.map((className) => (
-                            <option key={className} value={className}>{className}</option>
-                          ))}
-                        </select>
-                      </td>
-                      <td>
-                        <select
-                          title="Subject A"
-                          value={editingPairData.subjectA}
-                          onChange={(e) => setEditingPairData((prev) => ({ ...prev, subjectA: e.target.value }))}
-                          className="ts-input"
-                          disabled={!editingPairData.className}
-                        >
-                          <option value="">Select subject</option>
-                          {(classSubjectsMap.get(editingPairData.className) || []).map((subject) => (
-                            <option key={subject} value={subject}>{subject}</option>
-                          ))}
-                        </select>
-                      </td>
-                      <td>
-                        <select
-                          title="Subject B"
-                          value={editingPairData.subjectB}
-                          onChange={(e) => setEditingPairData((prev) => ({ ...prev, subjectB: e.target.value }))}
-                          className="ts-input"
-                          disabled={!editingPairData.className}
-                        >
-                          <option value="">Select subject</option>
-                          {(classSubjectsMap.get(editingPairData.className) || []).map((subject) => (
-                            <option key={subject} value={subject}>{subject}</option>
-                          ))}
-                        </select>
-                      </td>
-                      <td>
-                        <div className="ts-action-group">
-                          <button onClick={() => handleSavePair(pair.id)} className="ts-action-link ts-action-save">Save</button>
-                          <button onClick={handleCancelPairEdit} className="ts-action-link ts-action-cancel">Cancel</button>
-                        </div>
-                      </td>
-                    </tr>
-                  )
+              Add pair
+            </Button>
+          }
+        >
+          <DataTable
+            className="tt-subj-list"
+            caption="Parallel subject pairs"
+            columns={pairColumns}
+            rows={parallelSubjectPairs}
+            getRowKey={(pair) => pair.id}
+            empty={
+              <EmptyState
+                compact
+                icon={Split}
+                title="No parallel pairs yet"
+                body={
+                  classOptions.length === 0
+                    ? 'Add classes and their subjects first, then pair subjects that run in the same period.'
+                    : 'Pair subjects that run in the same period, like French and Sanskrit.'
                 }
-
-                return (
-                  <tr key={pair.id}>
-                    <td><span className="ts-sr">{index + 1}</span></td>
-                    <td><span className="ts-subject-name">{pair.className}</span></td>
-                    <td>{pair.subjectA}</td>
-                    <td>{pair.subjectB}</td>
-                    <td>
-                      <div className="ts-action-group">
-                        <button onClick={() => handleEditPair(pair.id)} className="ts-action-link ts-action-edit">Edit</button>
-                        <button
-                          onClick={() => handleDeletePair(pair.id)}
-                          className="ts-action-link"
-                          style={{ color: '#ef4444' }}
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })}
-
-              {parallelSubjectPairs.length === 0 && !isAddingPair && (
-                <tr>
-                  <td colSpan={5}>
-                    <div className="ts-empty">
-                      <div className="ts-empty-icon">
-                        <svg fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 6.75h7.5M8.25 12h7.5m-7.5 5.25h7.5M3.75 5.25A2.25 2.25 0 016 3h12a2.25 2.25 0 012.25 2.25v13.5A2.25 2.25 0 0118 21H6a2.25 2.25 0 01-2.25-2.25V5.25z" />
-                        </svg>
-                      </div>
-                      <h3>No Parallel Pairs Added</h3>
-                      <p>Define subject pairs (like French + Sanskrit) that run in the same period.</p>
-                      <button
-                        onClick={() => setIsAddingPair(true)}
-                        className="ts-btn ts-btn-primary"
-                        disabled={classOptions.length === 0}
-                      >
-                        <svg fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m6-6H6" />
-                        </svg>
-                        Add Parallel Pair
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-        </div>
+                action={
+                  <Button
+                    size="sm"
+                    icon={Plus}
+                    onClick={() => {
+                      setPairError('')
+                      setIsAddingPair(true)
+                    }}
+                    disabled={classOptions.length === 0}
+                  >
+                    Add pair
+                  </Button>
+                }
+              />
+            }
+            footer={
+              parallelSubjectPairs.length > 0 ? (
+                <span className="is-num">{plural(parallelSubjectPairs.length, 'pair', 'pairs')}</span>
+              ) : null
+            }
+          />
+        </Card>
       )}
 
       {showCommonPeriod && (
-      <div className="ts-card">
-        <div className="ts-card-header">
-          <div>
-            <h3>
-              <span className="ts-header-icon">
-                <svg fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M7 8h10M7 12h10M7 16h10" />
-                </svg>
-              </span>
-              Common Period
-            </h3>
-          </div>
-          <div className="ts-header-stats">
-            <div className="ts-stat-card-inline ts-bg-indigo-soft">
-              <div className="ts-stat-icon ts-bg-indigo-grad">
-                <svg fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M8 7h8M8 12h8M8 17h8" />
-                </svg>
-              </div>
-              <div>
-                <div className="ts-stat-value">{commonPeriods.length}</div>
-                <div className="ts-stat-label">Matches</div>
-              </div>
-            </div>
-          </div>
-          <div className="ts-btn-group">
-            <button
-              type="button"
-              onClick={handleOpenAddCommonPeriod}
-              className="ts-btn ts-btn-primary"
-            >
-              <svg fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m6-6H6" />
-              </svg>
-              Add Common Period
-            </button>
-          </div>
-        </div>
-
-        <div className="px-6 py-3 text-xs text-secondary-500 dark:text-secondary-400 border-b border-secondary-100 dark:border-secondary-800">
-          Create common periods by selecting a <b>Subject</b> and <b>Class</b>. Common Period matches are derived from the current timetable grid.
-        </div>
-
-        {isAddingCommonPeriod && (
-          <div className="px-6 py-4 border-b border-secondary-100 dark:border-secondary-800">
-            <div className="flex flex-wrap items-end gap-4">
-              <div className="min-w-[240px] flex-1">
-                <label className="block text-xs font-medium text-secondary-500 mb-1">Subject</label>
-                <select
-                  className="ts-input w-full"
-                  value={newCommonPeriod.subject}
-                  title="Subject"
-                  onChange={(e) => {
-                    const subject = e.target.value
-                    setNewCommonPeriod((prev) => ({ ...prev, subject }))
-                  }}
-                >
-                  <option value="">Select subject</option>
-                  {sortedSubjects.map((s) => (
-                    <option key={s.id} value={s.name}>
-                      {s.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="min-w-[240px] flex-1">
-                <label className="block text-xs font-medium text-secondary-500 mb-1">Class</label>
-                <select
-                  className="ts-input w-full"
-                  value={newCommonPeriod.className}
-                  title="Class"
-                  onChange={(e) => setNewCommonPeriod((prev) => ({ ...prev, className: e.target.value }))}
-                  disabled={!newCommonPeriod.subject}
-                >
-                  <option value="">Select class</option>
-                  {(newCommonPeriod.subject ? availableClassNamesForSubjectFromMatrix : classNameOptions).map((cn) => (
-                    <option key={cn} value={cn}>
-                      {cn}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="min-w-[240px] flex-1">
-                <label className="block text-xs font-medium text-secondary-500 mb-1">Sections</label>
-                <div className="relative">
-                  <button
-                    type="button"
-                    className="ts-input w-full text-left flex items-center justify-between gap-2"
-                    onClick={() => setIsCommonPeriodSectionsOpen((v) => !v)}
-                    disabled={!newCommonPeriod.subject || !newCommonPeriod.className || matrixAssignedSectionsForSelection.length === 0}
-                    title="Sections"
-                  >
-                    <span className="truncate">
-                      {selectedCommonPeriodSections.length > 0
-                        ? selectedCommonPeriodSections.join(', ')
-                        : (newCommonPeriod.subject && newCommonPeriod.className ? 'Select sections' : 'Select subject and class')}
-                    </span>
-                    <svg
-                      width="16"
-                      height="16"
-                      viewBox="0 0 20 20"
-                      fill="currentColor"
-                      aria-hidden="true"
-                      style={{ opacity: 0.7 }}
-                    >
-                      <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.17l3.71-3.94a.75.75 0 111.08 1.04l-4.24 4.5a.75.75 0 01-1.08 0l-4.24-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
-                    </svg>
-                  </button>
-
-                  {isCommonPeriodSectionsOpen && (
-                    <div className="absolute z-20 mt-2 w-full rounded-xl border border-secondary-200 bg-white shadow-lg p-2 max-h-[220px] overflow-auto">
-                      {matrixAssignedSectionsForSelection.map((section) => {
-                        const checked = selectedCommonPeriodSections.includes(section)
-                        return (
-                          <label key={section} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-secondary-50 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              className="ts-checkbox"
-                              checked={checked}
-                              onChange={(e) => {
-                                const nextChecked = e.target.checked
-                                setSelectedCommonPeriodSections((prev) => {
-                                  if (nextChecked) {
-                                    return Array.from(new Set([...prev, section]))
-                                  }
-                                  return prev.filter((s) => s !== section)
-                                })
-                              }}
-                              aria-label={`Select section ${section}`}
-                            />
-                            <span className="text-sm text-secondary-900">{section}</span>
-                          </label>
-                        )
-                      })}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleSaveCommonPeriod}
-                  className="ts-btn ts-btn-primary"
-                  disabled={!newCommonPeriod.subject || !newCommonPeriod.className || selectedCommonPeriodSections.length === 0}
-                >
-                  <svg fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m6-6H6" />
-                  </svg>
-                  Save
-                </button>
-                <button
-                  type="button"
-                  onClick={handleCancelAddCommonPeriod}
-                  className="ts-action-link ts-action-cancel"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-
-            <div className="mt-3 text-xs text-secondary-500">
-              {candidateCommonMatches.length === 0
-                ? 'No common period matches for the selected subject/class yet.'
-                : `Found ${candidateCommonMatches.length} timetable match(es) for this subject/class.`}
-              {matrixAssignedSectionsForSelection.length > 0 && ` Sections (from matrix): ${matrixAssignedSectionsForSelection.join(', ')}`}
-            </div>
-          </div>
-        )}
-
-        <div className="ts-table-wrap">
-          <table className="ts-table">
-            <thead>
-              <tr>
-                <th>Sr No</th>
-                <th>Subject</th>
-                <th>Class</th>
-                <th>Sections</th>
-              </tr>
-            </thead>
-            <tbody>
-              {commonPeriods.length === 0 ? (
-                <tr>
-                  <td colSpan={4}>
-                    <div className="ts-empty">
-                      <div className="ts-empty-icon">
-                        <svg fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 6.75h7.5M8.25 12h7.5m-7.5 5.25h7.5M3.75 5.25A2.25 2.25 0 016 3h12a2.25 2.25 0 012.25 2.25v13.5A2.25 2.25 0 0118 21H6a2.25 2.25 0 01-2.25-2.25V5.25z" />
-                        </svg>
-                      </div>
-                      <h3>No Common Periods</h3>
-                      <p>
-                        Click <b>Add Common Period</b> and choose a Subject+Class to create common periods from the timetable grid.
-                      </p>
-                    </div>
-                  </td>
-                </tr>
-              ) : (
-                commonPeriods.map((row, index) => (
-                  <tr key={row.id}>
-                    <td><span className="ts-sr">{index + 1}</span></td>
-                    <td>{row.subject}</td>
-                    <td><span className="ts-subject-name">{row.className}</span></td>
-                    <td>{row.sections.join(', ')}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+        <Card
+          flush
+          className="tt-subj-card"
+          title="Common periods"
+          subtitle="Sections of one class that take a subject together. Matches come from the current timetable."
+          action={
+            <Button size="sm" icon={Plus} onClick={handleOpenAddCommonPeriod} disabled={isAddingCommonPeriod}>
+              Add common period
+            </Button>
+          }
+        >
+          <DataTable
+            caption="Common periods"
+            columns={commonPeriodColumns}
+            rows={commonPeriods as CommonPeriodRow[]}
+            getRowKey={(row) => row.id}
+            empty={
+              <EmptyState
+                compact
+                icon={CalendarClock}
+                title="No common periods yet"
+                body="Choose a subject and class to find sections that share a period in the timetable."
+                action={
+                  <Button size="sm" icon={Plus} onClick={handleOpenAddCommonPeriod}>
+                    Add common period
+                  </Button>
+                }
+              />
+            }
+            footer={
+              commonPeriods.length > 0 ? (
+                <span className="is-num">{plural(commonPeriods.length, 'common period', 'common periods')}</span>
+              ) : null
+            }
+          />
+        </Card>
       )}
-    </div>
+
+      {/* ── Add subject ── */}
+      <Dialog
+        open={isAddingNew}
+        onClose={handleCancelEdit}
+        title="Add subject"
+        description="Once it's added, tick the classes that take it in the subject matrix."
+        footer={
+          <>
+            <Button onClick={handleCancelEdit}>Cancel</Button>
+            <Button
+              type="submit"
+              form={ADD_SUBJECT_FORM_ID}
+              variant="primary"
+              icon={Plus}
+              disabled={!newItem.name.trim()}
+            >
+              Add subject
+            </Button>
+          </>
+        }
+      >
+        <form id={ADD_SUBJECT_FORM_ID} className="tt-subj-form" onSubmit={submitWith(handleAdd)} noValidate>
+          <TextField
+            label="Subject name"
+            required
+            autoFocus
+            value={newItem.name}
+            onChange={(e) => setNewItem({ ...newItem, name: e.target.value })}
+            placeholder="e.g. Mathematics"
+          />
+          <Select
+            label="Type"
+            value={newItem.type}
+            onChange={(e) => setNewItem({ ...newItem, type: e.target.value })}
+            options={SUBJECT_TYPES}
+          />
+        </form>
+      </Dialog>
+
+      {/* ── Edit subject ── */}
+      <Dialog
+        open={editingId !== null}
+        onClose={handleCancelEdit}
+        title={editingSubject ? `Edit ${editingSubject.name}` : 'Edit subject'}
+        description="Class assignments stay as they are in the subject matrix."
+        footer={
+          <>
+            <Button onClick={handleCancelEdit}>Cancel</Button>
+            <Button type="submit" form={EDIT_SUBJECT_FORM_ID} variant="primary" disabled={!editingData.name.trim()}>
+              Save changes
+            </Button>
+          </>
+        }
+      >
+        <form
+          id={EDIT_SUBJECT_FORM_ID}
+          className="tt-subj-form"
+          onSubmit={submitWith(() => {
+            if (editingId) handleSave(editingId)
+          })}
+          noValidate
+        >
+          <TextField
+            label="Subject name"
+            required
+            value={editingData.name}
+            onChange={(e) => setEditingData({ ...editingData, name: e.target.value })}
+            placeholder="Subject name"
+          />
+          <Select
+            label="Type"
+            value={editingData.type}
+            onChange={(e) => setEditingData({ ...editingData, type: e.target.value })}
+            options={SUBJECT_TYPES}
+          />
+        </form>
+      </Dialog>
+
+      {/* ── Delete subjects ── */}
+      <Dialog
+        open={subjectDeleteIds !== null}
+        onClose={() => setSubjectDeleteIds(null)}
+        tone="danger"
+        size="sm"
+        title={
+          subjectsPendingDelete.length === 1
+            ? `Delete ${subjectsPendingDelete[0].name}?`
+            : `Delete ${plural(subjectsPendingDelete.length, 'subject', 'subjects')}?`
+        }
+        description="They're removed from the subject list, along with any parallel pairs and period allocations that use them. This can't be undone."
+        footer={
+          <>
+            <Button onClick={() => setSubjectDeleteIds(null)}>
+              {subjectsPendingDelete.length === 1 ? 'Keep subject' : 'Keep subjects'}
+            </Button>
+            <Button variant="danger" icon={Trash2} onClick={handleConfirmDeleteSubjects}>
+              Delete {plural(subjectsPendingDelete.length, 'subject', 'subjects')}
+            </Button>
+          </>
+        }
+      />
+
+      {/* ── Add / edit parallel pair ── */}
+      <Dialog
+        open={isAddingPair || editingPairId !== null}
+        onClose={handleCancelPairEdit}
+        title={isEditingPairDialog ? 'Edit parallel pair' : 'Add parallel pair'}
+        description="Both subjects run in the same period for the class."
+        footer={
+          <>
+            <Button onClick={handleCancelPairEdit}>Cancel</Button>
+            <Button type="submit" form={PAIR_FORM_ID} variant="primary">
+              {isEditingPairDialog ? 'Save pair' : 'Add pair'}
+            </Button>
+          </>
+        }
+      >
+        <form
+          id={PAIR_FORM_ID}
+          className="tt-subj-form"
+          onSubmit={submitWith(() => {
+            if (isEditingPairDialog && editingPairId) handleSavePair(editingPairId)
+            else handleAddPair()
+          })}
+          noValidate
+        >
+          {pairError ? (
+            <Banner tone="danger" onDismiss={() => setPairError('')}>
+              {pairError}
+            </Banner>
+          ) : null}
+          <Select
+            label="Class"
+            required
+            value={pairForm.className}
+            onChange={(e) => updatePairForm({ className: e.target.value, subjectA: '', subjectB: '' })}
+            placeholder="Choose class"
+            options={classOptions.map((className) => ({ value: className, label: classLabel(className) }))}
+          />
+          <Select
+            label="First subject"
+            required
+            value={pairForm.subjectA}
+            onChange={(e) => updatePairForm({ subjectA: e.target.value })}
+            placeholder="Choose subject"
+            disabled={!pairForm.className}
+            options={pairSubjectOptions}
+            hint={
+              pairForm.className && pairSubjectOptions.length === 0
+                ? 'This class has no subjects yet. Tick some in the subject matrix and save it.'
+                : undefined
+            }
+          />
+          <Select
+            label="Second subject"
+            required
+            value={pairForm.subjectB}
+            onChange={(e) => updatePairForm({ subjectB: e.target.value })}
+            placeholder="Choose subject"
+            disabled={!pairForm.className}
+            options={pairSubjectOptions}
+          />
+        </form>
+      </Dialog>
+
+      {/* ── Delete parallel pair ── */}
+      <Dialog
+        open={pairDeleteId !== null}
+        onClose={() => setPairDeleteId(null)}
+        tone="danger"
+        size="sm"
+        title="Delete this parallel pair?"
+        description={
+          pairPendingDelete
+            ? `${pairPendingDelete.subjectA} and ${pairPendingDelete.subjectB} in ${classLabel(pairPendingDelete.className)} will no longer share a period. This can't be undone.`
+            : undefined
+        }
+        footer={
+          <>
+            <Button onClick={() => setPairDeleteId(null)}>Keep pair</Button>
+            <Button variant="danger" icon={Trash2} onClick={handleConfirmDeletePair}>
+              Delete pair
+            </Button>
+          </>
+        }
+      />
+
+      {/* ── Add common period ── */}
+      <Dialog
+        open={isAddingCommonPeriod}
+        onClose={handleCancelAddCommonPeriod}
+        title="Add common period"
+        description="Pick a subject and class, then the sections that take it together."
+        footer={
+          <>
+            <Button onClick={handleCancelAddCommonPeriod}>Cancel</Button>
+            <Button type="submit" form={COMMON_PERIOD_FORM_ID} variant="primary" disabled={!commonPeriodCanSave}>
+              Save common period
+            </Button>
+          </>
+        }
+      >
+        <form
+          id={COMMON_PERIOD_FORM_ID}
+          className="tt-subj-form"
+          onSubmit={submitWith(handleSaveCommonPeriod)}
+          noValidate
+        >
+          {commonPeriodError ? (
+            <Banner tone="danger" onDismiss={() => setCommonPeriodError('')}>
+              {commonPeriodError}
+            </Banner>
+          ) : null}
+          <Select
+            label="Subject"
+            required
+            value={newCommonPeriod.subject}
+            onChange={(e) => {
+              const subject = e.target.value
+              setNewCommonPeriod((prev) => ({ ...prev, subject }))
+            }}
+            placeholder="Choose subject"
+            options={subjectNameOptions}
+          />
+          <Select
+            label="Class"
+            required
+            value={newCommonPeriod.className}
+            onChange={(e) => setNewCommonPeriod((prev) => ({ ...prev, className: e.target.value }))}
+            placeholder="Choose class"
+            disabled={!newCommonPeriod.subject}
+            options={(newCommonPeriod.subject ? availableClassNamesForSubjectFromMatrix : classNameOptions).map((cn) => ({
+              value: cn,
+              label: classLabel(cn),
+            }))}
+          />
+          <fieldset className="tt-subj-sections">
+            <legend className="tt-subj-sections__label">Sections</legend>
+            {matrixAssignedSectionsForSelection.length > 0 && newCommonPeriod.subject && newCommonPeriod.className ? (
+              <div className="tt-subj-sections__list">
+                {matrixAssignedSectionsForSelection.map((section) => (
+                  <Checkbox
+                    key={section}
+                    label={section}
+                    checked={selectedCommonPeriodSections.includes(section)}
+                    onChange={(nextChecked) => {
+                      setCommonPeriodError('')
+                      setSelectedCommonPeriodSections((prev) => {
+                        if (nextChecked) {
+                          return Array.from(new Set([...prev, section]))
+                        }
+                        return prev.filter((s) => s !== section)
+                      })
+                    }}
+                  />
+                ))}
+              </div>
+            ) : null}
+            <p className="tt-subj-sections__hint">{commonPeriodSectionsHint}</p>
+          </fieldset>
+        </form>
+      </Dialog>
+    </Page>
   )
 }
 

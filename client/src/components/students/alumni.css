@@ -1,0 +1,21 @@
+/* Students module — Alumni page. Tokens only. */
+
+.cb-app .almni-toolbar { padding: var(--space-1) var(--space-5) var(--space-4); }
+@media (max-width: 640px) { .cb-app .almni-toolbar { padding: var(--space-1) var(--space-4) var(--space-3); } }
+.cb-app .almni-card .cb-table-wrap { border-top: 1px solid var(--border); }
+
+.cb-app .almni-name { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
+.cb-app .almni-name__text { display: flex; flex-direction: column; min-width: 0; }
+.cb-app .almni-name__primary { font-weight: 600; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cb-app .almni-name__secondary { font-size: 12px; line-height: 16px; color: var(--ink-muted); white-space: nowrap; }
+
+.cb-app .almni-clip { display: inline-block; max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle; }
+.cb-app .almni-contact { display: inline-flex; flex-direction: column; min-width: 0; }
+.cb-app .almni-contact__email { font-size: 12px; line-height: 16px; color: var(--ink-muted); max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.cb-app .almni-profile { display: flex; flex-direction: column; gap: var(--space-6); }
+.cb-app .almni-profile__head { display: flex; align-items: center; gap: var(--space-4); }
+.cb-app .almni-profile__titles { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2); min-width: 0; }
+.cb-app .almni-profile__name { margin: 0; font: 600 15px/22px var(--font-sans); color: var(--ink); }
+.cb-app .almni-profile__group { display: flex; flex-direction: column; gap: var(--space-3); }
+.cb-app .almni-profile__title { margin: 0; font-size: 15px; line-height: 22px; }

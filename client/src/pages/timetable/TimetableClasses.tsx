@@ -1,35 +1,32 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import toast from 'react-hot-toast'
+import { Pencil, Plus, Save, Trash2 } from 'lucide-react'
 import { useTimetable, type TimetableClass } from '@/contexts/TimetableContext'
+import { getSectionDisplayName } from '@/constants/sectionMetadata'
+import { sectionLabel } from '@/components/students/studentFormat'
+import {
+  Badge,
+  Button,
+  Card,
+  Checkbox,
+  DataTable,
+  Dialog,
+  EmptyState,
+  Menu,
+  Page,
+  Select,
+  Sheet,
+  TextField,
+  type DataTableColumn,
+} from '@/components/ui'
+import '@/components/timetable/classes.css'
 
 const FLOOR_OPTIONS = ['Ground Floor', 'First Floor', 'Second Floor', 'Third Floor']
 
-/** Per-subject colour palette — same subject always gets same colour across timetable pages */
-const SUBJECT_COLORS: Record<string, { bg: string; text: string; darkBg: string; darkText: string }> = {}
-const SUBJECT_PALETTE = [
-  { bg: '#eef2ff', text: '#4338ca', darkBg: '#312e8144', darkText: '#a5b4fc' },
-  { bg: '#f0fdf4', text: '#166534', darkBg: '#14532d44', darkText: '#86efac' },
-  { bg: '#fef3c7', text: '#92400e', darkBg: '#78350f44', darkText: '#fcd34d' },
-  { bg: '#fce7f3', text: '#9d174d', darkBg: '#831843aa', darkText: '#f9a8d4' },
-  { bg: '#e0f2fe', text: '#075985', darkBg: '#0c4a6e44', darkText: '#7dd3fc' },
-  { bg: '#fae8ff', text: '#6b21a8', darkBg: '#581c8744', darkText: '#d8b4fe' },
-  { bg: '#fff7ed', text: '#9a3412', darkBg: '#7c2d1244', darkText: '#fdba74' },
-  { bg: '#f1f5f9', text: '#334155', darkBg: '#33415544', darkText: '#cbd5e1' },
-  { bg: '#ecfdf5', text: '#065f46', darkBg: '#064e3b44', darkText: '#6ee7b7' },
-  { bg: '#fef2f2', text: '#991b1b', darkBg: '#7f1d1d44', darkText: '#fca5a5' },
-  { bg: '#eff6ff', text: '#1e40af', darkBg: '#1e3a5f44', darkText: '#93c5fd' },
-  { bg: '#f5f3ff', text: '#5b21b6', darkBg: '#4c1d9544', darkText: '#c4b5fd' },
-]
-let _subjectColorIdx = 0
-const getSubjectColor = (subject: string) => {
-  const key = subject.trim().toLowerCase()
-  if (!key) return SUBJECT_PALETTE[0]
-  if (!SUBJECT_COLORS[key]) {
-    SUBJECT_COLORS[key] = SUBJECT_PALETTE[_subjectColorIdx % SUBJECT_PALETTE.length]
-    _subjectColorIdx++
-  }
-  return SUBJECT_COLORS[key]
-}
+/** Subjects shown in a row before the rest fold into "+N more". */
+const VISIBLE_SUBJECTS = 3
+
+const plural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`
 
 const EMPTY_FORM = {
   className: '',
@@ -49,6 +46,15 @@ interface MatrixClassRow {
 interface MatrixSectionColumn {
   id: string
   name: string
+}
+
+interface MatrixSavePlan {
+  normalizedMatrixClasses: MatrixClassRow[]
+  normalizedMatrixSections: MatrixSectionColumn[]
+  normalizedMatrixSelection: Record<string, Record<string, boolean>>
+  desiredCombos: Array<{ className: string, section: string }>
+  existingByKey: Map<string, TimetableClass>
+  idsToDelete: string[]
 }
 
 let matrixSeq = 0
@@ -104,6 +110,10 @@ const TimetableClasses: React.FC = () => {
   const [matrixSectionDrafts, setMatrixSectionDrafts] = useState<Record<string, string>>({})
   const [matrixDirty, setMatrixDirty] = useState(false)
   const didHydrateLocalMatrixRef = useRef(false)
+  // Confirmations that used to be window.confirm now go through kit Dialogs.
+  const [confirmDeleteAllOpen, setConfirmDeleteAllOpen] = useState(false)
+  const [confirmDeleteMatrixClassesOpen, setConfirmDeleteMatrixClassesOpen] = useState(false)
+  const [pendingMatrixSave, setPendingMatrixSave] = useState<MatrixSavePlan | null>(null)
 
   // Incharge dropdown is sourced from Timetable > Teachers module.
   const teacherOptions = useMemo(() => {
@@ -206,13 +216,20 @@ const TimetableClasses: React.FC = () => {
     }
   }
 
-  const handleDeleteSelected = () => {
+  /** Opens the "Delete all" confirmation (was window.confirm). */
+  const requestDeleteSelected = () => {
     const idsToDelete = classes.map((item) => item.id)
 
     if (idsToDelete.length === 0) return
 
-    const confirmMessage = `Delete all ${idsToDelete.length} class-section combination(s)? This cannot be undone.`
-    if (!window.confirm(confirmMessage)) return
+    setConfirmDeleteAllOpen(true)
+  }
+
+  const handleDeleteSelected = () => {
+    setConfirmDeleteAllOpen(false)
+    const idsToDelete = classes.map((item) => item.id)
+
+    if (idsToDelete.length === 0) return
 
     // Keep delete robust even if matrix metadata is inconsistent.
     try {
@@ -262,17 +279,6 @@ const TimetableClasses: React.FC = () => {
       return next
     })
   }, [matrixSections])
-
-  // ── Floor badge class ──
-  const floorBadgeClass = (floor: string) => {
-    switch (floor) {
-      case 'Ground Floor': return 'tc-floor-ground'
-      case 'First Floor': return 'tc-floor-first'
-      case 'Second Floor': return 'tc-floor-second'
-      case 'Third Floor': return 'tc-floor-third'
-      default: return 'tc-floor-default'
-    }
-  }
 
   // ── Stats ──
   const totalSections = classes.length
@@ -364,14 +370,22 @@ const TimetableClasses: React.FC = () => {
     setSelectedMatrixClassIds(new Set(matrixClasses.map((item) => item.id)))
   }
 
-  const handleDeleteSelectedMatrixClasses = () => {
+  /** Opens the matrix bulk-delete confirmation (was window.confirm). */
+  const requestDeleteSelectedMatrixClasses = () => {
     if (selectedMatrixClassIds.size === 0) return
 
     const selectedRows = matrixClasses.filter((item) => selectedMatrixClassIds.has(item.id))
     if (selectedRows.length === 0) return
 
-    const confirmMessage = `Delete ${selectedRows.length} selected class${selectedRows.length === 1 ? '' : 'es'} from the matrix? Related class-section rows will also be removed.`
-    if (!window.confirm(confirmMessage)) return
+    setConfirmDeleteMatrixClassesOpen(true)
+  }
+
+  const handleDeleteSelectedMatrixClasses = () => {
+    setConfirmDeleteMatrixClassesOpen(false)
+    if (selectedMatrixClassIds.size === 0) return
+
+    const selectedRows = matrixClasses.filter((item) => selectedMatrixClassIds.has(item.id))
+    if (selectedRows.length === 0) return
 
     const deletedNameKeys = new Set(
       selectedRows
@@ -493,23 +507,23 @@ const TimetableClasses: React.FC = () => {
     }))
 
     if (normalizedMatrixClasses.some((item) => !item.name)) {
-      window.alert('Please enter a valid class name for each class row.')
+      toast.error('Give every class row a name before saving the matrix.')
       return
     }
     if (normalizedMatrixSections.some((item) => !item.name)) {
-      window.alert('Please enter a valid section name for each section column.')
+      toast.error('Give every section column a name before saving the matrix.')
       return
     }
 
     const classNameSet = new Set(normalizedMatrixClasses.map((item) => item.name.toLowerCase()))
     if (classNameSet.size !== normalizedMatrixClasses.length) {
-      window.alert('Duplicate class names are not allowed in the matrix.')
+      toast.error('Two class rows have the same name. Rename or delete one, then save.')
       return
     }
 
     const sectionNameSet = new Set(normalizedMatrixSections.map((item) => item.name.toLowerCase()))
     if (sectionNameSet.size !== normalizedMatrixSections.length) {
-      window.alert('Duplicate section names are not allowed in the matrix.')
+      toast.error('Two section columns have the same name. Rename one, then save.')
       return
     }
 
@@ -541,13 +555,33 @@ const TimetableClasses: React.FC = () => {
       .filter((item) => !desiredKeys.has(comboKey(item.className, item.section)))
       .map((item) => item.id)
 
-    if (idsToDelete.length > 0) {
-      const confirmed = window.confirm(
-        `${idsToDelete.length} existing class-section combination(s) are not selected in the matrix and will be removed. Continue?`
-      )
-      if (!confirmed) return
+    const plan: MatrixSavePlan = {
+      normalizedMatrixClasses,
+      normalizedMatrixSections,
+      normalizedMatrixSelection,
+      desiredCombos,
+      existingByKey,
+      idsToDelete,
     }
 
+    // Removing existing class sections needs a confirmation (was window.confirm).
+    if (idsToDelete.length > 0) {
+      setPendingMatrixSave(plan)
+      return
+    }
+
+    commitMatrixSave(plan)
+  }
+
+  const commitMatrixSave = ({
+    normalizedMatrixClasses,
+    normalizedMatrixSections,
+    normalizedMatrixSelection,
+    desiredCombos,
+    existingByKey,
+    idsToDelete,
+  }: MatrixSavePlan) => {
+    setPendingMatrixSave(null)
     setMatrixClasses(normalizedMatrixClasses)
     setMatrixSections(normalizedMatrixSections)
     setMatrixSelection(normalizedMatrixSelection)
@@ -579,7 +613,7 @@ const TimetableClasses: React.FC = () => {
       })
     })
 
-    toast.success('Classes and sections saved.')
+    toast.success('Matrix saved. The class list is up to date.')
   }
 
   // ── Subject multi-select helpers ──
@@ -595,1034 +629,389 @@ const TimetableClasses: React.FC = () => {
     }
   }
 
+  // ── View helpers ──
+  const selectedMatrixCount = selectedMatrixClassIds.size
+  const matrixClassLabel = (row: MatrixClassRow, index: number) =>
+    (matrixClassDrafts[row.id] ?? row.name).trim() || `Class ${index + 1}`
+  const matrixSectionLabel = (section: MatrixSectionColumn, index: number) =>
+    getSectionDisplayName(matrixSectionDrafts[section.id] ?? section.name) || `Section ${index + 1}`
+  const rowLabel = (item: TimetableClass) =>
+    [item.className.trim(), sectionLabel(item.section)].filter(Boolean).join(' · ') || 'class section'
+  const editingItem = editingId ? classes.find((item) => item.id === editingId) : undefined
+  const pendingRemovals = pendingMatrixSave
+    ? classes.filter((item) => pendingMatrixSave.idsToDelete.includes(item.id))
+    : []
+
+  const columns: DataTableColumn<TimetableClass>[] = [
+    {
+      key: 'className',
+      header: 'Class',
+      mobile: 'title',
+      render: (item) => <span className="cb-strong">{item.className.trim() || '—'}</span>,
+    },
+    {
+      key: 'section',
+      header: 'Section',
+      mobile: 'subtitle',
+      render: (item) => sectionLabel(item.section) || '—',
+    },
+    {
+      key: 'floor',
+      header: 'Floor',
+      render: (item) =>
+        item.floor ? (
+          <Badge tone="neutral" dot={false}>
+            {item.floor}
+          </Badge>
+        ) : (
+          '—'
+        ),
+    },
+    {
+      key: 'subjects',
+      header: 'Subjects',
+      render: (item) => {
+        const visibleSubjects = normalizeSelectedSubjects(item.subjects)
+        if (visibleSubjects.length === 0) return '—'
+        const shown = visibleSubjects.slice(0, VISIBLE_SUBJECTS)
+        const hidden = visibleSubjects.slice(VISIBLE_SUBJECTS)
+        return (
+          <span className="tc-subjects">
+            {shown.map((subject) => (
+              <Badge key={subject} tone="neutral" dot={false}>
+                {subject}
+              </Badge>
+            ))}
+            {hidden.length > 0 ? (
+              <Badge tone="neutral" dot={false} title={hidden.join(', ')}>
+                +{hidden.length} more
+              </Badge>
+            ) : null}
+          </span>
+        )
+      },
+    },
+    {
+      key: 'incharge',
+      header: 'Class teacher',
+      render: (item) => item.incharge.trim() || '—',
+    },
+    {
+      key: 'actions',
+      header: <span className="cb-visually-hidden">Actions</span>,
+      headerLabel: 'Actions',
+      align: 'right',
+      width: 56,
+      mobile: 'aside',
+      interactive: true,
+      render: (item) => (
+        <Menu
+          label={`Actions for ${rowLabel(item)}`}
+          items={[{ label: 'Edit class section', icon: Pencil, onSelect: () => handleEdit(item) }]}
+        />
+      ),
+    },
+  ]
+
   return (
-    <div className="tc-page">
-      <style>{`
-        /* ───────── Page ───────── */
-        .tc-page {
-          padding: 12px 32px 32px;
-          max-width: 1600px;
-          margin: 0 auto;
-        }
+    <Page>
+      <div className="cb-stack">
+        <Card
+          flush
+          className="tc-matrix-card"
+          title="Class and section matrix"
+          subtitle="Tick a box to give that class the section. Rename a class or section by typing over its name, then save the matrix to update the list below."
+          action={
+            <div className="tc-actions">
+              {matrixDirty ? <Badge tone="warning">Unsaved changes</Badge> : null}
+              <Button size="sm" icon={Plus} onClick={handleAddMatrixClass}>
+                Add class
+              </Button>
+              <Button size="sm" icon={Plus} onClick={handleAddMatrixSection}>
+                Add section
+              </Button>
+              <Button size="sm" variant="primary" icon={Save} onClick={handleSaveMatrixToLowerTable}>
+                Save matrix
+              </Button>
+            </div>
+          }
+        >
+          {selectedMatrixCount > 0 ? (
+            <div className="tc-bulkbar" role="region" aria-label="Bulk actions">
+              <span className="is-num">{plural(selectedMatrixCount, 'class', 'classes')} selected</span>
+              <span className="tc-bulkbar__spacer" />
+              <Button variant="tertiary" size="sm" onClick={() => setSelectedMatrixClassIds(new Set())}>
+                Clear selection
+              </Button>
+              <Button size="sm" icon={Trash2} onClick={requestDeleteSelectedMatrixClasses}>
+                Delete {plural(selectedMatrixCount, 'class', 'classes')}
+              </Button>
+            </div>
+          ) : null}
 
-        /* ───────── Card ───────── */
-        .tc-card {
-          background: #fff;
-          border-radius: 16px;
-          box-shadow: none;
-          overflow: hidden;
-          margin-bottom: 32px;
-          border: 1px solid #e8ecf1;
-        }
-        .tc-card:hover {
-          border-color: #dbe3ec;
-        }
-        .dark .tc-card {
-          background: #1e293b;
-          border-color: #334155;
-        }
-
-        /* ───────── Header ───────── */
-        .tc-card-header {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          padding: 20px 28px;
-          background: linear-gradient(135deg, #f0f4ff 0%, #faf5ff 100%);
-          border-bottom: 1px solid #e2e8f0;
-        }
-        .dark .tc-card-header {
-          background: linear-gradient(135deg, #1e2a3e 0%, #2a1e3e 100%);
-          border-color: #334155;
-        }
-        .tc-card-header h3 {
-          font-size: 1.15rem;
-          font-weight: 700;
-          color: #1e293b;
-          margin: 0;
-          display: flex;
-          align-items: center;
-          gap: 10px;
-        }
-        .dark .tc-card-header h3 {
-          color: #f1f5f9;
-        }
-        .tc-header-icon {
-          width: 28px;
-          height: 28px;
-          border-radius: 8px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          flex-shrink: 0;
-          background: linear-gradient(135deg, #6366f1, #8b5cf6);
-        }
-        .tc-header-icon svg {
-          width: 18px;
-          height: 18px;
-          color: #fff;
-        }
-
-        /* ───────── Header stats ───────── */
-        .tc-header-stats {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          flex: 1;
-          justify-content: center;
-          min-width: 0;
-          overflow-x: auto;
-          padding: 2px 8px;
-        }
-        .tc-stat-card-inline {
-          min-width: 82px;
-          flex: 0 0 auto;
-          padding: 6px 7px;
-          border-radius: 8px;
-          gap: 6px;
-          display: flex;
-          align-items: center;
-        }
-        .tc-stat-icon {
-          width: 22px;
-          height: 22px;
-          border-radius: 6px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          flex-shrink: 0;
-        }
-        .tc-stat-icon svg { width: 12px; height: 12px; color: #fff; }
-        .tc-stat-value {
-          font-size: 0.95rem;
-          line-height: 1.05;
-          font-weight: 800;
-          color: #1e293b;
-        }
-        .dark .tc-stat-value { color: #f1f5f9; }
-        .tc-stat-label {
-          font-size: 0.5rem;
-          letter-spacing: 0.04em;
-          font-weight: 600;
-          color: #94a3b8;
-          text-transform: uppercase;
-        }
-
-        .tc-bg-indigo-soft { background: linear-gradient(135deg, #eef2ff 0%, #f5f3ff 100%); }
-        .tc-bg-green-soft { background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%); }
-        .tc-bg-indigo-grad { background: linear-gradient(135deg, #6366f1, #8b5cf6); }
-        .tc-bg-green-grad { background: linear-gradient(135deg, #10b981, #059669); }
-
-        .dark .tc-bg-indigo-soft { background: linear-gradient(135deg, #312e81 0%, #3b2f6b 100%); }
-        .dark .tc-bg-green-soft { background: linear-gradient(135deg, #064e3b 0%, #065f46 100%); }
-
-        /* ───────── Buttons ───────── */
-        .tc-btn-group {
-          display: flex;
-          gap: 10px;
-          align-items: center;
-          flex-wrap: wrap;
-        }
-        .tc-btn {
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          padding: 8px 18px;
-          border-radius: 10px;
-          font-size: 0.82rem;
-          font-weight: 600;
-          border: none;
-          cursor: pointer;
-          transition: all 0.2s ease;
-          white-space: nowrap;
-        }
-        .tc-btn svg { width: 16px; height: 16px; }
-        .tc-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-        .tc-btn-primary {
-          background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-          color: #fff;
-          box-shadow: 0 2px 10px rgba(99, 102, 241, 0.35);
-        }
-        .tc-btn-primary:hover:not(:disabled) {
-          transform: translateY(-1px);
-          box-shadow: 0 4px 16px rgba(99, 102, 241, 0.45);
-        }
-        .tc-btn-danger {
-          background: #fff;
-          color: #ef4444;
-          border: 1.5px solid #fecaca;
-          box-shadow: 0 1px 3px rgba(239, 68, 68, 0.1);
-        }
-        .tc-btn-danger:hover:not(:disabled) {
-          background: #fef2f2;
-          border-color: #fca5a5;
-          transform: translateY(-1px);
-        }
-
-        /* ───────── Table ───────── */
-        .tc-table-wrap { overflow-x: auto; }
-        .tc-table {
-          width: 100%;
-          border-collapse: collapse;
-          border-spacing: 0;
-        }
-        .tc-table thead th {
-          padding: 14px 20px;
-          font-size: 0.72rem;
-          font-weight: 700;
-          text-transform: uppercase;
-          letter-spacing: 0.06em;
-          color: #64748b;
-          background: #f8fafc;
-          border-bottom: 1px solid #e2e8f0;
-          border-top: none;
-          text-align: left;
-          white-space: nowrap;
-        }
-        .dark .tc-table thead th {
-          background: #1e293b;
-          color: #94a3b8;
-          border-color: #334155;
-        }
-        .tc-table tbody tr { transition: background 0.15s ease; }
-        .tc-table tbody tr:hover { background: #f1f5f9; }
-        .dark .tc-table tbody tr:hover { background: #283548; }
-        .tc-table tbody tr:nth-child(even) { background: #fafbfd; }
-        .dark .tc-table tbody tr:nth-child(even) { background: #1a2536; }
-        .tc-table tbody tr:nth-child(even):hover { background: #f1f5f9; }
-        .dark .tc-table tbody tr:nth-child(even):hover { background: #283548; }
-        .tc-table tbody td {
-          padding: 14px 20px;
-          font-size: 0.88rem;
-          color: #334155;
-          border-top: none;
-          border-bottom: 1px solid #f1f5f9;
-          white-space: nowrap;
-        }
-        .dark .tc-table tbody td {
-          color: #e2e8f0;
-          border-color: #1e293b;
-        }
-        .tc-table tbody tr:first-child td {
-          border-top: none;
-        }
-        .tc-table thead th:first-child,
-        .tc-table tbody td:first-child {
-          width: 48px;
-          padding-left: 20px;
-          padding-right: 8px;
-        }
-
-        /* ───────── Serial number ───────── */
-        .tc-sr {
-          font-weight: 600;
-          color: #94a3b8;
-          font-size: 0.82rem;
-          min-width: 32px;
-          display: inline-block;
-        }
-
-        /* ───────── Value styles ───────── */
-        .tc-class-name {
-          font-weight: 700;
-          color: #1e293b;
-          font-size: 0.9rem;
-        }
-        .dark .tc-class-name { color: #f1f5f9; }
-        .tc-section {
-          font-weight: 600;
-          color: #475569;
-        }
-        .dark .tc-section { color: #cbd5e1; }
-        .tc-incharge {
-          color: #475569;
-          font-weight: 500;
-        }
-        .dark .tc-incharge { color: #cbd5e1; }
-
-        /* ───────── Floor badges ───────── */
-        .tc-floor-badge {
-          display: inline-flex;
-          align-items: center;
-          gap: 4px;
-          padding: 4px 12px;
-          border-radius: 20px;
-          font-size: 0.75rem;
-          font-weight: 600;
-          letter-spacing: 0.01em;
-        }
-        .tc-floor-ground { background: #ecfdf5; color: #059669; }
-        .tc-floor-first { background: #eff6ff; color: #2563eb; }
-        .tc-floor-second { background: #fef3c7; color: #d97706; }
-        .tc-floor-third { background: #f3e8ff; color: #7c3aed; }
-        .tc-floor-default { background: #f1f5f9; color: #475569; }
-        .dark .tc-floor-ground { background: #064e3b33; color: #34d399; }
-        .dark .tc-floor-first { background: #1e3a5f33; color: #60a5fa; }
-        .dark .tc-floor-second { background: #78350f33; color: #fbbf24; }
-        .dark .tc-floor-third { background: #4c1d9533; color: #a78bfa; }
-        .dark .tc-floor-default { background: #33415533; color: #94a3b8; }
-
-        /* ───────── Subject pills ───────── */
-        .tc-subject-pills {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 4px;
-        }
-        .tc-subject-pill {
-          display: inline-flex;
-          align-items: center;
-          padding: 2px 10px;
-          border-radius: 12px;
-          font-size: 0.72rem;
-          font-weight: 600;
-          background: #eef2ff;
-          color: #4f46e5;
-        }
-        .dark .tc-subject-pill {
-          background: #312e8133;
-          color: #a5b4fc;
-        }
-        .tc-no-subjects {
-          color: #94a3b8;
-          font-size: 0.82rem;
-          font-style: italic;
-        }
-
-        /* ───────── Subject multi-select dropdown ───────── */
-        .tc-subject-select-wrap {
-          position: relative;
-        }
-        .tc-subject-select-trigger {
-          width: 100%;
-          padding: 6px 12px;
-          border: 1.5px solid #e2e8f0;
-          border-radius: 8px;
-          font-size: 0.85rem;
-          background: #fff;
-          color: #334155;
-          cursor: pointer;
-          text-align: left;
-          min-height: 36px;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 8px;
-          transition: all 0.2s ease;
-          outline: none;
-        }
-        .dark .tc-subject-select-trigger {
-          background: #1e293b;
-          border-color: #475569;
-          color: #e2e8f0;
-        }
-        .tc-subject-select-trigger:focus {
-          border-color: #6366f1;
-          box-shadow: 0 0 0 3px rgba(99,102,241,0.15);
-        }
-        .tc-subject-select-trigger svg {
-          width: 14px;
-          height: 14px;
-          flex-shrink: 0;
-          color: #94a3b8;
-        }
-        .tc-subject-dropdown {
-          position: absolute;
-          top: 100%;
-          left: 0;
-          right: 0;
-          z-index: 50;
-          margin-top: 4px;
-          background: #fff;
-          border: 1.5px solid #e2e8f0;
-          border-radius: 10px;
-          box-shadow: 0 8px 30px rgba(0,0,0,0.12);
-          max-height: 220px;
-          overflow-y: auto;
-          padding: 4px;
-        }
-        .dark .tc-subject-dropdown {
-          background: #1e293b;
-          border-color: #475569;
-          box-shadow: 0 8px 30px rgba(0,0,0,0.4);
-        }
-        .tc-subject-option {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          padding: 7px 10px;
-          border-radius: 6px;
-          font-size: 0.82rem;
-          font-weight: 500;
-          color: #334155;
-          cursor: pointer;
-          transition: background 0.12s ease;
-          user-select: none;
-        }
-        .tc-subject-option:hover {
-          background: #f1f5f9;
-        }
-        .dark .tc-subject-option {
-          color: #e2e8f0;
-        }
-        .dark .tc-subject-option:hover {
-          background: #334155;
-        }
-        .tc-subject-option input[type="checkbox"] {
-          width: 15px;
-          height: 15px;
-          accent-color: #6366f1;
-          border-radius: 3px;
-          cursor: pointer;
-          flex-shrink: 0;
-        }
-
-        /* ───────── Action links ───────── */
-        .tc-action-link {
-          font-size: 0.82rem;
-          font-weight: 600;
-          padding: 4px 12px;
-          border-radius: 6px;
-          border: none;
-          background: none;
-          cursor: pointer;
-          transition: all 0.15s ease;
-        }
-        .tc-action-edit { color: #6366f1; }
-        .tc-action-edit:hover { background: #eef2ff; color: #4f46e5; }
-        .dark .tc-action-edit { color: #818cf8; }
-        .dark .tc-action-edit:hover { background: #312e8133; }
-        .tc-action-save { color: #10b981; }
-        .tc-action-save:hover { background: #ecfdf5; color: #059669; }
-        .tc-action-cancel { color: #94a3b8; }
-        .tc-action-cancel:hover { background: #f1f5f9; color: #64748b; }
-        .tc-action-group { display: flex; gap: 8px; }
-        .tc-edit-icon {
-          width: 14px;
-          height: 14px;
-          display: inline;
-          margin-right: 4px;
-          vertical-align: -2px;
-        }
-
-        /* ───────── Checkbox ───────── */
-        .tc-checkbox-label {
-          display: flex;
-          align-items: center;
-          cursor: pointer;
-        }
-        .tc-checkbox {
-          width: 16px;
-          height: 16px;
-          border-radius: 4px;
-          accent-color: #6366f1;
-        }
-
-        /* ───────── New row ───────── */
-        .tc-new-row {
-          background: linear-gradient(90deg, #eef2ff 0%, #f5f3ff 100%) !important;
-        }
-        .dark .tc-new-row {
-          background: linear-gradient(90deg, #1e2a4a 0%, #2a1e4a 100%) !important;
-        }
-
-        /* ───────── Input ───────── */
-        .tc-input {
-          width: 100%;
-          padding: 6px 12px;
-          border: 1.5px solid #e2e8f0;
-          border-radius: 8px;
-          font-size: 0.85rem;
-          transition: all 0.2s ease;
-          outline: none;
-          background: #fff;
-          color: #334155;
-        }
-        .dark .tc-input {
-          background: #1e293b;
-          border-color: #475569;
-          color: #e2e8f0;
-        }
-        .tc-input:focus {
-          border-color: #6366f1;
-          box-shadow: 0 0 0 3px rgba(99,102,241,0.15);
-        }
-
-        /* ───────── Empty state ───────── */
-        .tc-empty {
-          padding: 48px 24px;
-          text-align: center;
-        }
-        .tc-empty-icon {
-          width: 64px;
-          height: 64px;
-          margin: 0 auto 16px;
-          border-radius: 16px;
-          background: linear-gradient(135deg, #f0f4ff 0%, #faf5ff 100%);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-        .tc-empty-icon svg {
-          width: 32px;
-          height: 32px;
-          color: #94a3b8;
-        }
-        .tc-empty h3 {
-          font-size: 1.05rem;
-          font-weight: 700;
-          color: #334155;
-          margin: 0 0 6px;
-        }
-        .dark .tc-empty h3 { color: #f1f5f9; }
-        .tc-empty p {
-          color: #94a3b8;
-          font-size: 0.88rem;
-          margin: 0 0 20px;
-        }
-
-        /* ————————— Summary table ————————— */
-        .tc-summary-card {
-          margin-bottom: 14px;
-          border-radius: 12px;
-        }
-        .tc-summary-header {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 10px;
-          padding: 8px 14px;
-          border-bottom: 1px solid #e2e8f0;
-          background: linear-gradient(90deg, #f8fafc 0%, #eef2ff 100%);
-        }
-        .dark .tc-summary-header {
-          border-color: #334155;
-          background: linear-gradient(90deg, #1e293b 0%, #1e2a4a 100%);
-        }
-        .tc-summary-header h4 {
-          margin: 0;
-          font-size: 0.84rem;
-          font-weight: 700;
-          color: #1e293b;
-        }
-        .dark .tc-summary-header h4 {
-          color: #f1f5f9;
-        }
-        .tc-summary-actions {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          flex-wrap: wrap;
-        }
-        .tc-summary-btn {
-          padding: 5px 10px;
-          font-size: 0.72rem;
-          border-radius: 7px;
-        }
-        .tc-summary-card .tc-table-wrap {
-          width: 100%;
-        }
-        .tc-summary-table {
-          width: 100%;
-          table-layout: fixed;
-        }
-        .tc-summary-table thead th {
-          background: #f1f5f9;
-          width: auto;
-          padding: 6px;
-          font-size: 0.65rem;
-          letter-spacing: 0.04em;
-          vertical-align: middle;
-        }
-        .dark .tc-summary-table thead th {
-          background: #1f2c3f;
-        }
-        .tc-summary-table tbody td {
-          width: auto;
-          padding: 4px 6px;
-          vertical-align: middle;
-        }
-        .tc-summary-table thead th:first-child,
-        .tc-summary-table tbody td:first-child {
-          width: 32px;
-          padding-left: 6px;
-          padding-right: 6px;
-        }
-        .tc-summary-table .tc-sr {
-          font-size: 0.75rem;
-          min-width: 20px;
-          display: inline-flex;
-          justify-content: center;
-          width: 100%;
-        }
-        .tc-summary-table .tc-matrix-sr-col,
-        .tc-summary-table .tc-matrix-class-col,
-        .tc-summary-table .tc-matrix-class-cell,
-        .tc-summary-table .tc-matrix-section-col,
-        .tc-summary-table .tc-matrix-cell,
-        .tc-summary-table .tc-matrix-select-col {
-          text-align: center;
-        }
-        .tc-summary-table .tc-matrix-class-cell {
-          min-width: 0;
-        }
-        .tc-matrix-class-input,
-        .tc-matrix-section-input {
-          width: auto;
-          max-width: 100%;
-          min-width: 2.75rem;
-          field-sizing: content;
-          padding: 3px 8px;
-          border: 1px solid #dbe4f0;
-          border-radius: 6px;
-          font-size: 0.75rem;
-          font-weight: 600;
-          background: #fff;
-          color: #334155;
-          outline: none;
-          text-align: center;
-          display: block;
-          margin-inline: auto;
-          transition: border-color 0.15s ease, box-shadow 0.15s ease;
-        }
-        .tc-matrix-class-input:focus,
-        .tc-matrix-section-input:focus {
-          border-color: #6366f1;
-          box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.14);
-        }
-        .dark .tc-matrix-class-input,
-        .dark .tc-matrix-section-input {
-          background: #1e293b;
-          border-color: #475569;
-          color: #e2e8f0;
-        }
-        .tc-matrix-cell .tc-checkbox-label,
-        .tc-matrix-select-col .tc-checkbox-label {
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          width: 100%;
-          margin: 0;
-          padding: 0;
-        }
-        .tc-matrix-checkbox {
-          appearance: none;
-          -webkit-appearance: none;
-          width: 16px;
-          height: 16px;
-          margin: 0 auto;
-          flex-shrink: 0;
-          border: 1.5px solid #cbd5e1;
-          border-radius: 4px;
-          background: #fff;
-          cursor: pointer;
-          position: relative;
-          display: block;
-          transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease, transform 0.12s ease;
-        }
-        .tc-matrix-checkbox:hover {
-          border-color: #818cf8;
-          background: #f5f3ff;
-        }
-        .tc-matrix-checkbox:focus-visible {
-          outline: none;
-          box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25);
-          border-color: #6366f1;
-        }
-        .tc-matrix-checkbox:checked {
-          background: linear-gradient(145deg, #6366f1 0%, #4f46e5 100%);
-          border-color: #4f46e5;
-          box-shadow: 0 1px 3px rgba(79, 70, 229, 0.35);
-        }
-        .tc-matrix-checkbox:checked:hover {
-          background: linear-gradient(145deg, #4f46e5 0%, #4338ca 100%);
-          border-color: #4338ca;
-        }
-        .tc-matrix-checkbox:checked::after {
-          content: '';
-          position: absolute;
-          left: 4.5px;
-          top: 1.5px;
-          width: 4px;
-          height: 8px;
-          border: solid #fff;
-          border-width: 0 1.75px 1.75px 0;
-          transform: rotate(45deg);
-        }
-        .tc-matrix-checkbox:indeterminate {
-          background: linear-gradient(145deg, #6366f1 0%, #4f46e5 100%);
-          border-color: #4f46e5;
-        }
-        .tc-matrix-checkbox:indeterminate::after {
-          content: '';
-          position: absolute;
-          left: 3px;
-          top: 6px;
-          width: 8px;
-          height: 0;
-          border: none;
-          border-top: 2px solid #fff;
-          transform: none;
-        }
-        .dark .tc-matrix-checkbox {
-          background: #0f172a;
-          border-color: #64748b;
-        }
-        .dark .tc-matrix-checkbox:hover {
-          background: #1e1b4b;
-          border-color: #818cf8;
-        }
-        .dark .tc-matrix-checkbox:checked,
-        .dark .tc-matrix-checkbox:indeterminate {
-          background: linear-gradient(145deg, #818cf8 0%, #6366f1 100%);
-          border-color: #6366f1;
-        }
-        .tc-matrix-select-col {
-          width: 32px;
-          text-align: center;
-        }
-        .tc-summary-empty {
-          padding: 10px 14px;
-          color: #94a3b8;
-          font-size: 0.8rem;
-        }
-      `}</style>
-
-      <div className="tc-card tc-summary-card">
-        <div className="tc-summary-header">
-          <h4>Class Section Matrix</h4>
-          <div className="tc-summary-actions">
-            <button
-              onClick={handleDeleteSelectedMatrixClasses}
-              disabled={selectedMatrixClassIds.size === 0}
-              className="tc-btn tc-btn-danger tc-summary-btn"
-            >
-              Delete Selected{selectedMatrixClassIds.size > 0 ? ` (${selectedMatrixClassIds.size})` : ''}
-            </button>
-            <button onClick={handleAddMatrixClass} className="tc-btn tc-btn-primary tc-summary-btn">
-              Add Class
-            </button>
-            <button onClick={handleAddMatrixSection} className="tc-btn tc-btn-primary tc-summary-btn">
-              Add Section
-            </button>
-            <button
-              onClick={handleSaveMatrixToLowerTable}
-              className="tc-btn tc-btn-primary tc-summary-btn"
-            >
-              {matrixDirty ? 'Save changes' : 'Save'}
-            </button>
-          </div>
-        </div>
-        <div className="tc-table-wrap">
-          <table className="tc-table tc-summary-table">
-            <thead>
-              <tr>
-                <th className="tc-matrix-select-col">
-                  <label className="tc-checkbox-label">
-                    <input
-                      type="checkbox"
-                      checked={allMatrixClassesSelected}
-                      ref={(el) => {
-                        if (el) el.indeterminate = someMatrixClassesSelected && !allMatrixClassesSelected
-                      }}
-                      onChange={toggleAllMatrixClasses}
-                      className="tc-matrix-checkbox"
-                      aria-label="Select all classes"
-                    />
-                  </label>
-                </th>
-                <th className="tc-matrix-sr-col">Sr No</th>
-                <th className="tc-matrix-class-col">Class</th>
-                {matrixSections.length > 0 ? (
-                  matrixSections.map((section, index) => (
-                    <th key={section.id} className="tc-matrix-section-col">
-                      <input
-                        type="text"
-                        value={matrixSectionDrafts[section.id] ?? section.name}
-                        placeholder={`Section ${index + 1}`}
-                        size={inputSizeFor(matrixSectionDrafts[section.id] ?? section.name, `Section ${index + 1}`, 6)}
-                        onChange={(e) => {
-                          setMatrixSectionDrafts((prev) => ({ ...prev, [section.id]: e.target.value }))
-                          setMatrixDirty(true)
-                        }}
-                        onBlur={() => commitMatrixSectionName(section.id)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault()
-                            e.currentTarget.blur()
-                          }
-                        }}
-                        className="tc-matrix-section-input"
-                      />
-                    </th>
-                  ))
-                ) : (
-                  <th className="tc-matrix-section-col">Sections</th>
-                )}
-              </tr>
-            </thead>
-            <tbody>
-              {matrixClasses.length > 0 ? (
-                matrixClasses.map((row, index) => (
-                  <tr key={row.id}>
-                    <td className="tc-matrix-select-col">
-                      <label className="tc-checkbox-label">
-                        <input
-                          type="checkbox"
-                          checked={selectedMatrixClassIds.has(row.id)}
-                          onChange={() => toggleMatrixClassSelection(row.id)}
-                          className="tc-matrix-checkbox"
-                          aria-label={`Select ${matrixClassDrafts[row.id] || row.name || `class ${index + 1}`}`}
+          {matrixClasses.length === 0 && matrixSections.length === 0 ? (
+            <EmptyState
+              compact
+              title="The matrix has no classes or sections yet"
+              body="Add a class and a section, tick the sections each class has, then save the matrix."
+            />
+          ) : (
+            <div className="tc-matrix-scroll">
+              <table className="tc-matrix">
+                <caption className="cb-visually-hidden">Class and section matrix</caption>
+                <thead>
+                  <tr>
+                    <th scope="col" className="tc-matrix__sticky">
+                      <span className="tc-matrix__classhead">
+                        <Checkbox
+                          checked={allMatrixClassesSelected}
+                          indeterminate={someMatrixClassesSelected && !allMatrixClassesSelected}
+                          onChange={() => toggleAllMatrixClasses()}
+                          aria-label="Select all classes"
                         />
-                      </label>
-                    </td>
-                    <td className="tc-matrix-sr-col"><span className="tc-sr">{index + 1}</span></td>
-                    <td className="tc-matrix-class-cell">
-                      <input
-                        type="text"
-                        value={matrixClassDrafts[row.id] ?? row.name}
-                        placeholder={`Class ${index + 1}`}
-                        size={inputSizeFor(matrixClassDrafts[row.id] ?? row.name, `Class ${index + 1}`, 4)}
-                        onChange={(e) => {
-                          setMatrixClassDrafts((prev) => ({ ...prev, [row.id]: e.target.value }))
-                          setMatrixDirty(true)
-                        }}
-                        onBlur={() => commitMatrixClassName(row.id)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault()
-                            e.currentTarget.blur()
-                          }
-                        }}
-                        className="tc-matrix-class-input"
-                      />
-                    </td>
+                        Class
+                      </span>
+                    </th>
                     {matrixSections.length > 0 ? (
-                      matrixSections.map((section) => (
-                        <td key={section.id} className="tc-matrix-cell">
-                          <label className="tc-checkbox-label">
+                      matrixSections.map((section, index) => {
+                        const raw = matrixSectionDrafts[section.id] ?? section.name
+                        const display = getSectionDisplayName(raw)
+                        return (
+                          <th key={section.id} scope="col" className="tc-matrix__section">
                             <input
-                              type="checkbox"
-                              checked={Boolean(matrixSelection[row.id]?.[section.id])}
-                              onChange={() => toggleMatrixSelection(row.id, section.id)}
-                              className="tc-matrix-checkbox"
+                              type="text"
+                              value={raw}
+                              placeholder={`Section ${index + 1}`}
+                              size={inputSizeFor(raw, `Section ${index + 1}`, 6)}
+                              aria-label={`Section ${index + 1} name`}
+                              onChange={(e) => {
+                                setMatrixSectionDrafts((prev) => ({ ...prev, [section.id]: e.target.value }))
+                                setMatrixDirty(true)
+                              }}
+                              onBlur={() => commitMatrixSectionName(section.id)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault()
+                                  e.currentTarget.blur()
+                                }
+                              }}
+                              className="tc-matrix__input"
                             />
-                          </label>
-                        </td>
-                      ))
+                            {display && display !== raw.trim() ? (
+                              <span className="tc-matrix__hint">{display}</span>
+                            ) : null}
+                          </th>
+                        )
+                      })
                     ) : (
-                      <td>
-                        <span className="tc-no-subjects">Add section columns first</span>
-                      </td>
+                      <th scope="col" className="tc-matrix__section">Sections</th>
                     )}
                   </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={Math.max(3 + matrixSections.length, 4)}>
-                    <div className="tc-summary-empty">Add classes and sections, tick checkboxes, then click Save.</div>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <div className="tc-card">
-        {/* ── Header ── */}
-        <div className="tc-card-header">
-          <div>
-            <h3>
-              <span className="tc-header-icon">
-                <svg fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M4.26 10.147a60.438 60.438 0 0 0-.491 6.347A48.62 48.62 0 0 1 12 20.904a48.62 48.62 0 0 1 8.232-4.41 60.46 60.46 0 0 0-.491-6.347m-15.482 0a50.636 50.636 0 0 0-2.658-.813A59.906 59.906 0 0 1 12 3.493a59.903 59.903 0 0 1 10.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.717 50.717 0 0 1 12 13.489a50.702 50.702 0 0 1 7.74-3.342M6.75 15a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm0 0v-3.675A55.378 55.378 0 0 1 12 8.443m-7.007 11.55A5.981 5.981 0 0 0 6.75 15.75v-1.5" />
-                </svg>
-              </span>
-              Classes & Sections
-            </h3>
-          </div>
-          <div className="tc-header-stats">
-            <div className="tc-stat-card-inline tc-bg-indigo-soft">
-              <div className="tc-stat-icon tc-bg-indigo-grad">
-                <svg fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M4.26 10.147a60.438 60.438 0 0 0-.491 6.347A48.62 48.62 0 0 1 12 20.904a48.62 48.62 0 0 1 8.232-4.41 60.46 60.46 0 0 0-.491-6.347m-15.482 0a50.636 50.636 0 0 0-2.658-.813A59.906 59.906 0 0 1 12 3.493a59.903 59.903 0 0 1 10.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.717 50.717 0 0 1 12 13.489a50.702 50.702 0 0 1 7.74-3.342" />
-                </svg>
-              </div>
-              <div>
-                <div className="tc-stat-value">{uniqueClasses}</div>
-                <div className="tc-stat-label">Classes</div>
-              </div>
-            </div>
-            <div className="tc-stat-card-inline tc-bg-green-soft">
-              <div className="tc-stat-icon tc-bg-green-grad">
-                <svg fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
-                </svg>
-              </div>
-              <div>
-                <div className="tc-stat-value">{totalSections}</div>
-                <div className="tc-stat-label">Sections</div>
-              </div>
-            </div>
-          </div>
-          <div className="tc-btn-group">
-            {classes.length > 0 && (
-              <button onClick={handleDeleteSelected} className="tc-btn tc-btn-danger">
-                <svg fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
-                </svg>
-                Delete All
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* ── Table ── */}
-        <div className="tc-table-wrap">
-          <table className="tc-table">
-            <thead>
-              <tr>
-                <th>
-                  <label className="tc-checkbox-label">
-                    <input
-                      type="checkbox"
-                      checked={allOnPageSelected}
-                      ref={(el) => {
-                        if (el) el.indeterminate = someOnPageSelected && !allOnPageSelected
-                      }}
-                      onChange={selectAllOnPage}
-                      className="tc-checkbox"
-                      aria-label="Select all"
-                    />
-                  </label>
-                </th>
-                <th>Sr No</th>
-                <th>Class</th>
-                <th>Section</th>
-                <th>Floor</th>
-                <th>Subjects</th>
-                <th>Incharge</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {/* Rows */}
-              {classes.map((item, index) => {
-                const isEditing = editingId === item.id
-                const visibleSubjects = normalizeSelectedSubjects(item.subjects)
-                if (isEditing) {
-                  return (
-                    <NewOrEditRow
-                      key={item.id}
-                      mode="edit"
-                      index={index}
-                      selected={selectedIds.has(item.id)}
-                      onToggleSelect={() => toggleSelection(item.id)}
-                      data={editingData}
-                      subjectOptions={subjectOptions}
-                      teacherOptions={teacherOptions}
-                      blockedTeacherKeys={assignedInchargeKeys}
-                      onFieldChange={(field, value) => setEditingData((prev) => ({ ...prev, [field]: value }))}
-                      onToggleSubject={(subj) =>
-                        toggleSubject(editingData.subjects, subj, (subjects) =>
-                          setEditingData((prev) => ({ ...prev, subjects }))
-                        )
-                      }
-                      onSave={() => handleSave(item.id)}
-                      onCancel={handleCancelEdit}
-                    />
-                  )
-                }
-
-                return (
-                  <tr key={item.id}>
-                    <td>
-                      <label className="tc-checkbox-label">
-                        <input
-                          type="checkbox"
-                          checked={selectedIds.has(item.id)}
-                          onChange={() => toggleSelection(item.id)}
-                          className="tc-checkbox"
-                          aria-label={`Select ${item.className} ${item.section}`}
-                        />
-                      </label>
-                    </td>
-                    <td><span className="tc-sr">{index + 1}</span></td>
-                    <td><span className="tc-class-name">{item.className}</span></td>
-                    <td><span className="tc-section">{item.section}</span></td>
-                    <td>
-                      <span className={`tc-floor-badge ${floorBadgeClass(item.floor)}`}>
-                        {item.floor}
-                      </span>
-                    </td>
-                    <td>
-                      {visibleSubjects.length > 0 ? (
-                        <div className="tc-subject-pills">
-                          {visibleSubjects.map((s) => {
-                            const color = getSubjectColor(s)
-                            return (
-                              <span
-                                key={s}
-                                className="tc-subject-pill"
-                                style={{
-                                  background: color.bg,
-                                  color: color.text,
+                </thead>
+                <tbody>
+                  {matrixClasses.length > 0 ? (
+                    matrixClasses.map((row, index) => {
+                      const classLabel = matrixClassLabel(row, index)
+                      const isSelected = selectedMatrixClassIds.has(row.id)
+                      return (
+                        <tr key={row.id} className={isSelected ? 'is-selected' : undefined}>
+                          <th scope="row" className="tc-matrix__sticky">
+                            <span className="tc-matrix__classcell">
+                              <Checkbox
+                                checked={isSelected}
+                                onChange={() => toggleMatrixClassSelection(row.id)}
+                                aria-label={`Select ${classLabel}`}
+                              />
+                              <input
+                                type="text"
+                                value={matrixClassDrafts[row.id] ?? row.name}
+                                placeholder={`Class ${index + 1}`}
+                                size={inputSizeFor(matrixClassDrafts[row.id] ?? row.name, `Class ${index + 1}`, 4)}
+                                aria-label={`Class ${index + 1} name`}
+                                onChange={(e) => {
+                                  setMatrixClassDrafts((prev) => ({ ...prev, [row.id]: e.target.value }))
+                                  setMatrixDirty(true)
                                 }}
-                              >
-                                {s}
-                              </span>
-                            )
-                          })}
-                        </div>
-                      ) : (
-                        <span className="tc-no-subjects">No subjects</span>
-                      )}
-                    </td>
-                    <td><span className="tc-incharge">{item.incharge || '—'}</span></td>
-                    <td>
-                      <button onClick={() => handleEdit(item)} className="tc-action-link tc-action-edit">
-                        <svg className="tc-edit-icon" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" />
-                        </svg>
-                        Edit
-                      </button>
-                    </td>
-                  </tr>
-                )
-              })}
+                                onBlur={() => commitMatrixClassName(row.id)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault()
+                                    e.currentTarget.blur()
+                                  }
+                                }}
+                                className="tc-matrix__input"
+                              />
+                            </span>
+                          </th>
+                          {matrixSections.length > 0 ? (
+                            matrixSections.map((section, sectionIndex) => (
+                              <td key={section.id} className="tc-matrix__cell">
+                                <Checkbox
+                                  checked={Boolean(matrixSelection[row.id]?.[section.id])}
+                                  onChange={() => toggleMatrixSelection(row.id, section.id)}
+                                  aria-label={`${classLabel} · ${matrixSectionLabel(section, sectionIndex)}`}
+                                />
+                              </td>
+                            ))
+                          ) : (
+                            <td className="tc-matrix__note">Add a section column to start ticking.</td>
+                          )}
+                        </tr>
+                      )
+                    })
+                  ) : (
+                    <tr>
+                      <td className="tc-matrix__note" colSpan={1 + Math.max(matrixSections.length, 1)}>
+                        No classes yet. Add a class to tick its sections.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Card>
 
-              {/* Empty state */}
-              {classes.length === 0 && (
-                <tr>
-                  <td colSpan={8}>
-                    <div className="tc-empty">
-                      <div className="tc-empty-icon">
-                        <svg fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M4.26 10.147a60.438 60.438 0 0 0-.491 6.347A48.62 48.62 0 0 1 12 20.904a48.62 48.62 0 0 1 8.232-4.41 60.46 60.46 0 0 0-.491-6.347m-15.482 0a50.636 50.636 0 0 0-2.658-.813A59.906 59.906 0 0 1 12 3.493a59.903 59.903 0 0 1 10.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.717 50.717 0 0 1 12 13.489a50.702 50.702 0 0 1 7.74-3.342M6.75 15a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm0 0v-3.675A55.378 55.378 0 0 1 12 8.443m-7.007 11.55A5.981 5.981 0 0 0 6.75 15.75v-1.5" />
-                        </svg>
-                      </div>
-                      <h3>No Classes Added</h3>
-                      <p>Use the Class Section Matrix above, then click Save to populate this table.</p>
-                    </div>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+        <Card
+          flush
+          title="Classes and sections"
+          subtitle={`${plural(uniqueClasses, 'class', 'classes')} · ${plural(totalSections, 'section', 'sections')}`}
+          action={
+            classes.length > 0 ? (
+              <Menu
+                label="More actions for classes and sections"
+                items={[
+                  {
+                    label: 'Delete all class sections',
+                    icon: Trash2,
+                    tone: 'danger',
+                    onSelect: requestDeleteSelected,
+                  },
+                ]}
+              />
+            ) : null
+          }
+        >
+          <DataTable
+            caption="Classes and sections"
+            columns={columns}
+            rows={classes}
+            getRowKey={(item) => item.id}
+            onRowClick={handleEdit}
+            selection={{
+              isSelected: (item) => selectedIds.has(item.id),
+              onToggle: (item) => toggleSelection(item.id),
+              allSelected: allOnPageSelected,
+              someSelected: someOnPageSelected,
+              onToggleAll: selectAllOnPage,
+              rowLabel: (item) => `Select ${rowLabel(item)}`,
+            }}
+            empty={
+              <EmptyState
+                compact
+                title="No class sections yet"
+                body="Tick sections in the matrix above, then save the matrix to list them here."
+              />
+            }
+          />
+        </Card>
       </div>
-    </div>
+
+      <EditClassSheet
+        open={Boolean(editingId)}
+        title={editingItem ? `Edit ${rowLabel(editingItem)}` : 'Edit class section'}
+        data={editingData}
+        subjectOptions={subjectOptions}
+        teacherOptions={teacherOptions}
+        blockedTeacherKeys={assignedInchargeKeys}
+        onFieldChange={(field, value) => setEditingData((prev) => ({ ...prev, [field]: value }))}
+        onToggleSubject={(subj) =>
+          toggleSubject(editingData.subjects, subj, (subjects) =>
+            setEditingData((prev) => ({ ...prev, subjects }))
+          )
+        }
+        onSave={() => {
+          if (editingId) handleSave(editingId)
+        }}
+        onCancel={handleCancelEdit}
+      />
+
+      <Dialog
+        open={confirmDeleteMatrixClassesOpen}
+        onClose={() => setConfirmDeleteMatrixClassesOpen(false)}
+        tone="danger"
+        size="sm"
+        title={`Delete ${plural(selectedMatrixCount, 'class', 'classes')} from the matrix?`}
+        description="Their class sections are removed from the list below too, including floor, subjects and class teacher. This can't be undone."
+        footer={
+          <>
+            <Button onClick={() => setConfirmDeleteMatrixClassesOpen(false)}>Keep classes</Button>
+            <Button variant="danger" icon={Trash2} onClick={handleDeleteSelectedMatrixClasses}>
+              Delete {plural(selectedMatrixCount, 'class', 'classes')}
+            </Button>
+          </>
+        }
+      />
+
+      <Dialog
+        open={Boolean(pendingMatrixSave)}
+        onClose={() => setPendingMatrixSave(null)}
+        tone="danger"
+        size="sm"
+        title={`Remove ${plural(pendingMatrixSave?.idsToDelete.length ?? 0, 'class section', 'class sections')}?`}
+        description="These class sections aren't ticked in the matrix, so saving removes them from the list, along with their floor, subjects and class teacher."
+        footer={
+          <>
+            <Button onClick={() => setPendingMatrixSave(null)}>Keep editing</Button>
+            <Button
+              variant="danger"
+              icon={Save}
+              onClick={() => {
+                if (pendingMatrixSave) commitMatrixSave(pendingMatrixSave)
+              }}
+            >
+              Save and remove {pendingMatrixSave?.idsToDelete.length ?? 0}
+            </Button>
+          </>
+        }
+      >
+        {pendingRemovals.length > 0 ? (
+          <span className="tc-subjects">
+            {pendingRemovals.map((item) => (
+              <Badge key={item.id} tone="neutral" dot={false}>
+                {rowLabel(item)}
+              </Badge>
+            ))}
+          </span>
+        ) : null}
+      </Dialog>
+
+      <Dialog
+        open={confirmDeleteAllOpen}
+        onClose={() => setConfirmDeleteAllOpen(false)}
+        tone="danger"
+        size="sm"
+        title={`Delete all ${plural(classes.length, 'class section', 'class sections')}?`}
+        description="Every class section is removed from the list and all ticks in the matrix are cleared. This can't be undone."
+        footer={
+          <>
+            <Button onClick={() => setConfirmDeleteAllOpen(false)}>Keep class sections</Button>
+            <Button variant="danger" icon={Trash2} onClick={handleDeleteSelected}>
+              Delete all {classes.length}
+            </Button>
+          </>
+        }
+      />
+    </Page>
   )
 }
 
 /* ═══════════════════════════════════════════════════
-   Inline-editing row (shared between "add new" and "edit")
+   Edit sheet for one class section (replaces the old inline edit row)
    ═══════════════════════════════════════════════════ */
-interface RowProps {
-  mode: 'new' | 'edit'
-  index?: number
-  selected?: boolean
-  onToggleSelect?: () => void
+interface EditClassSheetProps {
+  open: boolean
+  title: string
   data: {
     className: string
     section: string
@@ -1639,11 +1028,9 @@ interface RowProps {
   onCancel: () => void
 }
 
-const NewOrEditRow: React.FC<RowProps> = ({
-  mode,
-  index,
-  selected,
-  onToggleSelect,
+const EditClassSheet: React.FC<EditClassSheetProps> = ({
+  open,
+  title,
   data,
   subjectOptions,
   teacherOptions,
@@ -1653,7 +1040,6 @@ const NewOrEditRow: React.FC<RowProps> = ({
   onSave,
   onCancel,
 }) => {
-  const [dropdownOpen, setDropdownOpen] = useState(false)
   const availableTeacherOptions = useMemo(() => {
     const current = data.incharge.trim()
     const currentKey = current.toLowerCase()
@@ -1665,109 +1051,73 @@ const NewOrEditRow: React.FC<RowProps> = ({
   }, [teacherOptions, blockedTeacherKeys, data.incharge])
 
   return (
-    <tr className={mode === 'new' ? 'tc-new-row' : undefined}>
-      <td>
-        {mode === 'edit' && onToggleSelect ? (
-          <label className="tc-checkbox-label">
-            <input
-              type="checkbox"
-              checked={selected}
-              onChange={onToggleSelect}
-              className="tc-checkbox"
-            />
-          </label>
-        ) : null}
-      </td>
-      <td>
-        <span className="tc-sr">{mode === 'new' ? '—' : (index ?? 0) + 1}</span>
-      </td>
-      <td>
-        <input
-          type="text"
-          title="Class name"
+    <Sheet
+      open={open}
+      onClose={onCancel}
+      title={title}
+      description="Changes apply to this class section only."
+      onSubmit={(event) => {
+        event.preventDefault()
+        onSave()
+      }}
+      footer={
+        <>
+          <Button onClick={onCancel}>Cancel</Button>
+          <Button type="submit" variant="primary">
+            Save changes
+          </Button>
+        </>
+      }
+    >
+      <div className="cb-form-grid">
+        <TextField
+          label="Class"
           value={data.className}
           onChange={(e) => onFieldChange('className', e.target.value)}
-          placeholder="e.g. 10"
-          className="tc-input"
+          placeholder="For example, 10"
         />
-      </td>
-      <td>
-        <input
-          type="text"
-          title="Section"
+        <TextField
+          label="Section"
           value={data.section}
           onChange={(e) => onFieldChange('section', e.target.value)}
-          placeholder="e.g. A"
-          className="tc-input"
+          placeholder="For example, A"
         />
-      </td>
-      <td>
-        <select
-          title="Floor"
+        <Select
+          label="Floor"
           value={data.floor}
           onChange={(e) => onFieldChange('floor', e.target.value)}
-          className="tc-input"
-        >
-          <option value="">Select Floor</option>
-          {FLOOR_OPTIONS.map((f) => (
-            <option key={f} value={f}>{f}</option>
-          ))}
-        </select>
-      </td>
-      <td>
-        <div className="tc-subject-select-wrap">
-          <button
-            type="button"
-            className="tc-subject-select-trigger"
-            onClick={() => setDropdownOpen((o) => !o)}
-          >
-            <span>
-              {data.subjects.length === 0
-                ? 'Select subjects...'
-                : `${data.subjects.length} selected`}
-            </span>
-            <svg fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
-            </svg>
-          </button>
-          {dropdownOpen && (
-            <div className="tc-subject-dropdown">
-              {subjectOptions.map((subj) => (
-                <label key={subj} className="tc-subject-option">
-                  <input
-                    type="checkbox"
-                    checked={data.subjects.includes(subj)}
-                    onChange={() => onToggleSubject(subj)}
-                  />
-                  {subj}
-                </label>
-              ))}
-            </div>
-          )}
-        </div>
-      </td>
-      <td>
-        <select
-          title="Class incharge"
+          placeholder="Select floor"
+          options={FLOOR_OPTIONS}
+        />
+        <Select
+          label="Class teacher"
           value={data.incharge}
           onChange={(e) => onFieldChange('incharge', e.target.value)}
-          className="tc-input"
-        >
-          <option value="">Select teacher</option>
-          {availableTeacherOptions.map((teacherName) => (
-            <option key={teacherName} value={teacherName}>
-              {teacherName}
-            </option>
-          ))}
-        </select>
-      </td>
-      <td>
-        <div className="tc-action-group">
-          <button onClick={onSave} className="tc-action-link tc-action-save">Save</button>
-          <button onClick={onCancel} className="tc-action-link tc-action-cancel">Cancel</button>
-        </div>
-      </td>
-    </tr>
+          placeholder="Select teacher"
+          options={availableTeacherOptions}
+          hint="Teachers who already lead another section aren't listed."
+        />
+        <fieldset className="tc-subject-picker is-wide">
+          <legend className="cb-field__label">Subjects</legend>
+          {subjectOptions.length > 0 ? (
+            <div className="tc-subject-picker__grid">
+              {subjectOptions.map((subj) => (
+                <Checkbox
+                  key={subj}
+                  label={subj}
+                  checked={data.subjects.includes(subj)}
+                  onChange={() => onToggleSubject(subj)}
+                />
+              ))}
+            </div>
+          ) : (
+            <p className="cb-muted tc-subject-picker__empty">
+              No subjects yet. Add them under Timetable › Subjects, then come back to pick them here.
+            </p>
+          )}
+        </fieldset>
+      </div>
+    </Sheet>
   )
 }
 

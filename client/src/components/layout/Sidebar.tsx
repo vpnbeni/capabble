@@ -1,5 +1,4 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
 import { useQueryClient } from '@tanstack/react-query'
@@ -8,9 +7,14 @@ import type { AppDispatch } from '../../redux/store'
 import { useAcademicSession } from '../../contexts/AcademicSessionContext'
 import { isFeatureEnabledForPath, getModuleForPath, getAccessibleModules, getFirstEnabledPathForModule } from '../../constants/featureAccess'
 import { MODULE_REGISTRY, type ModuleId } from '../../constants/moduleRegistry'
-import { PartyPopper } from 'lucide-react'
+import {
+  Check,
+  ChevronRight,
+  ChevronsUpDown,
+  PartyPopper,
+} from 'lucide-react'
+import { navIconFor } from './navIcons'
 import { useCentreDetails } from '../../hooks/useCentreDetails'
-import logoMark from '../../assets/image.png'
 import {
   useSidebarCounts,
   sidebarKeys,
@@ -18,6 +22,7 @@ import {
 } from '../../hooks/useSidebarCounts'
 import { useSchoolProfile } from '../../hooks/useSchoolProfile'
 import { useLogoBrandTheme } from '../../hooks/useLogoBrandTheme'
+import logoMark from '../../assets/image.png'
 
 const EMPTY_COUNTS = {
   examFunctionaries: null,
@@ -34,6 +39,7 @@ const toBadgeValue = (value: SidebarCount): string | null => {
   }
   return value.toString()
 }
+
 
 type SidebarProps = {
   isCollapsed: boolean
@@ -89,13 +95,10 @@ const Sidebar: React.FC<SidebarProps> = ({
   const profileSchoolCode = String(schoolProfile?.schoolCode || '').trim()
   const profileSchoolName = String(schoolProfile?.name || '').trim()
   const schoolLogoUrl = String(schoolProfile?.logoUrl || '').trim()
-  const logoBrandTheme = useLogoBrandTheme(schoolLogoUrl)
-  const hasLogoBrandMenu = Boolean(logoBrandTheme && schoolLogoUrl)
 
   const schoolDisplayName = profileSchoolName || centreName || currentUser?.role || 'School'
   const affiliationDisplay = profileAffiliationNo || '—'
   const cbseCodeDisplay = profileSchoolCode || schoolCode || '—'
-  const footerFallbackInitial = (schoolDisplayName || currentUser?.email || 'A').charAt(0).toUpperCase()
 
   // Module switcher state
   const [moduleSwitcherOpen, setModuleSwitcherOpen] = useState(false)
@@ -111,6 +114,9 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   const activeModule = selectedModule
 
+  const logoBrandTheme = useLogoBrandTheme(schoolLogoUrl)
+  const hasLogoBrandMenu = Boolean(logoBrandTheme && schoolLogoUrl)
+  const footerFallbackInitial = (schoolDisplayName || currentUser?.email || 'A').charAt(0).toUpperCase()
   const renderSchoolLogoAvatar = (
     sizeClass = 'w-10 h-10',
     roundedClass = 'rounded-xl',
@@ -138,6 +144,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       </div>
     )
   }
+
 
   const accessibleModules = useMemo(
     () => getAccessibleModules(currentUser?.featureToggles),
@@ -349,7 +356,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       ],
     },
     {
-      name: 'Stdntboard',
+      name: 'Overview',
       href: '/stdnt/stdntboard',
       module: 'stdnt',
       icon: (
@@ -393,7 +400,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       badge: null,
     },
     {
-      name: 'Alumni Directory',
+      name: 'Alumni',
       href: '/stdnt/alumni',
       module: 'stdnt',
       icon: (
@@ -1570,408 +1577,204 @@ const Sidebar: React.FC<SidebarProps> = ({
     openGroups,
   ])
 
+  const moduleMenuRef = useRef<HTMLDivElement>(null)
+  const accountMenuRef = useRef<HTMLDivElement>(null)
+
+  // Close the module and account menus on an outside click, Escape, or navigation.
+  useEffect(() => {
+    if (!moduleSwitcherOpen && !accountDropdownOpen) return
+    const onDown = (event: MouseEvent) => {
+      const target = event.target as Node
+      if (moduleSwitcherOpen && moduleMenuRef.current && !moduleMenuRef.current.contains(target)) setModuleSwitcherOpen(false)
+      if (accountDropdownOpen && accountMenuRef.current && !accountMenuRef.current.contains(target)) setAccountDropdownOpen(false)
+    }
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      setModuleSwitcherOpen(false)
+      setAccountDropdownOpen(false)
+    }
+    document.addEventListener('mousedown', onDown)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDown)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [moduleSwitcherOpen, accountDropdownOpen])
+
+  useEffect(() => {
+    setModuleSwitcherOpen(false)
+    setAccountDropdownOpen(false)
+  }, [location.pathname])
+
+
+  const renderIcon = (name: string, href: string | undefined, fallback: React.ReactNode, size = 18) => {
+    const Glyph = navIconFor(name, href)
+    if (Glyph) return <Glyph size={size} strokeWidth={1.75} className="cb-icon" aria-hidden />
+    return <span className="cb-sidenav__legacyicon" aria-hidden>{fallback}</span>
+  }
+
+  const navItemClass = (active: boolean, extra = '') =>
+    `cb-navitem${active ? ' is-active' : ''}${extra ? ` ${extra}` : ''}`
+
+  const renderLink = (item: NavItem, depth = 0) => {
+    const isActive = location.pathname === item.href
+    return (
+      <li key={`${item.name}-${item.href}`}>
+        <NavLink
+          to={item.href}
+          className={navItemClass(isActive, depth > 0 ? 'cb-navitem--child' : '')}
+          aria-current={isActive ? 'page' : undefined}
+          title={isCollapsed ? item.name : undefined}
+        >
+          {renderIcon(item.name, item.href, item.icon, depth > 0 ? 16 : 18)}
+          {!isCollapsed ? <span className="cb-navitem__label truncate">{item.name}</span> : null}
+          {item.badge && !isCollapsed ? <span className="cb-navitem__count">{item.badge}</span> : null}
+          {item.badge && isCollapsed ? <span className="cb-sidenav__dot" aria-label={`${item.badge} new`} /> : null}
+        </NavLink>
+      </li>
+    )
+  }
+
+  const renderToggle = (key: string, name: string, href: string | undefined, icon: React.ReactNode, active: boolean, open: boolean, onClick: () => void, depth = 0) => (
+    <button
+      type="button"
+      onClick={onClick}
+      className={navItemClass(active && !open, `cb-navitem--group${depth > 0 ? ' cb-navitem--child' : ''}${active ? ' has-active' : ''}`)}
+      aria-expanded={open}
+      title={isCollapsed ? name : undefined}
+      key={key}
+    >
+      {renderIcon(name, href, icon, depth > 0 ? 16 : 18)}
+      {!isCollapsed ? (
+        <>
+          <span className="cb-navitem__label truncate">{name}</span>
+          <ChevronRight size={16} strokeWidth={1.75} className={`cb-icon cb-navitem__chev${open ? ' is-open' : ''}`} aria-hidden />
+        </>
+      ) : null}
+    </button>
+  )
+
   return (
     <div
       ref={rootRef}
-      className="h-[100vh] min-h-[100vh] transition-all duration-300 flex flex-col overflow-visible relative z-50 bg-white dark:bg-secondary-900 border-r border-secondary-200 dark:border-secondary-700"
+      className="cb-app cb-shellnav"
       style={{ width: currentSidebarWidth }}
     >
-      {/* Module Switcher Header */}
-      <div className={`flex-shrink-0 transition-all duration-300 ${isCollapsed ? 'px-2 py-2.5' : 'px-3 py-2.5'} relative z-10`} data-sidebar-fit>
-        <div className="relative">
-          <div
-            aria-hidden
-            className="pointer-events-none absolute -inset-0.5 rounded-[10px] bg-sky-50"
-          />
+      <nav className={`cb-sidenav${isCollapsed ? ' is-collapsed' : ''}`} aria-label="Main">
+        {/* Module switcher */}
+        <div className="cb-shellnav__modulewrap" data-sidebar-fit ref={moduleMenuRef}>
           <button
+            type="button"
+            className="cb-sidenav__module"
             onClick={() => hasMultipleModules && setModuleSwitcherOpen(!moduleSwitcherOpen)}
-            className={`relative w-full flex items-center gap-2 rounded-lg transition-all duration-200 group outline-none focus-visible:ring-2 bg-white ring-1 ring-secondary-200/80 focus-visible:ring-primary-500 ${isCollapsed ? 'justify-center p-1.5' : 'px-2 py-1.5'} ${hasMultipleModules ? 'hover:bg-white cursor-pointer' : 'cursor-default'} ${moduleSwitcherOpen ? 'bg-white/80 dark:bg-secondary-800/60' : ''}`}
+            aria-haspopup={hasMultipleModules ? 'menu' : undefined}
+            aria-expanded={hasMultipleModules ? moduleSwitcherOpen : undefined}
+            aria-label={`Switch module, current: ${activeModuleDef.abbreviation} ${activeModuleDef.title}`}
+            title={isCollapsed ? `${activeModuleDef.abbreviation} · ${activeModuleDef.title}` : undefined}
           >
-            <div className="relative flex h-8 w-8 flex-shrink-0 items-center justify-center overflow-hidden rounded-md bg-white ring-1 ring-secondary-200/70">
-              <img
-                src={activeModuleDef.icon || logoMark}
-                alt={activeModuleDef.title}
-                className="h-8 w-8 rounded-md object-cover"
-              />
-            </div>
-            {!isCollapsed && (
+            <img src={activeModuleDef.icon || logoMark} alt="" className="cb-shellnav__moduleimg" />
+            {!isCollapsed ? (
               <>
-                <div className="min-w-0 flex-1 flex items-baseline gap-1.5 text-left">
-                  <h2 className="text-[13px] font-bold leading-none tracking-tight shrink-0 text-slate-800 dark:text-white">
-                    {activeModuleDef.abbreviation}
-                  </h2>
-                  <p className="text-[11px] font-medium leading-none tracking-tight truncate text-slate-500 dark:text-slate-400">
-                    {activeModuleDef.title}
-                  </p>
-                </div>
-                {hasMultipleModules && (
-                  <svg
-                    className={`w-3.5 h-3.5 flex-shrink-0 transition-transform duration-200 ${moduleSwitcherOpen ? 'rotate-180' : ''} text-secondary-400 dark:text-secondary-500`}
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                )}
+                <span className="cb-sidenav__modulelabel cb-shellnav__modulename truncate">
+                  <strong>{activeModuleDef.abbreviation}</strong> <span>{activeModuleDef.title}</span>
+                </span>
+                {hasMultipleModules ? <ChevronsUpDown size={16} strokeWidth={1.75} aria-hidden /> : null}
               </>
-            )}
+            ) : null}
           </button>
 
-          {/* Module Switcher Dropdown */}
-          {moduleSwitcherOpen && (
-            <>
-              {/* In-sidebar overlay */}
-              <div
-                className="fixed top-0 bottom-0 left-0 z-40"
-                style={{ width: currentSidebarWidth }}
-                onClick={() => setModuleSwitcherOpen(false)}
-                aria-hidden="true"
-              />
-              <div className={`absolute z-50 bg-white dark:bg-secondary-900 rounded-xl border border-secondary-200 dark:border-secondary-700 animate-fade-in-up overflow-hidden ${isCollapsed ? 'left-full ml-3 top-0 w-64' : 'top-full left-0 right-0 mt-1.5'}`}>
-                <div className="px-2.5 pt-2 pb-1">
-                  <p className="text-[9px] font-bold uppercase tracking-wider text-secondary-400 dark:text-secondary-500 px-1">
-                    Switch Module
-                  </p>
-                </div>
-                <div className="max-h-[min(52vh,360px)] overflow-y-auto px-1.5 pb-1.5 space-y-px">
-                  {MODULE_REGISTRY
-                    .filter(m => accessibleModules.has(m.id))
-                    .map(mod => {
-                      const isActive = mod.id === activeModule
-                      return (
-                        <button
-                          key={mod.id}
-                          onClick={() => {
-                            setModuleSwitcherOpen(false)
-                            if (!isActive) {
-                              const targetPath = getFirstEnabledPathForModule(mod.id, currentUser?.featureToggles) || mod.defaultRoute
-                              setSelectedModule(mod.id)
-                              navigate(targetPath)
-                            }
-                          }}
-                          className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg transition-all duration-150 text-left ${isActive
-                            ? 'bg-primary-50 dark:bg-primary-900/20'
-                            : 'hover:bg-secondary-50 dark:hover:bg-secondary-800/50'
-                          }`}
-                        >
-                          <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center overflow-hidden rounded-md bg-white ring-1 ring-secondary-200 dark:bg-secondary-800 dark:ring-secondary-700">
-                            <img
-                              src={mod.icon}
-                              alt=""
-                              className="h-6 w-6 rounded-md object-cover"
-                            />
-                          </div>
-                          <div className="min-w-0 flex-1 flex items-baseline gap-1.5">
-                            <span className={`text-[12px] font-semibold shrink-0 ${isActive ? 'text-primary-700 dark:text-primary-400' : 'text-secondary-900 dark:text-white'}`}>
-                              {mod.abbreviation}
-                            </span>
-                            <span className="text-[11px] text-secondary-500 dark:text-secondary-400 truncate">
-                              {mod.title}
-                            </span>
-                          </div>
-                          {isActive && (
-                            <div className="w-1.5 h-1.5 rounded-full bg-primary-500 flex-shrink-0" />
-                          )}
-                        </button>
-                      )
-                    })}
-                </div>
-              </div>
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* Navigation - scrollable */}
-      <nav className={`flex-1 min-h-0 overflow-y-auto overflow-x-hidden transition-all duration-300 ${isCollapsed ? 'px-3 [&_svg]:w-4.5 [&_svg]:h-4.5' : 'px-3'} py-2`}>
-        <div className={`space-y-0.5 ${isCollapsed ? 'flex flex-col items-center' : ''}`}>
-          {filteredNavigation.map((entry) => {
-            if (isGroup(entry)) {
-              const group = entry
-              // Check if any child (or sub-group grandchild) is active
-              const isChildActive = group.children.some(child => {
-                if (isSubGroup(child)) {
-                  return child.children.some(gc => location.pathname === gc.href)
-                }
-                return location.pathname === child.href
-              })
-              // Also check if the group's own href matches
-              const isGroupHrefActive = group.href ? location.pathname === group.href : false
-              const isAnyActive = isChildActive || isGroupHrefActive
-              const isOpen = openGroups[group.name] ?? isAnyActive
-
-              return (
-                <div key={group.name}>
-                  {/* Group header */}
+          {moduleSwitcherOpen ? (
+            <div
+              className={`cb-menu__panel cb-shellnav__modules${isCollapsed ? ' is-flyout' : ''}`}
+              role="menu"
+              aria-label="Modules"
+            >
+              <div className="cb-shellnav__menulabel">Switch module</div>
+              {MODULE_REGISTRY.filter((m) => accessibleModules.has(m.id)).map((mod) => {
+                const isActive = mod.id === activeModule
+                return (
                   <button
+                    key={mod.id}
+                    type="button"
+                    role="menuitem"
+                    className={`cb-menu__item${isActive ? ' is-current' : ''}`}
+                    aria-current={isActive ? 'true' : undefined}
                     onClick={() => {
-                      toggleGroup(group.name)
-                      // If the group has an href and is being opened, navigate to it
-                      if (group.href && !isOpen) {
-                        navigate(group.href)
+                      setModuleSwitcherOpen(false)
+                      if (!isActive) {
+                        const targetPath = getFirstEnabledPathForModule(mod.id, currentUser?.featureToggles) || mod.defaultRoute
+                        setSelectedModule(mod.id)
+                        navigate(targetPath)
                       }
                     }}
-                    className={`group relative flex items-center w-full text-[12px] font-medium rounded-lg transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-primary-500 ${isCollapsed
-                      ? 'justify-center w-10 h-10 p-0'
-                      : 'px-2 py-1.5'
-                      } ${isAnyActive
-                        ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400'
-                        : 'text-secondary-600 dark:text-secondary-400 hover:bg-secondary-50 dark:hover:bg-secondary-800/50 hover:text-secondary-900 dark:hover:text-secondary-200'
-                      }`}
-                    title={isCollapsed ? group.name : undefined}
                   >
-                    {isAnyActive && !isCollapsed && (
-                      <div className="absolute left-0 top-1/2 -translate-y-1/2 h-6 w-1 bg-primary-500 rounded-r-full" />
-                    )}
-
-                    <span className={`flex-shrink-0 transition-colors duration-200 ${isAnyActive
-                      ? 'text-primary-600 dark:text-primary-400'
-                      : 'text-secondary-400 group-hover:text-secondary-600 dark:text-secondary-500 dark:group-hover:text-secondary-300'
-                      }`}>
-                      {group.icon}
+                    <img src={mod.icon} alt="" className="cb-shellnav__moduleimg is-sm" />
+                    <span className="cb-menu__label cb-shellnav__modulename truncate">
+                      <strong>{mod.abbreviation}</strong> <span>{mod.title}</span>
                     </span>
-
-                    {!isCollapsed && (
-                      <>
-                        <span className="ml-2.5 truncate font-medium">
-                          {group.name}
-                        </span>
-                        <svg
-                          className={`ml-auto w-3.5 h-3.5 flex-shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-90' : ''} ${isAnyActive
-                            ? 'text-primary-500 dark:text-primary-400'
-                            : 'text-secondary-400 dark:text-secondary-500'
-                            }`}
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                        </svg>
-                      </>
-                    )}
+                    {isActive ? <Check size={16} strokeWidth={1.75} className="cb-icon" aria-hidden /> : null}
                   </button>
-
-                  {/* Group children */}
-                  {isOpen && !isCollapsed && (
-                    <div className="mt-0.5 ml-3.5 pl-3 border-l-2 border-secondary-100 dark:border-secondary-800 space-y-px">
-                      {group.children.map((child) => {
-                        if (isSubGroup(child)) {
-                          // Render sub-group with its own expand/collapse
-                          const subGroup = child
-                          const isSubChildActive = subGroup.children.some(gc => location.pathname === gc.href)
-                          const isSubOpen = openGroups[`${group.name}/${subGroup.name}`] ?? isSubChildActive
-
-                          return (
-                            <div key={subGroup.name}>
-                              <button
-                                onClick={() => toggleGroup(`${group.name}/${subGroup.name}`)}
-                                className={`group relative flex items-center w-full text-[12px] font-medium rounded-lg transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-primary-500 px-2.5 py-1.5 ${isSubChildActive
-                                  ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400'
-                                  : 'text-secondary-500 dark:text-secondary-400 hover:bg-secondary-50 dark:hover:bg-secondary-800/50 hover:text-secondary-900 dark:hover:text-secondary-200'
-                                  }`}
-                              >
-                                <span className={`flex-shrink-0 transition-colors duration-200 ${isSubChildActive
-                                  ? 'text-primary-600 dark:text-primary-400'
-                                  : 'text-secondary-400 group-hover:text-secondary-600 dark:text-secondary-500 dark:group-hover:text-secondary-300'
-                                  }`}>
-                                  {subGroup.icon}
-                                </span>
-                                <span className="ml-2 truncate">
-                                  {subGroup.name}
-                                </span>
-                                <svg
-                                  className={`ml-auto w-3.5 h-3.5 flex-shrink-0 transition-transform duration-200 ${isSubOpen ? 'rotate-90' : ''} ${isSubChildActive
-                                    ? 'text-primary-500 dark:text-primary-400'
-                                    : 'text-secondary-400 dark:text-secondary-500'
-                                    }`}
-                                  fill="none"
-                                  stroke="currentColor"
-                                  viewBox="0 0 24 24"
-                                >
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                </svg>
-                              </button>
-
-                              {isSubOpen && (
-                                <div className="mt-0.5 ml-3 pl-3 border-l-2 border-secondary-100 dark:border-secondary-800 space-y-0.5">
-                                  {subGroup.children.map((grandChild) => {
-                                    const isActive = location.pathname === grandChild.href
-                                    return (
-                                      <NavLink
-                                        key={grandChild.name}
-                                        to={grandChild.href}
-                                        className={`group relative flex items-center text-[12px] font-medium rounded-lg transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-primary-500 px-2.5 py-1.5 ${isActive
-                                          ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400'
-                                          : 'text-secondary-500 dark:text-secondary-400 hover:bg-secondary-50 dark:hover:bg-secondary-800/50 hover:text-secondary-900 dark:hover:text-secondary-200'
-                                          }`}
-                                      >
-                                        <span className={`flex-shrink-0 transition-colors duration-200 ${isActive
-                                          ? 'text-primary-600 dark:text-primary-400'
-                                          : 'text-secondary-400 group-hover:text-secondary-600 dark:text-secondary-500 dark:group-hover:text-secondary-300'
-                                          }`}>
-                                          {grandChild.icon}
-                                        </span>
-                                        <span className="ml-2 truncate">
-                                          {grandChild.name}
-                                        </span>
-                                        {grandChild.badge && (
-                                          <span className={`ml-auto inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold shadow-sm ${isActive
-                                            ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/50 dark:text-primary-300'
-                                            : 'bg-secondary-100 text-secondary-600 dark:bg-secondary-800 dark:text-secondary-400 group-hover:bg-white group-hover:shadow-sm dark:group-hover:bg-secondary-700'
-                                            }`}>
-                                            {grandChild.badge}
-                                          </span>
-                                        )}
-                                      </NavLink>
-                                    )
-                                  })}
-                                </div>
-                              )}
-                            </div>
-                          )
-                        }
-
-                        // Regular NavItem child
-                        const isActive = location.pathname === child.href
-                        return (
-                          <NavLink
-                            key={child.name}
-                            to={child.href}
-                            className={`group relative flex items-center text-[12px] font-medium rounded-lg transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-primary-500 px-2.5 py-1.5 ${isActive
-                              ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400'
-                              : 'text-secondary-500 dark:text-secondary-400 hover:bg-secondary-50 dark:hover:bg-secondary-800/50 hover:text-secondary-900 dark:hover:text-secondary-200'
-                              }`}
-                          >
-                            <span className={`flex-shrink-0 transition-colors duration-200 ${isActive
-                              ? 'text-primary-600 dark:text-primary-400'
-                              : 'text-secondary-400 group-hover:text-secondary-600 dark:text-secondary-500 dark:group-hover:text-secondary-300'
-                              }`}>
-                              {child.icon}
-                            </span>
-                            <span className="ml-2 truncate">
-                              {child.name}
-                            </span>
-                            {child.badge && (
-                              <span className={`ml-auto inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold shadow-sm ${isActive
-                                ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/50 dark:text-primary-300'
-                                : 'bg-secondary-100 text-secondary-600 dark:bg-secondary-800 dark:text-secondary-400 group-hover:bg-white group-hover:shadow-sm dark:group-hover:bg-secondary-700'
-                                }`}>
-                                {child.badge}
-                              </span>
-                            )}
-                          </NavLink>
-                        )
-                      })}
-                    </div>
-                  )}
-
-                  {/* Collapsed mode: show children icons */}
-                  {isCollapsed && isOpen && (
-                    <div className="mt-1 space-y-0.5 flex flex-col items-center">
-                      {group.children.map((child) => {
-                        if (isSubGroup(child)) {
-                          // For sub-groups in collapsed mode, show sub-group children directly
-                          return child.children.map((gc) => {
-                            const isActive = location.pathname === gc.href
-                            return (
-                              <NavLink
-                                key={gc.name}
-                                to={gc.href}
-                                className={`relative flex items-center justify-center w-10 h-10 rounded-lg transition-all duration-200 ${isActive
-                                  ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400'
-                                  : 'text-secondary-400 dark:text-secondary-500 hover:bg-secondary-50 dark:hover:bg-secondary-800/50 hover:text-secondary-600 dark:hover:text-secondary-300'
-                                  }`}
-                                title={gc.name}
-                              >
-                                {gc.icon}
-                              </NavLink>
-                            )
-                          })
-                        }
-
-                        const isActive = location.pathname === child.href
-                        return (
-                          <NavLink
-                            key={child.name}
-                            to={child.href}
-                            className={`relative flex items-center justify-center w-10 h-10 rounded-lg transition-all duration-200 ${isActive
-                              ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400'
-                              : 'text-secondary-400 dark:text-secondary-500 hover:bg-secondary-50 dark:hover:bg-secondary-800/50 hover:text-secondary-600 dark:hover:text-secondary-300'
-                              }`}
-                            title={child.name}
-                          >
-                            {child.icon}
-                            {child.badge && (
-                              <span className="absolute -top-1 -right-1 inline-flex items-center justify-center min-w-[16px] h-[16px] px-0.5 rounded-full text-[9px] font-bold bg-primary-500 text-white border-2 border-white dark:border-secondary-900 shadow-sm z-10">
-                                {child.badge}
-                              </span>
-                            )}
-                          </NavLink>
-                        )
-                      })}
-                    </div>
-                  )}
-                </div>
-              )
-            }
-
-            // Regular nav item (not a group)
-            const item = entry
-            const isActive = location.pathname === item.href
-            return (
-              <NavLink
-                key={item.name}
-                to={item.href}
-                className={`group relative flex items-center text-[12px] font-medium rounded-lg transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-primary-500 ${isCollapsed
-                  ? 'justify-center w-10 h-10 p-0'
-                  : 'px-2 py-1.5'
-                  } ${isActive
-                    ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400'
-                    : 'text-secondary-600 dark:text-secondary-400 hover:bg-secondary-50 dark:hover:bg-secondary-800/50 hover:text-secondary-900 dark:hover:text-secondary-200'
-                  }`}
-                title={isCollapsed ? item.name : undefined}
-              >
-                {isActive && !isCollapsed && (
-                  <div className="absolute left-0 top-1/2 -translate-y-1/2 h-6 w-1 bg-primary-500 rounded-r-full" />
-                )}
-
-                <span className={`flex-shrink-0 transition-colors duration-200 ${
-                  isActive
-                    ? 'text-primary-600 dark:text-primary-400'
-                    : 'text-secondary-400 group-hover:text-secondary-600 dark:text-secondary-500 dark:group-hover:text-secondary-300'
-                }`}>
-                  {item.icon}
-                </span>
-
-                {!isCollapsed && (
-                  <>
-                    <span className="ml-2.5 truncate font-medium">
-                      {item.name}
-                    </span>
-                    {item.badge && (
-                      <span className={`ml-auto inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold shadow-sm ${
-                        isActive
-                          ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/50 dark:text-primary-300'
-                          : 'bg-secondary-100 text-secondary-600 dark:bg-secondary-800 dark:text-secondary-400 group-hover:bg-white group-hover:shadow-sm dark:group-hover:bg-secondary-700'
-                      }`}>
-                        {item.badge}
-                      </span>
-                    )}
-                  </>
-                )}
-
-                {isCollapsed && item.badge && (
-                  <span className="absolute -top-1 -right-1 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold bg-primary-500 text-white border-2 border-white dark:border-secondary-900 shadow-sm z-10">
-                    {item.badge}
-                  </span>
-                )}
-              </NavLink>
-            )
-          })}
+                )
+              })}
+            </div>
+          ) : null}
         </div>
+
+        {/* Navigation */}
+        <div className="cb-sidenav__sections">
+          <div className="cb-sidenav__section">
+            <ul>
+              {filteredNavigation.map((entry) => {
+                if (!isGroup(entry)) return renderLink(entry)
+
+                const group = entry
+                const isChildActive = group.children.some((child) =>
+                  isSubGroup(child)
+                    ? child.children.some((gc) => location.pathname === gc.href)
+                    : location.pathname === child.href
+                )
+                const isGroupHrefActive = group.href ? location.pathname === group.href : false
+                const isAnyActive = isChildActive || isGroupHrefActive
+                const isOpen = openGroups[group.name] ?? isAnyActive
+
+                return (
+                  <li key={group.name}>
+                    {renderToggle(group.name, group.name, group.href, group.icon, isAnyActive, isOpen, () => {
+                      toggleGroup(group.name)
+                      if (group.href && !isOpen) navigate(group.href)
+                    })}
+                    {isOpen ? (
+                      <ul className={isCollapsed ? 'cb-sidenav__children is-collapsed' : 'cb-sidenav__children'}>
+                        {group.children.map((child) => {
+                          if (!isSubGroup(child)) return renderLink(child, 1)
+                          const sub = child
+                          const key = `${group.name}/${sub.name}`
+                          const isSubActive = sub.children.some((gc) => location.pathname === gc.href)
+                          const isSubOpen = openGroups[key] ?? isSubActive
+                          if (isCollapsed) return sub.children.map((gc) => renderLink(gc, 1))
+                          return (
+                            <li key={key}>
+                              {renderToggle(key, sub.name, undefined, sub.icon, isSubActive, isSubOpen, () => toggleGroup(key), 1)}
+                              {isSubOpen ? (
+                                <ul className="cb-sidenav__children">
+                                  {sub.children.map((gc) => renderLink(gc, 2))}
+                                </ul>
+                              ) : null}
+                            </li>
+                          )
+                        })}
+                      </ul>
+                    ) : null}
+                  </li>
+                )
+              })}
+            </ul>
+          </div>
+        </div>
+
       </nav>
 
+      <div ref={accountMenuRef} className="cb-shellnav__legacyfoot">
       {/* Account at bottom - fixed */}
       <div className={`flex-shrink-0 backdrop-blur-sm border-t border-secondary-100 dark:border-secondary-800 bg-white/50 dark:bg-secondary-900/50 ${
         isCollapsed ? 'px-2 py-3 flex justify-center' : 'p-[0.8rem]'
@@ -2195,28 +1998,8 @@ const Sidebar: React.FC<SidebarProps> = ({
           )}
         </div>
       </div>
+      </div>
 
-      {accountDropdownOpen &&
-        createPortal(
-          <div
-            className="fixed top-0 right-0 bottom-0 z-40"
-            style={{ left: currentSidebarWidth }}
-            onClick={() => setAccountDropdownOpen(false)}
-            aria-hidden="true"
-          />,
-          document.body
-        )}
-
-      {moduleSwitcherOpen &&
-        createPortal(
-          <div
-            className="fixed top-0 right-0 bottom-0 z-40"
-            style={{ left: currentSidebarWidth }}
-            onClick={() => setModuleSwitcherOpen(false)}
-            aria-hidden="true"
-          />,
-          document.body
-        )}
     </div>
   )
 }
