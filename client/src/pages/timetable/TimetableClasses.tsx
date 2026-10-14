@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import toast from 'react-hot-toast'
-import { Pencil, Plus, Save, Trash2 } from 'lucide-react'
+import { LayoutGrid, Pencil, Plus, Save, Trash2 } from 'lucide-react'
 import { useTimetable, type TimetableClass } from '@/contexts/TimetableContext'
 import { getSectionDisplayName } from '@/constants/sectionMetadata'
 import { sectionLabel } from '@/components/students/studentFormat'
@@ -1054,6 +1054,7 @@ const EditClassSheet: React.FC<EditClassSheetProps> = ({
     <Sheet
       open={open}
       onClose={onCancel}
+      icon={LayoutGrid}
       title={title}
       description="Changes apply to this class section only."
       onSubmit={(event) => {

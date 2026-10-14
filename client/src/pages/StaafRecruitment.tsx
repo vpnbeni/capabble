@@ -1,13 +1,32 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import {
   Briefcase,
+  CalendarClock,
   ClipboardList,
   FileText,
   Megaphone,
+  Plus,
   Presentation,
   ScrollText,
   Users,
 } from 'lucide-react'
+import {
+  Badge,
+  Button,
+  Card,
+  DataTable,
+  Dialog,
+  EmptyState,
+  Page,
+  StatCard,
+  Tabs,
+  TextField,
+  formatDate,
+  orDash,
+  type DataTableColumn,
+  type Tone,
+} from '@/components/ui'
+import '@/components/staaf/recruitment.css'
 
 type VacantPost = {
   id: string
@@ -62,7 +81,7 @@ const PROCESS_STEPS = [
   'Entrance test',
   'Demo',
   'Interview',
-  'Offer / joining',
+  'Offer and joining',
 ]
 
 const SAMPLE: RecruitmentState = {
@@ -104,19 +123,44 @@ const loadState = (): RecruitmentState => {
 
 const TABS = [
   { id: 'posts', label: 'Vacant posts' },
-  { id: 'ads', label: 'Advertisement' },
-  { id: 'form', label: 'Job application form' },
-  { id: 'interview', label: 'Interview schedule' },
-  { id: 'demo', label: 'Demo schedule' },
-  { id: 'test', label: 'Entrance test schedule' },
+  { id: 'ads', label: 'Advertisements' },
+  { id: 'form', label: 'Applications' },
+  { id: 'interview', label: 'Interviews' },
+  { id: 'demo', label: 'Demos' },
+  { id: 'test', label: 'Entrance tests' },
 ] as const
 
 type TabId = (typeof TABS)[number]['id']
 
+const POST_TONE: Record<VacantPost['status'], Tone> = {
+  Open: 'info',
+  'On hold': 'warning',
+  Filled: 'success',
+}
+
+const APPLICATION_TONE: Record<Application['status'], Tone> = {
+  Received: 'info',
+  Shortlisted: 'warning',
+  Rejected: 'danger',
+}
+
+const TAB_COPY: Record<TabId, { title: string; subtitle: string }> = {
+  posts: { title: 'Vacant posts', subtitle: 'Posts the school is recruiting for, with the number of vacancies.' },
+  ads: { title: 'Advertisements', subtitle: 'Recruitment notices and where they were published.' },
+  form: { title: 'Applications', subtitle: 'Job applications received, newest first.' },
+  interview: { title: 'Interview schedule', subtitle: 'Candidates called for interview.' },
+  demo: { title: 'Demo schedule', subtitle: 'Demo lessons booked for teaching candidates.' },
+  test: { title: 'Entrance test schedule', subtitle: 'Written tests booked for candidates.' },
+}
+
+const EMPTY_FORM = { name: '', post: '', phone: '', email: '' }
+
 const StaafRecruitment: React.FC = () => {
   const [state, setState] = useState<RecruitmentState>(SAMPLE)
   const [tab, setTab] = useState<TabId>('posts')
-  const [form, setForm] = useState({ name: '', post: '', phone: '', email: '' })
+  const [form, setForm] = useState(EMPTY_FORM)
+  const [formOpen, setFormOpen] = useState(false)
+  const [attempted, setAttempted] = useState(false)
 
   useEffect(() => {
     setState(loadState())
@@ -138,8 +182,24 @@ const StaafRecruitment: React.FC = () => {
     }
   }, [state])
 
+  // Open vacancies grouped by staff group, for the tinted tiles above the posts table.
+  const groups = useMemo(() => {
+    const map = new Map<string, { vacancies: number; posts: number }>()
+    state.vacantPosts
+      .filter((post) => post.status === 'Open')
+      .forEach((post) => {
+        const key = post.group || 'Other'
+        const entry = map.get(key) || { vacancies: 0, posts: 0 }
+        entry.vacancies += Number(post.vacancies || 0)
+        entry.posts += 1
+        map.set(key, entry)
+      })
+    return Array.from(map.entries()).map(([name, value]) => ({ name, ...value }))
+  }, [state.vacantPosts])
+
   const submitApplication = (event: React.FormEvent) => {
     event.preventDefault()
+    setAttempted(true)
     if (!form.name.trim() || !form.post.trim()) return
     const next: Application = {
       id: `ap_${Date.now()}`,
@@ -151,215 +211,238 @@ const StaafRecruitment: React.FC = () => {
       status: 'Received',
     }
     setState((prev) => ({ ...prev, applications: [next, ...prev.applications] }))
-    setForm({ name: '', post: '', phone: '', email: '' })
+    setForm(EMPTY_FORM)
     setTab('form')
+    setAttempted(false)
+    setFormOpen(false)
   }
 
+  const closeForm = () => {
+    setFormOpen(false)
+    setAttempted(false)
+  }
+
+  const nameError = attempted && !form.name.trim() ? 'Enter the applicant’s name.' : undefined
+  const postError = attempted && !form.post.trim() ? 'Enter the post they are applying for.' : undefined
+
+  const postColumns: DataTableColumn<VacantPost>[] = [
+    { key: 'post', header: 'Post', mobile: 'title', render: (row) => <span className="recruit-cell-title">{orDash(row.post)}</span> },
+    { key: 'group', header: 'Group', mobile: 'subtitle', render: (row) => (row.group ? <Badge tone="neutral" dot={false}>{row.group}</Badge> : '—') },
+    { key: 'vacancies', header: 'Vacancies', numeric: true, align: 'right', render: (row) => Number(row.vacancies || 0) },
+    { key: 'status', header: 'Status', mobile: 'aside', render: (row) => <Badge tone={POST_TONE[row.status] || 'neutral'}>{row.status}</Badge> },
+  ]
+
+  const adColumns: DataTableColumn<Advertisement>[] = [
+    { key: 'title', header: 'Title', mobile: 'title', render: (row) => <span className="recruit-cell-title">{orDash(row.title)}</span> },
+    { key: 'medium', header: 'Published in', mobile: 'subtitle', render: (row) => orDash(row.medium) },
+    { key: 'publishedOn', header: 'Published on', render: (row) => formatDate(row.publishedOn) },
+    { key: 'lastDate', header: 'Last date', mobile: 'aside', render: (row) => formatDate(row.lastDate) },
+  ]
+
+  const applicationColumns: DataTableColumn<Application>[] = [
+    {
+      key: 'name',
+      header: 'Applicant',
+      mobile: 'title',
+      render: (row) => (
+        <>
+          <span className="recruit-cell-title">{orDash(row.name)}</span>
+          {row.email ? <span className="recruit-cell-sub">{row.email}</span> : null}
+        </>
+      ),
+    },
+    { key: 'post', header: 'Post', mobile: 'subtitle', render: (row) => orDash(row.post) },
+    { key: 'phone', header: 'Phone', numeric: true, render: (row) => orDash(row.phone) },
+    { key: 'appliedOn', header: 'Applied on', render: (row) => formatDate(row.appliedOn) },
+    { key: 'status', header: 'Status', mobile: 'aside', render: (row) => <Badge tone={APPLICATION_TONE[row.status] || 'neutral'}>{row.status}</Badge> },
+  ]
+
+  const scheduleColumns: DataTableColumn<ScheduleRow>[] = [
+    { key: 'candidate', header: 'Candidate', mobile: 'title', render: (row) => <span className="recruit-cell-title">{orDash(row.candidate)}</span> },
+    { key: 'post', header: 'Post', mobile: 'subtitle', render: (row) => orDash(row.post) },
+    { key: 'date', header: 'Date', mobile: 'aside', render: (row) => formatDate(row.date) },
+    { key: 'time', header: 'Time', numeric: true, render: (row) => orDash(row.time) },
+    { key: 'venue', header: 'Venue', render: (row) => orDash(row.venue) },
+  ]
+
+  const counts: Record<TabId, number> = {
+    posts: state.vacantPosts.length,
+    ads: state.advertisements.length,
+    form: state.applications.length,
+    interview: state.interviews.length,
+    demo: state.demos.length,
+    test: state.entranceTests.length,
+  }
+
+  const scheduleTable = (rows: ScheduleRow[], caption: string, icon: typeof Users, emptyTitle: string, emptyBody: string) => (
+    <DataTable
+      columns={scheduleColumns}
+      rows={rows}
+      getRowKey={(row) => row.id}
+      caption={caption}
+      empty={<EmptyState icon={icon} title={emptyTitle} body={emptyBody} compact />}
+    />
+  )
+
   return (
-    <div className="space-y-6">
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard icon={<Briefcase className="h-5 w-5" />} label="Vacant posts" value={stats.openVacancies} hint="Open vacancies currently being filled." tone="bg-blue-50 text-blue-600" />
-        <StatCard icon={<Megaphone className="h-5 w-5" />} label="Advertisements" value={stats.advertisements} hint="Live or published recruitment notices." tone="bg-amber-50 text-amber-600" />
-        <StatCard icon={<ClipboardList className="h-5 w-5" />} label="Applications" value={stats.applications} hint="Job applications received so far." tone="bg-violet-50 text-violet-600" />
-        <StatCard icon={<Users className="h-5 w-5" />} label="Shortlisted" value={stats.shortlisted} hint="Candidates moved to interview / demo." tone="bg-emerald-50 text-emerald-600" />
+    <Page width="full">
+      <section className="cb-stats" aria-label="Recruitment totals">
+        <StatCard icon={Briefcase} label="Open vacancies" value={stats.openVacancies} hint="Across posts marked open" />
+        <StatCard icon={Megaphone} label="Advertisements" value={stats.advertisements} hint="Notices published" />
+        <StatCard icon={ClipboardList} label="Applications" value={stats.applications} hint="Received so far" />
+        <StatCard icon={Users} label="Shortlisted" value={stats.shortlisted} hint="Moved to test, demo or interview" />
       </section>
 
-      <section className="rounded-[30px] border border-slate-200 bg-white p-6 shadow-sm">
-        <h2 className="text-xl font-semibold tracking-tight text-slate-900">Process flow</h2>
-        <p className="mt-1 text-sm text-slate-500">Standard recruitment path from vacancy to joining.</p>
-        <div className="mt-5 flex flex-wrap gap-2">
+      <Card title="Process flow" subtitle="The standard path from a vacant post to joining.">
+        <ol className="recruit-steps" aria-label="Recruitment steps">
           {PROCESS_STEPS.map((step, index) => (
-            <div key={step} className="flex items-center gap-2">
-              <div className="rounded-full bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 ring-1 ring-blue-100">
-                {index + 1}. {step}
-              </div>
-              {index < PROCESS_STEPS.length - 1 ? <span className="hidden text-slate-300 sm:inline">→</span> : null}
-            </div>
+            <li key={step} className="recruit-step">
+              <span className="recruit-step__num">{index + 1}</span>
+              {step}
+              {index < PROCESS_STEPS.length - 1 ? <span className="recruit-step__sep" aria-hidden="true" /> : null}
+            </li>
           ))}
-        </div>
-      </section>
+        </ol>
+      </Card>
 
-      <div className="flex flex-wrap gap-2">
-        {TABS.map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            onClick={() => setTab(item.id)}
-            className={`rounded-full px-3 py-1.5 text-sm font-semibold transition ${
-              tab === item.id
-                ? 'bg-blue-600 text-white shadow-sm'
-                : 'bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50'
-            }`}
-          >
-            {item.label}
-          </button>
-        ))}
-      </div>
+      <Card
+        title={TAB_COPY[tab].title}
+        subtitle={TAB_COPY[tab].subtitle}
+        action={
+          tab === 'form' ? (
+            <Button variant="primary" icon={Plus} onClick={() => setFormOpen(true)}>
+              Add application
+            </Button>
+          ) : null
+        }
+      >
+        <Tabs
+          className="recruit-tabs"
+          label="Recruitment records"
+          items={TABS.map((item) => ({ id: item.id, label: item.label, count: counts[item.id] }))}
+          value={tab}
+          onChange={(id) => setTab(id as TabId)}
+        />
 
-      {tab === 'posts' ? (
-        <Panel title="Vacant posts" icon={<Briefcase className="h-4 w-4" />}>
-          <Table
-            headers={['Post', 'Group', 'Vacancies', 'Status']}
-            rows={state.vacantPosts.map((post) => [post.post, post.group, String(post.vacancies), post.status])}
-            empty="No vacant posts recorded."
-          />
-        </Panel>
-      ) : null}
-
-      {tab === 'ads' ? (
-        <Panel title="Advertisement" icon={<Megaphone className="h-4 w-4" />}>
-          <Table
-            headers={['Title', 'Published on', 'Last date', 'Medium']}
-            rows={state.advertisements.map((ad) => [ad.title, ad.publishedOn, ad.lastDate, ad.medium])}
-            empty="No advertisements published yet."
-          />
-        </Panel>
-      ) : null}
-
-      {tab === 'form' ? (
-        <Panel title="Job application form" icon={<FileText className="h-4 w-4" />}>
-          <form onSubmit={submitApplication} className="grid gap-4 md:grid-cols-2">
-            <Field label="Applicant name" value={form.name} onChange={(value) => setForm((prev) => ({ ...prev, name: value }))} />
-            <Field label="Post applied for" value={form.post} onChange={(value) => setForm((prev) => ({ ...prev, post: value }))} />
-            <Field label="Phone" value={form.phone} onChange={(value) => setForm((prev) => ({ ...prev, phone: value }))} />
-            <Field label="Email" value={form.email} onChange={(value) => setForm((prev) => ({ ...prev, email: value }))} />
-            <div className="md:col-span-2">
-              <button type="submit" className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">
-                Submit application
-              </button>
-            </div>
-          </form>
-          <div className="mt-6">
-            <p className="mb-3 text-sm font-semibold text-slate-700">Received applications</p>
-            <Table
-              headers={['Name', 'Post', 'Phone', 'Applied on', 'Status']}
-              rows={state.applications.map((item) => [item.name, item.post, item.phone, item.appliedOn, item.status])}
-              empty="No applications received yet."
+        {tab === 'posts' ? (
+          <>
+            {groups.length ? (
+              <ul className="recruit-groups" aria-label="Open vacancies by group">
+                {groups.map((group, index) => (
+                  <li key={group.name} className={`recruit-group recruit-group--c${(index % 6) + 1}`}>
+                    <span className="recruit-group__name">{group.name}</span>
+                    <span className="recruit-group__count">{group.vacancies}</span>
+                    <span className="recruit-group__meta">
+                      {group.posts} {group.posts === 1 ? 'post' : 'posts'} open
+                    </span>
+                    <span className="recruit-group__bar" aria-hidden="true">
+                      <span style={{ width: `${stats.openVacancies ? Math.round((group.vacancies / stats.openVacancies) * 100) : 0}%` }} />
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            <DataTable
+              columns={postColumns}
+              rows={state.vacantPosts}
+              getRowKey={(row) => row.id}
+              caption="Vacant posts"
+              empty={<EmptyState icon={Briefcase} title="No vacant posts recorded" body="Posts you are recruiting for will be listed here." compact />}
             />
-          </div>
-        </Panel>
-      ) : null}
+          </>
+        ) : null}
 
-      {tab === 'interview' ? (
-        <Panel title="Interview schedule" icon={<ScrollText className="h-4 w-4" />}>
-          <Table
-            headers={['Candidate', 'Post', 'Date', 'Time', 'Venue']}
-            rows={state.interviews.map((item) => [item.candidate, item.post, item.date, item.time, item.venue])}
-            empty="No interviews scheduled."
+        {tab === 'ads' ? (
+          <DataTable
+            columns={adColumns}
+            rows={state.advertisements}
+            getRowKey={(row) => row.id}
+            caption="Advertisements"
+            empty={<EmptyState icon={Megaphone} title="No advertisements published yet" body="Recruitment notices will be listed here once published." compact />}
           />
-        </Panel>
-      ) : null}
+        ) : null}
 
-      {tab === 'demo' ? (
-        <Panel title="Demo schedule" icon={<Presentation className="h-4 w-4" />}>
-          <Table
-            headers={['Candidate', 'Post', 'Date', 'Time', 'Venue']}
-            rows={state.demos.map((item) => [item.candidate, item.post, item.date, item.time, item.venue])}
-            empty="No demos scheduled."
+        {tab === 'form' ? (
+          <DataTable
+            columns={applicationColumns}
+            rows={state.applications}
+            getRowKey={(row) => row.id}
+            caption="Applications"
+            empty={
+              <EmptyState
+                icon={FileText}
+                title="No applications received yet"
+                body="Add an application when a candidate applies for a post."
+                action={
+                  <Button icon={Plus} onClick={() => setFormOpen(true)}>
+                    Add application
+                  </Button>
+                }
+                compact
+              />
+            }
           />
-        </Panel>
-      ) : null}
+        ) : null}
 
-      {tab === 'test' ? (
-        <Panel title="Entrance test schedule" icon={<ClipboardList className="h-4 w-4" />}>
-          <Table
-            headers={['Candidate', 'Post', 'Date', 'Time', 'Venue']}
-            rows={state.entranceTests.map((item) => [item.candidate, item.post, item.date, item.time, item.venue])}
-            empty="No entrance tests scheduled."
+        {tab === 'interview'
+          ? scheduleTable(state.interviews, 'Interview schedule', ScrollText, 'No interviews scheduled', 'Shortlisted candidates called for interview will appear here.')
+          : null}
+        {tab === 'demo'
+          ? scheduleTable(state.demos, 'Demo schedule', Presentation, 'No demos scheduled', 'Demo lessons booked for candidates will appear here.')
+          : null}
+        {tab === 'test'
+          ? scheduleTable(state.entranceTests, 'Entrance test schedule', CalendarClock, 'No entrance tests scheduled', 'Written tests booked for candidates will appear here.')
+          : null}
+      </Card>
+
+      <Dialog
+        open={formOpen}
+        onClose={closeForm}
+        title="Add application"
+        description="Record a job application. It is added with the status Received."
+        footer={
+          <>
+            <Button onClick={closeForm}>Cancel</Button>
+            <Button variant="primary" type="submit" form="recruit-application-form">
+              Save application
+            </Button>
+          </>
+        }
+      >
+        <form id="recruit-application-form" className="cb-form-grid" onSubmit={submitApplication} noValidate>
+          <TextField
+            label="Applicant name"
+            required
+            value={form.name}
+            error={nameError}
+            onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
+            autoFocus
           />
-        </Panel>
-      ) : null}
-    </div>
+          <TextField
+            label="Post applied for"
+            required
+            placeholder="e.g. PGT Mathematics"
+            value={form.post}
+            error={postError}
+            onChange={(event) => setForm((prev) => ({ ...prev, post: event.target.value }))}
+          />
+          <TextField
+            label="Phone"
+            type="tel"
+            inputMode="tel"
+            value={form.phone}
+            onChange={(event) => setForm((prev) => ({ ...prev, phone: event.target.value }))}
+          />
+          <TextField
+            label="Email"
+            type="email"
+            value={form.email}
+            onChange={(event) => setForm((prev) => ({ ...prev, email: event.target.value }))}
+          />
+        </form>
+      </Dialog>
+    </Page>
   )
 }
-
-const StatCard = ({
-  icon,
-  label,
-  value,
-  hint,
-  tone,
-}: {
-  icon: React.ReactNode
-  label: string
-  value: number
-  hint: string
-  tone: string
-}) => (
-  <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
-    <div className="flex items-center gap-3">
-      <div className={`flex h-11 w-11 items-center justify-center rounded-2xl ${tone}`}>{icon}</div>
-      <div>
-        <p className="text-sm font-medium text-slate-500">{label}</p>
-        <p className="text-3xl font-bold tracking-tight text-slate-900">{value}</p>
-      </div>
-    </div>
-    <p className="mt-4 text-sm text-slate-500">{hint}</p>
-  </div>
-)
-
-const Panel = ({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) => (
-  <section className="rounded-[30px] border border-slate-200 bg-white shadow-sm">
-    <div className="flex items-center gap-2 border-b border-slate-200 px-6 py-4">
-      <span className="text-slate-500">{icon}</span>
-      <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
-    </div>
-    <div className="px-6 py-5">{children}</div>
-  </section>
-)
-
-const Field = ({
-  label,
-  value,
-  onChange,
-}: {
-  label: string
-  value: string
-  onChange: (value: string) => void
-}) => (
-  <label className="block text-sm font-medium text-slate-600">
-    {label}
-    <input
-      value={value}
-      onChange={(event) => onChange(event.target.value)}
-      className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-400 focus:bg-white"
-    />
-  </label>
-)
-
-const Table = ({
-  headers,
-  rows,
-  empty,
-}: {
-  headers: string[]
-  rows: string[][]
-  empty: string
-}) => (
-  <div className="overflow-x-auto">
-    {rows.length === 0 ? (
-      <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-10 text-center text-sm text-slate-500">{empty}</p>
-    ) : (
-      <table className="min-w-full text-left text-sm">
-        <thead>
-          <tr className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500">
-            {headers.map((header) => (
-              <th key={header} className="px-3 py-2 font-semibold">{header}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row, index) => (
-            <tr key={`${row[0]}-${index}`} className="border-b border-slate-100 last:border-0">
-              {row.map((cell) => (
-                <td key={`${index}-${cell}`} className="px-3 py-2.5 text-slate-800">{cell}</td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    )}
-  </div>
-)
 
 export default StaafRecruitment

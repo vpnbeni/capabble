@@ -1,6 +1,19 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useQueryClient } from "@tanstack/react-query";
+import {
+  Building2,
+  ChevronDown,
+  Download,
+  FileSpreadsheet,
+  Pencil,
+  SearchX,
+  Tag,
+  Trash2,
+  Upload,
+  UserPlus,
+  Users,
+} from "lucide-react";
 import { AppDispatch, RootState } from "../redux/store";
 import {
   showAddTeacherModal,
@@ -8,16 +21,30 @@ import {
   clearError,
   Teacher,
 } from "../redux/slices/teacherSlice";
-import AddTeacherModal from "../components/teachers/AddTeacherModal";
-import EditTeacherModal from "../components/teachers/EditTeacherModal";
-import ExportModal, { ExportFilters } from "../components/common/ExportModal";
-import { Dropdown } from "../components/common/Dropdown";
+import StaffForm from "../components/staaf/StaffForm";
 import { useTeachers, teacherKeys } from "../hooks/useTeachers";
 import toast from "react-hot-toast";
 import { useCentreDetails } from "../hooks/useCentreDetails";
 import teacherService from "../services/teacherService";
-
-
+import {
+  Avatar,
+  Badge,
+  Banner,
+  Button,
+  Card,
+  DataTable,
+  Dialog,
+  EmptyState,
+  FilterBar,
+  Menu,
+  Page,
+  Select,
+  StatCard,
+  orDash,
+  type DataTableColumn,
+  type MenuItem,
+} from "@/components/ui";
+import "../components/staaf/staff-list.css";
 
 const DUTY_TYPE_OPTIONS = [
   'Centre Superintendent',
@@ -77,6 +104,16 @@ const loadHiddenTeacherIdsFromStorage = (): Record<string, true> => {
   }
 };
 
+const formatCount = (n: number) => Number(n || 0).toLocaleString("en-IN");
+/** "Duty Type" → "Duty type": column labels come from callers in title case. */
+const toSentenceCase = (text: string) => {
+  const value = String(text || "").trim();
+  if (!value) return value;
+  return value.charAt(0).toUpperCase() + value.slice(1).replace(/\b([A-Z])([a-z])/g, (_m, a: string, b: string) => `${a.toLowerCase()}${b}`);
+};
+
+type PageMessage = { tone: "success" | "danger" | "warning"; title?: string; text: string; details?: string[] };
+
 type TeachersProps = {
   hideStats?: boolean;
   hideDutyType?: boolean;
@@ -103,6 +140,8 @@ type TeachersProps = {
   recordFilter?: (teacher: Teacher) => boolean;
   entityLabelPlural?: string;
 };
+
+type SortField = "name" | "dutyType" | "designation" | "subjectCode" | "subjects" | "schoolCode" | "schoolName";
 
 const Teachers: React.FC<TeachersProps> = ({
   hideStats = false,
@@ -138,22 +177,26 @@ const Teachers: React.FC<TeachersProps> = ({
   const [filterSubject, setFilterSubject] = useState("");
   const [filterDutyType, setFilterDutyType] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const [showFilterPanel, setShowFilterPanel] = useState(false);
 
   const [joiningDateFrom] = useState("");
   const [joiningDateTo] = useState("");
   const [yearsOfExperience] = useState("");
-  const [showExportModal, setShowExportModal] = useState(false);
   const [isTemplateDownloading, setIsTemplateDownloading] = useState(false);
   const [isTemplateUploading, setIsTemplateUploading] = useState(false);
   const [sortField, setSortField] = useState("name");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  // Until someone clicks a column header the list keeps its default order
+  // (Principal, Vice Principal, then by name).
+  const [hasUserSorted, setHasUserSorted] = useState(false);
   const [dutyTypeOverrides, setDutyTypeOverrides] = useState<Record<string, string>>({});
   const [hiddenDeletedTeacherIds, setHiddenDeletedTeacherIds] = useState<Record<string, true>>(
     () => loadHiddenTeacherIdsFromStorage()
   );
   const [selectedTeacherIds, setSelectedTeacherIds] = useState<Record<string, true>>({});
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+  const [deleteTargetIds, setDeleteTargetIds] = useState<string[] | null>(null);
+  const [pageMessage, setPageMessage] = useState<PageMessage | null>(null);
+  const templateInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (!uiOnlyDelete) return;
@@ -195,6 +238,12 @@ const Teachers: React.FC<TeachersProps> = ({
     }, 500);
     return () => clearTimeout(t);
   }, [yearsOfExperience, hidePagination]);
+
+  useEffect(() => {
+    if (!pageMessage) return;
+    const timeoutId = window.setTimeout(() => setPageMessage(null), pageMessage.tone === "success" ? 6000 : 12000);
+    return () => window.clearTimeout(timeoutId);
+  }, [pageMessage]);
 
   const queryLimit = typeof maxVisibleTeachers === 'number' ? maxVisibleTeachers : LIMIT
   const queryPage = hidePagination ? 1 : currentPage
@@ -287,7 +336,7 @@ const Teachers: React.FC<TeachersProps> = ({
         });
       } catch (err: unknown) {
         if (cancelled) return;
-        const msg = err instanceof Error ? err.message : "Failed to load functionaries.";
+        const msg = err instanceof Error ? err.message : "The list didn’t load. Refresh the page to try again.";
         setAllError(msg);
         setAllTeachers([]);
         setAllPagination({ currentPage: 1, totalPages: 1, totalItems: 0, itemsPerPage: LIMIT });
@@ -375,7 +424,7 @@ const Teachers: React.FC<TeachersProps> = ({
             .filter((t) => String(t.schoolCode || t.schoolName || '').trim())
             .map((t) => {
               const value = String(t.schoolCode || '').trim();
-              const label = `${t.schoolCode ? `${t.schoolCode} - ` : ''}${t.schoolName || 'Unknown School'}`;
+              const label = `${t.schoolCode ? `${t.schoolCode} · ` : ''}${t.schoolName || 'School name not set'}`;
               return [value || String(t.schoolName || '').trim(), { value: value || String(t.schoolName || '').trim(), label }];
             })
         ).values()
@@ -474,6 +523,30 @@ const Teachers: React.FC<TeachersProps> = ({
       );
     }
 
+    if (hasUserSorted) {
+      const valueFor = (teacher: Teacher): string => {
+        switch (sortField as SortField) {
+          case "dutyType":
+            return String(dutyTypeOverrides[getTeacherId(teacher)] ?? teacher.dutyType ?? "");
+          case "subjectCode":
+            return getPrimarySubjectCode(teacher);
+          case "subjects":
+            return getPrimarySubjectName(teacher);
+          case "designation":
+          case "schoolCode":
+          case "schoolName":
+          case "name":
+            return String(teacher[sortField as "name"] || "");
+          default:
+            return String(teacher.name || "");
+        }
+      };
+      const dir = sortDirection === "desc" ? -1 : 1;
+      return [...filtered].sort(
+        (a, b) => dir * valueFor(a).localeCompare(valueFor(b), undefined, { numeric: true, sensitivity: "base" })
+      );
+    }
+
     // Default sort: Principal first, then Vice Principal, then rest by name
     const designationPriority = (d: string | undefined): number => {
       const v = (d || '').trim().toUpperCase();
@@ -488,7 +561,7 @@ const Teachers: React.FC<TeachersProps> = ({
       if (pa !== pb) return pa - pb;
       return (a.name || '').localeCompare(b.name || '');
     });
-  }, [availableTeachers, debouncedSearchTerm, filterSchoolCode, filterSubject, filterDutyType, recordFilter]);
+  }, [availableTeachers, debouncedSearchTerm, filterSchoolCode, filterSubject, filterDutyType, recordFilter, hasUserSorted, sortField, sortDirection, dutyTypeOverrides]);
   const pagination = isLocalSource
     ? {
       currentPage: hidePagination ? 1 : currentPage,
@@ -522,6 +595,10 @@ const Teachers: React.FC<TeachersProps> = ({
       setCurrentPage(totalPages);
     }
   }, [isLocalSource, filteredTeachers.length, currentPage, hidePagination]);
+  const rowIndexById = useMemo(
+    () => new Map(displayTeachers.map((teacher, index) => [getTeacherId(teacher), index] as const)),
+    [displayTeachers]
+  );
   const visibleTeacherIds = useMemo(
     () => displayTeachers.map((teacher) => getTeacherId(teacher)).filter(Boolean),
     [displayTeachers]
@@ -554,16 +631,20 @@ const Teachers: React.FC<TeachersProps> = ({
 
   const activeCount = filteredTeachers.filter((t) => isSelfSchoolTeacher(t)).length;
   const inactiveCount = Math.max(0, filteredTeachers.length - activeCount);
-  const tableColumnCount = 10 - (hideDutyType ? 1 : 0) - (hideSchoolCode ? 1 : 0) - (hideSchoolName ? 1 : 0);
   const entityLabelPlural = entityLabelPluralOverride
     || (/personnel$/i.test(entityLabelSingular)
       ? entityLabelSingular
       : entityLabelSingular.endsWith("y")
         ? `${entityLabelSingular.slice(0, -1)}ies`
         : `${entityLabelSingular}s`);
-  const entityLabelSingularTitle = `${entityLabelSingular.charAt(0).toUpperCase()}${entityLabelSingular.slice(1)}`;
   const entityLabelPluralTitle = `${entityLabelPlural.charAt(0).toUpperCase()}${entityLabelPlural.slice(1)}`;
+  const nounFor = (count: number) => (count === 1 ? entityLabelSingular : entityLabelPlural);
+  const dutyLabel = toSentenceCase(dutyTypeColumnLabel);
+  const dutyLabelLower = dutyLabel.toLowerCase();
   const srNoOffset = hidePagination ? 0 : (currentPage - 1) * LIMIT;
+  const missingDutyCount = filteredTeachers.filter(
+    (t) => !String(dutyTypeOverrides[getTeacherId(t)] ?? t.dutyType ?? "").trim()
+  ).length;
 
   const invalidateTeachers = () => {
     if (isLocalSource) return;
@@ -606,34 +687,44 @@ const Teachers: React.FC<TeachersProps> = ({
       return next;
     });
   };
-  const handleBulkDelete = async () => {
-    if (selectedCount === 0 || isBulkDeleting) return;
-    const confirmed = window.confirm(
-      `Delete ${selectedCount} selected ${selectedCount === 1 ? entityLabelSingular : entityLabelPlural}? This cannot be undone.`
-    );
-    if (!confirmed) return;
+  const clearSelection = () => setSelectedTeacherIds({});
+
+  const handleSort = (field: string) => {
+    if (sortField === field) {
+      setSortDirection((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortField(field);
+      setSortDirection("asc");
+    }
+    setHasUserSorted(true);
+    if (!hidePagination) setCurrentPage(1);
+  };
+
+  /** Runs after the confirming Dialog. `targetIds` is the selection, or one row from its menu. */
+  const handleBulkDelete = async (targetIds: string[]) => {
+    if (targetIds.length === 0 || isBulkDeleting) return;
     setIsBulkDeleting(true);
     try {
       let deletedIds: string[] = [];
       let failedCount = 0;
       if (onDeleteSelected) {
-        const result = await onDeleteSelected(selectedTeacherList);
-        deletedIds = Array.isArray(result) ? result : [...selectedTeacherList];
-        failedCount = selectedTeacherList.length - deletedIds.length;
+        const result = await onDeleteSelected(targetIds);
+        deletedIds = Array.isArray(result) ? result : [...targetIds];
+        failedCount = targetIds.length - deletedIds.length;
       } else if (uiOnlyDelete) {
         // UI-only delete: hide selected rows locally without mutating backend data.
-        deletedIds = [...selectedTeacherList];
+        deletedIds = [...targetIds];
       } else {
         const results = await Promise.allSettled(
-          selectedTeacherList.map((teacherId) => teacherService.deleteById(teacherId, includeAllRecords))
+          targetIds.map((teacherId) => teacherService.deleteById(teacherId, includeAllRecords))
         );
         results.forEach((result, index) => {
-          if (result.status === "fulfilled") deletedIds.push(selectedTeacherList[index]);
+          if (result.status === "fulfilled") deletedIds.push(targetIds[index]);
           else failedCount += 1;
         });
       }
       if (deletedIds.length > 0) {
-        const selectedTeachers = displayTeachers.filter((teacher) => selectedTeacherList.includes(getTeacherId(teacher)));
+        const selectedTeachers = displayTeachers.filter((teacher) => targetIds.includes(getTeacherId(teacher)));
         setHiddenDeletedTeacherIds((prev) => {
           const next = { ...prev };
           deletedIds.forEach((teacherId) => {
@@ -653,48 +744,14 @@ const Teachers: React.FC<TeachersProps> = ({
           });
           return next;
         });
-        toast.success(
-          `${deletedIds.length} ${deletedIds.length === 1 ? entityLabelSingular : entityLabelPlural} deleted successfully`
-        );
+        toast.success(`${deletedIds.length} ${nounFor(deletedIds.length)} deleted`);
         invalidateTeachers();
       }
       if (failedCount > 0) {
-        toast.error(`Failed to delete ${failedCount} selected ${failedCount === 1 ? entityLabelSingular : entityLabelPlural}`);
+        toast.error(`${failedCount} ${nounFor(failedCount)} couldn’t be deleted. Try again.`);
       }
     } finally {
       setIsBulkDeleting(false);
-    }
-  };
-
-  const handleExport = () => {
-    setShowExportModal(true);
-  };
-
-  const handleFetchPreview = async (filters: ExportFilters) => {
-    try {
-      return await teacherService.getExportPreview(filters);
-    } catch (error) {
-      console.error("Failed to fetch preview:", error);
-      return { total: 0, filtered: 0 };
-    }
-  };
-
-  const handleExportData = async (filters: ExportFilters, exportAll: boolean) => {
-    try {
-      const blob = await teacherService.exportTeachersCsv(filters, exportAll);
-
-      // Create download link
-      const url = window.URL.createObjectURL(new Blob([blob]));
-      const link = document.createElement("a");
-      link.href = url;
-      link.setAttribute("download", `teachers_export_${new Date().toISOString().split('T')[0]}.csv`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error("Export failed:", error);
-      alert("Failed to export data. Please try again.");
     }
   };
 
@@ -713,7 +770,7 @@ const Teachers: React.FC<TeachersProps> = ({
       window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error("Template download failed:", error);
-      alert("Failed to download template.");
+      setPageMessage({ tone: "danger", text: "The template didn’t download. Try again." });
     } finally {
       setIsTemplateDownloading(false);
     }
@@ -729,14 +786,17 @@ const Teachers: React.FC<TeachersProps> = ({
       const response = await teacherService.uploadImportTemplate(selectedFile);
 
       const result = response?.data;
-      const errorPreview = (result?.errors || [])
+      const errorPreview: string[] = (result?.errors || [])
         .slice(0, 5)
-        .map((item: { row: number; message: string }) => `Row ${item.row}: ${item.message}`)
-        .join("\n");
+        .map((item: { row: number; message: string }) => `Row ${item.row}: ${item.message}`);
+      const errorCount = result?.errors?.length ?? 0;
       const warningCount = result?.warnings?.length ?? 0;
-      alert(
-        `Import completed.\nCreated: ${result?.created ?? 0}\nUpdated: ${result?.updated ?? 0}\nSkipped: ${result?.skipped ?? 0}\nErrors: ${result?.errors?.length ?? 0}\nWarnings: ${warningCount}${errorPreview ? `\n\nFirst errors:\n${errorPreview}` : ""}`
-      );
+      setPageMessage({
+        tone: errorCount > 0 ? "warning" : "success",
+        title: "Import finished",
+        text: `${result?.created ?? 0} added, ${result?.updated ?? 0} updated, ${result?.skipped ?? 0} skipped, ${errorCount} with errors, ${warningCount} with warnings.`,
+        details: errorPreview.length ? errorPreview : undefined,
+      });
       invalidateTeachers();
     } catch (error: any) {
       console.error("Template upload failed:", error);
@@ -744,682 +804,520 @@ const Teachers: React.FC<TeachersProps> = ({
         error?.response?.data?.message
         || error?.response?.data?.error
         || error?.message
-        || "Failed to upload CSV/XLSX template file.";
-      alert(message);
+        || "The file didn’t import. Check it is the filled CSV or XLSX template and try again.";
+      setPageMessage({ tone: "danger", text: message });
     } finally {
       setIsTemplateUploading(false);
     }
   };
 
+  const saveDutyType = async (teacher: Teacher, newDutyType: string) => {
+    const teacherId = teacher._id || teacher.id!;
+    if (!newDutyType) return;
+    setDutyTypeOverrides((prev) => ({ ...prev, [teacherId]: newDutyType }));
+    try {
+      await teacherService.update(teacherId, { dutyType: newDutyType } as any);
+      queryClient.invalidateQueries({ queryKey: teacherKeys.all });
+      const successLabel = toSentenceCase(dutyTypeErrorLabel || dutyTypeColumnLabel);
+      toast.success(`${successLabel} changed for ${teacher.name}`);
+    } catch (err: any) {
+      setDutyTypeOverrides((prev) => { const next = { ...prev }; delete next[teacherId]; return next; });
+      const fallbackLabel = (dutyTypeErrorLabel || dutyTypeColumnLabel).toLowerCase();
+      const serverMessage = String(err?.response?.data?.message || '').trim();
+      toast.error(serverMessage || `The ${fallbackLabel} didn’t change. Try again.`);
+    }
+  };
+
+  const renderDutyType = (teacher: Teacher) => {
+    const currentDuty = dutyTypeOverrides[teacher._id || teacher.id!] ?? teacher.dutyType ?? '';
+    const optionList = getDutyOptionsForDesignation(
+      teacher.designation,
+      dutyTypeOptions,
+      enforceDesignationDutyRules
+    );
+    const normalizedCurrentDuty = String(currentDuty || '').trim();
+    const optionsWithCurrent = normalizedCurrentDuty && !optionList.includes(normalizedCurrentDuty)
+      ? [normalizedCurrentDuty, ...optionList]
+      : optionList;
+
+    if (currentDuty && !alwaysEditableDutyType) {
+      return <Badge tone="neutral" dot={false}>{currentDuty}</Badge>;
+    }
+    return (
+      <Select
+        size="sm"
+        className="stafflist-type-select"
+        aria-label={`${dutyLabel} for ${teacher.name}`}
+        value={normalizedCurrentDuty}
+        onChange={(e) => {
+          void saveDutyType(teacher, e.target.value);
+        }}
+        placeholder={`Choose ${dutyLabelLower}`}
+        options={optionsWithCurrent}
+      />
+    );
+  };
+
+  const hasFilters = Boolean(searchTerm.trim() || activeFilterCount > 0);
+  const clearFilters = () => {
+    setSearchTerm("");
+    setFilterSchoolCode("");
+    setFilterSubject("");
+    setFilterDutyType("");
+  };
+
+  const canAdd = !disableApiMutations || showAddButton;
+  const deleteCount = deleteTargetIds?.length ?? 0;
+  const deleteDescription = onDeleteSelected
+    ? `They are removed from this list.`
+    : uiOnlyDelete
+      ? `They are hidden from this list on this device. Their records stay on file.`
+      : `Their records are deleted. This can’t be undone.`;
+
+  const columns: DataTableColumn<Teacher>[] = [
+    {
+      key: "srNo",
+      header: "No.",
+      numeric: true,
+      width: 56,
+      mobile: "hidden",
+      render: (teacher) => srNoOffset + (rowIndexById.get(getTeacherId(teacher)) ?? 0) + 1,
+    },
+    {
+      key: "name",
+      header: "Name",
+      sortable: true,
+      mobile: "title",
+      render: (teacher) => {
+        const currentDuty = String(dutyTypeOverrides[teacher._id || teacher.id!] ?? teacher.dutyType ?? "").trim().toLowerCase();
+        const oasisNotNeeded = currentDuty === "class iv" || currentDuty === "others";
+        const oasisLine = oasisNotNeeded
+          ? "OASIS ID not needed"
+          : teacher.oasisId
+            ? `OASIS ID ${teacher.oasisId}`
+            : null;
+        return (
+          <span className="stafflist-name">
+            <Avatar name={teacher.name || entityLabelSingular} src={teacher.profileImage || null} size="md" />
+            <span className="stafflist-name__text">
+              <span className="stafflist-name__primary">{orDash(teacher.name)}</span>
+              {oasisLine ? <span className="stafflist-name__secondary is-num">{oasisLine}</span> : null}
+            </span>
+          </span>
+        );
+      },
+    },
+    ...(!hideDutyType
+      ? [{
+        key: "dutyType",
+        header: dutyLabel,
+        headerLabel: dutyLabel,
+        sortable: true,
+        interactive: true,
+        render: renderDutyType,
+      } as DataTableColumn<Teacher>]
+      : []),
+    {
+      key: "designation",
+      header: "Designation",
+      sortable: true,
+      mobile: "subtitle",
+      render: (teacher) =>
+        String(teacher.designation || "").trim()
+          ? <Badge tone="neutral" dot={false}>{teacher.designation}</Badge>
+          : <span className="cb-subtle">—</span>,
+    },
+    {
+      key: "subjectCode",
+      header: "Subject code",
+      sortable: true,
+      render: (teacher) => {
+        const code = getPrimarySubjectCode(teacher);
+        return code === "N/A" ? "—" : orDash(code);
+      },
+    },
+    {
+      key: "subjects",
+      header: "Subject",
+      sortable: true,
+      render: (teacher) => {
+        const name = getPrimarySubjectName(teacher);
+        return name === "N/A" ? "—" : orDash(name);
+      },
+    },
+    ...(!hideSchoolCode
+      ? [{
+        key: "schoolCode",
+        header: "School code",
+        sortable: true,
+        mobile: "hidden",
+        render: (teacher: Teacher) => (teacher.schoolCode === "N/A" ? "—" : orDash(teacher.schoolCode)),
+      } as DataTableColumn<Teacher>]
+      : []),
+    ...(!hideSchoolName
+      ? [{
+        key: "schoolName",
+        header: "School",
+        sortable: true,
+        mobile: "hidden",
+        render: (teacher: Teacher) => {
+          const value = teacher.schoolName === "N/A" ? "" : String(teacher.schoolName || "");
+          return value ? <span className="stafflist-school" title={value}>{value}</span> : "—";
+        },
+      } as DataTableColumn<Teacher>]
+      : []),
+    ...(includeAllRecords
+      ? [{
+        key: "status",
+        header: "Status",
+        mobile: "aside",
+        render: (teacher: Teacher) =>
+          teacher.isActive === false ? <Badge tone="neutral">Inactive</Badge> : <Badge tone="success">Active</Badge>,
+      } as DataTableColumn<Teacher>]
+      : []),
+    {
+      key: "actions",
+      header: <span className="cb-visually-hidden">Actions</span>,
+      headerLabel: "Actions",
+      interactive: true,
+      mobile: "hidden",
+      width: 48,
+      render: (teacher) => {
+        const items: MenuItem[] = [];
+        if (!disableRowEdit) {
+          items.push({ label: "Edit details", icon: Pencil, onSelect: () => handleEditTeacher(teacher) });
+          items.push({ divider: true });
+        }
+        items.push({
+          label: `Delete ${entityLabelSingular}`,
+          icon: Trash2,
+          tone: "danger",
+          disabled: isBulkDeleting,
+          onSelect: () => setDeleteTargetIds([getTeacherId(teacher)].filter(Boolean)),
+        });
+        return <Menu label={`Actions for ${teacher.name}`} items={items} />;
+      },
+    },
+  ];
+
+  const showSchoolFilter = schoolFilterOptions.length > 0 || Boolean(filterSchoolCode);
+  const showDutyFilter = dutyTypeFilterOptions.length > 0 || Boolean(filterDutyType);
+  const showSubjectFilter = subjectFilterOptions.length > 0 || Boolean(filterSubject);
+  const hiddenByLimit = displayTeachers.length < filteredTeachers.length && hidePagination;
+
   return (
-    <div
-      className={
-        hidePagination
-          ? 'flex h-[calc(100dvh-4.75rem)] min-h-0 flex-col p-4'
-          : 'mx-auto max-w-7xl p-6'
-      }
-    >
-      {/* Error Message */}
-      {error && (
-        <div className="mb-4 p-4 bg-error-50 dark:bg-error-900/20 border border-error-200 dark:border-error-800 rounded-lg">
-          <p className="text-error-700 dark:text-error-300">{error}</p>
-        </div>
-      )}
+    <Page width="full">
+      {error ? <Banner tone="danger">{error}</Banner> : null}
 
-      {/* Stat cards (display only, like Datesheets – not clickable, small number animation) */}
-      {!hideStats && <div className="mb-6 overflow-x-auto">
-        <div className="flex flex-nowrap gap-6 min-w-max">
-        <div className="p-5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm min-w-[240px]">
-          <div className="flex items-center space-x-4">
-            <div className="p-3 rounded-lg flex-shrink-0 bg-blue-50 text-blue-500 dark:bg-blue-900/20 dark:text-blue-400">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-              </svg>
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Total {entityLabelPluralTitle}</p>
-              <span key={visibleTotalTeachers} className="text-xl font-bold text-gray-900 dark:text-white inline-block animate-number-in">{visibleTotalTeachers}</span>
-            </div>
-          </div>
-        </div>
-        <div className="p-5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm min-w-[240px]">
-          <div className="flex items-center space-x-4">
-            <div className="p-3 rounded-lg flex-shrink-0 bg-emerald-50 text-emerald-500 dark:bg-emerald-900/20 dark:text-emerald-400">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Self School</p>
-              <span key={activeCount} className="text-xl font-bold text-gray-900 dark:text-white inline-block animate-number-in">{activeCount}</span>
-              <span className="text-xs text-gray-400 font-medium ml-1">on this page</span>
-            </div>
-          </div>
-        </div>
-        <div className="p-5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm min-w-[240px]">
-          <div className="flex items-center space-x-4">
-            <div className="p-3 rounded-lg flex-shrink-0 bg-amber-50 text-amber-500 dark:bg-amber-900/20 dark:text-amber-400">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Outside School</p>
-              <span key={inactiveCount} className="text-xl font-bold text-gray-900 dark:text-white inline-block animate-number-in">{inactiveCount}</span>
-              <span className="text-xs text-gray-400 font-medium ml-1">on this page</span>
-            </div>
-          </div>
-        </div>
-        </div>
-      </div>}
+      {pageMessage ? (
+        <Banner tone={pageMessage.tone} title={pageMessage.title} onDismiss={() => setPageMessage(null)}>
+          {pageMessage.text}
+          {pageMessage.details ? (
+            <ul className="stafflist-banner-list">
+              {pageMessage.details.map((line) => (
+                <li key={line}>{line}</li>
+              ))}
+            </ul>
+          ) : null}
+        </Banner>
+      ) : null}
 
-      {/* Teachers Table */}
-      <div className={`card overflow-hidden ${hidePagination ? 'flex min-h-0 flex-1 flex-col' : ''}`}>
-        {/* Toolbar: search + actions (inside table card) */}
-        <div className="flex-shrink-0 border-b border-gray-200 p-3 dark:border-gray-700">
-          <div className="flex flex-col items-start justify-between gap-3 lg:flex-row lg:items-center">
-            <div className="flex-1 w-full max-w-md">
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <svg
-                    className="h-5 w-5 text-secondary-400"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                    />
-                  </svg>
-                </div>
-                <input
-                  type="text"
-                  placeholder={`Search ${entityLabelPlural}...`}
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="input pl-10 w-full"
-                />
-              </div>
-            </div>
-            <div className="flex gap-3 flex-shrink-0">
-              <input
-                type="file"
-                accept=".csv,.xlsx"
-                id="teacher-template-upload-input"
-                title="Upload teacher template file"
-                aria-label="Upload teacher template file"
-                onChange={uploadTemplateFile}
-                className="hidden"
-              />
-              {/* Export button hidden for now */}
-              {false && (
-                <button
-                  onClick={handleExport}
-                  className="btn btn-outline"
-                  disabled={loading}
-                >
-                  <svg
-                    className="w-4 h-4 mr-2"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                    />
-                  </svg>
-                  Export
-                </button>
-              )}
-              {!disableApiMutations && (
-                <button
-                  onClick={downloadImportTemplate}
-                  className="btn btn-outline"
-                  disabled={loading || isTemplateDownloading || isTemplateUploading}
-                >
-                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v10m0 0l-4-4m4 4l4-4M5 19h14" />
-                  </svg>
-                  {isTemplateDownloading ? "Downloading..." : "Template"}
-                </button>
-              )}
-              {!disableApiMutations && (
-                <button
-                  onClick={() => document.getElementById("teacher-template-upload-input")?.click()}
-                  className="btn btn-outline"
-                  disabled={loading || isTemplateDownloading || isTemplateUploading}
-                >
-                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15V5m0 0l4 4m-4-4L8 9m-3 10h14" />
-                  </svg>
-                  {isTemplateUploading ? "Uploading..." : "Upload"}
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={() => setShowFilterPanel((prev) => !prev)}
-                className="btn btn-outline"
-                disabled={loading}
-              >
-                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-                </svg>
-                <span>Filters</span>
-                {activeFilterCount > 0 && (
-                  <span className="ml-2 inline-flex items-center justify-center px-1.5 py-0.5 rounded-full text-[11px] font-semibold bg-primary-100 text-primary-700 dark:bg-primary-900 dark:text-primary-300">
-                    {activeFilterCount}
-                  </span>
-                )}
-              </button>
-              {(!disableApiMutations || showAddButton) && (
-                <button
-                  onClick={handleAddTeacher}
-                  className="btn btn-primary"
-                  disabled={loading}
-                >
-                  <svg
-                    className="w-5 h-5 mr-2"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-                    />
-                  </svg>
-                  Add {entityLabelSingularTitle}
-                </button>
-              )}
-              <button
-                onClick={handleBulkDelete}
-                className="btn btn-error"
-                disabled={loading || isBulkDeleting || selectedCount === 0}
-                title={selectedCount > 0 ? `Delete ${selectedCount} selected ${entityLabelPlural}` : `Select ${entityLabelPlural} first`}
-              >
-                {isBulkDeleting ? "Deleting..." : `Delete Selected${selectedCount > 0 ? ` (${selectedCount})` : ""}`}
-              </button>
-            </div>
-          </div>
-          {showFilterPanel && (
-            <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                <div>
-                  <p className="text-xs font-semibold text-secondary-500 dark:text-secondary-400 mb-1">School</p>
-                  <Dropdown
-                    options={[{ value: '', label: 'All Schools' }, ...schoolFilterOptions]}
-                    value={filterSchoolCode}
-                    onChange={(value) => setFilterSchoolCode(String(Array.isArray(value) ? value[0] : value ?? ''))}
-                    size="sm"
-                    clearable={false}
-                    searchable
-                    placeholder="School"
-                    className="w-full"
-                  />
-                </div>
-                <div>
-                  <p className="text-xs font-semibold text-secondary-500 dark:text-secondary-400 mb-1">{dutyTypeColumnLabel}</p>
-                  <Dropdown
-                    options={[{ value: '', label: `All ${dutyTypeColumnLabel}s` }, ...dutyTypeFilterOptions]}
-                    value={filterDutyType}
-                    onChange={(value) => setFilterDutyType(String(Array.isArray(value) ? value[0] : value ?? ''))}
-                    size="sm"
-                    clearable={false}
-                    searchable
-                    placeholder={dutyTypeColumnLabel}
-                    className="w-full"
-                  />
-                </div>
-                <div>
-                  <p className="text-xs font-semibold text-secondary-500 dark:text-secondary-400 mb-1">Subject</p>
-                  <Dropdown
-                    options={[{ value: '', label: 'All Subjects' }, ...subjectFilterOptions]}
-                    value={filterSubject}
-                    onChange={(value) => setFilterSubject(String(Array.isArray(value) ? value[0] : value ?? ''))}
-                    size="sm"
-                    clearable={false}
-                    searchable
-                    placeholder="Subject"
-                    className="w-full"
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
+      {!hideStats ? (
+        <section className="cb-stats" aria-label={`${entityLabelPluralTitle} totals`}>
+          <StatCard
+            label={entityLabelPluralTitle}
+            value={formatCount(visibleTotalTeachers)}
+            icon={Users}
+            hint={hasFilters ? "Matching the filters" : "In this list"}
+          />
+          <StatCard
+            label="From this school"
+            value={formatCount(activeCount)}
+            icon={Building2}
+            hint={centreDetails?.centreName ? orDash(centreDetails.centreName) : "The centre’s own school"}
+          />
+          <StatCard
+            label="From other schools"
+            value={formatCount(inactiveCount)}
+            hint="Outside the centre’s school"
+          />
+          {!hideDutyType ? (
+            <StatCard
+              label={`${dutyLabel} not set`}
+              value={formatCount(missingDutyCount)}
+              icon={Tag}
+              hint={missingDutyCount > 0 ? `Choose one in the ${dutyLabelLower} column` : "Everyone has one"}
+            />
+          ) : null}
+        </section>
+      ) : null}
 
-        <div
-          className={`overflow-x-auto overflow-y-auto ${
-            hidePagination ? 'min-h-0 flex-1' : 'max-h-[calc(100vh-16rem)]'
-          }`}
-        >
-          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-            <thead className="sticky top-0 z-20 bg-gray-50 dark:bg-gray-800">
-              <tr>
-                <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-300">
-                  <input
-                    type="checkbox"
-                    title="Select all functionaries on this page"
-                    aria-label="Select all functionaries on this page"
-                    checked={allVisibleSelected}
-                    onChange={(e) => toggleSelectAllVisible(e.target.checked)}
-                    className="h-3.5 w-3.5 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                  />
-                </th>
-                <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-300">
-                  Sr No
-                </th>
-                {[
-                  { label: "Teacher Name", field: "name" },
-                  { label: "OASIS ID", field: "oasisId" },
-                  ...(!hideDutyType ? [{ label: dutyTypeColumnLabel, field: "dutyType" }] : []),
-                  { label: "Designation", field: "designation" },
-                  { label: "Subject Code", field: "subjectCode" },
-                  { label: "Subject Name", field: "subjects" },
-                  ...(!hideSchoolCode ? [{ label: "School Code", field: "schoolCode" }] : []),
-                  ...(!hideSchoolName ? [{ label: "School Name", field: "schoolName" }] : []),
-                ].map(({ label, field }) => (
-                  <th
-                    key={field}
-                    className="group cursor-pointer select-none px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500 transition-colors hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
-                    onClick={() => {
-                      if (sortField === field) {
-                        setSortDirection((d) => (d === "asc" ? "desc" : "asc"));
-                      } else {
-                        setSortField(field);
-                        setSortDirection("asc");
-                      }
-                      if (!hidePagination) setCurrentPage(1);
-                    }}
-                  >
-                    <span className="inline-flex items-center gap-1">
-                      {label}
-                      <span className={`inline-flex flex-col text-[8px] leading-none ${sortField === field ? "text-primary-600 dark:text-primary-400" : "text-gray-400 dark:text-gray-600 opacity-0 group-hover:opacity-100 transition-opacity"}`}>
-                        <span className={sortField === field && sortDirection === "asc" ? "text-primary-600 dark:text-primary-400" : ""}>▲</span>
-                        <span className={sortField === field && sortDirection === "desc" ? "text-primary-600 dark:text-primary-400" : ""}>▼</span>
-                      </span>
-                    </span>
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-              {loading ? (
-                <tr>
-                  <td colSpan={tableColumnCount} className="px-6 py-16 text-center">
-                    <div className="flex flex-col items-center justify-center gap-3">
-                      <svg
-                        className="animate-spin h-10 w-10 text-primary-600"
-                        xmlns="http://www.w3.org/2000/svg"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        aria-hidden="true"
-                      >
-                        <circle
-                          className="opacity-25"
-                          cx="12"
-                          cy="12"
-                          r="10"
-                          stroke="currentColor"
-                          strokeWidth="4"
-                        />
-                        <path
-                          className="opacity-75"
-                          fill="currentColor"
-                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                        />
-                      </svg>
-                      <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                        Loading teachers...
-                      </span>
-                    </div>
-                  </td>
-                </tr>
-              ) : (
-                displayTeachers.map((teacher: Teacher, index: number) => (
-                  <tr
-                    key={teacher.id || teacher._id}
-                    className={`hover:bg-gray-50 dark:hover:bg-gray-700 ${disableRowEdit ? "cursor-default" : "cursor-pointer"}`}
-                    onClick={() => {
-                      if (!disableRowEdit) {
-                        handleEditTeacher(teacher)
-                      }
-                    }}
-                  >
-                    <td
-                      className="whitespace-nowrap px-3 py-1.5 text-sm text-gray-900 dark:text-white"
-                      onClick={(e) => e.stopPropagation()}
-                    >
+      <Card flush className="stafflist-card">
+        <div className="stafflist-toolbar">
+          <FilterBar
+            search={{
+              placeholder: `Search name, ID, phone, subject or school`,
+              value: searchTerm,
+              onChange: setSearchTerm,
+              label: `Search ${entityLabelPlural}`,
+            }}
+            filters={
+              showSchoolFilter || showDutyFilter || showSubjectFilter || hasFilters ? (
+                <>
+                  {showSchoolFilter ? (
+                    <Select
+                      aria-label="School"
+                      size="sm"
+                      value={filterSchoolCode}
+                      onChange={(e) => setFilterSchoolCode(e.target.value)}
+                      placeholder="All schools"
+                      options={schoolFilterOptions}
+                      className="stafflist-filter"
+                    />
+                  ) : null}
+                  {showDutyFilter ? (
+                    <Select
+                      aria-label={dutyLabel}
+                      size="sm"
+                      value={filterDutyType}
+                      onChange={(e) => setFilterDutyType(e.target.value)}
+                      placeholder={`Any ${dutyLabelLower}`}
+                      options={dutyTypeFilterOptions}
+                      className="stafflist-filter"
+                    />
+                  ) : null}
+                  {showSubjectFilter ? (
+                    <Select
+                      aria-label="Subject"
+                      size="sm"
+                      value={filterSubject}
+                      onChange={(e) => setFilterSubject(e.target.value)}
+                      placeholder="All subjects"
+                      options={subjectFilterOptions}
+                      className="stafflist-filter"
+                    />
+                  ) : null}
+                  {hasFilters ? (
+                    <Button variant="tertiary" size="sm" onClick={clearFilters}>
+                      Clear filters
+                    </Button>
+                  ) : null}
+                </>
+              ) : undefined
+            }
+            actions={
+              !disableApiMutations || canAdd ? (
+                <>
+                  {!disableApiMutations ? (
+                    <>
                       <input
-                        type="checkbox"
-                        title={`Select ${teacher.name}`}
-                        aria-label={`Select ${teacher.name}`}
-                        checked={Boolean(selectedTeacherIds[getTeacherId(teacher)])}
-                        onChange={(e) => toggleTeacherSelection(getTeacherId(teacher), e.target.checked)}
-                        className="h-3.5 w-3.5 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                        ref={templateInputRef}
+                        type="file"
+                        accept=".csv,.xlsx"
+                        aria-label={`Upload filled ${entityLabelSingular} template`}
+                        onChange={uploadTemplateFile}
+                        hidden
                       />
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-1.5 text-sm text-gray-900 dark:text-white">
-                      {srNoOffset + index + 1}
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-1.5">
-                      <div className="flex items-center">
-                        <div className="flex h-7 w-7 items-center justify-center rounded-md bg-gradient-to-br from-primary-400 to-primary-600">
-                          <span className="text-xs font-bold text-white">
-                            {teacher.avatar}
-                          </span>
-                        </div>
-                        <div className="ml-2.5">
-                          <div className="text-sm font-medium text-gray-900 dark:text-white">
-                            {String(teacher.name || "").toUpperCase()}
-                          </div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-1.5 text-sm text-gray-900 dark:text-white">
-                      {(() => {
-                        const currentDuty =
-                          dutyTypeOverrides[teacher._id || teacher.id!] ?? teacher.dutyType ?? "";
-                        const duty = String(currentDuty).trim().toLowerCase();
-                        const isClassIv = duty === "class iv";
-                        const isOthers = duty === "others";
-                        return isClassIv || isOthers ? "N/A" : teacher.oasisId || "—";
-                      })()}
-                    </td>
-                    {!hideDutyType && (
-                      <td
-                        className="whitespace-nowrap px-3 py-1.5 text-sm text-gray-900 dark:text-white"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        {(() => {
-                          const currentDuty = dutyTypeOverrides[teacher._id || teacher.id!] ?? teacher.dutyType ?? '';
-                          const optionList = getDutyOptionsForDesignation(
-                            teacher.designation,
-                            dutyTypeOptions,
-                            enforceDesignationDutyRules
-                          );
-                          const normalizedCurrentDuty = String(currentDuty || '').trim();
-                          const optionsWithCurrent = normalizedCurrentDuty && !optionList.includes(normalizedCurrentDuty)
-                            ? [normalizedCurrentDuty, ...optionList]
-                            : optionList;
-
-                          if (currentDuty && !alwaysEditableDutyType) {
-                            return (
-                              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-primary-100 text-primary-800 dark:bg-primary-900/30 dark:text-primary-300 border border-primary-200 dark:border-primary-700">
-                                {currentDuty}
-                              </span>
-                            );
-                          }
-                          return (
-                            <select
-                              title={`${dutyTypeColumnLabel} for ${teacher.name}`}
-                              aria-label={`${dutyTypeColumnLabel} for ${teacher.name}`}
-                              value={normalizedCurrentDuty}
-                              onChange={async (e) => {
-                                const teacherId = teacher._id || teacher.id!;
-                                const newDutyType = e.target.value;
-                                if (!newDutyType) return;
-                                setDutyTypeOverrides((prev) => ({ ...prev, [teacherId]: newDutyType }));
-                                try {
-                                  await teacherService.update(teacherId, { dutyType: newDutyType } as any);
-                                  queryClient.invalidateQueries({ queryKey: teacherKeys.all });
-                                  const successLabel = dutyTypeErrorLabel || dutyTypeColumnLabel;
-                                  toast.success(`${successLabel} updated for ${teacher.name}`);
-                                } catch (err: any) {
-                                  setDutyTypeOverrides((prev) => { const next = { ...prev }; delete next[teacherId]; return next; });
-                                  const fallbackLabel = (dutyTypeErrorLabel || dutyTypeColumnLabel).toLowerCase();
-                                  const serverMessage = String(err?.response?.data?.message || '').trim();
-                                  toast.error(serverMessage || `Failed to update ${fallbackLabel}`);
-                                }
-                              }}
-                              className="block min-w-[180px] rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-white py-1.5 px-2 focus:ring-primary-500 focus:border-primary-500"
-                            >
-                              <option value="">{`Select ${dutyTypeColumnLabel}`}</option>
-                              {optionsWithCurrent.map((duty: string) => (
-                                <option key={duty} value={duty}>{duty}</option>
-                              ))}
-                            </select>
-                          );
-                        })()}
-                      </td>
-                    )}
-                    <td className="whitespace-nowrap px-3 py-1.5 text-sm text-gray-900 dark:text-white">
-                      {teacher.designation || "N/A"}
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-1.5 text-sm text-gray-900 dark:text-white">
-                      {getPrimarySubjectCode(teacher)}
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-1.5 text-sm text-gray-900 dark:text-white">
-                      {getPrimarySubjectName(teacher)}
-                    </td>
-                    {!hideSchoolCode && (
-                      <td className="whitespace-nowrap px-3 py-1.5 text-sm text-gray-900 dark:text-white">
-                        {teacher.schoolCode || "N/A"}
-                      </td>
-                    )}
-                    {!hideSchoolName && (
-                      <td className="whitespace-nowrap px-3 py-1.5 text-sm text-gray-900 dark:text-white">
-                        {teacher.schoolName || 'N/A'}
-                      </td>
-                    )}
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Empty State for when no teachers match filters */}
-      {!loading && displayTeachers.length === 0 && (
-        <div className="card">
-          <div className="card-content text-center py-12">
-            <div className="w-24 h-24 bg-secondary-100 dark:bg-secondary-800 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg
-                className="w-12 h-12 text-secondary-400"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                />
-              </svg>
-            </div>
-            <h3 className="text-lg font-semibold text-secondary-900 dark:text-white mb-2">
-              No {entityLabelPlural} found
-            </h3>
-            <p className="text-secondary-600 dark:text-secondary-400 mb-6">
-              {searchTerm || filterSchoolCode || filterSubject || filterDutyType
-                ? `No ${entityLabelPlural} match your search criteria. Try adjusting your filters.`
-                : `Get started by adding your first ${entityLabelSingular} to the system.`}
-            </p>
-            {!disableApiMutations && (
-              <button
-                onClick={handleAddTeacher}
-                className="btn btn-primary"
+                      <Menu
+                        align="end"
+                        items={[
+                          {
+                            label: isTemplateDownloading ? "Downloading template…" : "Download template",
+                            icon: Download,
+                            disabled: loading || isTemplateDownloading || isTemplateUploading,
+                            onSelect: downloadImportTemplate,
+                          },
+                          {
+                            label: isTemplateUploading ? "Importing…" : "Import filled template",
+                            icon: Upload,
+                            hint: ".csv or .xlsx",
+                            disabled: loading || isTemplateDownloading || isTemplateUploading,
+                            onSelect: () => templateInputRef.current?.click(),
+                          },
+                        ]}
+                        trigger={(props) => (
+                          <Button
+                            size="sm"
+                            icon={FileSpreadsheet}
+                            iconRight={ChevronDown}
+                            loading={isTemplateUploading || isTemplateDownloading}
+                            {...props}
+                          >
+                            Import
+                          </Button>
+                        )}
+                      />
+                    </>
+                  ) : null}
+                  {canAdd ? (
+                    <Button variant="primary" size="sm" icon={UserPlus} onClick={handleAddTeacher} disabled={loading}>
+                      Add {entityLabelSingular}
+                    </Button>
+                  ) : null}
+                </>
+              ) : undefined
+            }
+          />
+          {selectedCount > 0 ? (
+            <div className="stafflist-bulkbar" role="region" aria-label="Bulk actions">
+              <span className="is-num">
+                {selectedCount} {nounFor(selectedCount)} selected
+              </span>
+              <span className="stafflist-bulkbar__spacer" />
+              <Button variant="tertiary" size="sm" onClick={clearSelection} disabled={isBulkDeleting}>
+                Clear selection
+              </Button>
+              <Button
+                size="sm"
+                icon={Trash2}
+                loading={isBulkDeleting}
                 disabled={loading}
+                onClick={() => setDeleteTargetIds([...selectedTeacherList])}
               >
-                <svg
-                  className="w-5 h-5 mr-2"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-                  />
-                </svg>
-                Add {entityLabelSingularTitle}
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Pagination */}
-      {!hidePagination && !loading && pagination.totalPages > 1 && (
-        <div className="bg-white dark:bg-gray-800 px-4 py-3 border-t border-gray-200 dark:border-gray-700 sm:px-6">
-          <div className="flex items-center justify-between">
-            <div className="flex-1 flex justify-between sm:hidden">
-              <button
-                onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-                disabled={currentPage === 1}
-                className="relative inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Previous
-              </button>
-              <button
-                onClick={() => setCurrentPage((prev) => Math.min(prev + 1, pagination.totalPages))}
-                disabled={currentPage === pagination.totalPages}
-                className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Next
-              </button>
+                {isBulkDeleting ? "Deleting" : `Delete ${selectedCount} ${nounFor(selectedCount)}`}
+              </Button>
             </div>
-            <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-              <div>
-                <p className="text-sm text-gray-700 dark:text-gray-300">
-                  Showing{' '}
-                  <span className="font-medium">
-                    {(currentPage - 1) * 50 + 1}
-                  </span>{' '}
-                  to{' '}
-                  <span className="font-medium">
-                    {Math.min(currentPage * 50, pagination.totalItems)}
-                  </span>{' '}
-                  of{' '}
-                  <span className="font-medium">{pagination.totalItems}</span> results
-                </p>
-              </div>
-              <div>
-                <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
-                  <button
-                    onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-                    disabled={currentPage === 1}
-                    className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <span className="sr-only">Previous</span>
-                    <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
-                    </svg>
-                  </button>
+          ) : null}
+        </div>
 
-                  {Array.from({ length: pagination.totalPages }, (_, i) => i + 1).map((page) => (
-                    <button
-                      key={page}
-                      onClick={() => setCurrentPage(page)}
-                      className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${page === currentPage
-                        ? 'z-10 bg-blue-50 dark:bg-blue-900 border-blue-500 text-blue-600 dark:text-blue-400'
-                        : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
-                        }`}
+        <DataTable
+          caption={entityLabelPluralTitle}
+          columns={columns}
+          rows={loading ? [] : displayTeachers}
+          getRowKey={(teacher) => String(teacher.id || teacher._id)}
+          onRowClick={disableRowEdit ? undefined : handleEditTeacher}
+          loading={loading}
+          loadingLabel={`Loading ${entityLabelPlural}`}
+          maxHeight={hideStats ? "min(820px, calc(100vh - 220px))" : "min(720px, calc(100vh - 320px))"}
+          sort={hasUserSorted ? { key: sortField, direction: sortDirection } : null}
+          onSort={handleSort}
+          selection={{
+            isSelected: (teacher) => Boolean(selectedTeacherIds[getTeacherId(teacher)]),
+            onToggle: (teacher) => {
+              const id = getTeacherId(teacher);
+              toggleTeacherSelection(id, !selectedTeacherIds[id]);
+            },
+            allSelected: allVisibleSelected,
+            someSelected: selectedCount > 0,
+            onToggleAll: () => toggleSelectAllVisible(!allVisibleSelected),
+            rowLabel: (teacher) => `Select ${teacher.name}`,
+          }}
+          empty={
+            hasFilters ? (
+              <EmptyState
+                compact
+                icon={SearchX}
+                title={`No ${entityLabelPlural} match these filters`}
+                body="Try another name or ID, or clear the filters."
+                action={
+                  <Button size="sm" onClick={clearFilters}>
+                    Clear filters
+                  </Button>
+                }
+              />
+            ) : (
+              <EmptyState
+                compact
+                icon={Users}
+                title={`No ${entityLabelPlural} yet`}
+                body={
+                  !disableApiMutations
+                    ? `Add ${entityLabelPlural} one at a time, or download the template and import them all at once.`
+                    : `${entityLabelPluralTitle} you add will be listed here.`
+                }
+                action={
+                  !disableApiMutations ? (
+                    <Button variant="primary" size="sm" icon={UserPlus} onClick={handleAddTeacher} disabled={loading}>
+                      Add {entityLabelSingular}
+                    </Button>
+                  ) : undefined
+                }
+              />
+            )
+          }
+          footer={
+            !loading && displayTeachers.length > 0 ? (
+              !hidePagination && pagination.totalPages > 1 ? (
+                <>
+                  <span className="is-num">
+                    {formatCount((currentPage - 1) * 50 + 1)}–{formatCount(Math.min(currentPage * 50, pagination.totalItems))} of{" "}
+                    {formatCount(pagination.totalItems)} {entityLabelPlural} · page {currentPage} of {pagination.totalPages}
+                  </span>
+                  <span className="stafflist-pager">
+                    <Button
+                      size="sm"
+                      onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                      disabled={currentPage === 1}
                     >
-                      {page}
-                    </button>
-                  ))}
+                      Previous
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={() => setCurrentPage((prev) => Math.min(prev + 1, pagination.totalPages))}
+                      disabled={currentPage === pagination.totalPages}
+                    >
+                      Next
+                    </Button>
+                  </span>
+                </>
+              ) : (
+                <span className="is-num">
+                  {hiddenByLimit
+                    ? `Showing ${formatCount(displayTeachers.length)} of ${formatCount(filteredTeachers.length)} ${entityLabelPlural}`
+                    : `${formatCount(displayTeachers.length)} ${nounFor(displayTeachers.length)}`}
+                </span>
+              )
+            ) : null
+          }
+        />
+      </Card>
 
-                  <button
-                    onClick={() => setCurrentPage((prev) => Math.min(prev + 1, pagination.totalPages))}
-                    disabled={currentPage === pagination.totalPages}
-                    className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <span className="sr-only">Next</span>
-                    <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
-                    </svg>
-                  </button>
-                </nav>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <Dialog
+        open={deleteTargetIds !== null}
+        onClose={() => setDeleteTargetIds(null)}
+        tone="danger"
+        size="sm"
+        title={`Delete ${deleteCount} ${nounFor(deleteCount)}?`}
+        description={deleteDescription}
+        footer={
+          <>
+            <Button onClick={() => setDeleteTargetIds(null)}>Keep {nounFor(deleteCount)}</Button>
+            <Button
+              variant="danger"
+              icon={Trash2}
+              onClick={() => {
+                const ids = deleteTargetIds || [];
+                setDeleteTargetIds(null);
+                void handleBulkDelete(ids);
+              }}
+            >
+              Delete {deleteCount} {nounFor(deleteCount)}
+            </Button>
+          </>
+        }
+      />
 
-      {/* Modals */}
-      <AddTeacherModal
+      {/* Add / edit forms (opened through the teachers slice) */}
+      <StaffForm
+        mode="add"
         onSuccess={handleAddTeacherModalSuccess}
         entityLabelSingular={entityLabelSingular}
+        dutyTypeOptions={dutyTypeOptions}
+        enforceDesignationDutyRules={enforceDesignationDutyRules}
+        dutyTypeLabel={dutyLabel}
       />
-      <EditTeacherModal
+      <StaffForm
+        mode="edit"
+        entityLabelSingular={entityLabelSingular}
+        dutyTypeOptions={dutyTypeOptions}
+        enforceDesignationDutyRules={enforceDesignationDutyRules}
+        dutyTypeLabel={dutyLabel}
         onSuccess={(updated?: Teacher) => {
           invalidateTeachers()
           if (updated && onTeacherUpdated) onTeacherUpdated(updated)
         }}
       />
-      <ExportModal
-        isOpen={showExportModal}
-        onClose={() => setShowExportModal(false)}
-        title="Export Teachers"
-        onExport={handleExportData}
-        onFetchPreview={handleFetchPreview}
-        filterConfig={[
-          {
-            label: "Search",
-            key: "search",
-            type: "text",
-            placeholder: "Search by name, email, or employee ID",
-          },
-          {
-            label: "School Code",
-            key: "schoolCode",
-            type: "text",
-            placeholder: "Filter by school code",
-          },
-          {
-            label: "Subject",
-            key: "subject",
-            type: "text",
-            placeholder: "Filter by subject code/name",
-          },
-          {
-            label: "Designation",
-            key: "designation",
-            type: "text",
-            placeholder: "Filter by designation",
-          },
-          {
-            label: "Status",
-            key: "status",
-            type: "select",
-            options: [
-              { label: "All Status", value: "all" },
-              { label: "Active", value: "active" },
-              { label: "Inactive", value: "inactive" },
-            ],
-          },
-          {
-            label: "Joining Date From",
-            key: "joiningDateFrom",
-            type: "date",
-          },
-          {
-            label: "Joining Date To",
-            key: "joiningDateTo",
-            type: "date",
-          },
-          {
-            label: "Min Years of Experience",
-            key: "minExperience",
-            type: "number",
-            placeholder: "e.g., 5",
-          },
-        ]}
-      />
-    </div>
+    </Page>
   );
 };
 
