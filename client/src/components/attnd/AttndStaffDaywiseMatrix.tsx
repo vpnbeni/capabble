@@ -4,18 +4,17 @@ import { CalendarCheck, CalendarOff, Save, SearchX, Users } from 'lucide-react'
 import { DateSwitcher } from '@/components/attnd/DateSwitcher'
 import { AttndDayMatrix, AttndSummary, pluralize, type DayColumn } from '@/components/attnd/AttndMatrix'
 import { Button, Card, FilterBar, Page } from '@/components/ui'
+import { addMark, emptyCounts, isSundayDate, todayDateKey, markState, useAttndSettings } from '@/components/attnd/attndSettings'
+import { AttndSettingsButton } from '@/components/attnd/AttndSettingsDialog'
 import attndService, { type StaffDirectoryItem } from '@/services/attndService'
 import { getStaffTypeId, STAFF_TYPE_OPTIONS, type StaffTypeId } from '@/utils/attndStaffTypes'
 
-const todayDateKey = () => {
-  const now = new Date()
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
-}
 
-const isSundayDate = (dateKey: string) => new Date(`${dateKey}T00:00:00`).getDay() === 0
 
 export const AttndStaffDaywiseMatrix = () => {
+  const settings = useAttndSettings()
   const [selectedDate, setSelectedDate] = useState(todayDateKey)
+  const isFuture = selectedDate > todayDateKey()
   const [staffRows, setStaffRows] = useState<StaffDirectoryItem[]>([])
   const [absenceMap, setAbsenceMap] = useState<Record<string, boolean>>({})
   const [holiday, setHoliday] = useState(false)
@@ -58,12 +57,14 @@ export const AttndStaffDaywiseMatrix = () => {
 
   const rowCount = Math.max(0, ...columns.map((column) => staffByType[column.id]?.length || 0))
   const visibleStaff = columns.flatMap((column) => staffByType[column.id] || [])
-  const absentCount = holiday ? 0 : visibleStaff.filter((item) => absenceMap[item._id]).length
-  const presentCount = holiday ? 0 : visibleStaff.length - absentCount
+  const counts = visibleStaff.reduce(
+    (next, item) => addMark(next, markState(settings, { holiday, future: isFuture, absent: Boolean(absenceMap[item._id]) })),
+    emptyCounts()
+  )
 
   useEffect(() => {
-    setHoliday(isSundayDate(selectedDate))
-  }, [selectedDate])
+    setHoliday(settings.sundayHoliday && isSundayDate(selectedDate))
+  }, [selectedDate, settings.sundayHoliday])
 
   useEffect(() => {
     const loadData = async () => {
@@ -165,23 +166,25 @@ export const AttndStaffDaywiseMatrix = () => {
               </>
             }
             actions={
-              <Button
-                variant="primary"
-                size="sm"
-                icon={Save}
-                onClick={handleSave}
-                loading={saving}
-                disabled={loading || staffRows.length === 0}
-              >
-                Save attendance
-              </Button>
+              <>
+                <AttndSettingsButton />
+                <Button
+                  variant="primary"
+                  size="sm"
+                  icon={Save}
+                  onClick={handleSave}
+                  loading={saving}
+                  disabled={loading || staffRows.length === 0}
+                >
+                  Save attendance
+                </Button>
+              </>
             }
           />
           <AttndSummary
             working={holiday ? 0 : 1}
             workingLabel="working day"
-            present={presentCount}
-            absent={absentCount}
+            counts={counts}
             holidayHint="Use the Working day button to mark this date a holiday."
           />
         </div>
@@ -190,6 +193,7 @@ export const AttndStaffDaywiseMatrix = () => {
           peopleByColumn={staffByType}
           isAbsent={(id) => Boolean(absenceMap[id])}
           onToggleAbsent={(id) => toggleAbsent(id)}
+          future={isFuture}
           loading={loading}
           loadingLabel="Loading staff"
           empty={empty}

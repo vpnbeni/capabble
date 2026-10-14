@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react'
 import { Badge, EmptyState, cx } from '@/components/ui'
 import type { LucideIcon } from 'lucide-react'
 import { formatCount } from '@/components/students/studentFormat'
+import { markState, useAttndSettings, type MarkCounts } from './attndSettings'
 import './attnd.css'
 
 export type MatrixDay = { dayLabel: string; dateKey: string; weekday: string }
@@ -14,35 +15,56 @@ export const pluralize = (n: number, word: string) => `${formatCount(n)} ${word}
 export const AttndSummary: React.FC<{
   working: number
   workingLabel: string
-  present: number
-  absent: number
+  counts: MarkCounts
   holidayHint: string
-}> = ({ working, workingLabel, present, absent, holidayHint }) => (
-  <div className="attnd-summary">
-    <div className="attnd-summary__counts" aria-live="polite">
-      <Badge tone="neutral" dot={false} size="lg">
-        {pluralize(working, workingLabel)}
-      </Badge>
-      <Badge tone="success" size="lg">
-        {formatCount(present)} present
-      </Badge>
-      <Badge tone="danger" size="lg">
-        {formatCount(absent)} absent
-      </Badge>
+}> = ({ working, workingLabel, counts, holidayHint }) => {
+  const settings = useAttndSettings()
+  const showPresent = settings.unmarkedAs === 'present'
+  return (
+    <div className="attnd-summary">
+      <div className="attnd-summary__counts" aria-live="polite">
+        <Badge tone="neutral" dot={false} size="lg">
+          {pluralize(working, workingLabel)}
+        </Badge>
+        {showPresent || counts.present > 0 ? (
+          <Badge tone="success" size="lg">
+            {formatCount(counts.present)} present
+          </Badge>
+        ) : null}
+        <Badge tone="danger" size="lg">
+          {formatCount(counts.absent)} absent
+        </Badge>
+        {counts.unmarked > 0 ? (
+          <Badge tone="warning" size="lg">
+            {formatCount(counts.unmarked)} not marked
+          </Badge>
+        ) : null}
+        {counts.upcoming > 0 ? (
+          <Badge tone="info" size="lg" title="Future dates are not counted as present.">
+            {formatCount(counts.upcoming)} upcoming
+          </Badge>
+        ) : null}
+      </div>
+      <div className="attnd-legend">
+        {showPresent && settings.showPresentMark ? (
+          <span className="attnd-legend__item">
+            <input type="checkbox" className="attnd-mark is-present" checked={false} readOnly tabIndex={-1} aria-hidden="true" />
+            Present
+          </span>
+        ) : null}
+        <span className="attnd-legend__item">
+          <input type="checkbox" className="attnd-mark" checked readOnly tabIndex={-1} aria-hidden="true" />
+          Absent
+        </span>
+        <span className="attnd-legend__item">
+          <span className="attnd-legend__swatch is-holiday" aria-hidden="true" />
+          Holiday
+        </span>
+        <span className="attnd-legend__item">{holidayHint}</span>
+      </div>
     </div>
-    <div className="attnd-legend">
-      <span className="attnd-legend__item">
-        <input type="checkbox" className="attnd-mark" checked readOnly tabIndex={-1} aria-hidden="true" />
-        Absent
-      </span>
-      <span className="attnd-legend__item">
-        <span className="attnd-legend__swatch is-holiday" aria-hidden="true" />
-        Holiday
-      </span>
-      <span className="attnd-legend__item">{holidayHint}</span>
-    </div>
-  </div>
-)
+  )
+}
 
 const MatrixMessage: React.FC<{ colSpan: number; loading?: boolean; loadingLabel?: string; empty?: MatrixEmpty }> = ({
   colSpan,
@@ -95,6 +117,7 @@ export const AttndMonthMatrix: React.FC<{
   loadingLabel,
   empty,
 }) => {
+  const settings = useAttndSettings()
   const scrollRef = useRef<HTMLDivElement>(null)
   const todayRef = useRef<HTMLTableCellElement>(null)
   const colSpan = 3 + days.length
@@ -140,7 +163,7 @@ export const AttndMonthMatrix: React.FC<{
                   key={day.dateKey}
                   ref={today ? todayRef : undefined}
                   scope="col"
-                  className={cx('attnd-dayhead', holiday && 'is-holiday', today && 'is-today')}
+                  className={cx('attnd-dayhead', holiday && 'is-holiday', today && 'is-today', day.dateKey > todayKey && 'is-future')}
                   aria-current={today ? 'date' : undefined}
                 >
                   <button
@@ -174,19 +197,22 @@ export const AttndMonthMatrix: React.FC<{
                 {days.map((day) => {
                   const holiday = isHoliday(day.dateKey)
                   const today = day.dateKey === todayKey
+                  const future = day.dateKey > todayKey
+                  const state = markState(settings, { holiday, future, absent: isAbsent(person._id, day.dateKey) })
+                  const locked = holiday || (future && !settings.allowFutureMarking)
                   return (
                     <td
                       key={day.dateKey}
-                      className={cx('attnd-cell', holiday && 'is-holiday', today && 'is-today')}
+                      className={cx('attnd-cell', holiday && 'is-holiday', today && 'is-today', future && 'is-future')}
                     >
                       <input
                         type="checkbox"
-                        className="attnd-mark"
-                        checked={!holiday && isAbsent(person._id, day.dateKey)}
-                        disabled={holiday}
+                        className={cx('attnd-mark', state === 'present' && settings.showPresentMark && 'is-present')}
+                        checked={state === 'absent'}
+                        disabled={locked}
                         onChange={() => onToggleAbsent(person._id, day.dateKey)}
-                        title={holiday ? `${day.dayLabel} ${day.weekday} is a holiday` : `Absent on ${day.dayLabel} ${day.weekday}`}
-                        aria-label={`${person.name || 'Unnamed'} absent on ${day.weekday} ${day.dayLabel}`}
+                        title={cellTitle(state, `${day.dayLabel} ${day.weekday}`, locked)}
+                        aria-label={`${person.name || 'Unnamed'}, ${day.weekday} ${day.dayLabel}: ${STATE_LABEL[state]}. Tick for absent.`}
                       />
                     </td>
                   )
@@ -198,6 +224,21 @@ export const AttndMonthMatrix: React.FC<{
       </table>
     </div>
   )
+}
+
+const STATE_LABEL = {
+  absent: 'absent',
+  present: 'present',
+  unmarked: 'not marked',
+  upcoming: 'upcoming',
+  holiday: 'holiday',
+} as const
+
+const cellTitle = (state: keyof typeof STATE_LABEL, when: string, locked: boolean) => {
+  if (state === 'holiday') return `${when} is a holiday`
+  if (state === 'upcoming' && locked) return `${when} is in the future`
+  if (state === 'absent') return `Absent on ${when}${locked ? '' : '. Click to clear.'}`
+  return `${STATE_LABEL[state][0].toUpperCase()}${STATE_LABEL[state].slice(1)} on ${when}. Click to mark absent.`
 }
 
 export type DayColumn = {
@@ -219,10 +260,13 @@ export const AttndDayMatrix: React.FC<{
   peopleByColumn: Record<string, MatrixPerson[]>
   isAbsent: (personId: string) => boolean
   onToggleAbsent: (personId: string, columnKey: string) => void
+  /** The whole grid is for a date after today. */
+  future?: boolean
   loading?: boolean
   loadingLabel: string
   empty?: MatrixEmpty | null
-}> = ({ columns, peopleByColumn, isAbsent, onToggleAbsent, loading, loadingLabel, empty }) => {
+}> = ({ columns, peopleByColumn, isAbsent, onToggleAbsent, future = false, loading, loadingLabel, empty }) => {
+  const settings = useAttndSettings()
   const rowCount = Math.max(0, ...columns.map((column) => peopleByColumn[column.key]?.length || 0))
   const colSpan = 1 + Math.max(columns.length, 1)
 
@@ -267,20 +311,21 @@ export const AttndDayMatrix: React.FC<{
                 {columns.map((column) => {
                   const person = peopleByColumn[column.key]?.[index]
                   if (!person) return <td key={column.key} className={cx('attnd-slotcell', column.holiday && 'is-holiday')} />
-                  const absent = !column.holiday && isAbsent(person._id)
+                  const state = markState(settings, { holiday: column.holiday, future, absent: isAbsent(person._id) })
+                  const locked = column.holiday || (future && !settings.allowFutureMarking)
                   return (
                     <td key={column.key} className={cx('attnd-slotcell', column.holiday && 'is-holiday')}>
                       <label
-                        className={cx('attnd-slot', absent && 'is-absent', column.holiday && 'is-disabled')}
+                        className={cx('attnd-slot', state === 'absent' && 'is-absent', locked && 'is-disabled')}
                         title={person.name || undefined}
                       >
                         <input
                           type="checkbox"
-                          className="attnd-mark"
-                          checked={absent}
-                          disabled={column.holiday}
+                          className={cx('attnd-mark', state === 'present' && settings.showPresentMark && 'is-present')}
+                          checked={state === 'absent'}
+                          disabled={locked}
                           onChange={() => onToggleAbsent(person._id, column.key)}
-                          aria-label={`${person.name || 'Unnamed'} absent`}
+                          aria-label={`${person.name || 'Unnamed'}: ${STATE_LABEL[state]}. Tick for absent.`}
                         />
                         <span className="attnd-slot__name">{person.name || '—'}</span>
                       </label>

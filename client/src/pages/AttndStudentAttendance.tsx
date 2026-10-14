@@ -5,6 +5,8 @@ import { MonthSwitcher, formatMonthLabel } from '@/components/attnd/MonthSwitche
 import { AttndDaywiseMatrix } from '@/components/attnd/AttndDaywiseMatrix'
 import { AttndMonthMatrix, AttndSummary, pluralize } from '@/components/attnd/AttndMatrix'
 import { Button, Card, FilterBar, Page, Select } from '@/components/ui'
+import { addMark, emptyCounts, isSundayDate, markState, useAttndSettings } from '@/components/attnd/attndSettings'
+import { AttndSettingsButton } from '@/components/attnd/AttndSettingsDialog'
 import { sortSectionNames } from '@/constants/studentClasses'
 import { useAttndMatrixMode } from '@/contexts/AttndMatrixModeContext'
 import attndService, {
@@ -18,9 +20,9 @@ type DayCategoryMap = Record<string, DayCategory>
 
 const currentMonthKey = () => new Date().toISOString().slice(0, 7)
 
-const isSundayDate = (dateKey: string) => new Date(`${dateKey}T00:00:00`).getDay() === 0
 
-const defaultDayCategory = (dateKey: string): DayCategory => (isSundayDate(dateKey) ? 'non-academic' : 'academic')
+const defaultDayCategory = (dateKey: string, sundayHoliday: boolean): DayCategory =>
+  sundayHoliday && isSundayDate(dateKey) ? 'non-academic' : 'academic'
 
 const getDaysInMonth = (month: string) => {
   const [yearValue, monthValue] = month.split('-').map(Number)
@@ -36,6 +38,7 @@ const getDaysInMonth = (month: string) => {
 
 const AttndStudentAttendance: React.FC = () => {
   const { mode } = useAttndMatrixMode()
+  const settings = useAttndSettings()
   const [selectedMonth, setSelectedMonth] = useState(currentMonthKey())
   const [classOptions, setClassOptions] = useState<StudentClassOption[]>([])
   const [selectedClass, setSelectedClass] = useState('')
@@ -110,9 +113,6 @@ const AttndStudentAttendance: React.FC = () => {
       setAbsenceMap(nextAbsence)
 
       const nextDays: DayCategoryMap = {}
-      days.forEach((day) => {
-        nextDays[day.dateKey] = defaultDayCategory(day.dateKey)
-      })
       attendance.daySettings.forEach((item) => {
         if (!item.attendanceDate) return
         nextDays[item.attendanceDate] = item.category === 'non-academic' ? 'non-academic' : 'academic'
@@ -144,21 +144,25 @@ const AttndStudentAttendance: React.FC = () => {
   }, [studentRows, searchQuery])
 
   const isHoliday = (dateKey: string) =>
-    (dayCategoryMap[dateKey] || defaultDayCategory(dateKey)) === 'non-academic'
-  const workingDays = useMemo(() => days.filter((day) => !isHoliday(day.dateKey)), [days, dayCategoryMap])
+    (dayCategoryMap[dateKey] || defaultDayCategory(dateKey, settings.sundayHoliday)) === 'non-academic'
+  const workingDays = useMemo(() => days.filter((day) => !isHoliday(day.dateKey)), [days, dayCategoryMap, settings.sundayHoliday])
 
-  const absentCount = useMemo(
-    () =>
-      filteredStudents.reduce((sum, student) => {
-        const absentDays = workingDays.reduce(
-          (dayCount, day) => dayCount + (absenceMap[student._id]?.[day.dateKey] ? 1 : 0),
-          0
+  const counts = useMemo(() => {
+    const next = emptyCounts()
+    filteredStudents.forEach((person) =>
+      workingDays.forEach((day) =>
+        addMark(
+          next,
+          markState(settings, {
+            holiday: false,
+            future: day.dateKey > todayKey,
+            absent: Boolean(absenceMap[person._id]?.[day.dateKey]),
+          })
         )
-        return sum + absentDays
-      }, 0),
-    [filteredStudents, workingDays, absenceMap]
-  )
-  const presentCount = filteredStudents.length * workingDays.length - absentCount
+      )
+    )
+    return next
+  }, [filteredStudents, workingDays, absenceMap, settings, todayKey])
 
   const toggleAbsent = (studentId: string, dateKey: string) => {
     if (isHoliday(dateKey)) return
@@ -290,23 +294,25 @@ const AttndStudentAttendance: React.FC = () => {
               </>
             }
             actions={
-              <Button
-                variant="primary"
-                size="sm"
-                icon={Save}
-                onClick={handleSave}
-                loading={saving}
-                disabled={loading || studentRows.length === 0}
-              >
-                Save attendance
-              </Button>
+              <>
+                <AttndSettingsButton />
+                <Button
+                  variant="primary"
+                  size="sm"
+                  icon={Save}
+                  onClick={handleSave}
+                  loading={saving}
+                  disabled={loading || studentRows.length === 0}
+                >
+                  Save attendance
+                </Button>
+              </>
             }
           />
           <AttndSummary
             working={workingDays.length}
             workingLabel="working day"
-            present={presentCount}
-            absent={absentCount}
+            counts={counts}
             holidayHint="Click a date to switch working day or holiday."
           />
         </div>
