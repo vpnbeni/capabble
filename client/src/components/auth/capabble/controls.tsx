@@ -1,4 +1,5 @@
 import React, { forwardRef, useId } from 'react'
+import { Link } from 'react-router-dom'
 import { AlertCircle as CircleAlert, CheckCircle2 as CircleCheck, type LucideIcon } from 'lucide-react'
 
 const ICON = { size: 16, strokeWidth: 1.75, 'aria-hidden': true } as const
@@ -64,17 +65,44 @@ TextField.displayName = 'TextField'
 
 export const Checkbox: React.FC<{
   label: string
+  description?: string
   checked: boolean
   onChange: (checked: boolean) => void
-}> = ({ label, checked, onChange }) => (
-  <label className="cb-check">
-    <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
-    {label}
-  </label>
+}> = ({ label, description, checked, onChange }) => {
+  const descId = useId()
+  return (
+    <label className="cb-check" data-described={description ? '' : undefined}>
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        aria-describedby={description ? descId : undefined}
+      />
+      {description ? (
+        <span className="cb-check-text">
+          <span>{label}</span>
+          <span className="cb-check-desc" id={descId}>
+            {description}
+          </span>
+        </span>
+      ) : (
+        label
+      )}
+    </label>
+  )
+}
+
+export const Badge: React.FC<{ tone?: 'neutral' | 'info'; children: React.ReactNode }> = ({
+  tone = 'neutral',
+  children,
+}) => (
+  <span className="cb-badge" data-tone={tone}>
+    {children}
+  </span>
 )
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary'
+  variant?: 'primary' | 'secondary' | 'tertiary'
   loading?: boolean
   loadingLabel?: string
   iconRight?: LucideIcon
@@ -103,6 +131,18 @@ export const Button: React.FC<ButtonProps> = ({
     <span>{loading && loadingLabel ? loadingLabel : children}</span>
     {!loading && Right ? <Right {...ICON} /> : null}
   </button>
+)
+
+/** A link styled as a primary button (status screens: "Sign in", "Send a new code"). */
+export const LinkButton: React.FC<{ to: string; iconRight?: LucideIcon; children: React.ReactNode }> = ({
+  to,
+  iconRight: Right,
+  children,
+}) => (
+  <Link to={to} className="cb-btn cb-btn-primary">
+    <span>{children}</span>
+    {Right ? <Right {...ICON} /> : null}
+  </Link>
 )
 
 export type StrengthLevel = 1 | 2 | 3

@@ -396,6 +396,12 @@
   --danger-border: #FECDD3;
   --danger-solid: #E11D48;
   --warning-solid: #D97706;
+  --warning-soft: #FFFBEB;
+  --warning-ink: #B45309;
+  --info-soft: #E3F5FE;
+  --info-ink: #166989;
+  --neutral-soft: #EDEFF0;
+  --neutral-ink: #383B3D;
   --success-ink: #047857;
   --success-soft: #ECFDF5;
   --success-border: #A7F3D0;
@@ -426,6 +432,12 @@
   --danger-border: #5E2433;
   --danger-solid: #FB7185;
   --warning-solid: #FBBF24;
+  --warning-soft: #2E2410;
+  --warning-ink: #FCD34D;
+  --info-soft: #0B2633;
+  --info-ink: #89D6FB;
+  --neutral-soft: #2A2D2F;
+  --neutral-ink: #C2C9CC;
   --success-ink: #6EE7B7;
   --success-soft: #0E2A22;
   --success-border: #1F5140;

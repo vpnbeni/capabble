@@ -1,0 +1,86 @@
+[
+  {
+    "id": "signing-in",
+    "icon": "log-in",
+    "title": "Signing in",
+    "blurb": "Passwords, reset emails and staying signed in",
+    "items": [
+      {
+        "q": "I forgot my password",
+        "a": "On the sign-in page, choose Forgot password? and enter the email you sign in with. We send you a link to set a new password. The link works for 30 minutes."
+      },
+      {
+        "q": "I didn't get the reset email",
+        "a": "Check your spam or promotions folder and give it a minute. You can resend the link after 45 seconds. If it still doesn't arrive, ask your school's Capabble admin to check the email on your account."
+      },
+      {
+        "q": "What does 'Keep me signed in' do?",
+        "a": "You stay signed in on that device until you sign out. Don't tick it on a shared or staff-room computer."
+      },
+      {
+        "q": "Do I need a separate sign-in for each module?",
+        "a": "No. One Capabble account opens every module your school has turned on, such as Exams, Exam centre and Finance."
+      }
+    ]
+  },
+  {
+    "id": "create-account",
+    "icon": "building-2",
+    "title": "Your school's account",
+    "blurb": "Setting up your institution for the first time",
+    "items": [
+      {
+        "q": "Who should create our school's account?",
+        "a": "Usually the principal or an office administrator. A school needs only one workspace account."
+      },
+      {
+        "q": "Where do I find our institution code?",
+        "a": "It's the 5-digit code your board gave your school. You'll find it on your affiliation letter and in your board's records."
+      },
+      {
+        "q": "Where do I find our affiliation no.?",
+        "a": "It's the 6-digit number on your school's board affiliation certificate."
+      },
+      {
+        "q": "It says our institution code already has an account",
+        "a": "Someone at your school has already set it up. Ask your principal or office who created it. If it was you, use Forgot password? on the sign-in page."
+      }
+    ]
+  },
+  {
+    "id": "modules",
+    "icon": "layout-grid",
+    "title": "Modules and access",
+    "blurb": "What you can open and why something is missing",
+    "items": [
+      {
+        "q": "Why can't I see a module?",
+        "a": "Your school chooses which modules are turned on. If you need one that's missing, ask your school's Capabble admin."
+      },
+      {
+        "q": "Which modules does Capabble have?",
+        "a": "Students, Staff, Attendance, Academics, Timetable, Activities, Clinic, Assets, Finance, Transport, Exams and Exam centre."
+      }
+    ]
+  },
+  {
+    "id": "security",
+    "icon": "shield-check",
+    "title": "Password and security",
+    "blurb": "Keeping your account and school data safe",
+    "items": [
+      {
+        "q": "How do I make a strong password?",
+        "a": "Use at least 12 characters with letters, numbers and a symbol, and don't reuse a password from another website."
+      },
+      {
+        "q": "I think someone else used my account",
+        "a": "Reset your password straight away, then tell your school's Capabble admin and Capabble support."
+      },
+      {
+        "q": "How is our school's data looked after?",
+        "a": "Our privacy policy explains what we collect, why we collect it and how long we keep it. You can open it from the footer of any page."
+      }
+    ]
+  }
+]

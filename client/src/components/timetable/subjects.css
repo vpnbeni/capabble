@@ -1,0 +1,38 @@
+/* Subjects (Students + Timetable) — page-specific layout on top of the Capabble design system. Tokens only. */
+
+/* ---------- List cards: toolbar above a flush table ---------- */
+.cb-app .tt-subj-toolbar { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-1) var(--space-5) var(--space-4); }
+@media (max-width: 640px) { .cb-app .tt-subj-toolbar { padding: var(--space-1) var(--space-4) var(--space-3); } }
+.cb-app .tt-subj-card .cb-table-wrap { border-top: 1px solid var(--border); }
+.cb-app .tt-subj-card__actions { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+.cb-app .tt-subj-bulkbar { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; padding: var(--space-2) var(--space-3) var(--space-2) var(--space-4); background: var(--accent-soft); color: var(--accent-soft-ink); border-radius: var(--radius-md); font: 500 13px/18px var(--font-sans); }
+.cb-app .tt-subj-bulkbar__spacer { flex: 1; }
+.cb-app .tt-subj-badges { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+
+/* ---------- Subject matrix: subject columns stay put while class columns scroll ---------- */
+.cb-app .tt-subj-matrix .cb-table { width: max-content; min-width: 100%; }
+.cb-app .tt-subj-matrix .cb-table th:nth-child(-n + 4),
+.cb-app .tt-subj-matrix .cb-table td:nth-child(-n + 4) { position: sticky; z-index: 2; box-sizing: border-box; background: var(--surface); }
+.cb-app .tt-subj-matrix .cb-table th:nth-child(-n + 4) { z-index: 3; background: var(--surface-sunken); }
+.cb-app .tt-subj-matrix .cb-table tbody tr:hover td:nth-child(-n + 4) { background: var(--surface-hover); }
+.cb-app .tt-subj-matrix .cb-table tbody tr.is-selected td:nth-child(-n + 4) { background: var(--accent-soft); }
+.cb-app .tt-subj-matrix .cb-table :is(th, td):nth-child(1) { left: 0; width: 48px; min-width: 48px; max-width: 48px; padding-left: var(--space-4); }
+.cb-app .tt-subj-matrix .cb-table :is(th, td):nth-child(2) { left: 48px; width: 220px; min-width: 220px; max-width: 220px; }
+.cb-app .tt-subj-matrix .cb-table :is(th, td):nth-child(3) { left: 268px; width: 132px; min-width: 132px; max-width: 132px; }
+.cb-app .tt-subj-matrix .cb-table :is(th, td):nth-child(4) { left: 400px; width: 56px; min-width: 56px; max-width: 56px; box-shadow: inset -1px 0 0 var(--border); }
+.cb-app .tt-subj-matrix .cb-table td.is-center .cb-check { justify-content: center; align-items: center; }
+.cb-app .tt-subj-matrix .cb-table th.is-center { text-align: center; min-width: 72px; }
+.cb-app .tt-subj-name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; color: var(--ink); }
+.cb-app .tt-subj-matrix .cb-tcard__fields { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+/* ---------- Common period form: section picker ---------- */
+.cb-app .tt-subj-sections { display: flex; flex-direction: column; gap: var(--space-2); border: 0; margin: 0; padding: 0; min-width: 0; }
+.cb-app .tt-subj-sections__label { font: 500 13px/18px var(--font-sans); color: var(--ink); padding: 0; }
+.cb-app .tt-subj-sections__list { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-5); }
+.cb-app .tt-subj-sections__hint { font-size: 12px; line-height: 16px; color: var(--ink-muted); }
+.cb-app .tt-subj-form { display: flex; flex-direction: column; gap: var(--space-4); }
+
+/* ---------- Row menus: keep an open menu above the sticky cells of later rows ---------- */
+.cb-app .tt-subj-matrix .cb-table td:has(.cb-menu__panel) { z-index: 5; }
+/* Short lists don't need to scroll sideways, so let row menus spill out of the table. */
+.cb-app .tt-subj-list .cb-table-scroll { overflow: visible; }
