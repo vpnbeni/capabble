@@ -20,10 +20,10 @@ const useEscape = (open: boolean, onClose?: () => void) => {
  * Portals to document.body inside a .cb-app wrapper (so tokens apply), fixed inset-0 z-[100]
  * with an absolute backdrop, scroll lock, Escape and a focus trap — per the overlay rules.
  */
-const OverlayShell: React.FC<{
+export const OverlayShell: React.FC<{
   open: boolean
   onClose?: () => void
-  variant: 'dialog' | 'sheet'
+  variant: 'dialog' | 'sheet' | 'command'
   children: (trapRef: React.RefObject<HTMLDivElement>) => React.ReactNode
 }> = ({ open, onClose, variant, children }) => {
   useEscape(open, onClose)
@@ -32,7 +32,7 @@ const OverlayShell: React.FC<{
   if (!open || typeof document === 'undefined') return null
   return createPortal(
     <div className="cb-app cb-portal">
-      <div className={cx('cb-overlay', variant === 'sheet' && 'cb-overlay--sheet')}>
+      <div className={cx('cb-overlay', variant !== 'dialog' && `cb-overlay--${variant}`)}>
         <div className="cb-overlay__backdrop" aria-hidden="true" onMouseDown={() => onClose?.()} />
         {children(trapRef)}
       </div>

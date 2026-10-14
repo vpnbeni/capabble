@@ -177,6 +177,11 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config
 
+    // Requests aborted by the caller (e.g. a superseded search) are not errors.
+    if (axios.isCancel(error)) {
+      return Promise.reject(error)
+    }
+
     // Handle network errors
     if (!error.response) {
       showApiErrorToast('Network error. Please check your connection.')
@@ -302,6 +307,7 @@ api.interceptors.response.use(
 
       case 500:
         // Internal Server Error
+        if ((error.config as any)?._silent === true) break
         showApiErrorToast(await extractApiErrorMessage(data, 'Server error. Please try again later.'))
         break
 

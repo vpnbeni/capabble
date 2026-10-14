@@ -1,0 +1,82 @@
+/* Timetable › Teacher wise and Timetable › Substitution — page layout on top of the Capabble design system. Tokens only. */
+
+/* ---------- Toolbar (search + version) ---------- */
+.cb-app .ttw-toolbar { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-4) var(--space-5); }
+.cb-app .ttw-toolbar__note { margin: 0; font-size: 13px; line-height: 18px; color: var(--ink-muted); }
+.cb-app .ttw-version { min-width: 240px; }
+@media (max-width: 640px) {
+  .cb-app .ttw-toolbar { padding: var(--space-3) var(--space-4); }
+  .cb-app .ttw-version { min-width: 0; width: 100%; }
+}
+
+/* ---------- Teacher card header ---------- */
+.cb-app .ttw-teacher-title { display: inline-flex; align-items: center; gap: var(--space-3); min-width: 0; }
+.cb-app .ttw-teacher-title__name { overflow-wrap: anywhere; }
+.cb-app .ttw-teacher-meta { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-2); flex-wrap: wrap; }
+@media (max-width: 760px) {
+  .cb-app .ttw-teacher-card > .cb-card__head { flex-wrap: wrap; }
+  .cb-app .ttw-teacher-card > .cb-card__head > .cb-card__action { flex: 1 1 100%; }
+  .cb-app .ttw-teacher-card .ttw-teacher-meta { justify-content: flex-start; }
+}
+
+/* ---------- Weekly grid (day × period) ---------- */
+.cb-app .ttw-grid-scroll { overflow-x: auto; border-top: 1px solid var(--border); }
+.cb-app .ttw-grid { width: 100%; min-width: 720px; border-collapse: separate; border-spacing: 0; table-layout: fixed; font-size: 13px; line-height: 18px; color: var(--ink); font-variant-numeric: tabular-nums; }
+.cb-app .ttw-grid th, .cb-app .ttw-grid td { background: var(--surface); border-bottom: 1px solid var(--border); border-right: 1px solid var(--border); }
+.cb-app .ttw-grid tr > *:last-child { border-right: 0; }
+.cb-app .ttw-grid tbody tr:last-child > * { border-bottom: 0; }
+.cb-app .ttw-grid thead th { background: var(--surface-sunken); color: var(--ink-subtle); font: 500 12px/16px var(--font-sans); padding: var(--space-2) var(--space-2); text-align: center; white-space: nowrap; }
+.cb-app .ttw-grid thead .ttw-grid__time th { padding-top: 0; font-weight: 400; color: var(--ink-muted); font-size: 11px; line-height: 14px; }
+.cb-app .ttw-grid thead tr:first-child th { padding-bottom: var(--space-1); }
+.cb-app .ttw-grid tbody td { padding: var(--space-1); height: 56px; vertical-align: middle; text-align: center; }
+.cb-app .ttw-grid tbody tr:hover > * { background: var(--surface-hover); }
+
+/* Sticky day column so the day stays in view while periods scroll sideways. */
+.cb-app .ttw-grid .ttw-grid__day { position: sticky; left: 0; z-index: 1; width: 72px; text-align: left; padding-left: var(--space-5); }
+.cb-app .ttw-grid tbody .ttw-grid__day { font: 600 12px/16px var(--font-sans); color: var(--ink-muted); letter-spacing: 0.02em; }
+@media (max-width: 640px) {
+  .cb-app .ttw-grid .ttw-grid__day { padding-left: var(--space-4); width: 60px; }
+}
+
+/* Filled period: class identity tint from the chart palette, words on ink. */
+.cb-app .ttw-slot { display: flex; flex-direction: column; justify-content: center; gap: 2px; min-height: 46px; padding: var(--space-1) var(--space-2); border-radius: var(--radius-sm); border-left: 3px solid var(--tile, var(--accent)); text-align: left; overflow: hidden; }
+.cb-app .ttw-slot__class { font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cb-app .ttw-slot__subject { font-size: 12px; line-height: 16px; color: var(--ink-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.cb-app .ttw-tint--c1 { --tile: var(--chart-1); background: color-mix(in srgb, var(--chart-1) 14%, var(--surface)); }
+.cb-app .ttw-tint--c2 { --tile: var(--chart-2); background: color-mix(in srgb, var(--chart-2) 16%, var(--surface)); }
+.cb-app .ttw-tint--c3 { --tile: var(--chart-3); background: color-mix(in srgb, var(--chart-3) 18%, var(--surface)); }
+.cb-app .ttw-tint--c4 { --tile: var(--chart-4); background: color-mix(in srgb, var(--chart-4) 14%, var(--surface)); }
+.cb-app .ttw-tint--c5 { --tile: var(--chart-5); background: color-mix(in srgb, var(--chart-5) 14%, var(--surface)); }
+.cb-app .ttw-tint--c6 { --tile: var(--chart-6); background: color-mix(in srgb, var(--chart-6) 14%, var(--surface)); }
+
+/* Free period: quiet, still says "Free" in words. */
+.cb-app .ttw-free { display: inline-flex; align-items: center; justify-content: center; }
+.cb-app .ttw-free .cb-badge { font-size: 11px; }
+
+/* ---------- Substitution matrix ---------- */
+.cb-app .ttw-subs-scroll { overflow-x: auto; border-top: 1px solid var(--border); }
+.cb-app .ttw-subs { width: 100%; min-width: 720px; border-collapse: separate; border-spacing: 0; font-size: 13px; line-height: 18px; color: var(--ink); font-variant-numeric: tabular-nums; }
+.cb-app .ttw-subs th, .cb-app .ttw-subs td { background: var(--surface); border-bottom: 1px solid var(--border); }
+.cb-app .ttw-subs tbody tr:last-child > * { border-bottom: 0; }
+.cb-app .ttw-subs thead th { position: sticky; top: 0; z-index: 2; background: var(--surface-sunken); color: var(--ink-subtle); font: 500 12px/16px var(--font-sans); padding: var(--space-2) var(--space-3); text-align: center; white-space: nowrap; }
+.cb-app .ttw-subs tbody td { height: var(--row-compact); padding: var(--space-2) var(--space-3); vertical-align: middle; text-align: center; }
+.cb-app .ttw-subs tbody tr:hover > * { background: var(--surface-hover); }
+.cb-app .ttw-subs tbody tr.is-marked > * { background: var(--accent-soft); }
+.cb-app .ttw-subs .cb-check { justify-content: center; align-items: center; }
+.cb-app .ttw-subs .cb-check__box { margin-top: 0; }
+
+.cb-app .ttw-subs .ttw-subs__no { box-sizing: border-box; position: sticky; left: 0; z-index: 1; width: 56px; min-width: 56px; text-align: left; padding-left: var(--space-5); color: var(--ink-muted); }
+.cb-app .ttw-subs .ttw-subs__name { box-sizing: border-box; position: sticky; left: 56px; z-index: 1; min-width: 180px; text-align: left; border-right: 1px solid var(--border); }
+.cb-app .ttw-subs thead .ttw-subs__no, .cb-app .ttw-subs thead .ttw-subs__name { z-index: 3; }
+.cb-app .ttw-subs__teacher { font-weight: 500; color: var(--ink); }
+.cb-app .ttw-subs__short { font-size: 12px; line-height: 16px; color: var(--ink-muted); }
+.cb-app .ttw-subs th:last-child, .cb-app .ttw-subs td:last-child { padding-right: var(--space-5); }
+@media (max-width: 640px) {
+  .cb-app .ttw-subs .ttw-subs__no { padding-left: var(--space-4); width: 44px; min-width: 44px; }
+  .cb-app .ttw-subs .ttw-subs__name { left: 44px; min-width: 132px; }
+  .cb-app .ttw-subs th:last-child, .cb-app .ttw-subs td:last-child { padding-right: var(--space-4); }
+}
+
+/* Three summary cards fill the row instead of leaving a gap. */
+@media (min-width: 1024px) { .cb-app .ttw-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); } }

@@ -1,12 +1,44 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react'
-import { Document, Page, pdfjs } from 'react-pdf'
+import { Document, Page as PdfPage, pdfjs } from 'react-pdf'
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 import toast from 'react-hot-toast'
+import {
+  ArrowDown,
+  ArrowUp,
+  BellRing,
+  BookOpen,
+  Clock,
+  Coffee,
+  FileText,
+  History,
+  Link2,
+  Plus,
+  Save,
+  Timer,
+  Trash2,
+} from 'lucide-react'
 import { useAcademicSession } from '@/contexts/AcademicSessionContext'
 import bellTimingsService, {
   type BellTimingsPayload,
   type BellTimingVersionSummary,
 } from '@/services/bellTimingsService'
+import {
+  Badge,
+  Banner,
+  Button,
+  Card,
+  DataTable,
+  Dialog,
+  EmptyState,
+  Page,
+  Select,
+  StatCard,
+  TextField,
+  cx,
+  formatDate,
+  type DataTableColumn,
+} from '@/components/ui'
+import '@/components/timetable/bell-timings.css'
 
 pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl
 
@@ -251,6 +283,8 @@ const BellTimings: React.FC = () => {
   const [showPreviewDialog, setShowPreviewDialog] = useState(false)
   const [previewPageCount, setPreviewPageCount] = useState(0)
   const [previewRenderError, setPreviewRenderError] = useState<string | null>(null)
+  /* ── View-only state: delete-version confirmation ── */
+  const [confirmDeleteVersion, setConfirmDeleteVersion] = useState(false)
 
   /* ── Sync session from global academic session selector ── */
   useEffect(() => {
@@ -522,411 +556,465 @@ const BellTimings: React.FC = () => {
 
   const totalMinutes = rows.reduce((sum, r) => sum + r.duration, 0)
 
+  const periodCount = rows.filter(r => r.type === 'period').length
+  const breakCount = rows.filter(r => r.type === 'break').length
+  const dayStart = computedRows.length > 0 ? to12h(computedRows[0].from) : null
+  const dayEnd = computedRows.length > 0 ? to12h(computedRows[computedRows.length - 1].to) : null
+  const selectedVersion = versions.find((version) => version._id === selectedVersionId) || null
+
+  /* ── Bell schedule columns (kept above any return) ── */
+  const scheduleColumns = useMemo<DataTableColumn<ComputedRow & { index: number }>[]>(() => [
+    {
+      key: 'label',
+      header: 'Period',
+      mobile: 'title',
+      interactive: true,
+      render: (row) => (
+        <TextField
+          size="sm"
+          value={row.label}
+          onChange={e => updateRow(row.id, { label: e.target.value })}
+          aria-label={`Label for row ${row.index + 1}`}
+          className={cx('tbt-label', row.type === 'break' && 'is-break')}
+        />
+      ),
+    },
+    {
+      key: 'type',
+      header: 'Type',
+      interactive: true,
+      render: (row) => (
+        <Select
+          size="sm"
+          value={row.type}
+          onChange={e => updateRow(row.id, { type: e.target.value === 'break' ? 'break' : 'period' })}
+          options={[
+            { value: 'period', label: 'Period' },
+            { value: 'break', label: 'Break' },
+          ]}
+          aria-label={`Type for ${row.label || `row ${row.index + 1}`}`}
+          className="tbt-type"
+        />
+      ),
+    },
+    {
+      key: 'from',
+      header: 'From',
+      numeric: true,
+      render: (row) => <span className="tbt-time">{to12h(row.from)}</span>,
+    },
+    {
+      key: 'to',
+      header: 'To',
+      numeric: true,
+      render: (row) => <span className="tbt-time">{to12h(row.to)}</span>,
+    },
+    {
+      key: 'duration',
+      header: 'Duration',
+      interactive: true,
+      render: (row) => (
+        <TextField
+          size="sm"
+          type="number"
+          min={1}
+          max={480}
+          inputMode="numeric"
+          value={row.duration || ''}
+          onChange={e => handleDurationChange(row.id, e.target.value)}
+          suffix="min"
+          aria-label={`Duration in minutes for ${row.label || `row ${row.index + 1}`}`}
+          className={cx('tbt-duration', row.type === 'break' && 'is-break')}
+        />
+      ),
+    },
+    {
+      key: 'actions',
+      header: <span className="cb-visually-hidden">Actions</span>,
+      headerLabel: 'Actions',
+      align: 'right',
+      mobile: 'aside',
+      interactive: true,
+      render: (row) => (
+        <div className="tbt-row-actions">
+          <Button
+            variant="tertiary"
+            size="sm"
+            icon={ArrowUp}
+            onClick={() => moveRow(row.id, -1)}
+            disabled={row.index === 0}
+            aria-label={`Move ${row.label || 'row'} up`}
+            title="Move up"
+          />
+          <Button
+            variant="tertiary"
+            size="sm"
+            icon={ArrowDown}
+            onClick={() => moveRow(row.id, 1)}
+            disabled={row.index === computedRows.length - 1}
+            aria-label={`Move ${row.label || 'row'} down`}
+            title="Move down"
+          />
+          <Button
+            variant="tertiary"
+            size="sm"
+            icon={Trash2}
+            onClick={() => removeRow(row.id)}
+            aria-label={`Remove ${row.label || 'row'}`}
+            title="Remove"
+            className="tbt-remove"
+          />
+        </div>
+      ),
+    },
+  ], [computedRows.length, handleDurationChange, moveRow, removeRow, updateRow])
+
+  const scheduleRows = useMemo(
+    () => computedRows.map((row, index) => ({ ...row, index })),
+    [computedRows]
+  )
+
+  const timelineRows = computedRows.filter(row => row.duration > 0)
+
   /* ── Render ── */
   return (
-    <div className="px-8 pb-8 pt-3 max-w-[1600px] mx-auto">
-
-      {/* ── Top bar ── */}
-      <div className="flex items-center justify-between mb-6">
-        <p className="text-sm text-secondary-500 dark:text-secondary-400">
-          Configure school bell timings, period durations, and break schedules
+    <Page>
+      {/* ── Page actions ── */}
+      <div className="tbt-actions">
+        <p className="tbt-actions__lead cb-muted">
+          Set the start time and the length of each period and break. Timings for every row are worked out for you.
         </p>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleSaveBellTimings}
-            disabled={isSaving || isLoadingSavedState}
-            className="btn gap-2 bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-60"
-          >
-            {isSaving ? (
-              <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-              </svg>
-            ) : (
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-            )}
-            {isSaving ? 'Saving...' : 'Save Bell Timings'}
-          </button>
-          <button
+        <div className="tbt-actions__buttons">
+          <Button
+            icon={FileText}
             onClick={handleDownload}
-            disabled={isGenerating || isLoadingSavedState}
-            className="btn btn-primary gap-2"
+            loading={isGenerating}
+            disabled={isLoadingSavedState}
           >
-            {isGenerating ? (
-              <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-              </svg>
-            ) : (
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-            )}
-            {isGenerating ? 'Generating...' : 'Download PDF'}
-          </button>
+            {isGenerating ? 'Preparing PDF…' : 'Preview PDF'}
+          </Button>
+          <Button
+            variant="primary"
+            icon={Save}
+            onClick={handleSaveBellTimings}
+            loading={isSaving}
+            disabled={isLoadingSavedState}
+          >
+            {isSaving ? 'Saving…' : 'Save bell timings'}
+          </Button>
         </div>
       </div>
 
-      <div className="bg-white dark:bg-secondary-900 rounded-2xl border border-secondary-200 dark:border-secondary-700 p-4 mb-6">
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_220px_auto_auto] gap-3 items-center">
-          <input
-            type="text"
-            value={versionName}
-            onChange={(e) => setVersionName(e.target.value)}
-            placeholder="Version name (optional)"
-            className="input"
-          />
-          <select
-            value={selectedVersionId}
-            onChange={(e) => setSelectedVersionId(e.target.value)}
-            className="input"
-            title="Select bell timing version"
-          >
-            <option value="">Select saved version</option>
-            {versions.map((version) => (
-              <option key={version._id} value={version._id}>
-                {version.name}
-              </option>
-            ))}
-          </select>
-          <button
-            onClick={handleSaveVersion}
-            disabled={isSavingVersion || isLoadingSavedState}
-            className="btn btn-secondary"
-          >
-            {isSavingVersion ? 'Saving Version...' : 'Save Version'}
-          </button>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleApplyVersion}
-              disabled={!selectedVersionId || isApplyingVersion}
-              className="btn btn-primary"
-            >
-              {isApplyingVersion ? 'Applying...' : 'Apply'}
-            </button>
-            <button
-              onClick={handleDeleteVersion}
-              disabled={!selectedVersionId || isDeletingVersion}
-              className="btn bg-error-500 hover:bg-error-600 text-white"
-            >
-              {isDeletingVersion ? 'Deleting...' : 'Delete'}
-            </button>
-          </div>
-        </div>
+      {/* ── Summary ── */}
+      <div className="cb-stats">
+        <StatCard label="Periods" value={periodCount} icon={BookOpen} hint="Teaching periods in the day" />
+        <StatCard label="Breaks" value={breakCount} icon={Coffee} hint="Recess, lunch and other breaks" />
+        <StatCard
+          label="School day"
+          value={totalMinutes}
+          unit="min"
+          icon={Timer}
+          hint={totalMinutes > 0 ? `${Math.floor(totalMinutes / 60)} h ${totalMinutes % 60} min in total` : 'No time scheduled yet'}
+        />
+        <StatCard
+          label="Day runs"
+          value={dayStart ?? '—'}
+          icon={Clock}
+          hint={dayEnd ? `Ends at ${dayEnd}` : 'Add a row to see the end time'}
+        />
       </div>
 
-      {/* ── Meta fields card ── */}
-      <div className="bg-white dark:bg-secondary-900 rounded-2xl border border-secondary-200 dark:border-secondary-700 p-6 mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-          <div>
-            <label className="block text-xs font-medium text-secondary-500 dark:text-secondary-400 mb-1.5">School Name</label>
-            <input
-              type="text"
-              value={meta.schoolName}
-              onChange={e => setMeta(p => ({ ...p, schoolName: e.target.value }))}
-              placeholder="e.g. Delhi Public School, Jind Road, Rohtak"
-              className="input"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-secondary-500 dark:text-secondary-400 mb-1.5">Title</label>
-            <input
-              type="text"
-              value={meta.title}
-              onChange={e => setMeta(p => ({ ...p, title: e.target.value }))}
-              placeholder="e.g. SUMMER BELL TIMINGS 3.0"
-              className="input"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-secondary-500 dark:text-secondary-400 mb-1.5">Session</label>
-            <div className="relative">
-              <input
-                type="text"
+      <div className="cb-grid-8-4">
+        {/* ── Bell schedule ── */}
+        <Card
+          flush
+          title="Bell schedule"
+          subtitle="Rows run in order from the start time. Change a duration to shift every row after it."
+          className="tbt-schedule"
+        >
+          {isLoadingSavedState ? (
+            <div className="cb-table-state" role="status">
+              <span className="cb-spinner" aria-hidden="true" />
+              Loading bell timings…
+            </div>
+          ) : (
+            <>
+              <div className="tbt-toolbar">
+                <div className="tbt-start">
+                  <TextField
+                    label="Start time"
+                    type="time"
+                    size="sm"
+                    value={startTime}
+                    onChange={e => setStartTime(e.target.value)}
+                    title="Bell timings start time"
+                  />
+                </div>
+
+                {timelineRows.length > 0 ? (
+                  <div className="tbt-timeline" aria-label="Day timeline">
+                    <div className="tbt-timeline__scroll">
+                      <ol className="tbt-timeline__track">
+                        {timelineRows.map(row => (
+                          <li
+                            key={row.id}
+                            className={cx('tbt-timeline__seg', row.type === 'break' && 'is-break')}
+                            style={{ flexGrow: row.duration }}
+                            title={`${row.label} (${row.type === 'break' ? 'Break' : 'Period'}): ${to12h(row.from)} – ${to12h(row.to)}, ${row.duration} min`}
+                          >
+                            <span className="tbt-timeline__label">{row.label}</span>
+                          </li>
+                        ))}
+                      </ol>
+                      <div className="tbt-timeline__ends is-num">
+                        <span>{dayStart}</span>
+                        <span>{dayEnd}</span>
+                      </div>
+                    </div>
+                    <div className="tbt-timeline__legend">
+                      <span className="tbt-legend"><span className="tbt-legend__swatch" aria-hidden="true" />Period</span>
+                      <span className="tbt-legend"><span className="tbt-legend__swatch is-break" aria-hidden="true" />Break</span>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+
+              <DataTable
+                className="tbt-table"
+                caption="Bell schedule"
+                columns={scheduleColumns}
+                rows={scheduleRows}
+                getRowKey={row => row.id}
+                empty={
+                  <EmptyState
+                    icon={BellRing}
+                    title="No periods or breaks yet"
+                    body="The school day is empty. Add a period or a break to start building the bell schedule."
+                    action={
+                      <div className="tbt-add">
+                        <Button size="sm" icon={Plus} onClick={addPeriod}>Add period</Button>
+                        <Button size="sm" icon={Plus} onClick={addBreak}>Add break</Button>
+                      </div>
+                    }
+                  />
+                }
+                footer={
+                  rows.length > 0 ? (
+                    <>
+                      <div className="tbt-add">
+                        <Button size="sm" icon={Plus} onClick={addPeriod}>Add period</Button>
+                        <Button size="sm" icon={Plus} onClick={addBreak}>Add break</Button>
+                      </div>
+                      <span className="tbt-summary is-num">
+                        {periodCount} {periodCount === 1 ? 'period' : 'periods'} · {breakCount} {breakCount === 1 ? 'break' : 'breaks'} · {totalMinutes} min
+                        {dayStart && dayEnd ? ` · ${dayStart} – ${dayEnd}` : ''}
+                      </span>
+                    </>
+                  ) : undefined
+                }
+              />
+            </>
+          )}
+        </Card>
+
+        <div className="cb-stack">
+          {/* ── PDF details ── */}
+          <Card title="PDF details" subtitle="Printed at the top of the bell timings sheet.">
+            <div className="tbt-fields">
+              <TextField
+                label="School name"
+                value={meta.schoolName}
+                onChange={e => setMeta(p => ({ ...p, schoolName: e.target.value }))}
+                placeholder="e.g. Delhi Public School, Jind Road, Rohtak"
+                disabled={isLoadingSavedState}
+              />
+              <TextField
+                label="Title"
+                value={meta.title}
+                onChange={e => setMeta(p => ({ ...p, title: e.target.value }))}
+                placeholder="e.g. SUMMER BELL TIMINGS 3.0"
+                disabled={isLoadingSavedState}
+              />
+              <TextField
+                label="Session"
                 value={meta.session}
                 readOnly
                 tabIndex={-1}
                 title="Academic session"
-                className="input bg-secondary-50 dark:bg-secondary-800/50 cursor-default pr-8"
+                icon={Link2}
+                hint="Linked to the active academic session."
               />
-              <svg className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-              </svg>
+              <TextField
+                label="Effective date (w.e.f.)"
+                type="date"
+                value={meta.effectiveDate}
+                onChange={e => setMeta(p => ({ ...p, effectiveDate: e.target.value }))}
+                title="Effective date"
+                disabled={isLoadingSavedState}
+              />
             </div>
-            <p className="text-[10px] text-secondary-400 dark:text-secondary-500 mt-0.5">Linked to active session</p>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-secondary-500 dark:text-secondary-400 mb-1.5">Effective Date (w.e.f.)</label>
-            <input
-              type="date"
-              value={meta.effectiveDate}
-              onChange={e => setMeta(p => ({ ...p, effectiveDate: e.target.value }))}
-              title="Effective date"
-              className="input"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-secondary-500 dark:text-secondary-400 mb-1.5">Start Time</label>
-            <input
-              type="time"
-              value={startTime}
-              onChange={e => setStartTime(e.target.value)}
-              title="Bell timings start time"
-              className="input"
-            />
-          </div>
+          </Card>
+
+          {/* ── Versions ── */}
+          <Card
+            title="Versions"
+            subtitle="Keep snapshots of the saved bell timings and switch between them."
+            action={<Badge tone={versions.length > 0 ? 'info' : 'neutral'}>{versions.length} saved</Badge>}
+          >
+            <div className="tbt-fields">
+              <div className="tbt-inline">
+                <TextField
+                  label="Version name"
+                  value={versionName}
+                  onChange={(e) => setVersionName(e.target.value)}
+                  placeholder="e.g. Winter timings"
+                  hint="Optional."
+                  className="tbt-inline__grow"
+                />
+                <Button
+                  icon={History}
+                  onClick={handleSaveVersion}
+                  loading={isSavingVersion}
+                  disabled={isLoadingSavedState}
+                >
+                  {isSavingVersion ? 'Saving…' : 'Save version'}
+                </Button>
+              </div>
+
+              <div className="tbt-divider" role="separator" />
+
+              <Select
+                label="Saved versions"
+                value={selectedVersionId}
+                onChange={(e) => setSelectedVersionId(e.target.value)}
+                placeholder={versions.length > 0 ? 'Select a version' : 'No saved versions yet'}
+                options={versions.map((version) => ({ value: version._id, label: version.name }))}
+                title="Select bell timing version"
+                hint={selectedVersion ? `Saved on ${formatDate(selectedVersion.createdAt)}` : 'Pick a version to apply or delete it.'}
+              />
+              <div className="tbt-add">
+                <Button
+                  onClick={handleApplyVersion}
+                  disabled={!selectedVersionId}
+                  loading={isApplyingVersion}
+                >
+                  {isApplyingVersion ? 'Applying…' : 'Apply version'}
+                </Button>
+                <Button
+                  variant="danger"
+                  icon={Trash2}
+                  onClick={() => setConfirmDeleteVersion(true)}
+                  disabled={!selectedVersionId || isDeletingVersion}
+                >
+                  Delete version
+                </Button>
+              </div>
+            </div>
+          </Card>
         </div>
       </div>
 
-      {/* ── Bell timings table ── */}
-      <div className="bg-white dark:bg-secondary-900 rounded-2xl border border-secondary-200 dark:border-secondary-700 overflow-hidden">
-        {/* Table header */}
-        <div className="grid grid-cols-[1fr_0.6fr_150px_150px_130px_80px] gap-0 bg-secondary-50 dark:bg-secondary-800/60 border-b border-secondary-200 dark:border-secondary-700 px-4 py-3 text-xs font-semibold text-secondary-600 dark:text-secondary-300 uppercase tracking-wide">
-          <span>Period</span>
-          <span>Type</span>
-          <span>From</span>
-          <span>To</span>
-          <span>Duration</span>
-          <span className="text-center">Actions</span>
-        </div>
-
-        {/* Table rows */}
-        <div className="divide-y divide-secondary-100 dark:divide-secondary-800">
-          {computedRows.map((row, idx) => (
-            <div
-              key={row.id}
-              className={`grid grid-cols-[1fr_0.6fr_150px_150px_130px_80px] gap-0 items-center px-4 py-2.5 transition-colors ${
-                row.type === 'break'
-                  ? 'bg-amber-50/60 dark:bg-amber-900/10'
-                  : 'hover:bg-secondary-50/50 dark:hover:bg-secondary-800/30'
-              }`}
+      {/* ── Delete version confirmation ── */}
+      <Dialog
+        open={confirmDeleteVersion}
+        onClose={() => { if (!isDeletingVersion) setConfirmDeleteVersion(false) }}
+        tone="danger"
+        size="sm"
+        title="Delete this version?"
+        description={`"${selectedVersion?.name || 'This version'}" will be removed. Your current bell timings stay as they are.`}
+        footer={
+          <>
+            <Button variant="tertiary" onClick={() => setConfirmDeleteVersion(false)} disabled={isDeletingVersion}>
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              loading={isDeletingVersion}
+              onClick={async () => {
+                await handleDeleteVersion()
+                setConfirmDeleteVersion(false)
+              }}
             >
-              {/* Label */}
-              <div>
-                <input
-                  type="text"
-                  value={row.label}
-                  onChange={e => updateRow(row.id, { label: e.target.value })}
-                  title="Period label"
-                  className={`w-full max-w-[160px] px-2.5 py-1.5 text-sm rounded-lg border border-secondary-200 dark:border-secondary-700 bg-white dark:bg-secondary-800 text-secondary-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none ${
-                    row.type === 'break' ? 'font-semibold' : ''
-                  }`}
-                />
-              </div>
+              Delete version
+            </Button>
+          </>
+        }
+      />
 
-              {/* Type toggle */}
-              <div>
-                <button
-                  onClick={() => updateRow(row.id, { type: row.type === 'period' ? 'break' : 'period' })}
-                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
-                    row.type === 'break'
-                      ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 hover:bg-amber-200 dark:hover:bg-amber-900/50'
-                      : 'bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400 hover:bg-primary-100 dark:hover:bg-primary-900/50'
-                  }`}
-                >
-                  {row.type === 'break' ? (
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  ) : (
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                    </svg>
-                  )}
-                  {row.type === 'break' ? 'Break' : 'Period'}
-                </button>
-              </div>
-
-              {/* From (read-only, auto-computed) */}
-              <div>
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-sm rounded-lg border border-secondary-100 dark:border-secondary-700/50 bg-secondary-50 dark:bg-secondary-800/50 text-secondary-700 dark:text-secondary-300">
-                  {to12h(row.from)}
-                  <svg className="w-3.5 h-3.5 text-secondary-400 dark:text-secondary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </span>
-              </div>
-
-              {/* To (read-only, auto-computed) */}
-              <div>
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-sm rounded-lg border border-secondary-100 dark:border-secondary-700/50 bg-secondary-50 dark:bg-secondary-800/50 text-secondary-700 dark:text-secondary-300">
-                  {to12h(row.to)}
-                  <svg className="w-3.5 h-3.5 text-secondary-400 dark:text-secondary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </span>
-              </div>
-
-              {/* Duration (editable) */}
-              <div className="flex items-center gap-1.5">
-                <input
-                  type="number"
-                  min={1}
-                  max={480}
-                  value={row.duration || ''}
-                  onChange={e => handleDurationChange(row.id, e.target.value)}
-                  title="Duration in minutes"
-                  className={`w-16 px-2.5 py-1.5 text-sm rounded-lg border border-secondary-200 dark:border-secondary-700 bg-white dark:bg-secondary-800 text-secondary-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none text-center ${
-                    row.type === 'break' ? 'font-semibold' : ''
-                  }`}
-                />
-                <span className="text-xs text-secondary-400 dark:text-secondary-500">Min</span>
-              </div>
-
-              {/* Actions */}
-              <div className="flex items-center justify-center gap-1">
-                <button
-                  onClick={() => moveRow(row.id, -1)}
-                  disabled={idx === 0}
-                  className="p-1 rounded-md text-secondary-400 hover:text-secondary-600 dark:hover:text-secondary-300 hover:bg-secondary-100 dark:hover:bg-secondary-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                  title="Move up"
-                >
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-                  </svg>
-                </button>
-                <button
-                  onClick={() => moveRow(row.id, 1)}
-                  disabled={idx === computedRows.length - 1}
-                  className="p-1 rounded-md text-secondary-400 hover:text-secondary-600 dark:hover:text-secondary-300 hover:bg-secondary-100 dark:hover:bg-secondary-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                  title="Move down"
-                >
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </button>
-                <button
-                  onClick={() => removeRow(row.id)}
-                  className="p-1 rounded-md text-secondary-400 hover:text-error-500 dark:hover:text-error-400 hover:bg-error-50 dark:hover:bg-error-900/20 transition-colors"
-                  title="Remove"
-                >
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-          ))}
-
-          {rows.length === 0 && (
-            <div className="px-4 py-12 text-center text-sm text-secondary-400 dark:text-secondary-500">
-              No periods added yet. Use the buttons below to add periods and breaks.
-            </div>
-          )}
-        </div>
-
-        {/* Add row buttons */}
-        <div className="flex items-center gap-3 px-4 py-3 border-t border-secondary-200 dark:border-secondary-700 bg-secondary-50/50 dark:bg-secondary-800/30">
-          <button onClick={addPeriod} className="btn btn-secondary gap-1.5 text-xs py-1.5 px-3">
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            Add Period
-          </button>
-          <button onClick={addBreak} className="btn btn-secondary gap-1.5 text-xs py-1.5 px-3">
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            Add Break
-          </button>
-
-          {/* Summary */}
-          {rows.length > 0 && (
-            <div className="ml-auto flex items-center gap-4 text-xs text-secondary-500 dark:text-secondary-400">
-              <span>{rows.filter(r => r.type === 'period').length} periods</span>
-              <span>{rows.filter(r => r.type === 'break').length} breaks</span>
-              <span>Total: {fmtDuration(totalMinutes)}</span>
-              {computedRows.length > 0 && (
-                <span className="text-secondary-400 dark:text-secondary-500">
-                  {to12h(computedRows[0].from)} — {to12h(computedRows[computedRows.length - 1].to)}
-                </span>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* ── PDF Preview Dialog (opens on Download PDF click) ── */}
-      {showPreviewDialog && previewPdfUrl && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4">
-          <div className="w-full max-w-6xl h-[88vh] bg-white dark:bg-secondary-900 rounded-xl shadow-xl overflow-hidden flex flex-col">
-
-            {/* ── Header bar ── */}
-            <div className="px-4 py-3 border-b border-secondary-200 dark:border-secondary-700 flex items-center justify-between">
-              <h4 className="text-sm font-semibold text-secondary-900 dark:text-white">
-                Bell Timings PDF Preview
-              </h4>
-              <div className="flex items-center gap-2">
-                <a
-                  href={previewPdfUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center px-3 py-1.5 rounded-md text-xs font-semibold border border-secondary-300 dark:border-secondary-600 text-secondary-700 dark:text-secondary-200 hover:bg-secondary-100 dark:hover:bg-secondary-800"
-                >
-                  Open in New Tab
-                </a>
-                <a
-                  href={previewPdfUrl}
-                  download={previewFilename || 'bell-timings.pdf'}
-                  className="inline-flex items-center px-3 py-1.5 rounded-md text-xs font-semibold bg-primary-600 text-white hover:bg-primary-700"
-                >
-                  Download PDF
-                </a>
-                <button
-                  type="button"
-                  onClick={closePreviewDialog}
-                  className="inline-flex items-center px-3 py-1.5 rounded-md text-xs font-semibold border border-secondary-300 dark:border-secondary-600 text-secondary-700 dark:text-secondary-200 hover:bg-secondary-100 dark:hover:bg-secondary-800"
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-
-            {/* ── PDF rendering area ── */}
-            <div className="w-full flex-1 overflow-auto bg-secondary-100 dark:bg-secondary-800 p-4">
-              {previewRenderError ? (
-                <div className="h-full w-full flex items-center justify-center p-6 text-center text-sm text-secondary-600 dark:text-secondary-300">
-                  {previewRenderError}
-                </div>
-              ) : (
-                <Document
-                  file={previewPdfUrl}
-                  loading={
-                    <div className="h-full w-full flex items-center justify-center text-sm text-secondary-600 dark:text-secondary-300">
-                      Loading PDF preview...
-                    </div>
-                  }
-                  onLoadSuccess={({ numPages }) => {
-                    setPreviewPageCount(numPages)
-                    setPreviewRenderError(null)
-                  }}
-                  onLoadError={(error) => {
-                    console.error('Failed to render bell timings preview:', error)
-                    const message = (error as Error)?.message || 'Unknown PDF render error'
-                    setPreviewRenderError(
-                      `Failed to render preview (${message}). Use "Open in New Tab" or "Download PDF".`
-                    )
-                  }}
-                  className="flex flex-col items-center gap-4"
-                >
-                  {Array.from({ length: previewPageCount }).map((_, index) => (
-                    <Page
-                      key={`bell-preview-page-${index + 1}`}
-                      pageNumber={index + 1}
-                      width={980}
-                      renderTextLayer={false}
-                      renderAnnotationLayer={false}
-                    />
-                  ))}
-                </Document>
-              )}
-            </div>
+      {/* ── PDF preview (opens from "Preview PDF") ── */}
+      <Dialog
+        open={showPreviewDialog && Boolean(previewPdfUrl)}
+        onClose={closePreviewDialog}
+        size="lg"
+        title="Bell timings PDF"
+        description="Check the sheet, then download it or open it in a new tab."
+        footer={
+          previewPdfUrl ? (
+            <>
+              <Button variant="tertiary" onClick={closePreviewDialog}>Close</Button>
+              <a
+                href={previewPdfUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="cb-btn cb-btn--secondary cb-btn--md"
+              >
+                <span className="cb-btn__label">Open in new tab</span>
+              </a>
+              <a
+                href={previewPdfUrl}
+                download={previewFilename || 'bell-timings.pdf'}
+                className="cb-btn cb-btn--primary cb-btn--md"
+              >
+                <span className="cb-btn__label">Download PDF</span>
+              </a>
+            </>
+          ) : null
+        }
+      >
+        {previewPdfUrl ? (
+          <div className="tbt-pdf">
+            {previewRenderError ? (
+              <Banner tone="danger" title="Preview could not be shown">
+                {previewRenderError}
+              </Banner>
+            ) : (
+              <Document
+                file={previewPdfUrl}
+                loading={
+                  <div className="cb-table-state" role="status">
+                    <span className="cb-spinner" aria-hidden="true" />
+                    Loading PDF preview…
+                  </div>
+                }
+                onLoadSuccess={({ numPages }) => {
+                  setPreviewPageCount(numPages)
+                  setPreviewRenderError(null)
+                }}
+                onLoadError={(error) => {
+                  console.error('Failed to render bell timings preview:', error)
+                  const message = (error as Error)?.message || 'Unknown PDF render error'
+                  setPreviewRenderError(
+                    `Failed to render preview (${message}). Use "Open in new tab" or "Download PDF".`
+                  )
+                }}
+                className="tbt-pdf__doc"
+              >
+                {Array.from({ length: previewPageCount }).map((_, index) => (
+                  <PdfPage
+                    key={`bell-preview-page-${index + 1}`}
+                    pageNumber={index + 1}
+                    width={640}
+                    renderTextLayer={false}
+                    renderAnnotationLayer={false}
+                    className="tbt-pdf__page"
+                  />
+                ))}
+              </Document>
+            )}
           </div>
-        </div>
-      )}
-    </div>
+        ) : null}
+      </Dialog>
+    </Page>
   )
 }
 

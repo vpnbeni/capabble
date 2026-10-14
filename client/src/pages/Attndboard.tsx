@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { ArrowRight, CalendarCheck, Grid3x3, UserRound, UserX, Users } from 'lucide-react'
 import { MonthSwitcher } from '@/components/attnd/MonthSwitcher'
-import { Button, Card, EmptyState, Page, StatCard, cx } from '@/components/ui'
+import { Badge, Button, Card, EmptyState, Page, StatCard, cx } from '@/components/ui'
 import { formatCount } from '@/components/students/studentFormat'
 import attndService, { type AttndDashboardData } from '@/services/attndService'
 import '@/components/attnd/attnd.css'
@@ -42,19 +42,23 @@ const emptyStats = {
 
 const percent = (part: number, whole: number) => (whole > 0 ? Math.round((part / whole) * 100) : 0)
 
-/** Five steps of one hue: none, then quarters of the busiest cell. */
-const heatLevel = (count: number, max: number) => {
-  if (count <= 0 || max <= 0) return 0
-  return Math.min(4, Math.max(1, Math.ceil((count / max) * 4)))
-}
+/** Attendance bands for a section this month. Thresholds are percentages of possible attendance. */
+type Band = 'good' | 'watch' | 'concern' | 'none'
+const BAND_GOOD = 95
+const BAND_WATCH = 90
+const BAND_LABEL: Record<Band, string> = { good: 'Good', watch: 'Watch', concern: 'Needs attention', none: 'No data' }
 
-const HEAT_STEPS = [
-  'var(--surface-sunken)',
-  'color-mix(in srgb, var(--chart-6) 14%, var(--surface))',
-  'color-mix(in srgb, var(--chart-6) 32%, var(--surface))',
-  'color-mix(in srgb, var(--chart-6) 58%, var(--surface))',
-  'var(--chart-6)',
-]
+const sectionAttendance = (
+  cell: { strength: number; monthAbsent: number; monthHalfDay: number },
+  workingDays: number
+) => {
+  const possible = cell.strength * workingDays
+  if (possible <= 0) return { rate: null as number | null, band: 'none' as Band }
+  const missed = cell.monthAbsent + cell.monthHalfDay * 0.5
+  const rate = Math.max(0, Math.round((1 - missed / possible) * 1000) / 10)
+  const band: Band = rate >= BAND_GOOD ? 'good' : rate >= BAND_WATCH ? 'watch' : 'concern'
+  return { rate, band }
+}
 
 const Attndboard: React.FC = () => {
   const navigate = useNavigate()
@@ -84,10 +88,25 @@ const Attndboard: React.FC = () => {
   const staff = data?.staff || emptyStats
   const students = data?.students || emptyStats
 
-  const maxClassAbsent = useMemo(
-    () => Math.max(0, ...classMatrix.flatMap((row) => row.sections.map((cell) => cell.monthAbsent))),
-    [classMatrix]
+  const workingDays = data?.workingDays || 0
+  const classRows = useMemo(
+    () =>
+      classMatrix.map((row) => ({
+        className: row.className,
+        sections: sections
+          .map((name) => row.sections.find((cell) => cell.section === name))
+          .filter((cell): cell is NonNullable<typeof cell> => Boolean(cell))
+          .map((cell) => ({ ...cell, ...sectionAttendance(cell, workingDays) })),
+      })),
+    [classMatrix, sections, workingDays]
   )
+  const bandCounts = useMemo(() => {
+    const counts: Record<Band, number> = { good: 0, watch: 0, concern: 0, none: 0 }
+    classRows.forEach((row) => row.sections.forEach((cell) => (counts[cell.band] += 1)))
+    return counts
+  }, [classRows])
+  const sectionCount = classRows.reduce((sum, row) => sum + row.sections.length, 0)
+  const absentTodayStudents = students.todayAbsent
   const maxStaffAbsent = useMemo(() => Math.max(0, ...staffMatrix.map((row) => row.monthAbsent)), [staffMatrix])
   const maxTrend = useMemo(
     () => Math.max(1, ...dailyTrend.map((item) => item.studentAbsent + item.staffAbsent)),
@@ -152,84 +171,90 @@ const Attndboard: React.FC = () => {
       </section>
 
       <Card
-        title="Class absences"
-        subtitle="Absences this month by class and section. Darker cells mean more absences."
+        title="Attendance by class"
+        subtitle={
+          sectionCount === 0
+            ? 'Each section\'s attendance this month.'
+            : bandCounts.watch + bandCounts.concern === 0
+              ? `All ${formatCount(sectionCount)} sections are at ${BAND_GOOD}% or better this month.`
+              : `${formatCount(bandCounts.watch + bandCounts.concern)} of ${formatCount(sectionCount)} sections are below ${BAND_GOOD}% this month.`
+        }
         action={
           <Button variant="tertiary" size="sm" iconRight={ArrowRight} onClick={() => navigate('/attnd/student-attendance')}>
             Mark student attendance
           </Button>
         }
         footer={
-          classMatrix.length ? (
-            <span className="attnd-scale">
-              Fewer
-              <span className="attnd-scale__steps" aria-hidden="true">
-                {HEAT_STEPS.map((color) => (
-                  <span key={color} style={{ background: color }} />
-                ))}
+          sectionCount ? (
+            <div className="attnd-bandkey">
+              <span className="attnd-bandkey__item">
+                <span className="attnd-bandkey__dot is-good" aria-hidden="true" />
+                Good · {BAND_GOOD}% or more
               </span>
-              More absences · small figure is today's count
-            </span>
+              <span className="attnd-bandkey__item">
+                <span className="attnd-bandkey__dot is-watch" aria-hidden="true" />
+                Watch · {BAND_WATCH}–{BAND_GOOD - 1}%
+              </span>
+              <span className="attnd-bandkey__item">
+                <span className="attnd-bandkey__dot is-concern" aria-hidden="true" />
+                Needs attention · below {BAND_WATCH}%
+              </span>
+            </div>
           ) : undefined
         }
       >
-        {classMatrix.length === 0 ? (
+        {sectionCount === 0 ? (
           <EmptyState
             compact
             icon={Grid3x3}
             title="No class attendance this month"
-            body="Absences appear here once student attendance is saved."
+            body="Sections appear here once students are added to classes."
           />
         ) : (
-          <div className="attnd-heat-scroll">
-            <table className="attnd-heat">
-              <thead>
-                <tr>
-                  <th scope="col" className="is-row">
-                    Class
-                  </th>
-                  {sections.map((section) => (
-                    <th key={section} scope="col">
-                      {section}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {classMatrix.map((row) => (
-                  <tr key={row.className}>
-                    <th scope="row" className="is-row">
-                      {row.className}
-                    </th>
-                    {sections.map((section) => {
-                      const cell = row.sections.find((item) => item.section === section)
-                      if (!cell) {
-                        return (
-                          <td key={section}>
-                            <span className="attnd-heat__none" aria-label="No section">
-                              —
-                            </span>
-                          </td>
-                        )
-                      }
-                      const level = heatLevel(cell.monthAbsent, maxClassAbsent)
-                      return (
-                        <td key={section}>
-                          <div
-                            className={cx('attnd-heat__cell', level > 0 && `is-l${level}`)}
-                            title={`${row.className} ${section}: ${cell.monthAbsent} absences this month · ${cell.todayAbsent} absent today · ${cell.todayHalfDay} half day today`}
-                          >
-                            <span className="attnd-heat__value">{formatCount(cell.monthAbsent)}</span>
-                            <span className="attnd-heat__sub">today {formatCount(cell.todayAbsent)}</span>
-                          </div>
-                        </td>
-                      )
-                    })}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <>
+            <div className="attnd-bandsummary" aria-label="Sections by attendance">
+              <Badge tone="success" size="lg">
+                {formatCount(bandCounts.good)} good
+              </Badge>
+              <Badge tone="warning" size="lg">
+                {formatCount(bandCounts.watch)} to watch
+              </Badge>
+              <Badge tone="danger" size="lg">
+                {formatCount(bandCounts.concern)} need attention
+              </Badge>
+              <Badge tone={absentTodayStudents > 0 ? 'info' : 'neutral'} dot={false} size="lg">
+                {absentTodayStudents > 0 ? `${formatCount(absentTodayStudents)} students absent today` : 'Nobody absent today'}
+              </Badge>
+            </div>
+            <ul className="attnd-classes">
+              {classRows.map((row) => (
+                <li key={row.className} className="attnd-classes__row">
+                  <span className="attnd-classes__name">{row.className}</span>
+                  <ul className="attnd-classes__sections">
+                    {row.sections.map((cell) => (
+                      <li
+                        key={cell.section}
+                        className={cx('attnd-sec', `is-${cell.band}`)}
+                        title={`${row.className} ${cell.section}: ${cell.rate == null ? 'no students' : `${cell.rate}% attendance`} · ${cell.monthAbsent} absences and ${cell.monthHalfDay} half days this month · ${cell.todayAbsent} absent today · ${cell.strength} students`}
+                      >
+                        <span className="attnd-sec__name">{cell.section}</span>
+                        <span className="attnd-sec__rate">{cell.rate == null ? '—' : `${cell.rate}%`}</span>
+                        <span className="attnd-sec__meta">
+                          {cell.monthAbsent === 0 && cell.monthHalfDay === 0
+                            ? 'No absences'
+                            : `${formatCount(cell.monthAbsent)} absence${cell.monthAbsent === 1 ? '' : 's'}`}
+                        </span>
+                        {cell.todayAbsent > 0 ? (
+                          <span className="attnd-sec__today">{formatCount(cell.todayAbsent)} absent today</span>
+                        ) : null}
+                        <span className="cb-visually-hidden">{BAND_LABEL[cell.band]}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </li>
+              ))}
+            </ul>
+          </>
         )}
       </Card>
 

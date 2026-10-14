@@ -59,6 +59,7 @@ const roomSchema = new mongoose.Schema({
 });
 
 roomSchema.index({ assetLocationId: 1 }, { sparse: true });
+roomSchema.index({ roomNo: 1 });
 roomSchema.plugin(academicSessionPlugin);
 
 module.exports = createContextModelProxy('Room', roomSchema);

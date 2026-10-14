@@ -3,26 +3,7 @@ import { Navigate, Outlet, useLocation } from 'react-router-dom'
 import { useSelector } from 'react-redux'
 import { selectIsAuthenticated, selectUser } from '../redux/slices/authSlice'
 import { useAcademicSession } from '../contexts/AcademicSessionContext'
-import { getFirstEnabledPath, isFeatureEnabledForPath } from '../constants/featureAccess'
-
-const CORE_ALLOWED_PREFIXES = [
-  '/',
-  '/dashboard',
-  '/candidate-details',
-  '/candidates',
-  '/subjects',
-  '/datesheets',
-  '/billing',
-]
-
-const isCoreAllowedPath = (pathname: string): boolean => {
-  return CORE_ALLOWED_PREFIXES.some((prefix) => {
-    if (prefix === '/') {
-      return pathname === '/'
-    }
-    return pathname === prefix || pathname.startsWith(`${prefix}/`)
-  })
-}
+import { getFirstEnabledPath, isCoreAllowedPath, isFeatureEnabledForPath } from '../constants/featureAccess'
 
 const ProtectedRoute: React.FC = () => {
   const isAuthenticated = useSelector(selectIsAuthenticated)

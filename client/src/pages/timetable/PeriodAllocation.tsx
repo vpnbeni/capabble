@@ -1,5 +1,9 @@
 import React, { useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { ArrowRight, BookOpen, LayoutGrid } from 'lucide-react'
 import { useTimetable, type TimetableClass } from '@/contexts/TimetableContext'
+import { Badge, Banner, Button, Card, EmptyState, Page, StatCard, cx } from '@/components/ui'
+import '@/components/timetable/distribution.css'
 
 /* ══════════════════════════════ Helpers ══════════════════════════════ */
 
@@ -13,8 +17,24 @@ interface ClassGroup {
   classes: TimetableClass[]
 }
 
+const plural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`
+
+type AllocationKind = 'full' | 'short' | 'over' | 'empty'
+
+/** Row status in words: matches the old colour rule (equal = ok, anything else needs attention). */
+const allocationStatus = (
+  total: number,
+  periodsPerWeek: number
+): { kind: AllocationKind; tone: 'success' | 'warning' | 'danger' | 'neutral'; label: string } => {
+  if (total === periodsPerWeek) return { kind: 'full', tone: 'success', label: 'Fully allocated' }
+  if (total === 0) return { kind: 'empty', tone: 'neutral', label: 'Not started' }
+  if (total < periodsPerWeek) return { kind: 'short', tone: 'warning', label: `${periodsPerWeek - total} short` }
+  return { kind: 'over', tone: 'danger', label: `${total - periodsPerWeek} over` }
+}
+
 const PeriodAllocation: React.FC = () => {
   const {
+    isHydrated,
     classes,
     parallelSubjectPairs,
     periodsPerWeek,
@@ -121,548 +141,221 @@ const PeriodAllocation: React.FC = () => {
     setPeriodCount(classId, subject, num)
   }
 
+  const navigate = useNavigate()
+  const goToClasses = () => navigate('/time-table/classes')
+
+  // Summary across every class that has subjects (computed in render; no hooks below this line).
+  const allocatedClasses = groups.flatMap((group) => group.classes)
+  const summary = allocatedClasses.reduce(
+    (acc, cls) => {
+      const status = allocationStatus(getRowTotal(cls), periodsPerWeek)
+      acc[status.kind] += 1
+      return acc
+    },
+    { full: 0, short: 0, over: 0, empty: 0 } as Record<AllocationKind, number>
+  )
+  const fullPct = allocatedClasses.length > 0 ? Math.round((summary.full / allocatedClasses.length) * 100) : 0
+
+  if (!isHydrated) {
+    return (
+      <Page width="full">
+        <Card flush>
+          <div className="cb-table-state" role="status">
+            <span className="cb-spinner" aria-hidden="true" />
+            Loading period distribution …
+          </div>
+        </Card>
+      </Page>
+    )
+  }
+
   return (
-    <div className="pa-page">
-      <style>{`
-        /* ───────── Page ───────── */
-        .pa-page {
-          padding: 12px 32px 32px;
-          max-width: 1600px;
-          margin: 0 auto;
-        }
-
-        /* ───────── Card ───────── */
-        .pa-card {
-          background: #fff;
-          border-radius: 16px;
-          box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 6px 24px rgba(0,0,0,0.04);
-          overflow: hidden;
-          margin-bottom: 24px;
-          border: 1px solid #e8ecf1;
-          transition: box-shadow 0.3s ease;
-        }
-        .pa-card:hover {
-          box-shadow: 0 2px 6px rgba(0,0,0,0.08), 0 10px 36px rgba(0,0,0,0.06);
-        }
-        .dark .pa-card {
-          background: #1e293b;
-          border-color: #334155;
-        }
-
-        /* ───────── Card header ───────── */
-        .pa-card-header {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          padding: 16px 24px;
-          background: linear-gradient(135deg, #f0f4ff 0%, #faf5ff 100%);
-          border-bottom: 1px solid #e2e8f0;
-        }
-        .dark .pa-card-header {
-          background: linear-gradient(135deg, #1e2a3e 0%, #2a1e3e 100%);
-          border-color: #334155;
-        }
-        .pa-card-header h3 {
-          font-size: 1rem;
-          font-weight: 700;
-          color: #1e293b;
-          margin: 0;
-          display: flex;
-          align-items: center;
-          gap: 10px;
-        }
-        .dark .pa-card-header h3 { color: #f1f5f9; }
-        .pa-header-icon {
-          width: 26px;
-          height: 26px;
-          border-radius: 7px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          flex-shrink: 0;
-          background: linear-gradient(135deg, #6366f1, #8b5cf6);
-        }
-        .pa-header-icon svg {
-          width: 16px;
-          height: 16px;
-          color: #fff;
-        }
-
-        /* ───────── Header stats ───────── */
-        .pa-header-stats {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-        }
-        .pa-stat-pill {
-          display: flex;
-          align-items: center;
-          gap: 5px;
-          padding: 4px 12px;
-          border-radius: 20px;
-          font-size: 0.72rem;
-          font-weight: 700;
-        }
-        .pa-stat-pill-indigo {
-          background: #eef2ff;
-          color: #4f46e5;
-        }
-        .dark .pa-stat-pill-indigo {
-          background: #312e8133;
-          color: #a5b4fc;
-        }
-        .pa-stat-pill-green {
-          background: #ecfdf5;
-          color: #059669;
-        }
-        .dark .pa-stat-pill-green {
-          background: #064e3b33;
-          color: #34d399;
-        }
-
-        /* ───────── Table ───────── */
-        .pa-table-wrap {
-          overflow-x: auto;
-        }
-        .pa-table {
-          width: 100%;
-          border-collapse: collapse;
-        }
-        .pa-table thead th {
-          padding: 10px 12px;
-          font-size: 0.72rem;
-          font-weight: 700;
-          text-transform: uppercase;
-          letter-spacing: 0.04em;
-          color: #475569;
-          background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
-          border: 1px solid #e2e8f0;
-          text-align: center;
-          white-space: nowrap;
-        }
-        .dark .pa-table thead th {
-          background: linear-gradient(180deg, #1e293b 0%, #1a2536 100%);
-          color: #94a3b8;
-          border-color: #334155;
-        }
-        .pa-table thead th.pa-th-class {
-          text-align: left;
-          min-width: 70px;
-        }
-        .pa-table thead th.pa-th-section {
-          text-align: left;
-          min-width: 60px;
-        }
-        .pa-table thead th.pa-th-sr {
-          width: 48px;
-          min-width: 48px;
-        }
-        .pa-table thead th.pa-th-total {
-          min-width: 64px;
-          background: linear-gradient(180deg, #f0fdf4 0%, #dcfce7 100%);
-          color: #166534;
-        }
-        .pa-table thead th.pa-th-parallel {
-          background: linear-gradient(180deg, #fff7ed 0%, #ffedd5 100%);
-          color: #9a3412;
-        }
-        .dark .pa-table thead th.pa-th-parallel {
-          background: linear-gradient(180deg, #7c2d1233 0%, #9a341233 100%);
-          color: #fdba74;
-        }
-        .dark .pa-table thead th.pa-th-total {
-          background: linear-gradient(180deg, #14532d44 0%, #16653444 100%);
-          color: #86efac;
-        }
-        .pa-table tbody td {
-          padding: 6px 8px;
-          font-size: 0.85rem;
-          color: #334155;
-          border: 1px solid #e2e8f0;
-          text-align: center;
-          vertical-align: middle;
-        }
-        .dark .pa-table tbody td {
-          color: #e2e8f0;
-          border-color: #334155;
-        }
-        .pa-table tbody tr:hover td {
-          background: #f8faff;
-        }
-        .dark .pa-table tbody tr:hover td {
-          background: #283548;
-        }
-        .pa-table tbody td.pa-td-parallel {
-          background: #fffaf0;
-        }
-        .dark .pa-table tbody td.pa-td-parallel {
-          background: #9a341214;
-        }
-        .pa-table tbody td.pa-td-class {
-          text-align: left;
-          font-weight: 700;
-          color: #1e293b;
-          white-space: nowrap;
-        }
-        .dark .pa-table tbody td.pa-td-class { color: #f1f5f9; }
-        .pa-table tbody td.pa-td-section {
-          text-align: left;
-          font-weight: 600;
-          color: #475569;
-          white-space: nowrap;
-        }
-        .dark .pa-table tbody td.pa-td-section { color: #cbd5e1; }
-        .pa-table tbody td.pa-td-sr {
-          font-weight: 600;
-          color: #94a3b8;
-          font-size: 0.78rem;
-        }
-
-        /* ── Total column ── */
-        .pa-table tbody td.pa-td-total {
-          font-weight: 800;
-          font-size: 0.9rem;
-        }
-        .pa-total-ok {
-          color: #16a34a; /* green text for fully allocated */
-        }
-        .dark .pa-total-ok {
-          color: #4ade80;
-        }
-        .pa-total-under {
-          color: #ef4444; /* red text when not fully allocated */
-        }
-        .dark .pa-total-under {
-          color: #fca5a5;
-        }
-        .pa-total-over {
-          color: #ef4444;
-        }
-        .dark .pa-total-over {
-          color: #fca5a5;
-        }
-
-        /* ── Cell input ── */
-        .pa-cell-input {
-          width: 48px;
-          padding: 4px 4px;
-          border: 1.5px solid transparent;
-          border-radius: 6px;
-          font-size: 0.85rem;
-          font-weight: 600;
-          text-align: center;
-          outline: none;
-          background: transparent;
-          color: #334155;
-          transition: all 0.15s ease;
-        }
-        .dark .pa-cell-input {
-          color: #e2e8f0;
-        }
-        .pa-cell-input:hover {
-          background: #f1f5f9;
-          border-color: #e2e8f0;
-        }
-        .dark .pa-cell-input:hover {
-          background: #334155;
-          border-color: #475569;
-        }
-        .pa-cell-input:focus {
-          background: #fff;
-          border-color: #6366f1;
-          box-shadow: 0 0 0 3px rgba(99,102,241,0.15);
-        }
-        .dark .pa-cell-input:focus {
-          background: #1e293b;
-          border-color: #818cf8;
-        }
-        .pa-cell-input-filled {
-          color: #1e293b;
-          font-weight: 700;
-        }
-        .dark .pa-cell-input-filled {
-          color: #f1f5f9;
-        }
-        .pa-cell-input-parallel {
-          border-color: #fdba74;
-          background: #fff7ed;
-        }
-        .dark .pa-cell-input-parallel {
-          border-color: #fb923c;
-          background: #7c2d1226;
-        }
-        .pa-cell-input-parallel:hover {
-          border-color: #fb923c;
-          background: #ffedd5;
-        }
-        .dark .pa-cell-input-parallel:hover {
-          border-color: #fdba74;
-          background: #9a341233;
-        }
-
-        /* ───────── Buttons ───────── */
-        .pa-btn {
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          padding: 6px 14px;
-          border-radius: 8px;
-          font-size: 0.78rem;
-          font-weight: 600;
-          border: none;
-          cursor: pointer;
-          transition: all 0.2s ease;
-          white-space: nowrap;
-        }
-        .pa-btn svg { width: 14px; height: 14px; }
-        .pa-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-        .pa-btn-primary {
-          background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-          color: #fff;
-          box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
-        }
-        .pa-btn-primary:hover:not(:disabled) {
-          transform: translateY(-1px);
-          box-shadow: 0 4px 14px rgba(99, 102, 241, 0.4);
-        }
-        .pa-btn-secondary {
-          background: #fff;
-          color: #475569;
-          border: 1.5px solid #e2e8f0;
-        }
-        .dark .pa-btn-secondary {
-          background: #334155;
-          color: #e2e8f0;
-          border-color: #475569;
-        }
-        .pa-btn-secondary:hover:not(:disabled) {
-          background: #f8fafc;
-          border-color: #cbd5e1;
-        }
-        .dark .pa-btn-secondary:hover:not(:disabled) {
-          background: #3b4f6b;
-        }
-        .pa-btn-save {
-          background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-          color: #fff;
-          box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
-        }
-        .pa-btn-save:hover:not(:disabled) {
-          transform: translateY(-1px);
-        }
-        .pa-btn-cancel {
-          background: none;
-          color: #94a3b8;
-          border: none;
-          padding: 6px 10px;
-        }
-        .pa-btn-cancel:hover { color: #64748b; }
-
-        /* ───────── Empty state ───────── */
-        .pa-empty {
-          padding: 48px 24px;
-          text-align: center;
-        }
-        .pa-empty-icon {
-          width: 64px;
-          height: 64px;
-          margin: 0 auto 16px;
-          border-radius: 16px;
-          background: linear-gradient(135deg, #f0f4ff 0%, #faf5ff 100%);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-        .pa-empty-icon svg {
-          width: 32px;
-          height: 32px;
-          color: #94a3b8;
-        }
-        .pa-empty h3 {
-          font-size: 1.05rem;
-          font-weight: 700;
-          color: #334155;
-          margin: 0 0 6px;
-        }
-        .dark .pa-empty h3 { color: #f1f5f9; }
-        .pa-empty p {
-          color: #94a3b8;
-          font-size: 0.88rem;
-          margin: 0 0 6px;
-        }
-        .pa-empty a {
-          color: #6366f1;
-          font-weight: 600;
-          text-decoration: none;
-        }
-        .pa-empty a:hover { text-decoration: underline; }
-
-        /* ───────── Unassigned notice ───────── */
-        .pa-notice {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          padding: 12px 20px;
-          background: #fef3c7;
-          border: 1px solid #fde68a;
-          border-radius: 12px;
-          margin-bottom: 20px;
-          font-size: 0.82rem;
-          font-weight: 500;
-          color: #92400e;
-        }
-        .dark .pa-notice {
-          background: #78350f33;
-          border-color: #92400e;
-          color: #fbbf24;
-        }
-        .pa-notice svg {
-          width: 18px;
-          height: 18px;
-          flex-shrink: 0;
-        }
-        .pa-notice strong {
-          font-weight: 700;
-        }
-      `}</style>
-
-      {/* ── Unassigned classes notice ── */}
-      {unassigned.length > 0 && (
-        <div className="pa-notice">
-          <svg fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
-          </svg>
-          <span>
-            <strong>{unassigned.length}</strong> class(es) have no subjects assigned and are not shown below.
-            Assign subjects on the <a href="#/time-table/classes">Classes</a> page.
-          </span>
-        </div>
-      )}
-
-      {/* ── Empty state ── */}
-      {groups.length === 0 && unassigned.length === 0 && (
-        <div className="pa-card">
-          <div className="pa-empty">
-            <div className="pa-empty-icon">
-              <svg fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 6.878V6a2.25 2.25 0 012.25-2.25h7.5A2.25 2.25 0 0118 6v.878m-12 0c.235-.083.487-.128.75-.128h10.5c.263 0 .515.045.75.128m-12 0A2.25 2.25 0 004.5 9v.878m13.5-3A2.25 2.25 0 0119.5 9v.878m0 0a2.246 2.246 0 00-.75-.128H5.25c-.263 0-.515.045-.75.128m15 0A2.25 2.25 0 0121 12v6a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 18v-6c0-.98.626-1.813 1.5-2.122" />
-              </svg>
-            </div>
-            <h3>No Classes to Allocate</h3>
-            <p>Add classes with subjects on the <a href="#/time-table/classes">Classes</a> page first, then come back here to distribute periods.</p>
+    <Page width="full">
+      <div className="cb-stack">
+        {allocatedClasses.length > 0 ? (
+          <div className="cb-stats">
+            <StatCard
+              label="Sections to plan"
+              value={allocatedClasses.length}
+              hint={`${plural(groups.length, 'subject group', 'subject groups')} · ${periodsPerWeek} periods a week`}
+            />
+            <StatCard
+              label="Fully allocated"
+              value={summary.full}
+              hint={`${fullPct}% of sections`}
+              progress={fullPct}
+              progressTone="success"
+            />
+            <StatCard label="Short of periods" value={summary.short + summary.empty} hint={`${summary.empty} not started`} />
+            <StatCard label="Over-allocated" value={summary.over} hint="More periods than the week has" />
           </div>
-        </div>
-      )}
+        ) : null}
 
-      {groups.length === 0 && unassigned.length > 0 && (
-        <div className="pa-card">
-          <div className="pa-empty">
-            <div className="pa-empty-icon">
-              <svg fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25" />
-              </svg>
-            </div>
-            <h3>No Subjects Assigned</h3>
-            <p>All your classes have no subjects assigned yet. Go to the <a href="#/time-table/classes">Classes</a> page and assign subjects to each class.</p>
-          </div>
-        </div>
-      )}
+        {/* ── Unassigned classes notice ── */}
+        {unassigned.length > 0 && groups.length > 0 ? (
+          <Banner tone="warning" title={`${plural(unassigned.length, 'section has', 'sections have')} no subjects`}>
+            They are not shown below. Assign subjects on the{' '}
+            <a href="#/time-table/classes">Classes</a> page to distribute their periods.
+          </Banner>
+        ) : null}
 
-      {/* ── Group cards ── */}
-      {groups.map((group, groupIdx) => {
-        const groupLabel = Array.from(
-          new Set(group.classes.map((c) => c.className))
-        ).join(', ')
-        const groupClassKeys = new Set(group.classes.map((item) => item.className.trim().toLowerCase()))
-        const isGroupParallelSubject = (subject: string) => {
-          const subjectKey = subject.trim().toLowerCase()
-          for (const classKey of groupClassKeys) {
-            if (parallelSubjectsByClass.get(classKey)?.has(subjectKey)) {
-              return true
+        {/* ── Empty states ── */}
+        {groups.length === 0 && unassigned.length === 0 ? (
+          <Card>
+            <EmptyState
+              icon={LayoutGrid}
+              title="There are no classes to distribute periods for"
+              body="Add classes and give them subjects on the Classes page, then come back to set periods per subject."
+              action={
+                <Button variant="primary" icon={ArrowRight} onClick={goToClasses}>
+                  Go to classes
+                </Button>
+              }
+            />
+          </Card>
+        ) : null}
+
+        {groups.length === 0 && unassigned.length > 0 ? (
+          <Card>
+            <EmptyState
+              icon={BookOpen}
+              title={`${plural(unassigned.length, 'section has', 'sections have')} no subjects yet`}
+              body="Assign subjects to each class on the Classes page, then come back to set periods per subject."
+              action={
+                <Button variant="primary" icon={ArrowRight} onClick={goToClasses}>
+                  Assign subjects
+                </Button>
+              }
+            />
+          </Card>
+        ) : null}
+
+        {/* ── Group cards ── */}
+        {groups.map((group, groupIdx) => {
+          const groupLabel = Array.from(
+            new Set(group.classes.map((c) => c.className))
+          ).join(', ')
+          const groupClassKeys = new Set(group.classes.map((item) => item.className.trim().toLowerCase()))
+          const isGroupParallelSubject = (subject: string) => {
+            const subjectKey = subject.trim().toLowerCase()
+            for (const classKey of groupClassKeys) {
+              if (parallelSubjectsByClass.get(classKey)?.has(subjectKey)) {
+                return true
+              }
             }
+            return false
           }
-          return false
-        }
+          const hasParallel = group.subjects.some((subj) => isGroupParallelSubject(subj))
+          const groupStatuses = group.classes.map((cls) => allocationStatus(getRowTotal(cls), periodsPerWeek))
+          const groupFull = groupStatuses.filter((status) => status.kind === 'full').length
+          const groupOver = groupStatuses.filter((status) => status.kind === 'over').length
+          const groupShort = group.classes.length - groupFull - groupOver
 
-        return (
-          <div key={group.key} className="pa-card">
-            <div className="pa-card-header">
-              <h3>
-                <span className="pa-header-icon">
-                  <svg fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
-                  </svg>
-                </span>
-                Group {groupIdx + 1} — Classes: {groupLabel}
-              </h3>
-              <div className="pa-header-stats">
-                <span className="pa-stat-pill pa-stat-pill-indigo">
-                  {group.classes.length} class{group.classes.length !== 1 ? 'es' : ''}
-                </span>
-                <span className="pa-stat-pill pa-stat-pill-green">
-                  {group.subjects.length} subject{group.subjects.length !== 1 ? 's' : ''}
-                </span>
+          return (
+            <Card
+              key={group.key}
+              flush
+              className="tpd-card"
+              title={`Group ${groupIdx + 1} · Classes ${groupLabel}`}
+              subtitle={`${plural(group.classes.length, 'section', 'sections')} · ${plural(group.subjects.length, 'subject', 'subjects')}`}
+              action={
+                <div className="tpd-actions">
+                  {groupFull === group.classes.length ? (
+                    <Badge tone="success">All sections allocated</Badge>
+                  ) : (
+                    <>
+                      {groupOver > 0 ? <Badge tone="danger">{groupOver} over</Badge> : null}
+                      {groupShort > 0 ? <Badge tone="warning">{groupShort} short</Badge> : null}
+                      {groupFull > 0 ? <Badge tone="success">{groupFull} allocated</Badge> : null}
+                    </>
+                  )}
+                </div>
+              }
+            >
+              {hasParallel ? (
+                <p className="tpd-legend">
+                  <span className="tpd-swatch" aria-hidden="true" />
+                  Parallel subjects run in the same period, so their shared periods count once in the total.
+                </p>
+              ) : null}
+              <div className="tpd-scroll">
+                <table className="tpd-grid">
+                  <caption className="cb-visually-hidden">
+                    Periods per subject for classes {groupLabel}
+                  </caption>
+                  <thead>
+                    <tr>
+                      <th scope="col" className="tpd-sticky">Class and section</th>
+                      {group.subjects.map((subj) => {
+                        const parallel = isGroupParallelSubject(subj)
+                        return (
+                          <th key={subj} scope="col" className={parallel ? 'is-parallel' : undefined}>
+                            <span className="tpd-colhead">
+                              <span className="tpd-colhead__name">{subj}</span>
+                              {parallel ? <span className="tpd-colhead__meta">Parallel</span> : null}
+                            </span>
+                          </th>
+                        )
+                      })}
+                      <th scope="col" className="tpd-end tpd-totalhead">Total per week</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {group.classes.map((cls, rowIdx) => {
+                      const rowTotal = getRowTotal(cls)
+                      const status = allocationStatus(rowTotal, periodsPerWeek)
+
+                      return (
+                        <tr key={cls.id}>
+                          <th scope="row" className="tpd-sticky">
+                            <span className="tpd-rowlabel">
+                              <span className="tpd-sr is-num">{rowIdx + 1}</span>
+                              <span className="tpd-rowlabel__text">
+                                <span className="tpd-rowlabel__name">
+                                  {cls.className}
+                                  {cls.section ? ` – ${cls.section}` : ''}
+                                </span>
+                              </span>
+                            </span>
+                          </th>
+                          {group.subjects.map((subj) => {
+                            const val = getCount(cls.id, subj)
+                            const classKey = cls.className.trim().toLowerCase()
+                            const isParallel = parallelSubjectsByClass.get(classKey)?.has(subj.trim().toLowerCase()) || false
+                            return (
+                              <td key={subj} className={isParallel ? 'is-parallel' : undefined}>
+                                <input
+                                  type="number"
+                                  inputMode="numeric"
+                                  className={cx('tpd-num', val > 0 && 'is-filled')}
+                                  value={val || ''}
+                                  min={0}
+                                  placeholder="0"
+                                  aria-label={`${subj} periods for ${cls.className} ${cls.section}`}
+                                  onChange={(e) => handleCellChange(cls.id, subj, e.target.value)}
+                                />
+                              </td>
+                            )
+                          })}
+                          <td className="tpd-end tpd-totalcell">
+                            <span className="tpd-total">
+                              <span className="tpd-total__count">
+                                {rowTotal} <span>/ {periodsPerWeek}</span>
+                              </span>
+                              <Badge tone={status.tone}>{status.label}</Badge>
+                            </span>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
               </div>
-            </div>
-
-            <div className="pa-table-wrap">
-              <table className="pa-table">
-                <thead>
-                  <tr>
-                    <th className="pa-th-sr">Sr</th>
-                    <th className="pa-th-class">Class</th>
-                    <th className="pa-th-section">Section</th>
-                    {group.subjects.map((subj) => (
-                      <th key={subj} className={isGroupParallelSubject(subj) ? 'pa-th-parallel' : ''}>{subj}</th>
-                    ))}
-                    <th className="pa-th-total">Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {group.classes.map((cls, rowIdx) => {
-                    const rowTotal = getRowTotal(cls)
-                    const totalClass =
-                      rowTotal === periodsPerWeek
-                        ? 'pa-total-ok'
-                        : rowTotal > 0
-                        ? 'pa-total-under'
-                        : ''
-
-                    return (
-                      <tr key={cls.id}>
-                        <td className="pa-td-sr">{rowIdx + 1}</td>
-                        <td className="pa-td-class">{cls.className}</td>
-                        <td className="pa-td-section">{cls.section}</td>
-                        {group.subjects.map((subj) => {
-                          const val = getCount(cls.id, subj)
-                          const classKey = cls.className.trim().toLowerCase()
-                          const isParallel = parallelSubjectsByClass.get(classKey)?.has(subj.trim().toLowerCase()) || false
-                          return (
-                            <td key={subj} className={isParallel ? 'pa-td-parallel' : ''}>
-                              <input
-                                type="number"
-                                className={`pa-cell-input ${val > 0 ? 'pa-cell-input-filled' : ''} ${isParallel ? 'pa-cell-input-parallel' : ''}`}
-                                value={val || ''}
-                                min={0}
-                                placeholder="0"
-                                onChange={(e) => handleCellChange(cls.id, subj, e.target.value)}
-                              />
-                            </td>
-                          )
-                        })}
-                        <td className={`pa-td-total ${totalClass}`}>
-                          {rowTotal} / {periodsPerWeek}
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )
-      })}
-    </div>
+            </Card>
+          )
+        })}
+      </div>
+    </Page>
   )
 }
 

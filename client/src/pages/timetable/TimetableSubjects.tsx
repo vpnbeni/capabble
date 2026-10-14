@@ -20,6 +20,7 @@ import {
   type DataTableColumn,
 } from '@/components/ui'
 import '@/components/timetable/subjects.css'
+import { useUrlSearchQuery } from '@/hooks/useUrlSearchQuery'
 
 const SUBJECT_TYPES = ['Language', 'Skill', 'Core', 'Elective', 'Co-Curricular', 'Other']
 
@@ -150,7 +151,8 @@ const TimetableSubjects: React.FC<TimetableSubjectsProps> = ({
   })
   const [selectedCommonPeriodSections, setSelectedCommonPeriodSections] = useState<string[]>([])
   // View-only state for the redesigned layout (search, type filter, confirmations, inline form errors).
-  const [subjectSearch, setSubjectSearch] = useState('')
+  const initialSubjectSearch = useUrlSearchQuery((value) => setSubjectSearch(value))
+  const [subjectSearch, setSubjectSearch] = useState(initialSubjectSearch)
   const [subjectTypeFilter, setSubjectTypeFilter] = useState('all')
   const [subjectDeleteIds, setSubjectDeleteIds] = useState<string[] | null>(null)
   const [pairDeleteId, setPairDeleteId] = useState<string | null>(null)

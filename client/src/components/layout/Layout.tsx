@@ -4,6 +4,7 @@ import Sidebar from './Sidebar'
 import Header from './Header'
 import BillingBanner from './BillingBanner'
 import { AttndMatrixModeProvider } from '@/contexts/AttndMatrixModeContext'
+import { CommandPaletteProvider } from '@/components/commandPalette/CommandPaletteProvider'
 
 const SIDEBAR_EXPANDED_DEFAULT = 248
 const SIDEBAR_EXPANDED_MIN = 232
@@ -111,6 +112,7 @@ const Layout: React.FC = () => {
   const currentSidebarWidth = isSidebarCollapsed ? SIDEBAR_COLLAPSED_WIDTH : sidebarWidth
 
   return (
+    <CommandPaletteProvider>
     <AttndMatrixModeProvider>
     <div className="cb-shell relative flex h-screen overflow-hidden">
       {/* Sidebar */}
@@ -161,6 +163,7 @@ const Layout: React.FC = () => {
       </div>
     </div>
     </AttndMatrixModeProvider>
+    </CommandPaletteProvider>
   )
 }
 
