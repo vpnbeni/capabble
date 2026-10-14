@@ -1534,6 +1534,7 @@ const Students: React.FC = () => {
         open={isFormOpen}
         onClose={closeForm}
         size="xl"
+        icon={editingStudentId ? Pencil : UserPlus}
         title={editingStudentId ? `Edit ${formData.name || 'student'}` : 'Add student'}
         description={
           editingStudentId

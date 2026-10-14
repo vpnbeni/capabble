@@ -92,6 +92,8 @@ export interface SheetProps {
   onClose?: () => void
   title: React.ReactNode
   description?: React.ReactNode
+  /** Small glyph shown in a grey rounded tile before the title. */
+  icon?: LucideIcon
   size?: 'sm' | 'md' | 'lg' | 'xl'
   footer?: React.ReactNode
   children?: React.ReactNode
@@ -100,7 +102,7 @@ export interface SheetProps {
 }
 
 /** Slides in from the right on desktop and up from the bottom on phones. */
-export const Sheet: React.FC<SheetProps> = ({ open, onClose, title, description, size = 'md', footer, children, onSubmit }) => {
+export const Sheet: React.FC<SheetProps> = ({ open, onClose, title, description, icon, size = 'md', footer, children, onSubmit }) => {
   const id = useId()
   const inner = (
     <>
@@ -119,11 +121,16 @@ export const Sheet: React.FC<SheetProps> = ({ open, onClose, title, description,
           aria-labelledby={`${id}-t`}
         >
           <div className="cb-sheet__head">
-            <div style={{ minWidth: 0 }}>
-              <h2 id={`${id}-t`} className="cb-dialog__title">
+            {icon ? (
+              <span className="cb-sheet__icon" aria-hidden="true">
+                <Icon icon={icon} size={16} />
+              </span>
+            ) : null}
+            <div className="cb-sheet__titles">
+              <h2 id={`${id}-t`} className="cb-sheet__title">
                 {title}
               </h2>
-              {description ? <p className="cb-dialog__desc">{description}</p> : null}
+              {description ? <p className="cb-sheet__desc">{description}</p> : null}
             </div>
             {onClose ? <Button variant="tertiary" size="sm" icon={X} aria-label="Close" onClick={onClose} /> : null}
           </div>

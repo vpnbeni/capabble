@@ -1,0 +1,150 @@
+/* Attendance module pages. Tokens only; everything sits inside .cb-app. */
+
+/* ---------- Month / date stepper ---------- */
+.cb-app .attnd-stepper { display: inline-flex; align-items: stretch; height: var(--control-sm); border: 1px solid var(--border-control); border-radius: var(--radius-md); background: var(--surface); overflow: hidden; flex: none; }
+.cb-app .attnd-stepper__btn { display: inline-flex; align-items: center; justify-content: center; width: 30px; border: 0; background: none; color: var(--ink-muted); cursor: pointer; }
+.cb-app .attnd-stepper__btn:hover { background: var(--surface-hover); color: var(--ink); }
+.cb-app .attnd-stepper__btn:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+.cb-app .attnd-stepper__label { display: inline-flex; align-items: center; justify-content: center; min-width: 108px; padding: 0 var(--space-2); border-inline: 1px solid var(--border); font: 500 13px/18px var(--font-sans); color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* ---------- Header view switch ---------- */
+.cb-app .attnd-modeswitch { flex: none; margin-left: var(--space-3); }
+
+/* ---------- Toolbar ---------- */
+.cb-app .attnd-toolbar { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-4) var(--space-5); }
+@media (max-width: 640px) { .cb-app .attnd-toolbar { padding: var(--space-3) var(--space-4); } }
+.cb-app .attnd-summary { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2) var(--space-4); flex-wrap: wrap; }
+.cb-app .attnd-summary__counts { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+.cb-app .attnd-summary__counts .cb-badge { font-variant-numeric: tabular-nums; }
+.cb-app .attnd-legend { display: flex; align-items: center; gap: var(--space-4); flex-wrap: wrap; font-size: 12px; line-height: 16px; color: var(--ink-muted); }
+.cb-app .attnd-legend__item { display: inline-flex; align-items: center; gap: 6px; }
+.cb-app .attnd-legend__swatch { width: 14px; height: 14px; border-radius: 4px; border: 1px solid var(--border-strong); background: var(--surface); }
+.cb-app .attnd-legend__swatch.is-holiday { background: var(--danger-soft); border-color: var(--danger-border); }
+.cb-app .attnd-legend__swatch.is-today { background: var(--accent-soft); border-color: var(--accent); }
+.cb-app .attnd-legend .attnd-mark { pointer-events: none; }
+.cb-app .attnd-daytoggle.is-holiday { color: var(--danger-ink); }
+
+/* ---------- Attendance matrix ---------- */
+.cb-app .attnd-matrix-card .attnd-matrix-scroll { border-top: 1px solid var(--border); }
+.cb-app .attnd-matrix-scroll { overflow: auto; max-height: calc(100dvh - 300px); min-height: 240px; overscroll-behavior: contain; }
+.cb-app .attnd-matrix { border-collapse: separate; border-spacing: 0; font-size: 13px; line-height: 18px; color: var(--ink); width: max-content; min-width: 100%; }
+.cb-app .attnd-matrix th { position: sticky; top: 0; z-index: 2; background: var(--surface-sunken); color: var(--ink-subtle); font: 500 12px/16px var(--font-sans); text-align: left; padding: 8px var(--space-3); border-bottom: 1px solid var(--border); white-space: nowrap; }
+.cb-app .attnd-matrix td { height: var(--row-compact); padding: 0 var(--space-3); border-bottom: 1px solid var(--border); vertical-align: middle; background: var(--surface); white-space: nowrap; }
+.cb-app .attnd-matrix tbody tr:last-child td { border-bottom: 0; }
+.cb-app .attnd-matrix tbody tr:hover td { background: var(--surface-hover); }
+
+/* Sticky identity columns: #, ID, name. */
+.cb-app .attnd-matrix .is-pin { position: sticky; z-index: 1; }
+.cb-app .attnd-matrix th.is-pin { z-index: 3; }
+.cb-app .attnd-matrix .is-idx { left: 0; width: 48px; min-width: 48px; color: var(--ink-subtle); font-variant-numeric: tabular-nums; }
+.cb-app .attnd-matrix th.is-idx { color: var(--ink-subtle); }
+.cb-app .attnd-matrix .is-id { left: 48px; width: 104px; min-width: 104px; max-width: 104px; color: var(--ink-muted); font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; }
+.cb-app .attnd-matrix .is-name { left: 152px; width: 220px; min-width: 220px; max-width: 220px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; box-shadow: inset -1px 0 0 var(--border); }
+.cb-app .attnd-matrix--narrow .is-idx { box-shadow: inset -1px 0 0 var(--border); }
+@media (max-width: 640px) {
+  .cb-app .attnd-matrix .is-id { display: none; }
+  .cb-app .attnd-matrix .is-name { left: 48px; width: 148px; min-width: 148px; max-width: 148px; }
+}
+
+/* Day columns. */
+.cb-app .attnd-matrix th.attnd-dayhead { padding: 0; width: 40px; min-width: 40px; text-align: center; }
+.cb-app .attnd-day { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; width: 100%; padding: 6px 0; border: 0; background: none; cursor: pointer; color: inherit; font: inherit; }
+.cb-app .attnd-day:hover { background: var(--surface-hover); }
+.cb-app .attnd-day:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+.cb-app .attnd-day__num { font: 600 13px/18px var(--font-sans); color: var(--ink); font-variant-numeric: tabular-nums; }
+.cb-app .attnd-day__dow { font: 500 10px/12px var(--font-sans); letter-spacing: 0.02em; color: var(--ink-subtle); text-transform: uppercase; }
+.cb-app .attnd-matrix th.attnd-dayhead.is-holiday { background: var(--danger-soft); }
+.cb-app .attnd-matrix th.attnd-dayhead.is-holiday .attnd-day__dow { color: var(--danger-ink); }
+.cb-app .attnd-matrix th.attnd-dayhead.is-today { background: var(--accent-soft); box-shadow: inset 0 -2px 0 var(--accent); }
+.cb-app .attnd-matrix th.attnd-dayhead.is-today .attnd-day__num { color: var(--accent-soft-ink); }
+.cb-app .attnd-matrix td.attnd-cell { padding: 0; width: 40px; min-width: 40px; text-align: center; }
+.cb-app .attnd-matrix td.attnd-cell.is-holiday { background: color-mix(in srgb, var(--danger-soft) 70%, var(--surface)); }
+.cb-app .attnd-matrix td.attnd-cell.is-today { background: color-mix(in srgb, var(--accent-soft) 60%, var(--surface)); }
+.cb-app .attnd-matrix tbody tr:hover td.attnd-cell.is-holiday { background: var(--danger-soft); }
+.cb-app .attnd-matrix tbody tr:hover td.attnd-cell.is-today { background: var(--accent-soft); }
+
+/* Absent mark: an empty box means present; a filled "A" means absent. */
+.cb-app .attnd-mark { appearance: none; -webkit-appearance: none; position: relative; display: inline-block; width: 20px; height: 20px; margin: 0; vertical-align: middle; border: 1px solid var(--border-strong); border-radius: 5px; background: var(--surface); cursor: pointer; transition: background-color .1s, border-color .1s; }
+.cb-app .attnd-mark:hover:not(:disabled) { border-color: var(--border-control); }
+.cb-app .attnd-mark:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+.cb-app .attnd-mark:checked { background: var(--danger-solid); border-color: var(--danger-solid); }
+.cb-app .attnd-mark:checked::after { content: 'A'; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font: 700 11px/1 var(--font-sans); color: var(--on-danger); }
+.cb-app .attnd-mark:disabled { cursor: not-allowed; opacity: 0.35; background: transparent; }
+
+/* Daywise: one column per class-section or staff type, a slot per person. */
+.cb-app .attnd-matrix th.attnd-grouphead { padding: 0; width: 148px; min-width: 148px; max-width: 148px; }
+.cb-app .attnd-matrix th.attnd-grouphead.is-holiday { background: var(--danger-soft); }
+.cb-app .attnd-group { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; width: 100%; padding: 6px var(--space-3); border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.cb-app .attnd-group:hover { background: var(--surface-hover); }
+.cb-app .attnd-group:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+.cb-app .attnd-group--static { cursor: default; }
+.cb-app .attnd-group--static:hover { background: none; }
+.cb-app .attnd-group__name { font: 600 13px/18px var(--font-sans); color: var(--ink); max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.cb-app .attnd-group__meta { font: 500 11px/14px var(--font-sans); color: var(--ink-subtle); }
+.cb-app .attnd-grouphead.is-holiday .attnd-group__meta { color: var(--danger-ink); }
+.cb-app .attnd-matrix td.attnd-slotcell { padding: 0 var(--space-2); width: 148px; min-width: 148px; max-width: 148px; }
+.cb-app .attnd-matrix td.attnd-slotcell.is-holiday { background: color-mix(in srgb, var(--danger-soft) 70%, var(--surface)); }
+.cb-app .attnd-slot { display: flex; align-items: center; gap: var(--space-2); min-width: 0; cursor: pointer; }
+.cb-app .attnd-slot__name { flex: 1; min-width: 0; font-size: 12px; line-height: 16px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; }
+.cb-app .attnd-slot.is-absent .attnd-slot__name { color: var(--danger-ink); font-weight: 500; }
+.cb-app .attnd-slot.is-disabled { cursor: not-allowed; }
+.cb-app .attnd-slot.is-disabled .attnd-slot__name { color: var(--ink-subtle); }
+
+.cb-app .attnd-matrix-state { padding: var(--space-8) var(--space-4); }
+
+/* ---------- Attndboard ---------- */
+.cb-app .attnd-boardbar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
+.cb-app .attnd-boardbar__text { font-size: 14px; line-height: 20px; color: var(--ink-muted); }
+.cb-app .attnd-boardbar__text strong { color: var(--ink); font-weight: 600; }
+
+/* Class absence heatmap: one hue, light to dark. */
+.cb-app .attnd-heat-scroll { overflow-x: auto; }
+.cb-app .attnd-heat { border-collapse: separate; border-spacing: 4px; font-size: 13px; line-height: 18px; margin: -4px; }
+.cb-app .attnd-heat th { font: 500 12px/16px var(--font-sans); color: var(--ink-subtle); text-align: center; padding: 0 var(--space-1) var(--space-1); white-space: nowrap; }
+.cb-app .attnd-heat th.is-row { text-align: left; color: var(--ink); font-weight: 600; font-size: 13px; padding: 0 var(--space-3) 0 0; position: sticky; left: 0; background: var(--surface); }
+.cb-app .attnd-heat thead th.is-row { color: var(--ink-subtle); font-weight: 500; font-size: 12px; }
+.cb-app .attnd-heat td { padding: 0; min-width: 84px; }
+.cb-app .attnd-heat__cell { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; height: 52px; border-radius: var(--radius-md); background: var(--surface-sunken); color: var(--ink); font-variant-numeric: tabular-nums; }
+.cb-app .attnd-heat__value { font: 600 15px/20px var(--font-sans); }
+.cb-app .attnd-heat__sub { font-size: 11px; line-height: 14px; color: var(--ink-muted); }
+.cb-app .attnd-heat__cell.is-l1 { background: color-mix(in srgb, var(--chart-6) 14%, var(--surface)); }
+.cb-app .attnd-heat__cell.is-l2 { background: color-mix(in srgb, var(--chart-6) 32%, var(--surface)); }
+.cb-app .attnd-heat__cell.is-l3 { background: color-mix(in srgb, var(--chart-6) 58%, var(--surface)); }
+.cb-app .attnd-heat__cell.is-l4 { background: var(--chart-6); }
+.cb-app .attnd-heat__cell.is-l3 .attnd-heat__value, .cb-app .attnd-heat__cell.is-l4 .attnd-heat__value { color: var(--ink-inverse); }
+.cb-app .attnd-heat__cell.is-l3 .attnd-heat__sub, .cb-app .attnd-heat__cell.is-l4 .attnd-heat__sub { color: var(--ink-inverse); opacity: .85; }
+.dark .cb-app .attnd-heat__cell.is-l3 .attnd-heat__value, .dark .cb-app .attnd-heat__cell.is-l3 .attnd-heat__sub { color: var(--ink); }
+.cb-app .attnd-heat__none { display: block; text-align: center; color: var(--ink-disabled); }
+.cb-app .attnd-scale { display: inline-flex; align-items: center; gap: var(--space-2); font-size: 12px; line-height: 16px; color: var(--ink-muted); }
+.cb-app .attnd-scale__steps { display: inline-flex; gap: 2px; }
+.cb-app .attnd-scale__steps span { width: 18px; height: 10px; border-radius: 3px; }
+
+/* Staff absences by group: horizontal bars. */
+.cb-app .attnd-bars { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-3); }
+.cb-app .attnd-bars li { display: grid; grid-template-columns: 120px minmax(0, 1fr) 40px; align-items: center; gap: var(--space-3); }
+.cb-app .attnd-bars__label { font: 500 13px/18px var(--font-sans); color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cb-app .attnd-bars__track { height: 10px; border-radius: var(--radius-full); background: var(--surface-sunken); overflow: hidden; }
+.cb-app .attnd-bars__fill { display: block; height: 100%; border-radius: var(--radius-full); background: var(--chart-6); min-width: 0; }
+.cb-app .attnd-bars__value { font: 600 14px/20px var(--font-sans); color: var(--ink); text-align: right; font-variant-numeric: tabular-nums; }
+.cb-app .attnd-bars__meta { grid-column: 2 / -1; margin-top: -8px; font-size: 12px; line-height: 16px; color: var(--ink-muted); font-variant-numeric: tabular-nums; }
+@media (max-width: 640px) { .cb-app .attnd-bars li { grid-template-columns: 96px minmax(0, 1fr) 36px; } }
+
+/* Daily absences: stacked columns (students + staff). */
+.cb-app .attnd-trend { display: flex; flex-direction: column; gap: var(--space-3); }
+.cb-app .attnd-trend__plot { display: flex; align-items: flex-end; gap: 2px; height: 168px; margin-bottom: 20px; position: relative; border-bottom: 1px solid var(--border); }
+.cb-app .attnd-trend__col { position: relative; flex: 1 1 0; min-width: 0; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; gap: 2px; cursor: default; }
+.cb-app .attnd-trend__col:hover .attnd-trend__seg, .cb-app .attnd-trend__col:focus-visible .attnd-trend__seg { filter: brightness(0.92); }
+.cb-app .attnd-trend__col:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; border-radius: 4px; }
+.cb-app .attnd-trend__seg { display: block; width: 100%; }
+.cb-app .attnd-trend__seg:first-child { border-radius: 4px 4px 0 0; }
+.cb-app .attnd-trend__seg--students { background: var(--chart-1); }
+.cb-app .attnd-trend__seg--staff { background: var(--chart-3); }
+.cb-app .attnd-trend__seg--off { background: var(--surface-sunken); height: 4px; border-radius: 2px; }
+.cb-app .attnd-trend__seg--zero { background: var(--border); height: 2px; border-radius: 1px; }
+.cb-app .attnd-trend__day { position: absolute; bottom: -18px; left: 50%; transform: translateX(-50%); font-size: 10px; line-height: 12px; color: var(--ink-subtle); font-variant-numeric: tabular-nums; }
+.cb-app .attnd-trend__tip { position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%); z-index: 2; display: none; padding: 6px 10px; border-radius: var(--radius-md); background: var(--surface-raised); border: 1px solid var(--border); box-shadow: var(--shadow-overlay); font-size: 12px; line-height: 16px; color: var(--ink); white-space: nowrap; pointer-events: none; }
+.cb-app .attnd-trend__col:hover .attnd-trend__tip, .cb-app .attnd-trend__col:focus-visible .attnd-trend__tip { display: block; }
+.cb-app .attnd-trend__tip strong { display: block; font-weight: 600; margin-bottom: 2px; }
+.cb-app .attnd-trend__legend { display: flex; gap: var(--space-4); flex-wrap: wrap; font-size: 12px; line-height: 16px; color: var(--ink-muted); }
+.cb-app .attnd-trend__legend span { display: inline-flex; align-items: center; gap: 6px; }
+.cb-app .attnd-trend__legend i { width: 10px; height: 10px; border-radius: 3px; }

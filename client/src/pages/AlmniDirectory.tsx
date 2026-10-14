@@ -263,6 +263,7 @@ const AlmniDirectory: React.FC = () => {
       <Sheet
         open={Boolean(viewing)}
         onClose={() => setViewing(null)}
+        icon={GraduationCap}
         title={viewing?.name || 'Alumni profile'}
         description={
           viewing

@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
+import { CalendarCheck, CalendarOff, Save, SearchX, Users } from 'lucide-react'
 import { DateSwitcher } from '@/components/attnd/DateSwitcher'
+import { AttndDayMatrix, AttndSummary, pluralize, type DayColumn } from '@/components/attnd/AttndMatrix'
+import { Button, Card, FilterBar, Page } from '@/components/ui'
 import attndService, { type StaffDirectoryItem } from '@/services/attndService'
 import { getStaffTypeId, STAFF_TYPE_OPTIONS, type StaffTypeId } from '@/utils/attndStaffTypes'
 
@@ -114,133 +117,84 @@ export const AttndStaffDaywiseMatrix = () => {
     }
   }
 
-  return (
-    <div className="p-6">
-      <div className="mx-auto max-w-[1400px] space-y-4">
-        <div className="flex flex-col gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm dark:border-gray-700 dark:bg-gray-800 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex flex-wrap items-center gap-2">
-            <DateSwitcher value={selectedDate} onChange={setSelectedDate} />
-            <button
-              type="button"
-              onClick={() => setHoliday((prev) => !prev)}
-              className={`rounded-lg border px-3 py-1.5 text-xs font-semibold ${
-                holiday
-                  ? 'border-rose-200 bg-rose-50 text-rose-700'
-                  : 'border-emerald-200 bg-emerald-50 text-emerald-700'
-              }`}
-            >
-              {holiday ? 'Holiday' : 'Working day'}
-            </button>
-            <p className="text-[11px] text-slate-500">All staff types for this day</p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(event) => setSearchQuery(event.target.value)}
-              placeholder="Search name or emp. ID"
-              className="w-[168px] rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-            />
-            <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-700">
-              <span className="text-xs font-semibold uppercase text-slate-500">Working </span>
-              <span className="font-semibold text-slate-800 dark:text-slate-100">{holiday ? 0 : 1}</span>
-            </div>
-            <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-sm dark:border-emerald-900/50 dark:bg-emerald-900/20">
-              <span className="text-xs font-semibold uppercase text-emerald-700 dark:text-emerald-300">Present </span>
-              <span className="font-semibold text-emerald-800 dark:text-emerald-200">{presentCount}</span>
-            </div>
-            <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-sm dark:border-rose-900/50 dark:bg-rose-900/20">
-              <span className="text-xs font-semibold uppercase text-rose-700 dark:text-rose-300">Absent </span>
-              <span className="font-semibold text-rose-800 dark:text-rose-200">{absentCount}</span>
-            </div>
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={saving || loading || staffRows.length === 0}
-              className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60"
-            >
-              {saving ? 'Saving...' : 'Save Attendance'}
-            </button>
-          </div>
-        </div>
+  const matrixColumns: DayColumn[] = columns.map((column) => ({
+    key: column.id,
+    name: column.label,
+    meta: holiday ? 'Holiday' : pluralize(staffByType[column.id]?.length || 0, 'member'),
+    holiday,
+  }))
+  const empty =
+    columns.length === 0
+      ? { icon: Users, title: 'No staff found', body: 'Add staff in the Staff module, then mark attendance here.' }
+      : rowCount === 0
+        ? { icon: SearchX, title: 'No staff match your search', body: 'Try a different name or employee ID.' }
+        : null
 
-        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
-          <div className="max-h-[68vh] overflow-auto">
-            <table className="w-max border-collapse">
-              <thead className="sticky top-0 z-40 bg-gray-50 dark:bg-gray-900">
-                <tr>
-                  <th className="sticky left-0 z-20 w-[36px] min-w-[36px] bg-gray-50 px-1 py-1.5 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:bg-gray-900/70">#</th>
-                  {columns.map((column) => (
-                    <th
-                      key={column.id}
-                      className={`w-[92px] min-w-[92px] max-w-[92px] p-1 text-center text-[11px] font-semibold ${
-                        holiday ? 'bg-rose-50 text-rose-700' : 'bg-gray-50 text-emerald-700'
-                      }`}
-                    >
-                      {column.label}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100 dark:divide-gray-700/60">
-                {loading ? (
-                  <tr>
-                    <td colSpan={1 + columns.length} className="px-3 py-8 text-center text-sm text-gray-500">
-                      Loading staff...
-                    </td>
-                  </tr>
-                ) : columns.length === 0 || rowCount === 0 ? (
-                  <tr>
-                    <td colSpan={1 + Math.max(columns.length, 1)} className="px-3 py-8 text-center text-sm text-gray-500">
-                      {columns.length === 0 ? 'No staff types found.' : 'No staff found for this day.'}
-                    </td>
-                  </tr>
-                ) : (
-                  Array.from({ length: rowCount }, (_, index) => (
-                    <tr key={`staff-daywise-${index}`} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
-                      <td className="sticky left-0 z-[5] bg-white px-1 py-1 text-center text-xs text-gray-500 dark:bg-gray-800">
-                        {index + 1}
-                      </td>
-                      {columns.map((column) => {
-                        const staff = staffByType[column.id]?.[index]
-                        return (
-                          <td
-                            key={`${column.id}-${index}`}
-                            className={`w-[92px] min-w-[92px] max-w-[92px] p-0.5 text-center ${holiday ? 'bg-rose-50/80' : ''}`}
-                          >
-                            {staff ? (
-                              <label className="flex cursor-pointer flex-col items-center gap-0.5 px-0.5 py-0.5">
-                                <span className="w-full truncate text-[9px] font-medium text-gray-700 dark:text-gray-200" title={staff.name}>
-                                  {staff.name}
-                                </span>
-                                <input
-                                  type="checkbox"
-                                  checked={!holiday && Boolean(absenceMap[staff._id])}
-                                  disabled={holiday}
-                                  onChange={() => toggleAbsent(staff._id)}
-                                  title={holiday ? 'Holiday' : `Mark ${staff.name} absent`}
-                                  className="h-3.5 w-3.5 cursor-pointer rounded border-gray-300 text-rose-600 focus:ring-rose-500 disabled:cursor-not-allowed disabled:opacity-30"
-                                />
-                              </label>
-                            ) : (
-                              <span className="block h-8" />
-                            )}
-                          </td>
-                        )
-                      })}
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+  return (
+    <Page width="full">
+      <Card
+        flush
+        className="attnd-matrix-card"
+        footer={
+          loading
+            ? undefined
+            : `${pluralize(visibleStaff.length, 'staff member')} across ${pluralize(columns.length, 'staff type')}. Save to keep changes.`
+        }
+      >
+        <div className="attnd-toolbar">
+          <FilterBar
+            search={{
+              placeholder: 'Search name or employee ID',
+              value: searchQuery,
+              onChange: setSearchQuery,
+              label: 'Search staff',
+            }}
+            filters={
+              <>
+                <DateSwitcher value={selectedDate} onChange={setSelectedDate} />
+                <Button
+                  size="sm"
+                  icon={holiday ? CalendarOff : CalendarCheck}
+                  className={holiday ? 'attnd-daytoggle is-holiday' : 'attnd-daytoggle'}
+                  aria-pressed={holiday}
+                  onClick={() => setHoliday((prev) => !prev)}
+                  title={holiday ? 'Holiday. Click to make it a working day.' : 'Working day. Click to make it a holiday.'}
+                >
+                  {holiday ? 'Holiday' : 'Working day'}
+                </Button>
+              </>
+            }
+            actions={
+              <Button
+                variant="primary"
+                size="sm"
+                icon={Save}
+                onClick={handleSave}
+                loading={saving}
+                disabled={loading || staffRows.length === 0}
+              >
+                Save attendance
+              </Button>
+            }
+          />
+          <AttndSummary
+            working={holiday ? 0 : 1}
+            workingLabel="working day"
+            present={presentCount}
+            absent={absentCount}
+            holidayHint="Use the Working day button to mark this date a holiday."
+          />
         </div>
-        <p className="text-[11px] text-slate-500">
-          {loading
-            ? 'Loading staff...'
-            : `${visibleStaff.length} staff across ${columns.length} type${columns.length === 1 ? '' : 's'}. Click Working day / Holiday to change this date.`}
-        </p>
-      </div>
-    </div>
+        <AttndDayMatrix
+          columns={matrixColumns}
+          peopleByColumn={staffByType}
+          isAbsent={(id) => Boolean(absenceMap[id])}
+          onToggleAbsent={(id) => toggleAbsent(id)}
+          loading={loading}
+          loadingLabel="Loading staff"
+          empty={empty}
+        />
+      </Card>
+    </Page>
   )
 }

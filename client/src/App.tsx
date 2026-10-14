@@ -24,6 +24,7 @@ import StaafStaffMembers from './pages/StaafStaffMembers'
 import StaafOverview from './pages/StaafOverview'
 import StaafStaffGroup from './pages/StaafStaffGroup'
 import StaafOrgStructure from './pages/StaafOrgStructure'
+import StaafStaffProfile from './pages/StaafStaffProfile'
 import StaafRecruitment from './pages/StaafRecruitment'
 import Teachers from './pages/Teachers'
 import TeacherDetail from './pages/TeacherDetail'
@@ -356,6 +357,7 @@ function App() {
               <Route path="stdnt" element={<Navigate to="/stdnt/stdntboard" replace />} />
               <Route path="staaf/overview" element={<StaafOverview />} />
               <Route path="staaf/organisation-structure" element={<StaafOrgStructure />} />
+              <Route path="staaf/staff/:id" element={<StaafStaffProfile />} />
               <Route path="staaf/teaching-staff" element={<StaafStaffGroup group="teaching" />} />
               <Route path="staaf/sports-coach" element={<StaafStaffGroup group="sportsCoach" />} />
               <Route path="staaf/admin-staff" element={<StaafStaffGroup group="admin" />} />

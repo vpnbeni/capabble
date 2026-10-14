@@ -34,6 +34,30 @@ export function useTeachers(
   })
 }
 
+/** The API caps `limit` at 100, so this fetches every page and joins them. */
+const TEACHERS_PAGE_LIMIT = 100
+
+export function useAllTeachers(
+  params: Omit<FetchTeachersParams, 'page' | 'limit'>,
+  options?: Omit<UseQueryOptions<PaginatedTeachersResponse, Error>, 'queryKey' | 'queryFn'>
+) {
+  return useQuery({
+    queryKey: [...teacherKeys.list({ ...params, page: 0, limit: TEACHERS_PAGE_LIMIT }), 'all'],
+    queryFn: async () => {
+      const first = await teacherService.getAll({ ...params, page: 1, limit: TEACHERS_PAGE_LIMIT })
+      const items = [...first.items]
+      for (let page = 2; page <= first.totalPages; page += 1) {
+        const next = await teacherService.getAll({ ...params, page, limit: TEACHERS_PAGE_LIMIT })
+        items.push(...next.items)
+      }
+      return { ...first, items, currentPage: 1, totalPages: 1, totalItems: items.length, itemsPerPage: items.length }
+    },
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    ...options,
+  })
+}
+
 export function useTeacher(id: string | null, options?: Omit<UseQueryOptions<any, Error>, 'queryKey' | 'queryFn'>) {
   return useQuery({
     queryKey: teacherKeys.detail(id!),

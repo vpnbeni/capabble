@@ -274,19 +274,27 @@ const Header: React.FC<HeaderProps> = ({ isSidebarCollapsed, onToggleSidebar }) 
       }
       case 'staaf': {
         const subPage = segments[1] || ''
-        const titleMap: Record<string, { title: string; subtitle: string }> = {
-          overview: { title: 'Overview', subtitle: 'Staff stats, gender matrix, group matrix, and designation matrix.' },
-          'organisation-structure': { title: 'Organisation Structure', subtitle: 'Hierarchy of the organisation from principal to support staff.' },
-          'teaching-staff': { title: 'Teaching Staff', subtitle: 'Detailed profiles of all teaching staff members.' },
-          'sports-coach': { title: 'Sports Coach', subtitle: 'Detailed profiles of all sports coaches.' },
-          'admin-staff': { title: 'Admin Staff', subtitle: 'Detailed profiles of all admin staff members.' },
-          drivers: { title: 'Drivers', subtitle: 'Detailed profiles of all drivers.' },
-          conductors: { title: 'Conductors', subtitle: 'Detailed profiles of all conductors.' },
-          security: { title: 'Security Personnel', subtitle: 'Detailed profiles of all security personnel.' },
-          recruitment: { title: 'Recruitment', subtitle: 'Vacant posts, advertisements, applications, schedules, and recruitment process flow.' },
-          'staff-members': { title: 'Staff Members', subtitle: 'Create, import, filter, and manage staff member records.' },
+        if (subPage === 'staff' && segments[2]) {
+          return {
+            pageTitle: 'Staff profile',
+            pageSubtitle: 'Work, contact and personal details.',
+            showBackButton: true,
+            backTo: '/staaf/organisation-structure',
+          }
         }
-        const info = titleMap[subPage] || { title: 'STAAF', subtitle: 'Staff management workspace' }
+        const titleMap: Record<string, { title: string; subtitle: string }> = {
+          overview: { title: 'Overview', subtitle: 'Staff strength by group, designation and gender for this session.' },
+          'organisation-structure': { title: 'Organisation structure', subtitle: 'Who reports to whom, from the principal to support staff.' },
+          'teaching-staff': { title: 'Teaching staff', subtitle: 'Teachers and their designations, subjects and contact details.' },
+          'sports-coach': { title: 'Sports coaches', subtitle: 'Coaches and their contact details.' },
+          'admin-staff': { title: 'Admin staff', subtitle: 'Office and administration staff.' },
+          drivers: { title: 'Drivers', subtitle: 'School bus and vehicle drivers.' },
+          conductors: { title: 'Conductors', subtitle: 'Bus conductors and attendants.' },
+          security: { title: 'Security', subtitle: 'Guards and security personnel.' },
+          recruitment: { title: 'Recruitment', subtitle: 'Vacant posts, applications and interview schedules.' },
+          'staff-members': { title: 'Staff members', subtitle: 'Add, import and manage staff records.' },
+        }
+        const info = titleMap[subPage] || { title: 'Staff', subtitle: 'Staff records for this session.' }
         return {
           pageTitle: info.title,
           pageSubtitle: info.subtitle,
@@ -500,11 +508,11 @@ const Header: React.FC<HeaderProps> = ({ isSidebarCollapsed, onToggleSidebar }) 
       case 'attnd': {
         const subPage = segments[1] || ''
         const titleMap: Record<string, { title: string; subtitle: string }> = {
-          attndboard: { title: 'Attndboard', subtitle: 'Attendance snapshot for staff and students' },
-          'staff-attendance': { title: 'Staff Attendance', subtitle: 'Mark and save daily staff attendance' },
-          'student-attendance': { title: 'Student Attendance', subtitle: 'Mark and save student attendance classwise or daywise' },
+          attndboard: { title: 'Attndboard', subtitle: 'Who is in today, and where absences are adding up.' },
+          'staff-attendance': { title: 'Staff attendance', subtitle: 'Tick the days each staff member was absent, then save.' },
+          'student-attendance': { title: 'Student attendance', subtitle: 'Tick the days each student was absent, then save.' },
         }
-        const info = titleMap[subPage] || { title: 'ATTND', subtitle: 'Attendance management workspace' }
+        const info = titleMap[subPage] || { title: 'Attendance', subtitle: 'Staff and student attendance for this session.' }
         return {
           pageTitle: info.title,
           pageSubtitle: info.subtitle,

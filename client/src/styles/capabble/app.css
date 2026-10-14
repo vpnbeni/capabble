@@ -115,12 +115,22 @@
 .cb-app .cb-tcard__head { justify-content: flex-start; }
 .cb-app .cb-tcard__titles { flex: 1; }
 
-/* ---------- FilterBar additions ---------- */
-.cb-app .cb-filterbar__filters { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
-.cb-app .cb-filterbar__filters .cb-field { min-width: 140px; }
+/* ---------- FilterBar additions ----------
+ * Search and filters sit together on the left and wrap inside their own area;
+ * the actions stay pinned to the top-right instead of dropping onto a row of their own.
+ * Every filter select has the same width so the row reads as one set. */
+.cb-app .cb-filterbar { flex-wrap: nowrap; align-items: flex-start; gap: var(--space-3); }
+.cb-app .cb-filterbar__main { flex: 1 1 auto; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.cb-app .cb-filterbar__search { flex: 1 1 240px; max-width: 320px; min-width: 200px; }
+.cb-app .cb-filterbar__filters { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; min-width: 0; }
+.cb-app .cb-filterbar__filters .cb-field { flex: none; width: 168px; min-width: 0; }
+.cb-app .cb-filterbar__actions { flex: none; flex-wrap: nowrap; }
 @media (max-width: 640px) {
-  .cb-app .cb-filterbar__filters { width: 100%; }
-  .cb-app .cb-filterbar__filters .cb-field { flex: 1 1 0; min-width: 0; }
+  .cb-app .cb-filterbar { flex-wrap: wrap; }
+  .cb-app .cb-filterbar__main { width: 100%; }
+  .cb-app .cb-filterbar__search { min-width: 0; }
+  .cb-app .cb-filterbar__filters { width: 100%; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cb-app .cb-filterbar__filters .cb-field { width: auto; }
   .cb-app .cb-filterbar__actions { width: 100%; flex-wrap: wrap; }
 }
 
@@ -130,6 +140,15 @@
 .cb-app .cb-overlay__backdrop { position: absolute; inset: 0; background: rgba(12, 13, 14, .48); }
 .cb-app .cb-overlay > .cb-dialog, .cb-app .cb-overlay > .cb-sheet { position: relative; z-index: 1; }
 .cb-app .cb-sheet--xl { max-width: 760px; }
+/* Compact sheet chrome: a short header with an icon tile, and a slim footer with small buttons. */
+.cb-app .cb-sheet__head { align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-4) var(--space-3) var(--space-5); }
+.cb-app .cb-sheet__icon { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: var(--radius-md); background: var(--surface-sunken); color: var(--ink-muted); }
+.cb-app .cb-sheet__titles { flex: 1; min-width: 0; }
+.cb-app .cb-sheet__title { margin: 0; font: 600 15px/22px var(--font-sans); color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cb-app .cb-sheet__desc { margin: 0; font-size: 13px; line-height: 18px; color: var(--ink-muted); }
+.cb-app .cb-sheet__foot { align-items: center; padding: var(--space-3) var(--space-5); }
+.cb-app .cb-sheet__foot .cb-btn { height: var(--control-sm); padding: 0 12px; gap: 6px; font-size: 13px; }
+@media (max-width: 640px) { .cb-app .cb-sheet__foot .cb-btn { height: var(--control-lg); font-size: 14px; } }
 .cb-app .cb-sheet__form { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 @media (prefers-reduced-motion: no-preference) {
   .cb-app .cb-overlay--sheet > .cb-sheet { animation: cb-sheet-in .18s ease-out; }
@@ -143,3 +162,9 @@
 
 /* ---------- Toast content rendered by react-hot-toast ---------- */
 .cb-app.cb-toast-host { background: transparent; }
+
+/* Card headers wrap on phones so a header action never squeezes the title. */
+@media (max-width: 640px) {
+  .cb-app .cb-card__head { flex-wrap: wrap; }
+  .cb-app .cb-card__titles { flex: 1 1 180px; }
+}

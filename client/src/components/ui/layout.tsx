@@ -191,6 +191,7 @@ export const FilterBar: React.FC<{
   className?: string
 }> = ({ search, chips, onChipClick, chipsLabel, filters, actions, className }) => (
   <div className={cx('cb-filterbar', className)}>
+    <div className="cb-filterbar__main">
     {search ? (
       <div className="cb-filterbar__search">
         <div className="cb-input cb-input--sm">
@@ -222,6 +223,7 @@ export const FilterBar: React.FC<{
       </div>
     ) : null}
     {filters ? <div className="cb-filterbar__filters">{filters}</div> : null}
+    </div>
     {actions ? <div className="cb-filterbar__actions">{actions}</div> : null}
   </div>
 )

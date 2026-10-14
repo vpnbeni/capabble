@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react'
-import { BarChart3, Shield, Users, UserSquare2 } from 'lucide-react'
-import { useTeachers } from '../hooks/useTeachers'
+import { useNavigate } from 'react-router-dom'
+import { ArrowRight, Briefcase, Contact, GraduationCap, UserCheck, Users, UserX } from 'lucide-react'
+import { useAllTeachers } from '../hooks/useTeachers'
 import {
   getDesignationCode,
   getStaffGender,
@@ -13,21 +14,40 @@ import {
   isTeachingStaff,
 } from '../utils/staafStaff'
 import type { Teacher } from '../redux/slices/teacherSlice'
+import { Badge, Button, Card, EmptyState, Icon, Page, Progress, StatCard } from '@/components/ui'
+import { formatCount } from '@/components/students/studentFormat'
+import '@/components/staaf/staaf.css'
 
 const GROUP_CARDS = [
-  { key: 'teaching', label: 'Teaching', tone: 'bg-blue-50 text-blue-700 ring-blue-100', match: isTeachingStaff },
-  { key: 'sports-coach', label: 'Sports Coach', tone: 'bg-orange-50 text-orange-700 ring-orange-100', match: isSportsCoach },
-  { key: 'admin', label: 'Admin', tone: 'bg-violet-50 text-violet-700 ring-violet-100', match: isAdminStaff },
-  { key: 'class-iv', label: 'Class IV', tone: 'bg-amber-50 text-amber-700 ring-amber-100', match: isClassIvStaff },
-  { key: 'drivers', label: 'Drivers', tone: 'bg-emerald-50 text-emerald-700 ring-emerald-100', match: isDriver },
-  { key: 'conductors', label: 'Conductors', tone: 'bg-sky-50 text-sky-700 ring-sky-100', match: isConductor },
-  { key: 'security', label: 'Security', tone: 'bg-slate-100 text-slate-700 ring-slate-200', match: isSecurityStaff },
+  { key: 'teaching', label: 'Teaching', match: isTeachingStaff },
+  { key: 'sports-coach', label: 'Sports coaches', match: isSportsCoach },
+  { key: 'admin', label: 'Admin', match: isAdminStaff },
+  { key: 'class-iv', label: 'Class IV', match: isClassIvStaff },
+  { key: 'drivers', label: 'Drivers', match: isDriver },
+  { key: 'conductors', label: 'Conductors', match: isConductor },
+  { key: 'security', label: 'Security', match: isSecurityStaff },
 ] as const
 
+const DESIGNATION_TILES = [
+  { key: 'PRT', label: 'PRT' },
+  { key: 'TGT', label: 'TGT' },
+  { key: 'PGT', label: 'PGT' },
+  { key: 'Other', label: 'Other teaching' },
+] as const
+
+const GENDER_SERIES = [
+  { key: 'Male', label: 'Male', color: 'var(--chart-1)' },
+  { key: 'Female', label: 'Female', color: 'var(--chart-2)' },
+  { key: 'Other', label: 'Other', color: 'var(--chart-4)' },
+  { key: 'Unspecified', label: 'Not recorded', color: 'var(--neutral-solid)' },
+] as const
+
+const percent = (part: number, whole: number) => (whole > 0 ? Math.round((part / whole) * 100) : 0)
+const staffWord = (n: number) => (n === 1 ? 'member' : 'members')
+
 const StaafOverview: React.FC = () => {
-  const { data, isLoading } = useTeachers({
-    page: 1,
-    limit: 500,
+  const navigate = useNavigate()
+  const { data, isLoading } = useAllTeachers({
     includeAllRecords: true,
     sort: 'name',
   })
@@ -65,105 +85,177 @@ const StaafOverview: React.FC = () => {
     }
   }, [staff])
 
+  const goToStaff = () => navigate('/staaf/teaching-staff')
+
   if (isLoading && staff.length === 0) {
     return (
-      <div className="rounded-[30px] border border-slate-200 bg-white px-6 py-16 text-center text-sm text-slate-500 shadow-sm">
-        Loading staff overview...
-      </div>
+      <Page>
+        <div className="cb-table-state" role="status">
+          <span className="cb-spinner" aria-hidden="true" />
+          Loading the staff overview
+        </div>
+      </Page>
     )
   }
 
+  const total = stats.total
+  const teachingCount = stats.groups.find((group) => group.key === 'teaching')?.count || 0
+  const supportCount = total - teachingCount
+  const inactive = Math.max(0, total - stats.active)
+  const largestGroup = Math.max(1, ...stats.groups.map((group) => group.count))
+  const teachingDesignated = DESIGNATION_TILES.reduce((sum, tile) => sum + stats.designations[tile.key], 0)
+  const largestDesignation = Math.max(1, ...DESIGNATION_TILES.map((tile) => stats.designations[tile.key]))
+  const genderCounts = GENDER_SERIES.map((series) => ({ ...series, count: stats.gender[series.key] }))
+  const unrecordedGender = stats.gender.Unspecified
+
   return (
-    <div className="space-y-6">
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard icon={<Users className="h-5 w-5" />} label="Total Staff" value={stats.total} hint="All staff records in the current session." tone="bg-blue-50 text-blue-600" />
-        <StatCard icon={<UserSquare2 className="h-5 w-5" />} label="Active Staff" value={stats.active} hint="Members currently marked active." tone="bg-emerald-50 text-emerald-600" />
-        <StatCard icon={<BarChart3 className="h-5 w-5" />} label="Teaching Staff" value={stats.groups.find((group) => group.key === 'teaching')?.count || 0} hint="Teachers and PRT / TGT / PGT designations." tone="bg-violet-50 text-violet-600" />
-        <StatCard icon={<Shield className="h-5 w-5" />} label="Support Staff" value={stats.total - (stats.groups.find((group) => group.key === 'teaching')?.count || 0)} hint="Admin, Class IV, transport, and security." tone="bg-amber-50 text-amber-600" />
+    <Page>
+      <section className="cb-stats" aria-label="Staff totals">
+        <StatCard label="Total staff" value={formatCount(total)} icon={Users} hint="All staff records this session" />
+        <StatCard
+          label="Active staff"
+          value={formatCount(stats.active)}
+          icon={UserCheck}
+          hint={inactive > 0 ? `${formatCount(inactive)} inactive` : 'Everyone is active'}
+          progress={percent(stats.active, total)}
+        />
+        <StatCard label="Teaching staff" value={formatCount(teachingCount)} icon={GraduationCap} hint="Teachers and PRT, TGT, PGT" />
+        <StatCard label="Support staff" value={formatCount(supportCount)} icon={Briefcase} hint="Admin, Class IV, transport and security" />
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-2">
-        <MatrixCard title="Gender Matrix" description="Male, female, and records still awaiting a gender value.">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <CountTile label="Male" value={stats.gender.Male} className="border-blue-100 bg-blue-50 text-blue-700" />
-            <CountTile label="Female" value={stats.gender.Female} className="border-rose-100 bg-rose-50 text-rose-700" />
-            <CountTile label="Other" value={stats.gender.Other} className="border-violet-100 bg-violet-50 text-violet-700" />
-            <CountTile label="Unspecified" value={stats.gender.Unspecified} className="border-slate-200 bg-slate-50 text-slate-600" />
-          </div>
-        </MatrixCard>
+      <div className="cb-grid-8-4">
+        <div className="cb-stack">
+          <Card
+            title="Staff by group"
+            subtitle="Bars compare each group with the largest one."
+            action={
+              total > 0 ? (
+                <Button variant="tertiary" size="sm" iconRight={ArrowRight} onClick={goToStaff}>
+                  View teaching staff
+                </Button>
+              ) : null
+            }
+          >
+            {total === 0 ? (
+              <EmptyState
+                compact
+                icon={Users}
+                title="No staff added yet"
+                body="Group, designation and gender counts appear here once staff records are added."
+                action={
+                  <Button variant="primary" size="sm" onClick={goToStaff}>
+                    Add staff
+                  </Button>
+                }
+              />
+            ) : (
+              <ul className="staaf-tiles">
+                {stats.groups.map((group, index) => (
+                  <li key={group.key} className={`staaf-tile staaf-tint--c${(index % 6) + 1}`}>
+                    <span className="staaf-tile__name">{group.label}</span>
+                    <span className="staaf-tile__count">{formatCount(group.count)}</span>
+                    <Progress value={group.count} max={largestGroup} showValue={false} size="sm" />
+                    <span className="staaf-tile__meta">{percent(group.count, total)}% of staff</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
 
-        <MatrixCard title="Designation Matrix" description="Teaching designations grouped as PRT, TGT, and PGT.">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <CountTile label="PRT" value={stats.designations.PRT} className="border-emerald-100 bg-emerald-50 text-emerald-700" />
-            <CountTile label="TGT" value={stats.designations.TGT} className="border-sky-100 bg-sky-50 text-sky-700" />
-            <CountTile label="PGT" value={stats.designations.PGT} className="border-indigo-100 bg-indigo-50 text-indigo-700" />
-            <CountTile label="Other teaching" value={stats.designations.Other} className="border-slate-200 bg-slate-50 text-slate-600" />
-          </div>
-        </MatrixCard>
-      </section>
-
-      <MatrixCard title="Group Matrix" description="Staff grouped as Teaching, Admin, Class IV, Drivers, Conductors, and Security.">
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {stats.groups.map((group) => (
-            <div key={group.key} className={`rounded-2xl px-4 py-4 ring-1 ${group.tone}`}>
-              <p className="text-sm font-medium">{group.label}</p>
-              <p className="mt-2 text-3xl font-bold text-slate-900">{group.count}</p>
-            </div>
-          ))}
+          <Card
+            title="Teaching staff by designation"
+            subtitle={total === 0 ? 'PRT, TGT and PGT counts' : `${formatCount(teachingDesignated)} teaching staff`}
+          >
+            {teachingDesignated === 0 ? (
+              <EmptyState
+                compact
+                icon={GraduationCap}
+                title="No teaching staff yet"
+                body="Designations are read from each teacher's designation, such as PRT, TGT or PGT."
+              />
+            ) : (
+              <ul className="staaf-tiles">
+                {DESIGNATION_TILES.map((tile, index) => {
+                  const count = stats.designations[tile.key]
+                  return (
+                    <li key={tile.key} className={`staaf-tile staaf-tint--c${(index % 6) + 1}`}>
+                      <span className="staaf-tile__name">{tile.label}</span>
+                      <span className="staaf-tile__count">{formatCount(count)}</span>
+                      <Progress value={count} max={largestDesignation} showValue={false} size="sm" />
+                      <span className="staaf-tile__meta">{percent(count, teachingDesignated)}% of teaching</span>
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
+          </Card>
         </div>
-      </MatrixCard>
-    </div>
+
+        <div className="cb-stack">
+          <Card title="Gender split" subtitle={`${formatCount(total)} staff`}>
+            {total === 0 ? (
+              <EmptyState compact icon={Contact} title="No staff yet" />
+            ) : (
+              <div className="staaf-gender">
+                <div
+                  className="staaf-gender__bar"
+                  role="img"
+                  aria-label={genderCounts.map((g) => `${g.label} ${g.count}`).join(', ')}
+                >
+                  {genderCounts
+                    .filter((g) => g.count > 0)
+                    .map((g) => (
+                      <span key={g.key} style={{ width: `${(g.count / total) * 100}%`, background: g.color }} />
+                    ))}
+                </div>
+                <ul className="staaf-legend">
+                  {genderCounts.map((g) => (
+                    <li key={g.key}>
+                      <span className="staaf-legend__dot" style={{ background: g.color }} aria-hidden="true" />
+                      <span className="staaf-legend__label">{g.label}</span>
+                      <span className="staaf-legend__value">{formatCount(g.count)}</span>
+                      <span className="staaf-legend__pct">{percent(g.count, total)}%</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </Card>
+
+          {total > 0 ? (
+            <Card
+              title="Records to complete"
+              subtitle={unrecordedGender + inactive === 0 ? 'Every record has the basics.' : 'Fix these from the staff lists.'}
+            >
+              <ul className="staaf-todo">
+                {[
+                  { icon: Contact, label: 'Gender not recorded', count: unrecordedGender, tone: 'warning' as const },
+                  { icon: UserX, label: 'Marked inactive', count: inactive, tone: 'neutral' as const },
+                ].map((item) => (
+                  <li key={item.label}>
+                    <Icon icon={item.icon} size={16} className="staaf-todo__icon" />
+                    <span className="staaf-todo__label">{item.label}</span>
+                    {item.count > 0 ? (
+                      <Badge tone={item.tone}>
+                        {formatCount(item.count)} staff {staffWord(item.count)}
+                      </Badge>
+                    ) : (
+                      <Badge tone="success">None</Badge>
+                    )}
+                  </li>
+                ))}
+              </ul>
+              <div className="staaf-todo__action">
+                <Button size="sm" onClick={goToStaff}>
+                  Review staff
+                </Button>
+              </div>
+            </Card>
+          ) : null}
+        </div>
+      </div>
+    </Page>
   )
 }
-
-const StatCard = ({
-  icon,
-  label,
-  value,
-  hint,
-  tone,
-}: {
-  icon: React.ReactNode
-  label: string
-  value: number
-  hint: string
-  tone: string
-}) => (
-  <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
-    <div className="flex items-center gap-3">
-      <div className={`flex h-11 w-11 items-center justify-center rounded-2xl ${tone}`}>{icon}</div>
-      <div>
-        <p className="text-sm font-medium text-slate-500">{label}</p>
-        <p className="text-3xl font-bold tracking-tight text-slate-900">{value}</p>
-      </div>
-    </div>
-    <p className="mt-4 text-sm text-slate-500">{hint}</p>
-  </div>
-)
-
-const MatrixCard = ({
-  title,
-  description,
-  children,
-}: {
-  title: string
-  description: string
-  children: React.ReactNode
-}) => (
-  <div className="rounded-[30px] border border-slate-200 bg-white shadow-sm">
-    <div className="border-b border-slate-200 px-6 py-5">
-      <h2 className="text-xl font-semibold tracking-tight text-slate-900">{title}</h2>
-      <p className="mt-1 text-sm text-slate-500">{description}</p>
-    </div>
-    <div className="px-6 py-6">{children}</div>
-  </div>
-)
-
-const CountTile = ({ label, value, className }: { label: string; value: number; className: string }) => (
-  <div className={`rounded-2xl border px-4 py-4 ${className}`}>
-    <p className="text-sm font-medium">{label}</p>
-    <p className="mt-2 text-3xl font-bold text-slate-900">{value}</p>
-  </div>
-)
 
 export default StaafOverview
