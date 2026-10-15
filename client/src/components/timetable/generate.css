@@ -14,10 +14,17 @@
 /* ---------- Configuration check: issue list ---------- */
 .cb-app .tg-issue-summary { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; margin-bottom: var(--space-3); }
 .cb-app .tg-issues { list-style: none; margin: 0; padding: 0; max-height: 264px; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius-md); }
-.cb-app .tg-issue { display: flex; align-items: flex-start; gap: var(--space-3); padding: var(--space-2) var(--space-3); font-size: 13px; line-height: 18px; color: var(--ink); }
+.cb-app .tg-issue { font-size: 13px; line-height: 18px; color: var(--ink); }
 .cb-app .tg-issue + .tg-issue { border-top: 1px solid var(--border); }
+.cb-app .tg-issue__row, .cb-app .tg-issue__link { display: flex; align-items: flex-start; gap: var(--space-3); width: 100%; padding: var(--space-2) var(--space-3); text-align: left; }
+.cb-app .tg-issue__link { background: none; border: 0; font: inherit; color: inherit; cursor: pointer; }
+.cb-app .tg-issue__link:hover { background: var(--surface-hover); }
+.cb-app .tg-issue__link:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
 .cb-app .tg-issue .cb-badge { flex: none; }
-.cb-app .tg-issue__text { min-width: 0; overflow-wrap: anywhere; padding-top: 1px; }
+.cb-app .tg-issue__text { flex: 1; min-width: 0; overflow-wrap: anywhere; padding-top: 1px; }
+.cb-app .tg-issue__go { flex: none; display: inline-flex; align-items: center; gap: var(--space-1); padding-top: 1px; font-weight: 500; color: var(--accent-strong); white-space: nowrap; }
+.cb-app .tg-issue__link:hover .tg-issue__text { text-decoration: underline; text-decoration-color: var(--border-strong); text-underline-offset: 2px; }
+@media (max-width: 640px) { .cb-app .tg-issue__go-label { display: none; } }
 
 /* ---------- Generate card ---------- */
 .cb-app .tg-generate { display: flex; flex-direction: column; gap: var(--space-4); }

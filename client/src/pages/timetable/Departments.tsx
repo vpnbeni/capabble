@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import React, { useEffect, useMemo, useState } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowRight, BookOpen, LayoutGrid, Layers, Link2, Search, Users } from 'lucide-react'
 import {
   useTimetable,
@@ -36,6 +36,8 @@ const uniqueByNormalized = (values: string[]) => {
 
   return output
 }
+
+const departmentId = (subjectName: string) => `dept-${normalize(subjectName).replace(/[^a-z0-9]+/g, '-')}`
 
 const cloneAllocations = (allocations: TeacherSubjectAllocation[]) =>
   allocations.map((allocation) => ({
@@ -326,6 +328,30 @@ const Departments: React.FC = () => {
   }, [subjectNames, matrixTeachers, classesBySubject])
 
   const navigate = useNavigate()
+
+  // Deep link from the Generate configuration check: ?subject=<name>&class=<id> scrolls to that
+  // department and marks the class column that still needs a teacher.
+  const [searchParams] = useSearchParams()
+  const targetSubjectKey = normalize(searchParams.get('subject') ?? '')
+  const targetClassId = searchParams.get('class')
+  useEffect(() => {
+    if (!isHydrated || !targetSubjectKey) return
+    const card = document.getElementById(departmentId(targetSubjectKey))
+    if (!card) return
+    card.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    const column = targetClassId
+      ? card.querySelector<HTMLElement>(`th[data-class-id="${CSS.escape(targetClassId)}"]`)
+      : null
+    // Bring the column into view inside the table's own horizontal scroller, without
+    // cancelling the page scroll above.
+    const scroller = column?.closest<HTMLElement>('.tpd-scroll')
+    if (column && scroller) {
+      scroller.scrollLeft = column.offsetLeft - scroller.clientWidth / 2 + column.offsetWidth / 2
+    }
+  }, [isHydrated, targetSubjectKey, targetClassId])
+  const isTargetColumn = (subjectName: string, classId: string) =>
+    classId === targetClassId && normalize(subjectName) === targetSubjectKey
+
   const activeDepartments = departmentCards.filter((card) => card.members.length > 0).length
   const subjectsWithoutTeachers = departmentCards.length - activeDepartments
 
@@ -476,8 +502,9 @@ const Departments: React.FC = () => {
           {departmentCards.map((card) => (
             <Card
               key={card.subjectName}
+              id={departmentId(card.subjectName)}
               flush
-              className="tpd-card"
+              className={cx('tpd-card', normalize(card.subjectName) === targetSubjectKey && 'is-target')}
               title={`${card.subjectName} department`}
               subtitle={`${plural(card.members.length, 'teacher', 'teachers')} · ${plural(card.classRows.length, 'class-section', 'class-sections')}`}
               action={
@@ -512,7 +539,12 @@ const Departments: React.FC = () => {
                       <tr>
                         <th scope="col" className="tpd-sticky">Teacher</th>
                         {card.classRows.map((row) => (
-                          <th key={row.id} scope="col">
+                          <th
+                            key={row.id}
+                            scope="col"
+                            data-class-id={row.id}
+                            className={isTargetColumn(card.subjectName, row.id) ? 'is-target' : undefined}
+                          >
                             <span className="tpd-colhead">
                               <span className="tpd-colhead__name">
                                 {row.className}-{row.section}
@@ -545,7 +577,10 @@ const Departments: React.FC = () => {
                               </span>
                             </th>
                             {card.classRows.map((classRow) => (
-                              <td key={`${teacher.id}-${classRow.id}`} className="tpd-cell">
+                              <td
+                                key={`${teacher.id}-${classRow.id}`}
+                                className={cx('tpd-cell', isTargetColumn(card.subjectName, classRow.id) && 'is-target')}
+                              >
                                 <Checkbox
                                   checked={assignedClassIds.has(classRow.id)}
                                   onChange={() => handleToggleDepartmentClass(teacher, card.subjectName, classRow)}

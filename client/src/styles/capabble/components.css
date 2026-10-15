@@ -32,7 +32,7 @@
 .cb-app .cb-btn--danger:hover:not(:disabled) { filter: brightness(.92); }
 .cb-app .cb-btn:disabled { cursor: not-allowed; background: var(--surface-sunken); color: var(--ink-disabled); border-color: transparent; box-shadow: none; }
 .cb-app .cb-btn.is-loading { cursor: progress; }
-.cb-app .cb-spinner { width: 14px; height: 14px; border-radius: var(--radius-full); border: 2px solid currentColor; border-right-color: transparent; animation: cb-spin .7s linear infinite; }
+.cb-app .cb-spinner { display: inline-block; flex: none; vertical-align: middle; width: 14px; height: 14px; border-radius: var(--radius-full); border: 2px solid currentColor; border-right-color: transparent; animation: cb-spin .7s linear infinite; }
 @keyframes cb-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .cb-app .cb-spinner { animation-duration: 2s; } }
 

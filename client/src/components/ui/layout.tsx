@@ -40,9 +40,11 @@ export const Card: React.FC<{
   fill?: boolean
   className?: string
   bodyClassName?: string
+  id?: string
   children?: React.ReactNode
-}> = ({ title, subtitle, action, footer, flush, fill, className, bodyClassName, children }) => (
+}> = ({ title, subtitle, action, footer, flush, fill, className, bodyClassName, id, children }) => (
   <section
+    id={id}
     className={cx('cb-card', flush && 'cb-card--flush', fill && 'cb-card--fill', className)}
     aria-label={typeof title === 'string' ? title : undefined}
   >

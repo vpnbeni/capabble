@@ -46,7 +46,26 @@ import '@/components/timetable/generate.css'
 interface PreflightIssue {
   severity: 'error' | 'warning'
   message: string
+  /** Where the issue gets fixed; the row links there. */
+  fix?: { to: string; page: string }
 }
+
+const FIX_PAGES = {
+  classes: { to: '/time-table/classes', page: 'Classes' },
+  subjects: { to: '/time-table/subjects', page: 'Subjects' },
+  teachers: { to: '/time-table/teachers', page: 'Teachers' },
+  bellTimings: { to: '/time-table/bell-timings', page: 'Bell Timings' },
+}
+
+const distributionFix = (classId: string) => ({
+  to: `/time-table/period-distribution?class=${encodeURIComponent(classId)}`,
+  page: 'Period Distribution',
+})
+
+const departmentFix = (subject: string, classId: string) => ({
+  to: `/time-table/departments?subject=${encodeURIComponent(subject)}&class=${encodeURIComponent(classId)}`,
+  page: 'Departments',
+})
 
 interface PreflightStats {
   classCount: number
@@ -152,19 +171,19 @@ const Generate: React.FC = () => {
     const issues: PreflightIssue[] = []
 
     if (classes.length === 0) {
-      issues.push({ severity: 'error', message: 'No classes configured. Add classes in the Classes page.' })
+      issues.push({ severity: 'error', message: 'No classes configured. Add classes in the Classes page.', fix: FIX_PAGES.classes })
     }
 
     if (subjects.length === 0) {
-      issues.push({ severity: 'error', message: 'No subjects configured. Add subjects in the Subjects page.' })
+      issues.push({ severity: 'error', message: 'No subjects configured. Add subjects in the Subjects page.', fix: FIX_PAGES.subjects })
     }
 
     if (teachers.length === 0) {
-      issues.push({ severity: 'warning', message: 'No teachers configured. Periods will be generated without teacher assignments.' })
+      issues.push({ severity: 'warning', message: 'No teachers configured. Periods will be generated without teacher assignments.', fix: FIX_PAGES.teachers })
     }
 
     if (periodsPerDay === 0) {
-      issues.push({ severity: 'error', message: 'Bell timings are not configured. Set up Bell Timings first.' })
+      issues.push({ severity: 'error', message: 'Bell timings are not configured. Set up Bell Timings first.', fix: FIX_PAGES.bellTimings })
     }
 
     // Build parallel-pair lookup: classNameLower → [[subjALower, subjBLower]]
@@ -186,6 +205,7 @@ const Generate: React.FC = () => {
         issues.push({
           severity: 'error',
           message: `${cls.className} ${cls.section}: No period distribution set. Configure in Period Distribution.`,
+          fix: distributionFix(cls.id),
         })
         return
       }
@@ -217,6 +237,7 @@ const Generate: React.FC = () => {
         issues.push({
           severity: 'warning',
           message: `${cls.className} ${cls.section}: Allocated ${totalAllocated} periods but only ${totalAvailable} available per week.`,
+          fix: distributionFix(cls.id),
         })
       }
     })
@@ -240,6 +261,7 @@ const Generate: React.FC = () => {
             issues.push({
               severity: 'warning',
               message: `${cls.className} ${cls.section} — "${subj}": No teacher assigned in Departments. Will be scheduled without teacher.`,
+              fix: departmentFix(subj, cls.id),
             })
           }
         }
@@ -544,14 +566,36 @@ const Generate: React.FC = () => {
                 {warningCount > 0 ? <Badge tone="warning">{plural(warningCount, 'warning', 'warnings')}</Badge> : null}
               </div>
               <ul className="tg-issues" aria-label="Configuration issues">
-                {preflight.issues.map((issue, idx) => (
-                  <li key={idx} className="tg-issue">
-                    <Badge tone={issue.severity === 'error' ? 'danger' : 'warning'}>
-                      {issue.severity === 'error' ? 'Error' : 'Warning'}
-                    </Badge>
-                    <span className="tg-issue__text">{issue.message}</span>
-                  </li>
-                ))}
+                {preflight.issues.map((issue, idx) => {
+                  const content = (
+                    <>
+                      <Badge tone={issue.severity === 'error' ? 'danger' : 'warning'}>
+                        {issue.severity === 'error' ? 'Error' : 'Warning'}
+                      </Badge>
+                      <span className="tg-issue__text">{issue.message}</span>
+                    </>
+                  )
+                  return (
+                    <li key={idx} className="tg-issue">
+                      {issue.fix ? (
+                        <button
+                          type="button"
+                          className="tg-issue__link"
+                          onClick={() => navigate(issue.fix!.to)}
+                          title={`Fix in ${issue.fix.page}`}
+                        >
+                          {content}
+                          <span className="tg-issue__go">
+                            <span className="tg-issue__go-label">Fix in {issue.fix.page}</span>
+                            <ArrowRight size={14} aria-hidden="true" />
+                          </span>
+                        </button>
+                      ) : (
+                        <div className="tg-issue__row">{content}</div>
+                      )}
+                    </li>
+                  )
+                })}
               </ul>
             </>
           ) : (

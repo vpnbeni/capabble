@@ -1,5 +1,5 @@
-import React, { useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
+import React, { useEffect, useMemo } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowRight, BookOpen, LayoutGrid } from 'lucide-react'
 import { useTimetable, type TimetableClass } from '@/contexts/TimetableContext'
 import { Badge, Banner, Button, Card, EmptyState, Page, StatCard, cx } from '@/components/ui'
@@ -143,6 +143,17 @@ const PeriodAllocation: React.FC = () => {
 
   const navigate = useNavigate()
   const goToClasses = () => navigate('/time-table/classes')
+
+  // Deep link from the Generate configuration check: ?class=<id> scrolls to that row and focuses it.
+  const [searchParams] = useSearchParams()
+  const targetClassId = searchParams.get('class')
+  useEffect(() => {
+    if (!isHydrated || !targetClassId) return
+    const row = document.querySelector<HTMLTableRowElement>(`tr[data-class-id="${CSS.escape(targetClassId)}"]`)
+    if (!row) return
+    row.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    row.querySelector<HTMLInputElement>('input')?.focus({ preventScroll: true })
+  }, [isHydrated, targetClassId])
 
   // Summary across every class that has subjects (computed in render; no hooks below this line).
   const allocatedClasses = groups.flatMap((group) => group.classes)
@@ -306,7 +317,11 @@ const PeriodAllocation: React.FC = () => {
                       const status = allocationStatus(rowTotal, periodsPerWeek)
 
                       return (
-                        <tr key={cls.id}>
+                        <tr
+                          key={cls.id}
+                          data-class-id={cls.id}
+                          className={cls.id === targetClassId ? 'is-target' : undefined}
+                        >
                           <th scope="row" className="tpd-sticky">
                             <span className="tpd-rowlabel">
                               <span className="tpd-sr is-num">{rowIdx + 1}</span>
