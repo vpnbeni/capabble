@@ -80,3 +80,12 @@
 
 /* Department list. */
 .cb-app .tpd-dept-list { display: flex; flex-direction: column; gap: var(--space-4); }
+
+/* ---------- Deep-link target (from the Generate configuration check) ---------- */
+.cb-app .tpd-card.is-target { scroll-margin-top: calc(var(--header-height) + var(--space-4)); box-shadow: 0 0 0 2px var(--accent); }
+.cb-app .tpd-grid tr.is-target > *,
+.cb-app .tpd-grid tbody tr:hover.is-target > *,
+.cb-app .tpd-grid thead th.is-target,
+.cb-app .tpd-grid tbody td.is-target,
+.cb-app .tpd-grid tbody tr:hover > td.is-target { background: var(--accent-soft); }
+.cb-app .tpd-grid thead th.is-target { color: var(--accent-soft-ink); }

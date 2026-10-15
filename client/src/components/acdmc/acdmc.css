@@ -1,0 +1,92 @@
+/* Academics (ACDMC) — module-scoped layout only. Colours, type and radii come from tokens. */
+
+.cb-app .ac-note { font-size: 13px; line-height: 18px; }
+
+/* Topic picker: one fieldset per syllabus unit */
+.cb-app .ac-topics { display: flex; flex-direction: column; gap: var(--space-4); }
+.cb-app .ac-topics__unit { display: flex; flex-direction: column; gap: var(--space-2); margin: 0; padding: 0; border: 0; min-width: 0; }
+.cb-app .ac-topics__unit legend { padding: 0; margin-bottom: var(--space-2); }
+
+/* Toolbar filters inside a flush card */
+.cb-app .ac-filters { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.cb-app .ac-filters .cb-field { min-width: 140px; max-width: 220px; }
+.cb-app .ac-filters .cb-input { width: 100%; }
+.cb-app .ac-filters select { width: 100%; min-width: 0; text-overflow: ellipsis; }
+@media (max-width: 640px) {
+  .cb-app .ac-filters { flex-direction: column; align-items: stretch; }
+  .cb-app .ac-filters .cb-field { width: 100%; max-width: none; min-width: 0; }
+}
+
+/* Plain list rows inside a card (due soon, today's plans) */
+.cb-app .ac-list { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
+.cb-app .ac-list__row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-3) 0; border-top: 1px solid var(--border); min-width: 0; }
+.cb-app .ac-list__row:first-child { border-top: 0; padding-top: 0; }
+.cb-app .ac-list__row:last-child { padding-bottom: 0; }
+.cb-app .ac-list__main { display: flex; flex-direction: column; min-width: 0; }
+.cb-app .ac-list__title { font: 500 14px/20px var(--font-sans); color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cb-app .ac-list__meta { font-size: 13px; line-height: 18px; color: var(--ink-muted); }
+.cb-app .ac-list__aside { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; font-size: 13px; color: var(--ink-muted); font-variant-numeric: tabular-nums; }
+.cb-app button.ac-list__row { width: 100%; background: none; border-left: 0; border-right: 0; border-bottom: 0; text-align: left; cursor: pointer; font: inherit; }
+.cb-app button.ac-list__row:first-child { border-top: 0; }
+.cb-app button.ac-list__row:hover .ac-list__title { color: var(--accent-strong); }
+
+/* Syllabus editor: units with their topics */
+.cb-app .ac-units { display: flex; flex-direction: column; gap: var(--space-4); }
+.cb-app .ac-unit { border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); }
+.cb-app .ac-unit__head { display: flex; align-items: flex-end; gap: var(--space-2); padding: var(--space-3) var(--space-4); background: var(--surface-sunken); border-bottom: 1px solid var(--border); border-radius: var(--radius-md) var(--radius-md) 0 0; }
+.cb-app .ac-unit__head .cb-field { flex: 1; min-width: 0; }
+.cb-app .ac-unit__body { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-3) var(--space-4); }
+.cb-app .ac-topic-row { display: grid; grid-template-columns: minmax(0, 1fr) 96px 160px auto; gap: var(--space-2); align-items: end; }
+.cb-app .ac-topic-row__labels { display: grid; grid-template-columns: minmax(0, 1fr) 96px 160px 36px; gap: var(--space-2); font: 500 12px/16px var(--font-sans); color: var(--ink-subtle); }
+.cb-app .ac-row-actions { display: inline-flex; gap: 2px; }
+@media (max-width: 640px) {
+  .cb-app .ac-topic-row { grid-template-columns: minmax(0, 1fr) 80px; }
+  .cb-app .ac-topic-row > :nth-child(3) { grid-column: 1 / 2; }
+  .cb-app .ac-topic-row__labels { display: none; }
+}
+
+/* Coverage grid: topics down, sections across */
+.cb-app .ac-coverage-scroll { overflow-x: auto; }
+.cb-app .ac-coverage { width: 100%; border-collapse: collapse; font-size: 13px; line-height: 18px; }
+.cb-app .ac-coverage th, .cb-app .ac-coverage td { padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--border); text-align: left; white-space: nowrap; }
+.cb-app .ac-coverage thead th { position: sticky; top: 0; background: var(--surface-sunken); font: 500 12px/16px var(--font-sans); color: var(--ink-subtle); }
+.cb-app .ac-coverage th[scope='row'] { position: sticky; left: 0; background: var(--surface); font-weight: 400; color: var(--ink); white-space: normal; min-width: 200px; }
+.cb-app .ac-coverage .ac-coverage__unit th { background: var(--surface-sunken); font-weight: 600; color: var(--ink); }
+.cb-app .ac-coverage td { color: var(--ink-muted); }
+
+/* Roster (submissions / marks) */
+.cb-app .ac-roster-marks { width: 96px; }
+.cb-app .ac-roster-remark { min-width: 160px; }
+.cb-app .ac-roster-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); }
+
+/* Quiz question builder */
+.cb-app .ac-questions { display: flex; flex-direction: column; gap: var(--space-4); }
+.cb-app .ac-question { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-4); border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); }
+.cb-app .ac-question__head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.cb-app .ac-question__grid { display: grid; grid-template-columns: 160px 96px; gap: var(--space-3); }
+.cb-app .ac-options { display: flex; flex-direction: column; gap: var(--space-2); }
+.cb-app .ac-option { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: var(--space-2); align-items: center; }
+
+/* Question paper (printed document — paper colours come from .cb-paper) */
+.cb-app .ac-paper { font: 13px/1.5 var(--font-sans); color: var(--paper-ink); padding: var(--space-4); }
+.cb-app .ac-paper h1 { font: 600 18px/24px var(--font-sans); margin: 0 0 4px; text-align: center; }
+.cb-app .ac-paper p { margin: 0; }
+.cb-app .ac-paper ol { padding-left: 20px; margin: 0; }
+.cb-app .ac-paper li { margin: 0 0 14px; }
+.cb-app .ac-paper__school { text-align: center; font-size: 12px; }
+.cb-app .ac-paper__meta { display: flex; justify-content: space-between; gap: var(--space-3); border-bottom: 1px solid var(--paper-ink); padding: 6px 0; margin: 8px 0 16px; font-size: 12px; }
+.cb-app .ac-paper__q { display: flex; justify-content: space-between; gap: var(--space-3); }
+.cb-app .ac-paper__marks { white-space: nowrap; font-size: 12px; }
+.cb-app .ac-paper__options { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 24px; margin-top: 4px; padding-left: 0 !important; list-style: none; }
+.cb-app .ac-paper__options li { margin: 0; }
+.cb-app .ac-paper__lines { margin-top: 8px; border-bottom: 1px solid var(--paper-rule); height: 22px; }
+.cb-app .ac-paper__key { margin-top: 24px; border-top: 1px dashed var(--paper-ink); padding-top: 8px; }
+
+.cb-app .ac-question-add { margin-top: var(--space-4); }
+.cb-app .ac-prewrap { white-space: pre-wrap; }
+.cb-app .ac-paper__instructions { margin-bottom: 12px; white-space: pre-wrap; }
+
+/* Tab panels inside a flush card get the card's own padding back */
+.cb-app .ac-tab-body { padding: var(--space-5); border-top: 1px solid var(--border); }
+@media (max-width: 640px) { .cb-app .ac-tab-body { padding: var(--space-4); } }
+.cb-app .ac-paper > ol, .cb-app .ac-paper__key > ol { list-style: decimal; }

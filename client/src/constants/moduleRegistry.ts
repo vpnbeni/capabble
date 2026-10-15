@@ -47,7 +47,7 @@ export const MODULE_REGISTRY: ModuleDefinition[] = [
     id: 'acdmc',
     abbreviation: 'ACDMC',
     title: 'Academics',
-    defaultRoute: '/acdmc/lesson-plan',
+    defaultRoute: '/acdmc/overview',
     icon: acdmcIcon,
   },
   {

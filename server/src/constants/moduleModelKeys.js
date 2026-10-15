@@ -103,6 +103,8 @@ const MODULE_MODEL_KEYS = Object.freeze({
     'Student',
   ]),
   acdmc: Object.freeze([
+    'Student',
+    'TimetableState',
     'AcademicLessonPlan',
     'AcademicHomework',
     'AcademicAssignment',

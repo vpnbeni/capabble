@@ -70,11 +70,12 @@ export const PAGE_INDEX: PageEntry[] = [
     ['Student attendance', '/attnd/student-attendance', 'Attendance', 'mark present absent'],
   ]),
   ...group('acdmc', [
-    ['Lesson plans', '/acdmc/lesson-plan', 'Academics'],
+    ['Academics overview', '/acdmc/overview', 'Academics', 'syllabus coverage due this week'],
+    ['Lesson plans', '/acdmc/lesson-plan', 'Academics', 'lesson plan delivered'],
     ['Homework', '/acdmc/homework', 'Academics'],
     ['Assignments', '/acdmc/assignment', 'Academics'],
-    ['Quizzes', '/acdmc/quiz', 'Academics', 'test'],
-    ['Curriculum', '/acdmc/curriculum', 'Academics', 'syllabus'],
+    ['Quizzes', '/acdmc/quiz', 'Academics', 'test question paper marks'],
+    ['Curriculum', '/acdmc/curriculum', 'Academics', 'syllabus units topics books coverage'],
   ]),
   ...group('actvt', [
     ['Activity board', '/actvt/board', 'Activities'],

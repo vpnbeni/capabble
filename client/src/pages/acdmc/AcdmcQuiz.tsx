@@ -1,28 +1,12 @@
 import React from 'react'
-import { RecordManager } from '@/components/records/RecordManager'
-import { makeRecordService } from '@/services/recordService'
-
-const service = makeRecordService('/acdmc/quizzes')
+import { ListChecks } from 'lucide-react'
+import ClassWorkList from '@/components/acdmc/ClassWorkList'
 
 const AcdmcQuiz: React.FC = () => (
-  <RecordManager
-    fields={[
-      { key: 'title', label: 'Title', required: true },
-      { key: 'teacherName', label: 'Teacher' },
-      { key: 'className', label: 'Class' },
-      { key: 'section', label: 'Section' },
-      { key: 'subject', label: 'Subject' },
-      { key: 'topic', label: 'Topic' },
-      { key: 'date', label: 'Date', type: 'date' },
-      { key: 'durationMinutes', label: 'Duration (minutes)', type: 'number' },
-      { key: 'questions', label: 'Questions (one per line: question | A | B | C | D | answer)', type: 'textarea' },
-      { key: 'status', label: 'Status', type: 'select', options: ['draft', 'published'] },
-    ]}
-    list={service.list}
-    save={service.save}
-    remove={service.remove}
-    cardTitle={(item) => item.title || 'Untitled quiz'}
-    cardMeta={(item) => `${item.topic || item.subject || ''} · ${item.className || ''} ${item.section || ''} · ${item.durationMinutes || 15} min`}
+  <ClassWorkList
+    kind="quiz"
+    icon={ListChecks}
+    emptyBody="Build a quiz from multiple-choice and written questions, print the paper, then enter each student's marks."
   />
 )
 
