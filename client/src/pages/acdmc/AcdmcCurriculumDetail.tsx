@@ -41,7 +41,7 @@ import {
   errorMessage,
   shortDate,
   subjectNamesFor,
-  useIsAdmin,
+  useCanDeleteAcademics,
 } from '@/components/acdmc/AcdmcUi'
 import '@/components/acdmc/acdmc.css'
 
@@ -72,7 +72,7 @@ const findProblem = (units: Unit[], books: Book[]) => {
 const AcdmcCurriculumDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const isAdmin = useIsAdmin()
+  const canDelete = useCanDeleteAcademics('curriculum')
   const { data: curriculum, isLoading, isError, error, refetch } = useCurriculum(id)
   const { data: coverage } = useCoverage(id)
   const { data: options } = useAcdmcOptions()
@@ -220,7 +220,7 @@ const AcdmcCurriculumDetail: React.FC = () => {
       setDetailsOpen(true)
     } },
     { label: 'Copy to other classes', icon: Copy, onSelect: () => setCopyOpen(true) },
-    ...(isAdmin ? [{ divider: true } as const, { label: 'Delete syllabus', icon: Trash2, tone: 'danger' as const, onSelect: () => setDeleteOpen(true) }] : []),
+    ...(canDelete ? [{ divider: true } as const, { label: 'Delete syllabus', icon: Trash2, tone: 'danger' as const, onSelect: () => setDeleteOpen(true) }] : []),
   ]
 
   // ── Unit and topic editing ──

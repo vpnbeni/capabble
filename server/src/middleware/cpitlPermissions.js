@@ -1,20 +1,13 @@
-const { roleHasPermission, CPITL_PERMISSIONS } = require('../modules/cpitl/constants');
+const { CPITL_PERMISSIONS } = require('../modules/cpitl/constants');
+const { requirePermission } = require('../rbac/middleware');
 
-const requireCpitlPermission = (permission) => {
-  return (req, res, next) => {
-    const role = req.user?.role;
-    if (!roleHasPermission(role, permission)) {
-      return res.status(403).json({
-        success: false,
-        message: `Permission '${permission}' is required for this action.`,
-        permission,
-      });
-    }
-    return next();
-  };
-};
+/** cpitl:collect → cpitl.finance.collect (see packages/shared/src/permissionCatalog.json). */
+const toCatalogKey = (permission) => `cpitl.finance.${String(permission).replace(/^cpitl:/, '')}`;
+
+const requireCpitlPermission = (permission) => requirePermission(toCatalogKey(permission));
 
 module.exports = {
   requireCpitlPermission,
   CPITL_PERMISSIONS,
+  toCatalogKey
 };

@@ -16,6 +16,10 @@ const COPIES = [
     from: 'packages/shared/src/tenantFeatureCatalog.json',
     to: 'server/src/constants/tenantFeatureCatalog.json',
   },
+  {
+    from: 'packages/shared/src/permissionCatalog.json',
+    to: 'server/src/constants/permissionCatalog.json',
+  },
 ]
 
 const checkOnly = process.argv.includes('--check')

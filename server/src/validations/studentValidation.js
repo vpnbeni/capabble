@@ -132,6 +132,20 @@ const baseStudentSchema = {
       'any.required': 'Mother name is required'
     }),
   
+  guardianName: Joi.string()
+    .trim()
+    .max(100)
+    .allow('', null),
+
+  guardianEmail: Joi.string()
+    .trim()
+    .lowercase()
+    .email()
+    .allow('', null)
+    .messages({
+      'string.email': 'Please provide a valid guardian email'
+    }),
+
   guardianPhone: Joi.string()
     .pattern(REGEX_PATTERNS.PHONE)
     .required()

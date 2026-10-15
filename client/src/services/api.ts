@@ -2,7 +2,7 @@ import axios, { AxiosInstance, AxiosResponse, InternalAxiosRequestConfig } from 
 import toast from 'react-hot-toast'
 import { getTenantHeader, isLocalRuntime, resolveApiBaseUrl } from '@/utils/tenantRuntime'
 import { getAcademicSessionHeader } from '@/contexts/AcademicSessionContext'
-import { clearAuthData, getAuthToken, getRefreshToken, setStoredToken } from '@/utils/authStorage'
+import { clearAuthData, setStoredUser } from '@/utils/authStorage'
 
 // API configuration
 const API_BASE_URL = resolveApiBaseUrl()
@@ -111,14 +111,60 @@ export const setStoreDispatch = (dispatch: any) => {
   storeDispatch = dispatch
 }
 
-// Create axios instance
+// Create axios instance. The session rides in httpOnly cookies, so every call
+// sends credentials; `X-Requested-With` is the server's CSRF check for writes.
 const api: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
   timeout: 30000,
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
+    'X-Requested-With': 'XMLHttpRequest',
   },
 })
+
+const tenantHeaders = () => {
+  const tenantHeader = getTenantHeader()
+  return tenantHeader ? { 'x-tenant-slug': tenantHeader } : {}
+}
+
+// One refresh at a time: parallel 401s all wait for the same attempt.
+let refreshInFlight: Promise<boolean> | null = null
+
+/** Rotate the refresh cookie. Resolves true when a new session cookie was issued. */
+export const refreshSession = (): Promise<boolean> => {
+  if (!refreshInFlight) {
+    refreshInFlight = axios
+      .post(`${API_BASE_URL}/auth/refresh`, {}, {
+        withCredentials: true,
+        headers: { 'X-Requested-With': 'XMLHttpRequest', ...tenantHeaders() },
+      })
+      .then((response) => {
+        const user = response.data?.data?.user
+        if (user) {
+          setStoredUser(user)
+          storeDispatch?.({ type: 'auth/sessionRefreshed', payload: user })
+        }
+        return Boolean(response.data?.success)
+      })
+      .catch(() => false)
+      .finally(() => {
+        refreshInFlight = null
+      })
+  }
+  return refreshInFlight
+}
+
+const endSession = (message: string) => {
+  clearAuthData()
+  storeDispatch?.({ type: 'auth/clearCredentials' })
+  if (!isAuthSurfacePath() && !sessionExpiredToastShown) {
+    sessionExpiredToastShown = true
+    showApiErrorToast(message)
+  }
+}
+
+const AUTH_ENDPOINTS_WITHOUT_REFRESH = ['/auth/login', '/auth/refresh', '/auth/logout', '/auth/accept-invite', '/auth/invite/preview']
 
 // Request interceptor
 api.interceptors.request.use(
@@ -136,12 +182,6 @@ api.interceptors.request.use(
       }
     }
 
-    // Add auth token to requests
-    const token = getAuthToken()
-    if (token && config.headers) {
-      config.headers.Authorization = `Bearer ${token}`
-      sessionExpiredToastShown = false // reset so next session expiry can show one toast
-    }
 
     // Add timestamp to prevent caching
     config.params = {
@@ -201,78 +241,40 @@ api.interceptors.response.use(
         break
       }
 
-      case 401:
-        // Unauthorized - try to refresh token or handle auth failure
-        if (!originalRequest._retry) {
-          originalRequest._retry = true
+      case 401: {
+        // The access cookie expired (or was revoked): rotate the refresh cookie once
+        // and replay the request. If that fails, the session is over.
+        const url = String(originalRequest?.url || '')
+        const isAuthEndpoint = AUTH_ENDPOINTS_WITHOUT_REFRESH.some((path) => url.includes(path))
+        if (isAuthEndpoint || originalRequest?._retry) break
 
-          const refreshToken = getRefreshToken()
-          if (refreshToken) {
-            try {
-              const tenantHeader = getTenantHeader()
-              const response = await axios.post(
-                `${API_BASE_URL}/auth/refresh`,
-                { refreshToken },
-                tenantHeader
-                  ? {
-                      headers: {
-                        'x-tenant-slug': tenantHeader,
-                      },
-                    }
-                  : undefined
-              )
-
-              if (response.data.success) {
-                const newToken = response.data.data.accessToken
-                setStoredToken(newToken)
-                api.defaults.headers.common['Authorization'] = `Bearer ${newToken}`
-                originalRequest.headers.Authorization = `Bearer ${newToken}`
-
-                return api(originalRequest)
-              }
-            } catch (refreshError) {
-              // Refresh failed, clear storage and let Redux handle the auth state
-              clearAuthData()
-              delete api.defaults.headers.common['Authorization']
-
-              // Dispatch logout action to Redux store
-              if (storeDispatch) {
-                storeDispatch({ type: 'auth/clearCredentials' })
-              }
-
-              // Show session-expired toast only once (multiple requests can 401 together)
-              if (!isAuthSurfacePath() && !sessionExpiredToastShown) {
-                sessionExpiredToastShown = true
-                showApiErrorToast('Session expired. Please login again.')
-              }
-
-              return Promise.reject(refreshError)
-            }
-          } else {
-            // No refresh token, clear storage and let Redux handle auth state
-            clearAuthData()
-            delete api.defaults.headers.common['Authorization']
-
-            // Dispatch logout action to Redux store
-            if (storeDispatch) {
-              storeDispatch({ type: 'auth/clearCredentials' })
-            }
-
-            if (!isAuthSurfacePath() && !sessionExpiredToastShown) {
-              sessionExpiredToastShown = true
-              showApiErrorToast('Please login to continue')
-            }
-          }
+        originalRequest._retry = true
+        if (await refreshSession()) {
+          sessionExpiredToastShown = false
+          return api(originalRequest)
         }
+        endSession('Your session has ended. Please sign in again.')
         break
+      }
 
       case 403: {
         // Forbidden - skip toast when feature is disabled for tenant (silent)
         const isFeatureDisabled =
           (typeof data?.featureKey === 'string' && data.featureKey.length > 0) ||
           (typeof data?.message === 'string' && data.message.includes('disabled by platform admin'))
-        if (!isFeatureDisabled) {
-          showApiErrorToast('You do not have permission to perform this action')
+        if (data?.errorCode === 'password_change_required') {
+          // App.tsx sends the user to the change-password screen.
+          storeDispatch?.({ type: 'auth/passwordChangeRequired' })
+          break
+        }
+        if (data?.errorCode === 'csrf_check_failed') break
+        const isSilent403 = (error.config as any)?._silent === true
+        // A page loading data the role can't see shows its own empty state;
+        // only actions the user took deserve a toast.
+        const isBackgroundRead = String(error.config?.method || 'get').toLowerCase() === 'get'
+          && data?.errorCode === 'permission_denied'
+        if (!isFeatureDisabled && !isSilent403 && !isBackgroundRead) {
+          showApiErrorToast(data?.message || 'You do not have permission to do this.')
         }
         break
       }
@@ -290,10 +292,12 @@ api.interceptors.response.use(
         break
       }
 
-      case 409:
+      case 409: {
         // Conflict
-        showApiErrorToast(data?.error || 'Resource already exists')
+        if ((error.config as any)?._silent === true) break
+        showApiErrorToast(data?.message || data?.error || 'Resource already exists')
         break
+      }
 
       case 422:
         // Unprocessable Entity - validation errors
@@ -302,7 +306,8 @@ api.interceptors.response.use(
 
       case 429:
         // Too Many Requests
-        showApiErrorToast('Too many requests. Please try again later.')
+        if ((error.config as any)?._silent === true) break
+        showApiErrorToast(data?.message || 'Too many requests. Please try again later.')
         break
 
       case 500:

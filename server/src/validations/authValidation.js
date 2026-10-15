@@ -5,53 +5,45 @@ const { USER_ROLES } = require('../utils/constants');
 const loginSchema = Joi.object({
   email: Joi.string()
     .trim()
+    .max(254)
     .required()
     .messages({
-      'string.empty': 'Email or username is required',
-      'any.required': 'Email or username is required'
+      'string.empty': 'Email or login ID is required',
+      'any.required': 'Email or login ID is required'
     }),
   password: Joi.string()
-    .min(6)
+    .max(128)
     .required()
     .messages({
-      'string.min': 'Password must be at least 6 characters long',
+      'string.empty': 'Password is required',
       'any.required': 'Password is required'
-    })
+    }),
+  rememberMe: Joi.boolean().default(true)
 });
 
-// Register validation schema
-const registerSchema = Joi.object({
-  email: Joi.string()
-    .email()
-    .required()
-    .messages({
-      'string.email': 'Please provide a valid email address',
-      'any.required': 'Email is required'
-    }),
-  password: Joi.string()
-    .min(6)
-    .max(128)
-    .pattern(new RegExp('^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[!@#\$%\^&\*])'))
-    .required()
-    .messages({
-      'string.min': 'Password must be at least 6 characters long',
-      'string.max': 'Password cannot exceed 128 characters',
-      'string.pattern.base': 'Password must contain at least one lowercase letter, one uppercase letter, one number, and one special character',
-      'any.required': 'Password is required'
-    }),
+// Shared rule for every password a person chooses.
+const newPasswordRule = Joi.string()
+  .min(8)
+  .max(128)
+  .pattern(/^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[^A-Za-z0-9])/)
+  .messages({
+    'string.min': 'Password must be at least 8 characters long',
+    'string.max': 'Password cannot exceed 128 characters',
+    'string.pattern.base': 'Password must contain an uppercase letter, a lowercase letter, a number and a symbol',
+    'any.required': 'Password is required'
+  });
+
+const invitePreviewSchema = Joi.object({
+  token: Joi.string().trim().max(200).required()
+});
+
+const acceptInviteSchema = Joi.object({
+  token: Joi.string().trim().max(200).required(),
+  password: newPasswordRule.required(),
   confirmPassword: Joi.string()
     .valid(Joi.ref('password'))
     .required()
-    .messages({
-      'any.only': 'Confirm password must match password',
-      'any.required': 'Confirm password is required'
-    }),
-  role: Joi.string()
-    .valid(...Object.values(USER_ROLES))
-    .default(USER_ROLES.DATA_ENTRY_OPERATOR)
-    .messages({
-      'any.only': `Role must be one of: ${Object.values(USER_ROLES).join(', ')}`
-    })
+    .messages({ 'any.only': 'Passwords do not match' })
 });
 
 // Change password validation schema
@@ -61,17 +53,7 @@ const changePasswordSchema = Joi.object({
     .messages({
       'any.required': 'Current password is required'
     }),
-  newPassword: Joi.string()
-    .min(6)
-    .max(128)
-    .pattern(new RegExp('^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[!@#\$%\^&\*])'))
-    .required()
-    .messages({
-      'string.min': 'New password must be at least 6 characters long',
-      'string.max': 'New password cannot exceed 128 characters',
-      'string.pattern.base': 'New password must contain at least one lowercase letter, one uppercase letter, one number, and one special character',
-      'any.required': 'New password is required'
-    }),
+  newPassword: newPasswordRule.required(),
   confirmNewPassword: Joi.string()
     .valid(Joi.ref('newPassword'))
     .required()
@@ -119,17 +101,7 @@ const resetPasswordSchema = Joi.object({
       'string.pattern.base': 'OTP must be a valid 6-digit code',
       'any.required': 'OTP is required'
     }),
-  newPassword: Joi.string()
-    .min(8)
-    .max(128)
-    .pattern(new RegExp('^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[!@#\$%\^&\*])'))
-    .required()
-    .messages({
-      'string.min': 'New password must be at least 8 characters long',
-      'string.max': 'New password cannot exceed 128 characters',
-      'string.pattern.base': 'New password must contain at least one lowercase letter, one uppercase letter, one number, and one special character',
-      'any.required': 'New password is required'
-    }),
+  newPassword: newPasswordRule.required(),
   confirmNewPassword: Joi.string()
     .valid(Joi.ref('newPassword'))
     .required()
@@ -148,19 +120,9 @@ const refreshTokenSchema = Joi.object({
     })
 });
 
-// Update profile validation schema
+// Update own profile validation schema
 const updateProfileSchema = Joi.object({
-  email: Joi.string()
-    .email()
-    .messages({
-      'string.email': 'Please provide a valid email address'
-    }),
-  role: Joi.string()
-    .valid(...Object.values(USER_ROLES))
-    .messages({
-      'any.only': `Role must be one of: ${Object.values(USER_ROLES).join(', ')}`
-    }),
-  isActive: Joi.boolean()
+  name: Joi.string().trim().max(120).allow('')
 });
 
 // MongoDB ObjectId validation
@@ -262,7 +224,9 @@ const resendEmailVerificationSchema = Joi.object({
 
 module.exports = {
   loginSchema,
-  registerSchema,
+  newPasswordRule,
+  invitePreviewSchema,
+  acceptInviteSchema,
   changePasswordSchema,
   forgotPasswordSchema,
   forgotPasswordResendOtpSchema,

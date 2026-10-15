@@ -1,10 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import { useSelector } from 'react-redux'
-import { selectUser } from '@/redux/slices/authSlice'
 import { useAcademicSession } from '@/contexts/AcademicSessionContext'
 import { useTimetable } from '@/contexts/TimetableContext'
 import { isFeatureEnabledForPath } from '@/constants/featureAccess'
+import { usePermissions } from '@/hooks/usePermissions'
 import { useCentreDetails } from '@/hooks/useCentreDetails'
 import { useOnboardingStatus } from '@/hooks/useOnboarding'
 import { AttndModeSwitch } from '@/components/attnd/AttndModeSwitch'
@@ -31,11 +30,11 @@ const Header: React.FC<HeaderProps> = ({ isSidebarCollapsed, onToggleSidebar }) 
   const location = useLocation()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
-  const user = useSelector(selectUser)
+  const { access } = usePermissions()
   const isDashboardRoute = location.pathname === '/dashboard'
   const isStudentAttendanceRoute = /\/attnd\/student-attendance\/?$/.test(location.pathname)
   const isStaffAttendanceRoute = /\/attnd\/staff-attendance\/?$/.test(location.pathname)
-  const canAccessCentreDetails = isFeatureEnabledForPath('/centre-details', user?.featureToggles)
+  const canAccessCentreDetails = isFeatureEnabledForPath('/centre-details', access)
   const { currentSession } = useAcademicSession()
   const { periodsPerWeek, setPeriodsPerWeek } = useTimetable()
   const [editingPeriodsPerWeek, setEditingPeriodsPerWeek] = useState(false)
@@ -531,6 +530,25 @@ const Header: React.FC<HeaderProps> = ({ isSidebarCollapsed, onToggleSidebar }) 
           pageSubtitle: info.subtitle,
           showBackButton: false,
           backTo: null,
+        }
+      }
+      case 'settings': {
+        const subPage = segments[1] || ''
+        const isDetail = segments.length > 2
+        const titleMap: Record<string, { title: string; subtitle: string }> = {
+          users: isDetail
+            ? { title: 'Login', subtitle: 'Roles, linked students and sign-in activity for one login.' }
+            : { title: 'Users and access', subtitle: 'Logins for staff, parents and students, and what each can open.' },
+          roles: isDetail
+            ? { title: segments[2] === 'new' ? 'New role' : 'Role', subtitle: 'What people with this role can see and change.' }
+            : { title: 'Roles', subtitle: 'Bundles of access you give to staff logins.' },
+        }
+        const info = titleMap[subPage] || { title: 'Settings', subtitle: '' }
+        return {
+          pageTitle: info.title,
+          pageSubtitle: info.subtitle,
+          showBackButton: isDetail,
+          backTo: isDetail ? `/settings/${subPage}` : null,
         }
       }
       case 'attnd': {

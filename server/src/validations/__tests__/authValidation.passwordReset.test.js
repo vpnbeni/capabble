@@ -22,7 +22,7 @@ describe('authValidation resetPasswordSchema', () => {
     });
 
     expect(error).toBeDefined();
-    expect(error.details[0].message).toContain('must contain at least one lowercase letter');
+    expect(error.details[0].message).toContain('must contain an uppercase letter, a lowercase letter, a number and a symbol');
   });
 
   it('accepts valid payload with 8-char strong password', () => {

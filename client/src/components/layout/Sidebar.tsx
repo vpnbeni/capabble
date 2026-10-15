@@ -6,6 +6,7 @@ import { logout, selectUser } from '../../redux/slices/authSlice'
 import type { AppDispatch } from '../../redux/store'
 import { useAcademicSession } from '../../contexts/AcademicSessionContext'
 import { isFeatureEnabledForPath, getModuleForPath, getAccessibleModules, getFirstEnabledPathForModule } from '../../constants/featureAccess'
+import { usePermissions } from '@/hooks/usePermissions'
 import { MODULE_REGISTRY, type ModuleId } from '../../constants/moduleRegistry'
 import {
   Check,
@@ -67,7 +68,9 @@ const Sidebar: React.FC<SidebarProps> = ({
   // Tracks expand/collapse state for group headers + nested sub-groups.
   // "Ungroup all" -> we expand everything based on accessible navigation.
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({})
-  const isPathAllowed = (href: string) => isFeatureEnabledForPath(href, currentUser?.featureToggles)
+  const { access } = usePermissions()
+  // A page shows when the school has it turned on and the user's role allows it.
+  const isPathAllowed = (href: string) => isFeatureEnabledForPath(href, access)
   const canAccessCentreDetails = isPathAllowed('/centre-details')
 
   const sidebarCountsAccess = useMemo(
@@ -79,7 +82,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       datesheetDays: isPathAllowed('/datesheets'),
       rooms: isPathAllowed('/examrooms'),
     }),
-    [currentUser?.featureToggles]
+    [access]
   )
 
   const { data: countsData } = useSidebarCounts(sidebarCountsAccess)
@@ -147,9 +150,17 @@ const Sidebar: React.FC<SidebarProps> = ({
 
 
   const accessibleModules = useMemo(
-    () => getAccessibleModules(currentUser?.featureToggles),
-    [currentUser?.featureToggles]
+    () => getAccessibleModules(access),
+    [access]
   )
+
+  // Land on a module this user can actually use (e.g. a teacher has no Exam centre pages).
+  useEffect(() => {
+    if (accessibleModules.size > 0 && !accessibleModules.has(selectedModule)) {
+      const first = MODULE_REGISTRY.find((m) => accessibleModules.has(m.id))
+      if (first) setSelectedModule(first.id)
+    }
+  }, [accessibleModules, selectedModule])
 
   const activeModuleDef = MODULE_REGISTRY.find(m => m.id === activeModule)!
   const hasMultipleModules = accessibleModules.size > 1
@@ -1507,7 +1518,7 @@ const Sidebar: React.FC<SidebarProps> = ({
 
     return acc
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []), [activeModule, currentUser?.featureToggles, counts])
+  }, []), [activeModule, access, counts])
 
   // Expand all groups/sub-groups once accessible navigation is resolved.
   useEffect(() => {
@@ -1531,6 +1542,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   const canAccessBilling = isPathAllowed('/billing')
   const canAccessAccountSettings = isPathAllowed('/account-settings')
   const canAccessHelpSupport = isPathAllowed('/help-support')
+  const canManageUsers = isPathAllowed('/settings/users')
   const currentSidebarWidth = isCollapsed ? collapsedWidth : expandedWidth
 
   useLayoutEffect(() => {
@@ -1726,7 +1738,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                     onClick={() => {
                       setModuleSwitcherOpen(false)
                       if (!isActive) {
-                        const targetPath = getFirstEnabledPathForModule(mod.id, currentUser?.featureToggles) || mod.defaultRoute
+                        const targetPath = getFirstEnabledPathForModule(mod.id, access) || mod.defaultRoute
                         setSelectedModule(mod.id)
                         navigate(targetPath)
                       }
@@ -1941,6 +1953,23 @@ const Sidebar: React.FC<SidebarProps> = ({
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                       </svg>
                       Account Settings
+                    </NavLink>
+                  )}
+                  {canManageUsers && (
+                    <NavLink
+                      to="/settings/users"
+                      className={({ isActive }) =>
+                        `flex items-center px-3 py-2.5 text-sm font-medium rounded-xl transition-colors ${
+                          isActive
+                            ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300'
+                            : 'text-secondary-700 dark:text-secondary-300 hover:bg-secondary-50 dark:hover:bg-secondary-800 hover:text-primary-600 dark:hover:text-primary-400'
+                        }`
+                      }
+                    >
+                      <svg className="w-4 h-4 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                      </svg>
+                      Users and access
                     </NavLink>
                   )}
                   {canAccessBilling && (

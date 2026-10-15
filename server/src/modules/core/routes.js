@@ -19,9 +19,15 @@ const supportRoutes = require('../../routes/supportRoutes');
 const dashboardRoutes = require('../../routes/dashboardRoutes');
 const billingRoutes = require('../../routes/billingRoutes');
 const exportRoutes = require('../../routes/exportRoutes');
+const userRoutes = require('../../routes/userRoutes');
+const roleRoutes = require('../../routes/roleRoutes');
+const portalRoutes = require('../../routes/portalRoutes');
 
 const mountRoutes = (router) => {
   router.use('/auth', authRoutes);
+  router.use('/users', userRoutes);
+  router.use('/roles', roleRoutes);
+  router.use('/portal', portalRoutes);
   router.use('/teachers', requireTenantFeature('exam_functionaries'), teacherRoutes);
   router.use('/subjects', requireTenantFeature('subjects'), subjectRoutes);
   router.use('/rooms', requireTenantFeature('examrooms'), roomRoutes);

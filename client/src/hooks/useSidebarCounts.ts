@@ -1,5 +1,6 @@
 import { useQuery, type UseQueryOptions } from '@tanstack/react-query'
-import { getAuthToken } from '../utils/authStorage'
+import { useSelector } from 'react-redux'
+import { selectIsAuthenticated } from '../redux/slices/authSlice'
 import answerSheetService from '../services/answerSheetService'
 import candidateService from '../services/candidateService'
 import datesheetService from '../services/datesheetService'
@@ -111,7 +112,7 @@ export function useSidebarCounts(
   access: SidebarCountsAccess,
   options?: Omit<UseQueryOptions<SidebarCounts, Error>, 'queryKey' | 'queryFn'>
 ) {
-  const hasToken = Boolean(getAuthToken())
+  const hasToken = useSelector(selectIsAuthenticated)
 
   return useQuery({
     queryKey: sidebarKeys.counts(access),

@@ -1,10 +1,21 @@
-import { useEffect } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { HashRouter as Router, Routes, Route, Navigate, Link, useLocation } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
-import { getCurrentUser, selectIsAuthenticated, selectAuthLoading, selectUser } from './redux/slices/authSlice'
+import { getCurrentUser, selectAuth } from './redux/slices/authSlice'
 import { useAcademicSession } from './contexts/AcademicSessionContext'
-import authService from './services/authService'
+import { hasSessionHint } from './utils/authStorage'
+import { landingPathFor } from './utils/landing'
 import type { AppDispatch } from './redux/store'
+import ChangePasswordRequired from './pages/ChangePasswordRequired'
+import AcceptInvite from './pages/AcceptInvite'
+import UsersAndAccess from './pages/settings/UsersAndAccess'
+import UserDetail from './pages/settings/UserDetail'
+import RolesPage from './pages/settings/Roles'
+import RoleEditor from './pages/settings/RoleEditor'
+import PortalRoute from './routes/PortalRoute'
+
+// Parents and students only download the portal; staff never download it.
+const PortalApp = lazy(() => import('./portal/PortalApp'))
 
 // Pages
 import Dashboard from './pages/Dashboard'
@@ -178,25 +189,23 @@ const PublicLanding = () => {
 
 function App() {
   const dispatch = useDispatch<AppDispatch>()
-  const isAuthenticated = useSelector(selectIsAuthenticated)
-  const loading = useSelector(selectAuthLoading)
-  const user = useSelector(selectUser)
+  const { isAuthenticated, checkingSession, user } = useSelector(selectAuth)
   const { hasSession } = useAcademicSession()
 
   const timetableFeatureEnabled = user?.featureToggles?.timetable_classes !== false
+  const isPortalUser = user?.kind === 'parent' || user?.kind === 'student'
+  // Where a signed-in person goes from public pages.
+  const landing = landingPathFor(user, hasSession)
 
   useEffect(() => {
-    // Initialize auth on app startup
-    authService.initializeAuth()
-
-    // Refresh current user (and feature toggles) once on mount when token exists.
-    const token = authService.getToken()
-    if (token) {
+    // The session cookie is invisible to JS; if this browser was signed in, ask
+    // the server who we are (it refreshes the cookie if needed).
+    if (hasSessionHint()) {
       dispatch(getCurrentUser())
     }
   }, [dispatch])
 
-  if (loading) {
+  if (checkingSession) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
         <div className="text-center">
@@ -217,7 +226,7 @@ function App() {
             path="/"
             element={
               isAuthenticated ? (
-                hasSession ? <Navigate to="/home" replace /> : <Navigate to="/select-session" replace />
+                <Navigate to={landing} replace />
               ) : (
                 <PublicLanding />
               )
@@ -227,7 +236,7 @@ function App() {
             path="/login"
             element={
               isAuthenticated ? (
-                hasSession ? <Navigate to="/home" replace /> : <Navigate to="/select-session" replace />
+                <Navigate to={landing} replace />
               ) : (
                 <Login />
               )
@@ -237,7 +246,7 @@ function App() {
             path="/forgot-password"
             element={
               isAuthenticated ? (
-                hasSession ? <Navigate to="/home" replace /> : <Navigate to="/select-session" replace />
+                <Navigate to={landing} replace />
               ) : (
                 <ForgotPassword />
               )
@@ -247,7 +256,7 @@ function App() {
             path="/signup"
             element={
               isAuthenticated ? (
-                hasSession ? <Navigate to="/home" replace /> : <Navigate to="/select-session" replace />
+                <Navigate to={landing} replace />
               ) : (
                 <Signup />
               )
@@ -257,7 +266,7 @@ function App() {
             path="/signupold"
             element={
               isAuthenticated ? (
-                hasSession ? <Navigate to="/home" replace /> : <Navigate to="/select-session" replace />
+                <Navigate to={landing} replace />
               ) : (
                 <TenantSignupChat />
               )
@@ -267,12 +276,33 @@ function App() {
             path="/signup/complete"
             element={
               isAuthenticated ? (
-                hasSession ? <Navigate to="/home" replace /> : <Navigate to="/select-session" replace />
+                <Navigate to={landing} replace />
               ) : (
                 <TenantSignupComplete />
               )
             }
           />
+
+          {/* Invite link from the school: set a password and sign in */}
+          <Route path="/accept-invite" element={<AcceptInvite />} />
+
+          {/* First sign-in with a temporary password */}
+          <Route
+            path="/change-password"
+            element={!isAuthenticated ? <Navigate to="/login" replace /> : <ChangePasswordRequired />}
+          />
+
+          {/* Parent / student portal */}
+          <Route element={<PortalRoute />}>
+            <Route
+              path="/portal/*"
+              element={
+                <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><Loader size="lg" /></div>}>
+                  <PortalApp />
+                </Suspense>
+              }
+            />
+          </Route>
 
           {/* Session Selection (authenticated but no session yet) */}
           <Route
@@ -280,6 +310,8 @@ function App() {
             element={
               !isAuthenticated ? (
                 <Navigate to="/" replace />
+              ) : isPortalUser || user?.mustChangePassword ? (
+                <Navigate to={landing} replace />
               ) : hasSession ? (
                 <Navigate to="/home" replace />
               ) : (
@@ -294,6 +326,8 @@ function App() {
             element={
               !isAuthenticated ? (
                 <Navigate to="/" replace />
+              ) : isPortalUser ? (
+                <Navigate to="/portal" replace />
               ) : !hasSession ? (
                 <Navigate to="/select-session" replace />
               ) : (
@@ -306,6 +340,8 @@ function App() {
             element={
               !isAuthenticated ? (
                 <Navigate to="/" replace />
+              ) : isPortalUser ? (
+                <Navigate to="/portal" replace />
               ) : !hasSession ? (
                 <Navigate to="/select-session" replace />
               ) : (
@@ -514,6 +550,11 @@ function App() {
               <Route path="cbse-portals" element={<CBSEPortals />} />
               <Route path="billing" element={<Billing />} />
               <Route path="account-settings" element={<AccountSettings />} />
+              <Route path="settings/users" element={<UsersAndAccess />} />
+              <Route path="settings/users/:id" element={<UserDetail />} />
+              <Route path="settings/roles" element={<RolesPage />} />
+              <Route path="settings/roles/new" element={<RoleEditor />} />
+              <Route path="settings/roles/:roleKey" element={<RoleEditor />} />
               <Route path="help-support" element={<HelpSupport />} />
               <Route path="dropdown-examples" element={<DropdownExamples />} />
               <Route path="dialog-showcase" element={<DialogShowcase />} />

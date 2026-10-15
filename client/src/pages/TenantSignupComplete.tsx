@@ -4,9 +4,8 @@ import { useDispatch } from 'react-redux'
 import { CheckCircle2, Loader2, Mail, RefreshCcw, XCircle } from 'lucide-react'
 import tenantSignupService from '@/services/tenantSignupService'
 import { resolveTenantSlug } from '@/utils/tenantRuntime'
-import { setCredentials } from '@/redux/slices/authSlice'
+import { setSignedInUser } from '@/redux/slices/authSlice'
 import type { AppDispatch } from '@/redux/store'
-import { persistAuthData } from '@/utils/authStorage'
 
 const TenantSignupComplete: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>()
@@ -56,15 +55,9 @@ const TenantSignupComplete: React.FC = () => {
         ...(response.billing ? { billing: response.billing } : {}),
       }
 
-      persistAuthData({
-        token: response.token,
-        refreshToken: response.refreshToken,
-        user: userWithBilling,
-        remember: true,
-      })
+      // The session cookie is already set by the exchange response.
       localStorage.setItem('tenantSlug', response.tenant.slug)
-
-      dispatch(setCredentials({ user: userWithBilling, token: response.token }))
+      dispatch(setSignedInUser(userWithBilling))
 
       setStatus('success')
       window.setTimeout(() => {

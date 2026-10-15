@@ -3,11 +3,14 @@ import { resolvePlatformAdminApiBaseUrl } from '@/utils/tenantRuntime'
 import type { User } from '@/types/auth'
 import type { BillingSnapshot } from '@/types/auth'
 
+// The exchange step signs the new admin in with httpOnly cookies, so send credentials.
 const tenantSignupApi = axios.create({
   baseURL: resolvePlatformAdminApiBaseUrl(),
   timeout: 30000,
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
+    'X-Requested-With': 'XMLHttpRequest',
   },
 })
 
@@ -45,8 +48,6 @@ export interface TenantSignupResendOtpResponse {
 }
 
 export interface TenantSignupExchangeResponse {
-  token: string
-  refreshToken: string
   user: User
   billing?: BillingSnapshot | null
   tenant: {

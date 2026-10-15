@@ -5,6 +5,7 @@ import { LayoutDashboard, Settings2 } from 'lucide-react'
 import { Button, EmptyState, Page } from '@/components/ui'
 import { selectUser } from '@/redux/slices/authSlice'
 import { useSchoolProfile } from '@/hooks/useSchoolProfile'
+import { usePermissions } from '@/hooks/usePermissions'
 import { useLocalIndex } from '@/components/commandPalette/useLocalIndex'
 import { MODULE_REGISTRY } from '@/constants/moduleRegistry'
 import { resolveTenantSlug } from '@/utils/tenantRuntime'
@@ -52,7 +53,11 @@ const Home: React.FC = () => {
     [pageByPath]
   )
   const visibleWidgets = layout.widgets.filter((id) => availableWidgets.includes(id))
-  const availableActions = useMemo(() => QUICK_ACTIONS.filter((action) => pageByPath.has(action.path)), [pageByPath])
+  const { can } = usePermissions()
+  const availableActions = useMemo(
+    () => QUICK_ACTIONS.filter((action) => pageByPath.has(action.path) && can(action.permission)),
+    [pageByPath, can]
+  )
   const shownActions = layout.actions
     .map((id) => availableActions.find((action) => action.id === id))
     .filter((action): action is NonNullable<typeof action> => Boolean(action))

@@ -8,16 +8,15 @@ jest.mock('../../utils/mailer', () => ({
   sendMail: jest.fn(),
 }));
 
-jest.mock('../../utils/jwt', () => ({
-  createTokenResponse: jest.fn(),
-  clearTokenCookies: jest.fn(),
-  verifyRefreshToken: jest.fn(),
-  generateToken: jest.fn(),
+jest.mock('../../rbac/session', () => ({
+  ...jest.requireActual('../../rbac/session'),
+  clearSessionCookies: jest.fn(),
+  issueSession: jest.fn(),
 }));
 
 const User = require('../../models/User');
 const { sendMail } = require('../../utils/mailer');
-const { clearTokenCookies } = require('../../utils/jwt');
+const { clearSessionCookies } = require('../../rbac/session');
 
 const {
   forgotPassword,
@@ -90,7 +89,9 @@ describe('authController password reset OTP', () => {
     }));
   });
 
-  it('returns user_not_found for forgot password on unknown email', async () => {
+  // Forgot-password answers the same way whether or not an account exists, so
+  // it cannot be used to discover who has a login.
+  it('answers generically and sends nothing for an unknown email', async () => {
     User.findOne.mockResolvedValueOnce(null);
     const req = { body: { email: 'missing@example.com' } };
     const res = createRes();
@@ -98,14 +99,12 @@ describe('authController password reset OTP', () => {
     forgotPassword(req, res, jest.fn());
     await flush();
 
-    expect(res.status).toHaveBeenCalledWith(404);
-    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
-      success: false,
-      errorCode: 'user_not_found',
-    }));
+    expect(sendMail).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
   });
 
-  it('returns user_inactive for forgot password on inactive user', async () => {
+  it('answers generically and sends nothing for an inactive user', async () => {
     User.findOne.mockResolvedValueOnce({
       email: 'inactive@example.com',
       isActive: false,
@@ -117,14 +116,12 @@ describe('authController password reset OTP', () => {
     forgotPassword(req, res, jest.fn());
     await flush();
 
-    expect(res.status).toHaveBeenCalledWith(403);
-    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
-      success: false,
-      errorCode: 'user_inactive',
-    }));
+    expect(sendMail).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
   });
 
-  it('returns otp_not_requested on resend without initial forgot request', async () => {
+  it('answers generically on resend when no reset was requested', async () => {
     User.findOne.mockResolvedValueOnce({
       email: 'admin@example.com',
       isActive: true,
@@ -138,11 +135,8 @@ describe('authController password reset OTP', () => {
     resendForgotPasswordOtp(req, res, jest.fn());
     await flush();
 
-    expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
-      success: false,
-      errorCode: 'otp_not_requested',
-    }));
+    expect(sendMail).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(200);
   });
 
   it('resends OTP and rotates fields', async () => {
@@ -299,13 +293,15 @@ describe('authController password reset OTP', () => {
 
     expect(user.password).toBe('Password@123');
     expect(user.refreshTokens).toEqual([]);
+    expect(user.tokenVersion).toBe(1);
+    expect(user.mustChangePassword).toBe(false);
     expect(user.passwordResetOtpHash).toBeNull();
     expect(user.passwordResetOtpExpiresAt).toBeNull();
     expect(user.passwordResetOtpSentAt).toBeNull();
     expect(user.passwordResetOtpAttemptCount).toBe(0);
     expect(user.passwordResetOtpLastAttemptAt).toBeNull();
     expect(user.save).toHaveBeenCalledTimes(1);
-    expect(clearTokenCookies).toHaveBeenCalledTimes(1);
+    expect(clearSessionCookies).toHaveBeenCalledTimes(1);
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
       success: true,

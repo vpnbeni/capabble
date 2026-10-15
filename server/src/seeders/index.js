@@ -24,18 +24,24 @@ const userData = [
     email: 'admin@sems.com',
     password: 'admin123',
     role: USER_ROLES.ADMIN,
+    kind: 'staff',
+    roles: ['administrator'],
     isActive: true
   },
   {
     email: 'operator@sems.com',
     password: 'operator123',
     role: USER_ROLES.DATA_ENTRY_OPERATOR,
+    kind: 'staff',
+    roles: ['office_staff'],
     isActive: true
   },
   {
     email: 'operator2@sems.com',
     password: 'operator123',
     role: USER_ROLES.DATA_ENTRY_OPERATOR,
+    kind: 'staff',
+    roles: ['office_staff'],
     isActive: true
   }
 ];

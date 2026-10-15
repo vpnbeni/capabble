@@ -8,6 +8,9 @@ export interface ExmclExamDefinition {
   maximumMarks?: number
   displayOrder: number
   subjectKeys?: string[]
+  /** Parents and students see marks only for exams with published results. */
+  resultsPublished?: boolean
+  resultsPublishedAt?: string | null
   createdAt: string
   updatedAt: string
 }
@@ -61,8 +64,14 @@ const remove = async (id: string): Promise<void> => {
   await api.delete(`/exam-definitions/${id}`)
 }
 
+const setResultsPublication = async (id: string, published: boolean): Promise<ExmclExamDefinition> => {
+  const response = await api.put(`/exam-definitions/${id}/results-publication`, { published }, { _silent: true } as never)
+  return response?.data?.data as ExmclExamDefinition
+}
+
 const exmclExamService = {
   getAll,
+  setResultsPublication,
   create,
   update,
   remove,

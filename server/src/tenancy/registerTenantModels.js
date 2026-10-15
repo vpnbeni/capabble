@@ -1,4 +1,6 @@
 const User = require('../models/User');
+const Role = require('../models/Role');
+const AuthAuditLog = require('../models/AuthAuditLog');
 const Teacher = require('../models/Teacher');
 const Student = require('../models/Student');
 const Subject = require('../models/Subject');
@@ -105,6 +107,8 @@ const {
 
 const tenantModelExports = {
   User,
+  Role,
+  AuthAuditLog,
   Teacher,
   Student,
   Subject,

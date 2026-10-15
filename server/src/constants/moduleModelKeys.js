@@ -20,6 +20,8 @@ const { getModuleFeatureKeys } = require('./tenantFeatures');
 const MODULE_MODEL_KEYS = Object.freeze({
   core: Object.freeze([
     'User',
+    'Role',
+    'AuthAuditLog',
     'Teacher',
     'Subject',
     'Room',

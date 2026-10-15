@@ -40,6 +40,15 @@ const examDefinitionSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    // Parents and students only see marks for exams whose results are published.
+    resultsPublished: {
+      type: Boolean,
+      default: false,
+    },
+    resultsPublishedAt: {
+      type: Date,
+      default: null,
+    },
   },
   {
     timestamps: true,

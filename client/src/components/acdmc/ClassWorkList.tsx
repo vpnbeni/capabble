@@ -42,7 +42,7 @@ import {
   sectionSelectOptions,
   shortDate,
   todayKey,
-  useIsAdmin,
+  useCanDeleteAcademics,
   type ClassContextErrors,
 } from './AcdmcUi'
 import './acdmc.css'
@@ -256,7 +256,7 @@ type Config = {
 const ClassWorkList: React.FC<Config> = ({ kind, icon, emptyBody }) => {
   const meta = KIND_META[kind]
   const navigate = useNavigate()
-  const isAdmin = useIsAdmin()
+  const canDelete = useCanDeleteAcademics('classwork')
   const [searchParams, setSearchParams] = useSearchParams()
   const [q, setQ] = useState('')
   const [status, setStatus] = useState<ClassWorkStatus | ''>('')
@@ -359,7 +359,7 @@ const ClassWorkList: React.FC<Config> = ({ kind, icon, emptyBody }) => {
         toast('Choose the section for the copy.')
       },
     })
-    if (isAdmin) items.push({ divider: true }, { label: 'Delete', icon: Trash2, tone: 'danger', onSelect: () => setDeleteTarget(work) })
+    if (canDelete) items.push({ divider: true }, { label: 'Delete', icon: Trash2, tone: 'danger', onSelect: () => setDeleteTarget(work) })
     return items
   }
 
@@ -428,7 +428,7 @@ const ClassWorkList: React.FC<Config> = ({ kind, icon, emptyBody }) => {
     })
     return cols
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [kind, isAdmin])
+  }, [kind, canDelete])
 
   const counts = data?.counts || { draft: 0, published: 0, closed: 0 }
   const items = data?.items || []

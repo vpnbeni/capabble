@@ -9,6 +9,7 @@ const {
   deleteExamDefinition,
   getExamSubjectMatrix,
   saveExamSubjectMatrix,
+  setResultsPublication,
 } = require('../controllers/examDefinitionController');
 
 const router = express.Router();
@@ -29,6 +30,12 @@ router.get('/subject-matrix', getExamSubjectMatrix);
 router.put('/subject-matrix', requireExamManagement, saveExamSubjectMatrix);
 
 router.put('/:id', requireExamManagement, validateParams(Joi.object({ id: objectIdSchema })), updateExamDefinition);
+router.put(
+  '/:id/results-publication',
+  requireExamManagement,
+  validateParams(Joi.object({ id: objectIdSchema })),
+  setResultsPublication
+);
 router.delete('/:id', requireExamManagement, validateParams(Joi.object({ id: objectIdSchema })), deleteExamDefinition);
 
 module.exports = router;

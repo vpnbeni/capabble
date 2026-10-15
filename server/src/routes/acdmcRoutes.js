@@ -1,5 +1,7 @@
 const express = require('express');
-const { protect, authorize } = require('../middleware/auth');
+const { protect } = require('../middleware/auth');
+const { requirePermission } = require('../rbac/middleware');
+const { buildSectionFilter, requireSectionInScope } = require('../rbac/scope');
 const { requireTenantFeature } = require('../middleware/tenantFeatureAccess');
 const ctrl = require('../controllers/acdmcController');
 const schemas = require('../validations/acdmcValidation');
@@ -25,32 +27,85 @@ const router = express.Router();
 router.use(protect);
 router.use(requireTenantFeature('acdmc_academics'));
 
+// Lesson plans and class work belong to a class-section. A teacher whose grant
+// is limited to their own sections only sees and changes those.
+const CLASS_WORK_PERMISSION = { read: 'acdmc.classwork.read', write: 'acdmc.classwork.write' };
+
+const scopeList = async (req, res, next) => {
+  try {
+    req.sectionScope = await buildSectionFilter(req, CLASS_WORK_PERMISSION.read, {
+      classField: 'className',
+      sectionField: 'section'
+    });
+    return next();
+  } catch (error) {
+    return next(error);
+  }
+};
+
+const scopeRecord = (modelKey, action) => requireSectionInScope(CLASS_WORK_PERMISSION[action], async (req) => {
+  const doc = await req.models?.[modelKey]?.findById(req.params.id).select('className section').lean();
+  return doc ? { className: doc.className, section: doc.section } : null;
+});
+
+const scopeBody = requireSectionInScope(CLASS_WORK_PERMISSION.write, (req) => ({
+  className: req.body?.className,
+  section: req.body?.section
+}));
+
 router.get('/options', ctrl.getOptions);
 router.get('/overview', ctrl.getOverview);
 
 // Lesson plans
-router.get('/lesson-plans', ctrl.lessonPlans.list);
-router.get('/lesson-plans/:id', ctrl.lessonPlans.get);
-router.post('/lesson-plans', validateBody(schemas.lessonPlanSchema), ctrl.lessonPlans.create);
-router.put('/lesson-plans/:id', validateBody(schemas.lessonPlanSchema), ctrl.lessonPlans.update);
-router.post('/lesson-plans/:id/status', validateBody(schemas.lessonPlanStatusSchema), ctrl.lessonPlans.setStatus);
-router.delete('/lesson-plans/:id', authorize('admin'), ctrl.lessonPlans.remove);
+const LP = ctrl.MODEL_KEYS.LessonPlan;
+router.get('/lesson-plans', scopeList, ctrl.lessonPlans.list);
+router.get('/lesson-plans/:id', scopeRecord(LP, 'read'), ctrl.lessonPlans.get);
+router.post('/lesson-plans', validateBody(schemas.lessonPlanSchema), scopeBody, ctrl.lessonPlans.create);
+router.put(
+  '/lesson-plans/:id',
+  validateBody(schemas.lessonPlanSchema),
+  scopeRecord(LP, 'write'),
+  scopeBody,
+  ctrl.lessonPlans.update
+);
+router.post(
+  '/lesson-plans/:id/status',
+  validateBody(schemas.lessonPlanStatusSchema),
+  scopeRecord(LP, 'write'),
+  ctrl.lessonPlans.setStatus
+);
+router.delete('/lesson-plans/:id', requirePermission('acdmc.classwork.delete'), scopeRecord(LP, 'write'), ctrl.lessonPlans.remove);
 
 // Homework, assignments and quizzes share one shape
-const mountClassWork = (path, handlers, schema) => {
-  router.get(path, handlers.list);
-  router.get(`${path}/:id`, handlers.get);
-  router.post(path, validateBody(schema), handlers.create);
-  router.put(`${path}/:id`, validateBody(schema), handlers.update);
-  router.post(`${path}/:id/status`, validateBody(schemas.classWorkStatusSchema), handlers.setStatus);
-  router.get(`${path}/:id/roster`, handlers.roster);
-  router.put(`${path}/:id/submissions`, validateBody(schemas.submissionsSchema), handlers.saveSubmissions);
-  router.delete(`${path}/:id`, authorize('admin'), handlers.remove);
+const mountClassWork = (path, handlers, schema, modelKey) => {
+  router.get(path, scopeList, handlers.list);
+  router.get(`${path}/:id`, scopeRecord(modelKey, 'read'), handlers.get);
+  router.post(path, validateBody(schema), scopeBody, handlers.create);
+  router.put(`${path}/:id`, validateBody(schema), scopeRecord(modelKey, 'write'), scopeBody, handlers.update);
+  router.post(
+    `${path}/:id/status`,
+    validateBody(schemas.classWorkStatusSchema),
+    scopeRecord(modelKey, 'write'),
+    handlers.setStatus
+  );
+  router.get(`${path}/:id/roster`, scopeRecord(modelKey, 'read'), handlers.roster);
+  router.put(
+    `${path}/:id/submissions`,
+    validateBody(schemas.submissionsSchema),
+    scopeRecord(modelKey, 'write'),
+    handlers.saveSubmissions
+  );
+  router.delete(
+    `${path}/:id`,
+    requirePermission('acdmc.classwork.delete'),
+    scopeRecord(modelKey, 'write'),
+    handlers.remove
+  );
 };
 
-mountClassWork('/homework', ctrl.homework, schemas.homeworkSchema);
-mountClassWork('/assignments', ctrl.assignments, schemas.assignmentSchema);
-mountClassWork('/quizzes', ctrl.quizzes, schemas.quizSchema);
+mountClassWork('/homework', ctrl.homework, schemas.homeworkSchema, ctrl.MODEL_KEYS.Homework);
+mountClassWork('/assignments', ctrl.assignments, schemas.assignmentSchema, ctrl.MODEL_KEYS.Assignment);
+mountClassWork('/quizzes', ctrl.quizzes, schemas.quizSchema, ctrl.MODEL_KEYS.Quiz);
 
 // Curriculum (syllabus per class + subject)
 router.get('/curriculum', ctrl.curriculum.list);
@@ -60,6 +115,6 @@ router.post('/curriculum', validateBody(schemas.curriculumSchema), ctrl.curricul
 router.put('/curriculum/:id', validateBody(schemas.curriculumSchema), ctrl.curriculum.update);
 router.post('/curriculum/:id/status', validateBody(schemas.curriculumStatusSchema), ctrl.curriculum.setStatus);
 router.post('/curriculum/:id/copy', validateBody(schemas.curriculumCopySchema), ctrl.curriculum.copy);
-router.delete('/curriculum/:id', authorize('admin'), ctrl.curriculum.remove);
+router.delete('/curriculum/:id', requirePermission('acdmc.curriculum.delete'), ctrl.curriculum.remove);
 
 module.exports = router;

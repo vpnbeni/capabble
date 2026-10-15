@@ -8,7 +8,7 @@ const normalizeDuration = (value) => String(value || '').trim();
 const listExamDefinitions = asyncHandler(async (req, res) => {
   const ExamDefinitionModel = req.models?.ExamDefinition || ExamDefinition;
   const rows = await ExamDefinitionModel.find({ isActive: true })
-    .select('_id name code displayOrder duration maximumMarks subjectKeys createdAt updatedAt')
+    .select('_id name code displayOrder duration maximumMarks subjectKeys resultsPublished resultsPublishedAt createdAt updatedAt')
     .sort({ displayOrder: 1, createdAt: 1 })
     .lean();
 
@@ -254,7 +254,30 @@ const saveExamSubjectMatrix = asyncHandler(async (req, res) => {
   });
 });
 
+// @desc    Show or hide an exam's results in the parent/student portal
+// @route   PUT /api/exam-definitions/:id/results-publication  { published: boolean }
+const setResultsPublication = asyncHandler(async (req, res) => {
+  const ExamDefinitionModel = req.models?.ExamDefinition || ExamDefinition;
+  const published = req.body?.published === true;
+  const exam = await ExamDefinitionModel.findOneAndUpdate(
+    { _id: req.params.id, isActive: true },
+    { $set: { resultsPublished: published, resultsPublishedAt: published ? new Date() : null } },
+    { new: true }
+  ).lean();
+
+  if (!exam) {
+    return res.status(404).json({ success: false, message: 'Exam not found.' });
+  }
+
+  return res.status(200).json({
+    success: true,
+    message: published ? 'Results are now visible to parents and students.' : 'Results are hidden from parents and students.',
+    data: exam,
+  });
+});
+
 module.exports = {
+  setResultsPublication,
   listExamDefinitions,
   createExamDefinition,
   updateExamDefinition,

@@ -2,7 +2,6 @@ const express = require('express');
 const Joi = require('joi');
 const rateLimit = require('express-rate-limit');
 const {
-  register,
   login,
   logout,
   refreshToken,
@@ -14,27 +13,23 @@ const {
   resetPassword,
   verifyEmail,
   resendEmailVerificationOtp,
-  getUsers,
-  updateUser,
-  deleteUser,
-  getUserStats
+  previewInvite,
+  acceptInvite
 } = require('../controllers/authController');
 
-const { protect, authorize } = require('../middleware/auth');
-const { validateJoi, validateParams, validateQuery } = require('../middleware/validation');
+const { protect } = require('../middleware/auth');
+const { validateJoi } = require('../middleware/validation');
 const {
   loginSchema,
-  registerSchema,
+  acceptInviteSchema,
+  invitePreviewSchema,
   changePasswordSchema,
   forgotPasswordSchema,
   forgotPasswordResendOtpSchema,
   resetPasswordSchema,
   verifyEmailSchema,
   resendEmailVerificationSchema,
-  refreshTokenSchema,
-  updateProfileSchema,
-  objectIdSchema,
-  userQuerySchema
+  updateProfileSchema
 } = require('../validations/authValidation');
 
 const router = express.Router();
@@ -83,10 +78,37 @@ const resetPasswordLimiter = rateLimit({
   },
 });
 
-// Public routes
-router.post('/register', validateJoi(registerSchema), register);
-router.post('/login', validateJoi(loginSchema), login);
-router.post('/refresh', validateJoi(refreshTokenSchema), refreshToken);
+const loginLimiter = rateLimit({
+  windowMs: parsePositiveInt(process.env.LOGIN_RATE_LIMIT_WINDOW_MS, 15 * 60 * 1000),
+  max: parsePositiveInt(process.env.LOGIN_RATE_LIMIT_MAX, 30),
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    message: 'Too many sign-in attempts from this network. Please try again later.',
+    errorCode: 'rate_limit_exceeded',
+  },
+});
+
+const inviteLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    message: 'Too many attempts. Please try again later.',
+    errorCode: 'rate_limit_exceeded',
+  },
+});
+
+// Public routes. There is no self sign-up: accounts are created by the school
+// (see /api/users). The tenant access gate (src/rbac/gate.js) lists these too.
+router.post('/login', loginLimiter, validateJoi(loginSchema), login);
+router.post('/refresh', refreshToken);
+router.post('/logout', logout);
+router.post('/invite/preview', inviteLimiter, validateJoi(invitePreviewSchema), previewInvite);
+router.post('/accept-invite', inviteLimiter, validateJoi(acceptInviteSchema), acceptInvite);
 router.post('/forgot-password', forgotPasswordLimiter, validateJoi(forgotPasswordSchema), forgotPassword);
 router.post(
   '/forgot-password/resend-otp',
@@ -95,31 +117,19 @@ router.post(
   resendForgotPasswordOtp
 );
 router.post('/reset-password', resetPasswordLimiter, validateJoi(resetPasswordSchema), resetPassword);
-router.post('/verify-email', validateJoi(verifyEmailSchema), verifyEmail);
-router.post('/resend-email-verification', validateJoi(resendEmailVerificationSchema), resendEmailVerificationOtp);
+router.post('/verify-email', resetPasswordLimiter, validateJoi(verifyEmailSchema), verifyEmail);
+router.post(
+  '/resend-email-verification',
+  forgotPasswordResendLimiter,
+  validateJoi(resendEmailVerificationSchema),
+  resendEmailVerificationOtp
+);
 
-// Protected routes (require authentication)
+// Signed-in account routes (any kind of user)
 router.use(protect);
 
-// User profile routes
 router.get('/me', getMe);
 router.put('/me', validateJoi(updateProfileSchema), updateProfile);
 router.put('/change-password', validateJoi(changePasswordSchema), changePassword);
-router.post('/logout', logout);
-
-// Admin only routes
-router.get('/users', authorize('admin'), validateQuery(userQuerySchema), getUsers);
-router.get('/stats', authorize('admin'), getUserStats);
-router.put('/users/:id', 
-  authorize('admin'), 
-  validateParams(Joi.object({ id: objectIdSchema.required() })),
-  validateJoi(updateProfileSchema),
-  updateUser
-);
-router.delete('/users/:id', 
-  authorize('admin'),
-  validateParams(Joi.object({ id: objectIdSchema.required() })),
-  deleteUser
-);
 
 module.exports = router;

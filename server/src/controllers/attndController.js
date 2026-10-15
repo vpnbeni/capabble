@@ -1,4 +1,5 @@
 const { StaffAttendanceDaily, StudentAttendanceDaily, StudentAttendanceDay } = require('../models/AttndDailyRecord');
+const { isAssignedScope, getAssignedSections, sectionKey } = require('../rbac/scope');
 const Teacher = require('../models/Teacher');
 const Student = require('../models/Student');
 const TimetableState = require('../models/TimetableState');
@@ -112,6 +113,16 @@ const getStudentFilters = async (req, res) => {
         const current = classMap.get(className) || [];
         if (!current.includes(section)) current.push(section);
         classMap.set(className, current);
+      });
+    }
+
+    // Teachers limited to their own sections only see those sections.
+    if (isAssignedScope(req, 'attnd.students.read')) {
+      const allowed = new Set((await getAssignedSections(req)).map((entry) => entry.key));
+      Array.from(classMap.entries()).forEach(([className, sections]) => {
+        const visible = sections.filter((section) => allowed.has(sectionKey(className, section)));
+        if (visible.length > 0) classMap.set(className, visible);
+        else classMap.delete(className);
       });
     }
 

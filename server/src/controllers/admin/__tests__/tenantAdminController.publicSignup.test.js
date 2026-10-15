@@ -26,9 +26,9 @@ jest.mock('../../../config/platformDatabase', () => ({
   getPlatformConnection: jest.fn(),
 }));
 
-jest.mock('../../../utils/jwt', () => ({
-  generateTenantToken: jest.fn(),
-  generateRefreshToken: jest.fn(),
+jest.mock('../../../rbac/session', () => ({
+  ...jest.requireActual('../../../rbac/session'),
+  issueSession: jest.fn().mockResolvedValue('tenant-access-token'),
 }));
 
 jest.mock('../../../utils/mailer', () => ({
@@ -45,7 +45,7 @@ const {
   removeTenantFromCache,
 } = require('../../../tenancy/tenantConnectionManager');
 const { getPlatformConnection } = require('../../../config/platformDatabase');
-const { generateTenantToken, generateRefreshToken } = require('../../../utils/jwt');
+const { issueSession } = require('../../../rbac/session');
 
 const {
   startPublicTenantSignup,
@@ -143,7 +143,6 @@ describe('tenantAdminController public signup', () => {
       role: 'admin',
       isActive: true,
       createdAt: new Date('2025-01-01T00:00:00.000Z'),
-      addRefreshToken: jest.fn().mockResolvedValue(undefined),
     };
 
     const req = {
@@ -174,28 +173,25 @@ describe('tenantAdminController public signup', () => {
     getTenantConnectionAndModels.mockReturnValueOnce({
       models: {
         User: {
-          findById: jest.fn().mockResolvedValue(userDoc),
+          findById: jest.fn().mockReturnValue({ select: jest.fn().mockResolvedValue(userDoc) }),
         },
       },
     });
-    generateTenantToken.mockReturnValueOnce('tenant-access-token');
-    generateRefreshToken.mockReturnValueOnce('tenant-refresh-token');
 
     exchangePublicTenantSignup(req, res, jest.fn());
     await flush();
 
     expect(consumeOnboardingTicket).toHaveBeenCalledTimes(1);
-    expect(generateTenantToken).toHaveBeenCalledTimes(1);
-    expect(generateRefreshToken).toHaveBeenCalledTimes(1);
-    expect(userDoc.addRefreshToken).toHaveBeenCalledWith('tenant-refresh-token');
+    // The session is set as httpOnly cookies; no tokens in the response body.
+    expect(issueSession).toHaveBeenCalledWith(expect.objectContaining({ user: userDoc, tenantSlug: 'alpha-school' }));
+    expect(userDoc.roles).toEqual(['administrator']);
+    expect(userDoc.isEmailVerified).toBe(true);
     expect(res.status).toHaveBeenCalledWith(200);
-    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
-      success: true,
-      data: expect.objectContaining({
-        token: 'tenant-access-token',
-        refreshToken: 'tenant-refresh-token',
-      }),
-    }));
+    const body = res.json.mock.calls[0][0];
+    expect(body.success).toBe(true);
+    expect(body.data.token).toBeUndefined();
+    expect(body.data.refreshToken).toBeUndefined();
+    expect(body.data.user).toEqual(expect.objectContaining({ email: 'admin@alpha.com', isAdmin: true }));
   });
 
   it('returns used_ticket error code when exchange ticket is consumed', async () => {

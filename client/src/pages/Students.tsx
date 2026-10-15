@@ -80,6 +80,7 @@ type StudentFormState = {
   section: string
   fatherName: string
   motherName: string
+  guardianEmail: string
   guardianPhone: string
   house: string
   houseId: string
@@ -123,6 +124,7 @@ const createInitialFormState = (): StudentFormState => ({
   section: '',
   fatherName: '',
   motherName: '',
+  guardianEmail: '',
   guardianPhone: '',
   house: '',
   houseId: '',
@@ -195,6 +197,7 @@ const mapStudentToFormState = (student: any): StudentFormState => ({
   section: String(student?.section || ''),
   fatherName: String(student?.fatherName || ''),
   motherName: String(student?.motherName || ''),
+  guardianEmail: String(student?.guardianEmail || ''),
   guardianPhone: String(student?.guardianPhone || ''),
   house: String(student?.house || ''),
   houseId: String(student?.houseId?._id || student?.houseId || ''),
@@ -631,6 +634,9 @@ const Students: React.FC = () => {
     if (!formData.name.trim()) nextErrors.name = 'Enter the student’s name.'
     if (!formData.fatherName.trim()) nextErrors.fatherName = 'Enter the father’s name.'
     if (!formData.motherName.trim()) nextErrors.motherName = 'Enter the mother’s name.'
+    if (formData.guardianEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.guardianEmail.trim())) {
+      nextErrors.guardianEmail = 'Enter an email like parent@example.com'
+    }
     if (!formData.guardianPhone.trim()) nextErrors.guardianPhone = 'Enter a phone number for the guardian.'
     if (!/^\d{10}$/.test(formData.guardianPhone.trim())) nextErrors.guardianPhone = 'Guardian’s phone must be 10 digits.'
     if (formData.phone.trim() && !/^\d{10}$/.test(formData.phone.trim())) nextErrors.phone = 'Student’s phone must be 10 digits.'
@@ -727,6 +733,7 @@ const Students: React.FC = () => {
         fatherName: formData.fatherName.trim(),
         motherName: formData.motherName.trim(),
         guardianPhone: formData.guardianPhone.trim() || formData.phone.trim(),
+        guardianEmail: formData.guardianEmail.trim().toLowerCase(),
         email: formData.email.trim(),
         phone: formData.phone.trim(),
         penNumber: formData.penNumber.trim(),
@@ -1710,6 +1717,16 @@ const Students: React.FC = () => {
               onChange={handleFieldChange}
               error={fieldError('guardianPhone')}
               hint="10 digits"
+            />
+            <TextField
+              label="Parent's email"
+              name="guardianEmail"
+              type="email"
+              autoComplete="off"
+              value={formData.guardianEmail}
+              onChange={handleFieldChange}
+              error={fieldError('guardianEmail')}
+              hint="Used for the parent's portal login. Brothers and sisters share one."
             />
             <TextField
               label="Student's phone"

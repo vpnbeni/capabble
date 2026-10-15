@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const { ADMINISTRATOR_ROLE } = require('../rbac/catalog');
 const { getPlatformModels } = require('./platformModels');
 const { getTenantConnectionAndModels } = require('./tenantConnectionManager');
 const { syncTenantUserDirectoryEntry } = require('./tenantUserDirectoryService');
@@ -92,6 +93,8 @@ const provisionTenant = async ({
     const tenantAdmin = await models.User.create({
       email,
       password: generatedPassword,
+      kind: 'staff',
+      roles: [ADMINISTRATOR_ROLE],
       role: 'admin',
       isActive: true,
       isEmailVerified: false

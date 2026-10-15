@@ -220,7 +220,15 @@ The system uses a **database-per-tenant** isolation strategy:
 
 - Frontend uses path aliases: `@/components`, `@/pages`, `@/services`, `@/hooks`, `@/redux`, `@/utils`, `@/types`, `@/styles` (configured in tsconfig and vite.config)
 - API calls proxy from Vite dev server (5173) to backend (5000)
-- Authentication: JWT with role-based access (Admin, Data Entry Operator) for tenants; separate platform JWT for platform admins
+- Authentication: tenant sessions are httpOnly cookies (`cb_at` access 15 min, `cb_rt` refresh rotated on use, path `/api/auth`); the web app never sees a token. Cookie-authenticated writes need the `X-Requested-With` header (the axios instance sends it). Separate platform JWT for platform admins.
+
+### Access control (RBAC) — must follow for any new route or page
+- Three kinds of login: `staff` (school panel, permissions from roles), `parent` and `student` (family portal at `#/portal`, read-only, only their linked students). No self sign-up: logins are created in Settings → Users and access (`/api/users`).
+- Permissions live in `packages/shared/src/permissionCatalog.json` (`module.resource.action`, plus built-in role templates and route rules). Edit it there, then `npm run sync:shared`.
+- Every tenant route goes through `server/src/rbac/gate.js`: deny by default. **A new route prefix needs a rule in the catalog's `routes`**, otherwise only administrators can call it (the `route coverage` test in `src/rbac/__tests__` fails). Finer checks: `requirePermission(...)` from `src/rbac/middleware`.
+- "Own classes only" grants (`scope: 'assigned'`) must be enforced with `buildSectionFilter` / `requireSectionInScope` from `src/rbac/scope.js` on any endpoint that lists or changes class-section data.
+- Client: hide what a role can't use with `usePermissions()` (`can`, `access`); pass `access` (not raw `featureToggles`) to `featureAccess` helpers. New pages map to a permission through the catalog's `features` (or `EXTRA_PATH_PERMISSIONS` in `constants/featureAccess.ts`).
+- Existing tenants: run `npm run migrate:rbac` in `/server` (dry run) then `-- --apply` once after deploying.
 - File uploads: Multer/express-fileupload with 10MB limit, Cloudinary for storage
 - Security middleware: Helmet, rate limiting, mongo-sanitize, xss-clean, hpp
 - CORS: Dynamic origin validation — allows `ROOT_APP_DOMAIN` subdomains + explicit `CLIENT_URL`/`CLIENT_URLS`

@@ -97,6 +97,18 @@ const studentSchema = new mongoose.Schema({
     trim: true,
     maxlength: [100, 'Mother name cannot be more than 100 characters']
   },
+  guardianName: {
+    type: String,
+    trim: true,
+    maxlength: [100, 'Guardian name cannot be more than 100 characters']
+  },
+  // Used to create the parent's portal login (one login covers siblings).
+  guardianEmail: {
+    type: String,
+    trim: true,
+    lowercase: true,
+    match: [/^$|^[^\s@]+@[^\s@]+\.[^\s@]+$/, 'Please provide a valid guardian email']
+  },
   guardianPhone: {
     type: String,
     required: [true, 'Guardian phone is required'],
@@ -252,6 +264,7 @@ studentSchema.index({ rollNumber: 1 });
 studentSchema.index({ class: 1, section: 1, classRollNo: 1 });
 studentSchema.index({ email: 1 });
 studentSchema.index({ guardianPhone: 1 });
+studentSchema.index({ guardianEmail: 1 }, { sparse: true });
 studentSchema.index({ isActive: 1 });
 studentSchema.index({ name: 'text', rollNumber: 'text', fatherName: 'text' });
 studentSchema.index({ createdAt: -1 });
