@@ -92,8 +92,12 @@ const bellTimingsService = {
     return Array.isArray(data) ? data : []
   },
 
-  async createVersion(name?: string): Promise<BellTimingVersionSummary> {
-    const response = await api.post('/timetable/bell-timings/versions', name ? { name } : {})
+  /** Pass `bellTimings` to snapshot unsaved on-screen edits; omit it to snapshot the saved timings. */
+  async createVersion(name?: string, bellTimings?: BellTimingsPayload): Promise<BellTimingVersionSummary> {
+    const response = await api.post('/timetable/bell-timings/versions', {
+      ...(name ? { name } : {}),
+      ...(bellTimings ? { bellTimings } : {}),
+    })
     return response.data?.data as BellTimingVersionSummary
   },
 

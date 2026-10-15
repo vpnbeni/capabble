@@ -234,6 +234,11 @@ The system uses a **database-per-tenant** isolation strategy:
 - CORS: Dynamic origin validation — allows `ROOT_APP_DOMAIN` subdomains + explicit `CLIENT_URL`/`CLIENT_URLS`
 - Tenant header: Requests include `x-tenant-slug` to identify the target tenant
 
+### Design system (must follow for any UI work)
+- Before building or changing UI in `/client`, read `client/src/components/ui/DESIGN.md`. It is the condensed Capabble design system mapped to our kit (`@/components/ui`): voice, colour/status rules, component props, page recipes, and the patterns that were rejected.
+- Don't fetch the design system artifact (claude.ai/artifact/LyYegFLHJxi1rNpnkaqHjH) for routine work. Open it only to resync `DESIGN.md` (asked by the user, or a needed piece isn't covered); then update `DESIGN.md` and its version line in the same change.
+- Missing component or pattern: add it to the kit (`components/ui` + `styles/capabble`) in the system's style, document it in `DESIGN.md`, then use it.
+
 ### Dialogs & overlays (must follow — see `.cursor/rules/dialogs-and-overlays.mdc`)
 - Always use the shared `@/components/common/Modal` or `@/components/common/Dialog`. Both render through `createPortal(…, document.body)`.
 - Never render a `fixed inset-0` overlay inline in page JSX. The sticky header (`z-40`) sits outside the page's stacking context and paints over an inline overlay, leaving a **white strip at the top of the dialog**. Raising `z-index` on an inline overlay does not fix this.
