@@ -118,6 +118,7 @@ const BY_HREF: Record<string, LucideIcon> = {
   '/attnd/staff-attendance': UserCheck,
   '/attnd/student-attendance': CalendarCheck,
 
+  '/acdmc/overview': Home,
   '/acdmc/lesson-plan': BookOpenText,
   '/acdmc/homework': ClipboardList,
   '/acdmc/assignment': FileText,

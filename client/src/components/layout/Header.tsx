@@ -373,14 +373,30 @@ const Header: React.FC<HeaderProps> = ({ isSidebarCollapsed, onToggleSidebar }) 
       case 'acdmc': {
         const subPage = segments[1] || ''
         const titleMap: Record<string, { title: string; subtitle: string }> = {
-          'lesson-plan': { title: 'Lesson Plan', subtitle: 'Prepare, edit, and manage class lesson plans' },
-          homework: { title: 'Homework', subtitle: 'Record and publish daily homework' },
-          assignment: { title: 'Assignment', subtitle: 'Prepare and publish class assignments' },
-          quiz: { title: 'Quiz', subtitle: 'Prepare topic quizzes for students to attempt' },
-          curriculum: { title: 'Curriculum', subtitle: 'Manage and select books for current and next session' },
+          overview: { title: 'Academics', subtitle: 'Lesson plans, class work and syllabus coverage this week.' },
+          'lesson-plan': { title: 'Lesson plans', subtitle: 'Plan lessons against the syllabus and mark them delivered.' },
+          homework: { title: 'Homework', subtitle: 'Set homework and track who turned it in.' },
+          assignment: { title: 'Assignments', subtitle: 'Set assignments and record submissions and marks.' },
+          quiz: { title: 'Quizzes', subtitle: 'Build question papers and enter marks.' },
+          curriculum: { title: 'Curriculum', subtitle: 'Syllabus units, topics and books for each class and subject.' },
         }
-        const info = titleMap[subPage] || { title: 'ACDMC', subtitle: 'Academics planning and tracking' }
-        return { pageTitle: info.title, pageSubtitle: info.subtitle, showBackButton: false, backTo: null }
+        const detailMap: Record<string, { title: string; subtitle: string }> = {
+          homework: { title: 'Homework', subtitle: 'Details and submissions.' },
+          assignment: { title: 'Assignment', subtitle: 'Details, submissions and marks.' },
+          quiz: { title: 'Quiz', subtitle: 'Questions, question paper and marks.' },
+          curriculum: { title: 'Syllabus', subtitle: 'Units, topics, coverage and books.' },
+        }
+        const isAcdmcDetail = segments.length >= 3 && Boolean(detailMap[subPage])
+        const info = (isAcdmcDetail ? detailMap[subPage] : titleMap[subPage]) || {
+          title: 'Academics',
+          subtitle: 'Lesson plans, class work and syllabus coverage.',
+        }
+        return {
+          pageTitle: info.title,
+          pageSubtitle: info.subtitle,
+          showBackButton: isAcdmcDetail,
+          backTo: isAcdmcDetail ? `/acdmc/${subPage}` : null,
+        }
       }
       case 'actvt': {
         const subPage = segments[1] || ''

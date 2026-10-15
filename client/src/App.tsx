@@ -97,11 +97,14 @@ import TrnstOverview from './pages/TrnstOverview'
 import TrnstVehicles from './pages/TrnstVehicles'
 import TrnstRoutes from './pages/TrnstRoutes'
 import TrnstSelfStudents from './pages/TrnstSelfStudents'
+import AcdmcOverview from './pages/acdmc/AcdmcOverview'
 import AcdmcLessonPlan from './pages/acdmc/AcdmcLessonPlan'
 import AcdmcHomework from './pages/acdmc/AcdmcHomework'
 import AcdmcAssignment from './pages/acdmc/AcdmcAssignment'
 import AcdmcQuiz from './pages/acdmc/AcdmcQuiz'
 import AcdmcCurriculum from './pages/acdmc/AcdmcCurriculum'
+import AcdmcCurriculumDetail from './pages/acdmc/AcdmcCurriculumDetail'
+import AcdmcWorkDetail from './pages/acdmc/AcdmcWorkDetail'
 import ActvtClubs from './pages/actvt/ActvtClubs'
 import ActvtClubDetail from './pages/actvt/ActvtClubDetail'
 import ActvtHouses from './pages/actvt/ActvtHouses'
@@ -377,12 +380,17 @@ function App() {
               <Route path="trnst/routes" element={<TrnstRoutes />} />
               <Route path="trnst/self-students" element={<TrnstSelfStudents />} />
               <Route path="trnst" element={<TrnstOverview />} />
+              <Route path="acdmc/overview" element={<AcdmcOverview />} />
               <Route path="acdmc/lesson-plan" element={<AcdmcLessonPlan />} />
               <Route path="acdmc/homework" element={<AcdmcHomework />} />
+              <Route path="acdmc/homework/:id" element={<AcdmcWorkDetail key="homework" kind="homework" />} />
               <Route path="acdmc/assignment" element={<AcdmcAssignment />} />
+              <Route path="acdmc/assignment/:id" element={<AcdmcWorkDetail key="assignment" kind="assignment" />} />
               <Route path="acdmc/quiz" element={<AcdmcQuiz />} />
+              <Route path="acdmc/quiz/:id" element={<AcdmcWorkDetail key="quiz" kind="quiz" />} />
               <Route path="acdmc/curriculum" element={<AcdmcCurriculum />} />
-              <Route path="acdmc" element={<Navigate to="/acdmc/lesson-plan" replace />} />
+              <Route path="acdmc/curriculum/:id" element={<AcdmcCurriculumDetail />} />
+              <Route path="acdmc" element={<Navigate to="/acdmc/overview" replace />} />
               <Route path="actvt/houses" element={<ActvtHouses />} />
               <Route path="actvt/houses/:id" element={<ActvtHouseDetail />} />
               <Route path="actvt/student-council" element={<ActvtStudentCouncil />} />

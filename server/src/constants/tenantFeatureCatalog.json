@@ -117,7 +117,7 @@
   {
     "key": "acdmc_academics",
     "label": "ACDMC - Academics",
-    "path": "/acdmc/lesson-plan",
+    "path": "/acdmc/overview",
     "group": "Academics Hub",
     "module": "acdmc",
     "prefixes": ["/acdmc"],
