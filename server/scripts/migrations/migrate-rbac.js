@@ -13,6 +13,9 @@
  *   node scripts/migrations/migrate-rbac.js --apply    # migrate
  *   node scripts/migrations/migrate-rbac.js --apply --tenant=<slug>
  */
+const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
+
 const { connectPlatformDB, getPlatformConnection } = require('../../src/config/platformDatabase');
 const { getPlatformModels } = require('../../src/tenancy/platformModels');
 const { getTenantConnectionAndModels } = require('../../src/tenancy/tenantConnectionManager');
@@ -52,8 +55,11 @@ const migrateTenant = async (tenant) => {
   await User.updateMany({ kind: { $exists: false } }, { $set: { kind: 'staff' } });
   // Old-format refresh tokens ({ token, createdAt }) can never be used again.
   await User.updateMany({}, { $set: { refreshTokens: [] }, $inc: { tokenVersion: 1 } });
-  await models.AuthAuditLog.createIndexes();
-  await models.Role.createIndexes();
+  // Roles and the audit log are created lazily on first write; creating them
+  // here can fail on clusters at their collection limit, which is not fatal.
+  await Promise.all([models.AuthAuditLog, models.Role].map((Model) => Model.createIndexes().catch((error) => {
+    summary.warnings = [...(summary.warnings || []), `${Model.modelName}: ${error.message}`];
+  })));
   return summary;
 };
 
