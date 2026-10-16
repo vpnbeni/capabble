@@ -192,7 +192,7 @@ export const SignupChat: React.FC = () => {
             {
               id: messageId(),
               role: "assistant",
-              text: "Hi, I am your BECMS onboarding assistant. I will create your centre in a few quick steps.",
+              text: "Hi, I am your Capabble onboarding assistant. I will create your centre in a few quick steps.",
             },
             {
               id: messageId(),
@@ -212,7 +212,7 @@ export const SignupChat: React.FC = () => {
           {
             id: messageId(),
             role: "assistant",
-            text: "Hi, I am your BECMS onboarding assistant. I will create your centre in a few quick steps.",
+            text: "Hi, I am your Capabble onboarding assistant. I will create your centre in a few quick steps.",
           },
           {
             id: messageId(),
@@ -418,7 +418,7 @@ export const SignupChat: React.FC = () => {
               <Bot className="w-5 h-5 text-cyan-200" />
             </div>
             <div>
-              <h2 className="text-lg sm:text-xl font-semibold">BECMS Onboarding Assistant</h2>
+              <h2 className="text-lg sm:text-xl font-semibold">Capabble Onboarding Assistant</h2>
               <p className="text-xs text-slate-400">Interactive centre registration</p>
             </div>
           </div>

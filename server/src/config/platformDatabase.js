@@ -8,7 +8,7 @@ const getMongoUri = () => {
   return process.env.MONGODB_URI || process.env.MONGO_URI || process.env.DATABASE_URL || 'mongodb://127.0.0.1:27017';
 };
 
-const getCentralDbName = () => process.env.CENTRAL_DB_NAME || 'sems_central';
+const getCentralDbName = () => process.env.CENTRAL_DB_NAME || 'capabble_central';
 
 const connectPlatformDB = async () => {
   if (platformConnection && platformConnection.readyState === 1) {

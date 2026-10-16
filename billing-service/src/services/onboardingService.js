@@ -30,7 +30,7 @@ async function ensureDefaultPlans() {
     {
       code: DEFAULT_MONTHLY_CODE,
       name: 'Core Monthly',
-      description: 'Core monthly flat subscription for SEMS tenant',
+      description: 'Core monthly flat subscription for Capabble tenant',
       billingCycle: 'monthly',
       amountMinor: 99900,
       currency,
@@ -40,7 +40,7 @@ async function ensureDefaultPlans() {
     {
       code: DEFAULT_YEARLY_CODE,
       name: 'Core Yearly',
-      description: 'Core yearly flat subscription for SEMS tenant',
+      description: 'Core yearly flat subscription for Capabble tenant',
       billingCycle: 'yearly',
       amountMinor: 999000,
       currency,

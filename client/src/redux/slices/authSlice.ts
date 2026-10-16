@@ -30,7 +30,7 @@ const getInitialState = (): AuthState => {
 
 const initialState: AuthState = getInitialState();
 
-const ACADEMIC_SESSION_STORAGE_KEY = 'becms-academic-session';
+const ACADEMIC_SESSION_STORAGE_KEY = 'capabble-academic-session';
 
 const withBilling = (data: AuthResponse["data"]): User => ({
   ...data.user,

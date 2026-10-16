@@ -1,6 +1,6 @@
-# BECMS - Bharat Examination Core Management System
+# Capabble
 
-A comprehensive full-stack MERN application designed for managing CBSE examination processes at examination centers. BECMS handles the complete examination lifecycle from importing CBSE datesheets to managing answer sheet dispatch.
+A comprehensive full-stack MERN application designed for managing CBSE examination processes at examination centers. Capabble handles the complete examination lifecycle from importing CBSE datesheets to managing answer sheet dispatch.
 
 ## Quick Start
 
@@ -13,8 +13,8 @@ A comprehensive full-stack MERN application designed for managing CBSE examinati
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/your-username/BECMS.git
-   cd BECMS
+   git clone https://github.com/your-username/capabble.git
+   cd capabble
    ```
 
 2. **Install dependencies**
@@ -46,19 +46,19 @@ The application will be available at:
 ### Default Login Credentials
 
 After seeding:
-- **Admin**: admin@becms.com / admin123
-- **Data Entry Operator**: operator@becms.com / operator123
+- **Admin**: admin@example.com / admin123
+- **Data Entry Operator**: operator@example.com / operator123
 
 ## Multi-Tenant Setup (Greenfield)
 
-BECMS now supports subdomain-based multi-tenancy with:
+Capabble now supports subdomain-based multi-tenancy with:
 - One **central platform database** for tenant metadata and platform admins.
 - One **isolated database per tenant** for all school/exam data.
 
 ### Domain model
-- Tenant app: `https://<tenant>.becms.vpnbeni.com`
+- Tenant app: `https://<tenant>.school.capabble.cloud`
 - Tenant API: `https://<tenant>.api.vpnbeni.com`
-- Platform admin app: `https://becms.vpnbeni.com`
+- Platform admin app: `https://school.capabble.cloud`
 - Platform API: `https://api.vpnbeni.com/api/admin/*`
 
 ### Required environment variables (server)
@@ -67,9 +67,9 @@ Add these in `server/.env`:
 
 ```env
 MONGODB_URI=...
-CENTRAL_DB_NAME=becms_central
-TENANT_DB_PREFIX=becms_tenant_
-ROOT_APP_DOMAIN=becms.vpnbeni.com
+CENTRAL_DB_NAME=capabble_central
+TENANT_DB_PREFIX=capabble_tenant_
+ROOT_APP_DOMAIN=school.capabble.cloud
 ROOT_API_DOMAIN=api.vpnbeni.com
 
 JWT_SECRET=...
@@ -142,7 +142,7 @@ The frontend automatically attaches `x-tenant-slug` in local mode.
 
 ### Project Structure
 ```
-BECMS/
+capabble/
 ├── client/                 # React frontend application
 │   ├── src/
 │   │   ├── pages/          # 17 route pages

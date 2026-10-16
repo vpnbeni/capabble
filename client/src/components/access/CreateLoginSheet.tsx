@@ -146,6 +146,7 @@ const CreateLoginSheet: React.FC<{
     const trimmedEmail = email.trim()
     if (kind !== 'student' && !trimmedEmail) next.email = 'Enter an email address'
     if (trimmedEmail && !EMAIL_PATTERN.test(trimmedEmail)) next.email = 'Enter an email like name@school.in'
+    if (/\.local$/i.test(trimmedEmail)) next.email = 'This is a placeholder from a staff import. Enter their real email.'
     if (kind === 'staff' && roleKeys.length === 0) next.roles = 'Choose at least one role'
     if (kind !== 'staff' && students.length === 0) next.students = kind === 'student' ? 'Choose the student' : 'Add at least one child'
     if (kind === 'student' && !username.trim()) next.username = 'Enter a login ID'

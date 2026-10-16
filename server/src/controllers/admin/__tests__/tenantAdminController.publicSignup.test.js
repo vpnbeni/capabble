@@ -157,7 +157,7 @@ describe('tenantAdminController public signup', () => {
             slug: 'alpha-school',
             name: 'Alpha School',
             status: 'active',
-            dbName: 'sems_tenant_alpha_school',
+            dbName: 'capabble_tenant_alpha_school',
           }),
         },
       },
@@ -233,7 +233,7 @@ describe('tenantAdminController public signup', () => {
           findById: jest.fn().mockResolvedValue({
             _id: '507f1f77bcf86cd799439011',
             slug: 'alpha-school',
-            dbName: 'sems_tenant_alpha_school',
+            dbName: 'capabble_tenant_alpha_school',
           }),
         },
       },
@@ -261,7 +261,7 @@ describe('tenantAdminController public signup', () => {
     const tenantDoc = {
       _id: '507f1f77bcf86cd799439011',
       slug: 'alpha-school',
-      dbName: 'sems_tenant_alpha_school',
+      dbName: 'capabble_tenant_alpha_school',
     };
 
     const Tenant = {

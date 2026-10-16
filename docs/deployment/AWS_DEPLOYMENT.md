@@ -1,6 +1,6 @@
 # AWS EC2 + Nginx Deployment (Backend API)
 
-This guide is for deploying only the SEMS backend (`server`) on AWS EC2 behind Nginx, with GitHub Actions CD.
+This guide is for deploying only the Capabble backend (`server`) on AWS EC2 behind Nginx, with GitHub Actions CD.
 
 ## 1. Target architecture
 
@@ -47,17 +47,17 @@ sudo apt install -y \
 ### 2.2 Create app directory
 
 ```bash
-sudo mkdir -p /var/www/sems/server
-sudo chown -R $USER:$USER /var/www/sems
+sudo mkdir -p /var/www/capabble/server
+sudo chown -R $USER:$USER /var/www/capabble
 ```
 
 ### 2.3 Nginx config
 
 Reference template in repo:
 
-- `deploy/nginx/sems-api.conf`
+- `deploy/nginx/capabble-api.conf`
 
-Create `/etc/nginx/sites-available/sems-api.conf`:
+Create `/etc/nginx/sites-available/capabble-api.conf`:
 
 ```nginx
 server {
@@ -87,7 +87,7 @@ server {
 Enable and reload:
 
 ```bash
-sudo ln -sf /etc/nginx/sites-available/sems-api.conf /etc/nginx/sites-enabled/sems-api.conf
+sudo ln -sf /etc/nginx/sites-available/capabble-api.conf /etc/nginx/sites-enabled/capabble-api.conf
 sudo nginx -t
 sudo systemctl reload nginx
 ```
@@ -103,7 +103,7 @@ sudo certbot --nginx -d api.example.com
 
 ## 3. Backend environment variables on EC2
 
-Create `/var/www/sems/server/.env` (example):
+Create `/var/www/capabble/server/.env` (example):
 
 ```env
 NODE_ENV=production
@@ -111,7 +111,7 @@ PORT=5000
 
 MONGODB_URI=<mongo-uri>
 CENTRAL_DB_NAME=examination_management_system
-TENANT_DB_PREFIX=becms_tenant_
+TENANT_DB_PREFIX=capabble_tenant_
 
 API_URL=https://api.example.com/api
 ROOT_API_DOMAIN=api.example.com
@@ -140,12 +140,12 @@ Required GitHub repository secrets:
 - `EC2_HOST`
 - `EC2_USER`
 - `EC2_SSH_PRIVATE_KEY`
-- `EC2_APP_DIR` (example: `/var/www/sems/server`)
+- `EC2_APP_DIR` (example: `/var/www/capabble/server`)
 
 Optional secrets:
 
 - `EC2_SSH_PORT` (default `22`)
-- `EC2_SERVICE_NAME` (default `sems-server`)
+- `EC2_SERVICE_NAME` (default `capabble-server`)
 
 What the workflow does:
 
@@ -161,9 +161,9 @@ What the workflow does:
 On EC2 once:
 
 ```bash
-cd /var/www/sems/server
+cd /var/www/capabble/server
 npm ci --omit=dev
-pm2 start ecosystem.config.js --only sems-server --update-env
+pm2 start ecosystem.config.js --only capabble-server --update-env
 pm2 save
 pm2 startup
 ```
@@ -185,5 +185,5 @@ curl -i https://api.example.com/api
 - If deploy fails, check PM2 logs:
 
 ```bash
-pm2 logs sems-server --lines 200
+pm2 logs capabble-server --lines 200
 ```

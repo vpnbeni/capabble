@@ -7,7 +7,7 @@ async function checkAndLinkCandidateSubjects() {
     console.log('🔍 Checking and linking candidate subjects...\n')
     
     // Connect to MongoDB
-    await mongoose.connect('mongodb://localhost:27017/sems')
+    await mongoose.connect('mongodb://localhost:27017/capabble')
     console.log('✅ Connected to MongoDB\n')
     
     // Get all candidates

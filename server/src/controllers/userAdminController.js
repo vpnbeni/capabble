@@ -27,6 +27,7 @@ const {
 const { revokeAllSessions } = require('../rbac/session');
 const { recordAuthEvent } = require('../rbac/audit');
 const { ensureUserIndexes } = require('../rbac/userIndexes');
+const { isPlaceholderEmail, realEmailOrEmpty } = require('../utils/placeholderEmail');
 const {
   generateTemporaryPassword,
   createInvite,
@@ -262,7 +263,14 @@ const resolveTeacher = async (req, teacherId, excludeUserId = null) => {
   return teacher._id;
 };
 
+const assertRealEmail = (email) => {
+  if (email && isPlaceholderEmail(email)) {
+    throw httpError(400, "That's a placeholder address from a staff import, not a real mailbox. Enter the person's own email.", 'placeholder_email');
+  }
+};
+
 const assertIdentityFree = async (User, { email, username }, excludeUserId = null) => {
+  assertRealEmail(email);
   const exclude = excludeUserId ? { _id: { $ne: excludeUserId } } : {};
   if (email && await User.exists({ email, ...exclude })) {
     throw httpError(409, 'Another login already uses this email.', 'duplicate_email');
@@ -593,7 +601,8 @@ const bulkCreatePortalLogins = handle(async (req, res) => {
       let username = base;
       // eslint-disable-next-line no-await-in-loop
       for (let n = 2; await User.exists({ username }); n += 1) username = `${base}-${n}`;
-      const email = student.email && !(await User.exists({ email: student.email })) ? student.email : null; // eslint-disable-line no-await-in-loop
+      const ownEmail = realEmailOrEmpty(student.email);
+      const email = ownEmail && !(await User.exists({ email: ownEmail })) ? ownEmail : null; // eslint-disable-line no-await-in-loop
       try {
         // eslint-disable-next-line no-await-in-loop
         await createOne({
@@ -692,7 +701,8 @@ const listStaffCandidates = handle(async (req, res) => {
       _id: teacher._id,
       name: teacher.name,
       designation: teacher.designation || '',
-      email: teacher.email || '',
+      // Imported staff without an email have a placeholder address; never offer it.
+      email: realEmailOrEmpty(teacher.email),
       employeeId: teacher.employeeId || '',
       hasLogin: linkedIds.has(String(teacher._id)),
       suggestedRole: suggestRoleForDesignation(teacher.designation)

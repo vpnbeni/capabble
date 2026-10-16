@@ -1,7 +1,7 @@
-# Migrating sems-server / sems-stage to a New AWS Account
+# Migrating capabble-server / capabble-stage to a New AWS Account
 
 **Why:** The current AWS account ("Vipin", `413368290841`, ap-south-1) is on the free plan, which
-ends 2026-07-28 (~$37 credit left). `sems-server` and `sems-stage` need to move to the "Amoura"
+ends 2026-07-28 (~$37 credit left). `capabble-server` and `capabble-stage` need to move to the "Amoura"
 AWS account (`459640517815`) before then. `amoura-server` and `capabble-api` on the old box are
 unrelated apps and are **out of scope** — do not touch them.
 
@@ -23,7 +23,7 @@ until step 10 is verified, so you always have a rollback.
 - [ ] AWS CLI configured with a profile for the Amoura account (`aws configure --profile amoura`),
       since your local `default` profile currently points at the Vipin account.
 - [ ] SSH access to the **old** box (`capable`, `i-07b7ae21eb75e3033`, ap-south-1) to pull real
-      secrets and discover `sems-stage`'s config.
+      secrets and discover `capabble-stage`'s config.
 - [ ] Access to your DNS provider for whatever zone hosts `api.capabble.cloud` (or the real
       current API domain — see step 1.2).
 
@@ -33,23 +33,23 @@ until step 10 is verified, so you always have a rollback.
 
 SSH into the current `capable` instance and capture what's not in git.
 
-### 1.1 Find `sems-stage`'s actual config
+### 1.1 Find `capabble-stage`'s actual config
 
-Only `sems-server` has an `ecosystem.config.js` in the repo — `sems-stage` isn't documented
+Only `capabble-server` has an `ecosystem.config.js` in the repo — `capabble-stage` isn't documented
 anywhere. Reconstruct it:
 
 ```bash
-pm2 describe sems-stage
-pm2 show sems-stage        # script path, cwd, port, env
-cat /path/to/sems-stage/.env   # wherever pm2 describe says its cwd is
+pm2 describe capabble-stage
+pm2 show capabble-stage        # script path, cwd, port, env
+cat /path/to/capabble-stage/.env   # wherever pm2 describe says its cwd is
 ```
 
 Write down: script path, working directory, `PORT`, and any env vars that differ from
-`sems-server`'s.
+`capabble-server`'s.
 
 ### 1.2 Confirm the real domain/nginx config in use
 
-The repo's `deploy/nginx/sems-api.conf` is a generic template (`api.example.com`). Check what's
+The repo's `deploy/nginx/capabble-api.conf` is a generic template (`api.example.com`). Check what's
 actually live:
 
 ```bash
@@ -61,8 +61,8 @@ sudo certbot certificates      # shows the real domain(s) with active certs
 
 ```bash
 # from your local machine
-scp ubuntu@<old-ip>:/var/www/sems/server/.env ./sems-server.env.bak
-scp ubuntu@<old-ip>:<sems-stage-path>/.env ./sems-stage.env.bak
+scp ubuntu@<old-ip>:/var/www/capabble/server/.env ./capabble-server.env.bak
+scp ubuntu@<old-ip>:<capabble-stage-path>/.env ./capabble-stage.env.bak
 ```
 
 These contain `MONGODB_URI`, `JWT_SECRET`, `JWT_REFRESH_SECRET`, `PLATFORM_JWT_SECRET`,
@@ -72,7 +72,7 @@ they are gitignored and were never committed.
 ### 1.4 Check for local file storage
 
 ```bash
-du -sh /var/www/sems/server/uploads 2>/dev/null
+du -sh /var/www/capabble/server/uploads 2>/dev/null
 ```
 
 If non-trivial, you'll need to `rsync`/`scp` this directory too (Cloudinary is used for most
@@ -89,7 +89,7 @@ aws ec2 run-instances \
   --instance-type t3.micro \
   --key-name <new-keypair-name> \
   --security-group-ids <sg-id> \
-  --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=sems-server}]'
+  --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=capabble-server}]'
 ```
 
 - [ ] Security group: allow inbound 22 (SSH, ideally restricted to your IP), 80, 443. Do **not**
@@ -103,7 +103,7 @@ aws ec2 run-instances \
 ## 3. Install runtime on the new box
 
 Follow `docs/deployment/AWS_DEPLOYMENT.md` §2.1–2.2 verbatim (Node 20, PM2, Nginx, Puppeteer
-system deps, `/var/www/sems/server` app directory). Also create a directory for `sems-stage`
+system deps, `/var/www/capabble/server` app directory). Also create a directory for `capabble-stage`
 using whatever path you found in step 1.1.
 
 ---
@@ -111,17 +111,17 @@ using whatever path you found in step 1.1.
 ## 4. Deploy the code
 
 ```bash
-cd /var/www/sems
-git clone <repo-url> sems-server-src   # or scp a release tarball if repo is private without deploy keys set up
-cd sems-server-src/server
+cd /var/www/capabble
+git clone <repo-url> capabble-server-src   # or scp a release tarball if repo is private without deploy keys set up
+cd capabble-server-src/server
 npm ci --omit=dev
 ```
 
-Repeat for `sems-stage` if it runs from a different checkout/branch (check what you found in
+Repeat for `capabble-stage` if it runs from a different checkout/branch (check what you found in
 step 1.1 — it may just be the same repo checked out twice, or a different branch/commit).
 
-Copy the `.env` files pulled in step 1.3 into place (`/var/www/sems/server/.env`, and the
-`sems-stage` equivalent) — **do not** recreate them from `.env.example`, since the example has
+Copy the `.env` files pulled in step 1.3 into place (`/var/www/capabble/server/.env`, and the
+`capabble-stage` equivalent) — **do not** recreate them from `.env.example`, since the example has
 placeholder secrets, not the real ones.
 
 ---
@@ -137,9 +137,9 @@ placeholder secrets, not the real ones.
 ## 6. Start PM2 on the new box
 
 ```bash
-cd /var/www/sems/server
-pm2 start ecosystem.config.js --only sems-server --update-env
-# then sems-stage, using the config reconstructed in step 1.1
+cd /var/www/capabble/server
+pm2 start ecosystem.config.js --only capabble-server --update-env
+# then capabble-stage, using the config reconstructed in step 1.1
 pm2 save
 pm2 startup     # run the printed command to enable boot persistence
 ```
@@ -149,7 +149,7 @@ pm2 startup     # run the printed command to enable boot persistence
 ## 7. Nginx + TLS on the new box
 
 Use the real domain(s) found in step 1.2 (not the `api.example.com` placeholder) when adapting
-`deploy/nginx/sems-api.conf`. Enable the site, then once DNS points here (step 9):
+`deploy/nginx/capabble-api.conf`. Enable the site, then once DNS points here (step 9):
 
 ```bash
 sudo certbot --nginx -d <real-api-domain>
@@ -188,17 +188,17 @@ DNS cutover — remove the hosts-file entry afterward.
 ## 10. Post-cutover verification
 
 - [ ] `curl -i https://<real-api-domain>/health` and `/api` from outside.
-- [ ] Log into the actual client app (`school.capabble.cloud` / `sems.capabble.cloud`, whichever is
+- [ ] Log into the actual client app (`school.capabble.cloud` / `school.capabble.cloud`, whichever is
       live — see the domain-model note below) and exercise a real flow: login, load a tenant
       dashboard, one write action.
-- [ ] Watch `pm2 logs sems-server sems-stage --lines 200` on the new box for errors during first
+- [ ] Watch `pm2 logs capabble-server capabble-stage --lines 200` on the new box for errors during first
       real traffic.
 - [ ] Confirm CORS still works — `CLIENT_URL`/`CLIENT_URLS`/`ROOT_APP_DOMAIN` in the copied `.env`
       must match whatever frontend origin is actually calling this API.
 
 > **Domain-model discrepancy found during exploration:** `PROJECT_OVERVIEW.md` describes
 > subdomain-based tenant resolution via `school.capabble.cloud`, while `server/.env.example` and
-> CLAUDE.md describe a newer single-URL model at `sems.capabble.cloud`. Confirm which is actually
+> CLAUDE.md describe a newer single-URL model at `school.capabble.cloud`. Confirm which is actually
 > live in production before assuming which client origin needs to keep working post-cutover.
 
 ---
@@ -206,7 +206,7 @@ DNS cutover — remove the hosts-file entry afterward.
 ## 11. Decommission the old instance (only after 24–48h stable on the new box)
 
 - [ ] Remove the old instance's IP from the MongoDB Atlas allowlist.
-- [ ] `pm2 stop sems-server sems-stage` on the old box (leave `amoura-server`/`capabble-api`
+- [ ] `pm2 stop capabble-server capabble-stage` on the old box (leave `amoura-server`/`capabble-api`
       running — out of scope).
 - [ ] Terminate the old EC2 instance (or leave the Vipin account running until its free-tier
       window naturally closes on 2026-07-28, as a passive rollback, if the $37 credit covers it).

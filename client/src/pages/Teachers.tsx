@@ -75,7 +75,7 @@ const getDutyOptionsForDesignation = (
 
 const LIMIT = 50;
 const getTeacherId = (teacher: Teacher) => teacher._id || teacher.id || "";
-const UI_ONLY_HIDDEN_KEY = "sems:exam-functionaries:hidden-teacher-ids";
+const UI_ONLY_HIDDEN_KEY = "capabble:exam-functionaries:hidden-teacher-ids";
 const getTeacherHideKeys = (teacher: Partial<Teacher>) => {
   const keys: string[] = [];
   const id = String(teacher._id || '').trim();

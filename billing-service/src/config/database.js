@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 let connectionPromise = null;
 
 const getMongoUri = () => process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017';
-const getDbName = () => process.env.CENTRAL_DB_NAME || 'sems_central';
+const getDbName = () => process.env.CENTRAL_DB_NAME || 'capabble_central';
 
 async function connectDatabase() {
   if (mongoose.connection.readyState === 1) {

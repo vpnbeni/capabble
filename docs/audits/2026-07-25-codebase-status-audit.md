@@ -1,4 +1,4 @@
-# SEMS / CAPABBLE ERP — Codebase Status Audit
+# CAPABBLE ERP — Codebase Status Audit
 
 **Date:** 2026-07-25
 **Scope:** Full monorepo (`server`, `client`, `admin`, `billing-service`, `capabble-landing`)
@@ -300,7 +300,7 @@ Concrete hardcoded CBSE rules found (with evidence):
 4. **Tenant provisioned and marked live before OTP/email verification** — `tenantAdminController.js:530-539` creates a real tenant DB + admin user during signup **start**, before OTP is checked. Bounded by rate limiting (5/hr/IP) but can still accumulate abandoned live tenant databases.
 5. **Single shared Mongo connection/credential across all tenant databases** — `tenantConnectionManager.js:24-25` uses one `useDb()` call per tenant on a shared connection, not per-tenant credentials/ACLs. Logical isolation is real; credential-level isolation is not — a compromised app process has driver-level reach to every tenant DB.
 6. **`mongoSanitize({ allowDots: true })`** (`app.js:163-165`) is a deliberate but real trade-off that narrows NoSQL-injection protection to support dotted subject names like "I.T."
-7. **Weak default seed credentials** (`admin@sems.com/admin123`, etc., `server/src/seeders/index.js:24-36`) — low risk unless the seeder is ever run against a shared/real environment.
+7. **Weak default seed credentials** (`admin@example.com/admin123`, etc., `server/src/seeders/index.js:24-36`) — low risk unless the seeder is ever run against a shared/real environment.
 8. Local `.env` files with live-looking Atlas credentials exist on disk but are correctly `.gitignore`'d and confirmed **not committed to git** — not a current leak, but the same DB user/password is reused across `server/.env` and `billing-service/.env`, widening blast radius if either host is compromised.
 9. No hardcoded API keys, `eval()`, `child_process`, or TLS-verification bypasses found anywhere in the repo.
 

@@ -36,7 +36,7 @@ export const isLocalRuntime = () => {
 // Resolves tenant slug from (in priority order):
 // 1. URL query param (?tenant=slug) — highest priority, works everywhere
 // 2. localStorage — persisted after first login or email resolution
-// Subdomain-based resolution is no longer used (single-URL model: sems.capabble.cloud).
+// Subdomain-based resolution is no longer used (single-URL model: school.capabble.cloud).
 export const resolveTenantSlug = (): string | null => {
   const params = getSearchParams();
   const fromQuery = sanitizeTenantSlug(params.get('tenant'));
@@ -83,7 +83,7 @@ export const buildTenantAppRedirectUrl = (tenantSlug: string, ticket: string): s
   const encodedSlug = encodeURIComponent(tenantSlug);
   const encodedTicket = encodeURIComponent(ticket);
 
-  // Single-URL model: always use current origin (sems.capabble.cloud in production)
+  // Single-URL model: always use current origin (school.capabble.cloud in production)
   return `${window.location.origin}/?tenant=${encodedSlug}#/signup/complete?ticket=${encodedTicket}`;
 };
 

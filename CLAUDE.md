@@ -234,6 +234,9 @@ The system uses a **database-per-tenant** isolation strategy:
 - CORS: Dynamic origin validation — allows `ROOT_APP_DOMAIN` subdomains + explicit `CLIENT_URL`/`CLIENT_URLS`
 - Tenant header: Requests include `x-tenant-slug` to identify the target tenant
 
+### Naming (must follow)
+- The product and company name is **Capabble** (`capabble` in identifiers, package names, DB names, storage keys, folders, emails). Older names of this project are retired and must never be written again in code, copy, config, scripts or docs. `npm run check:names` (part of `npm run lint`) fails if they appear.
+
 ### Design system (must follow for any UI work)
 - Before building or changing UI in `/client`, read `client/src/components/ui/DESIGN.md`. It is the condensed Capabble design system mapped to our kit (`@/components/ui`): voice, colour/status rules, component props, page recipes, and the patterns that were rejected.
 - Don't fetch the design system artifact (claude.ai/artifact/LyYegFLHJxi1rNpnkaqHjH) for routine work. Open it only to resync `DESIGN.md` (asked by the user, or a needed piece isn't covered); then update `DESIGN.md` and its version line in the same change.
@@ -279,6 +282,6 @@ See `.env.example` (root and `/server`) for required variables:
 
 ## Default Dev Credentials
 - Platform admin: admin.capabble / admin.capabble (`npm run bootstrap:platform` in `/server`)
-- Tenant admin: admin@sems.com / admin123
-- Operator: operator@sems.com / operator123
-- Operator2: operator2@sems.com / operator123
+- Tenant admin: admin@example.com / admin123
+- Operator: operator@example.com / operator123
+- Operator2: operator2@example.com / operator123

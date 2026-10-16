@@ -14,7 +14,7 @@ require('dotenv').config();
 const mongoose = require('mongoose');
 
 // Connect to MongoDB
-const MONGO_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/sems';
+const MONGO_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/capabble';
 
 /**
  * Calculate end time based on start time and duration

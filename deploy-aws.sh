@@ -1,11 +1,11 @@
 #!/bin/bash
 
-# AWS Deployment Script for SEMS Server
+# AWS Deployment Script for Capabble Server
 # This script helps automate the deployment process to AWS Elastic Beanstalk
 
 set -e
 
-echo "🚀 SEMS Server AWS Deployment Script"
+echo "🚀 Capabble Server AWS Deployment Script"
 echo "======================================"
 echo ""
 
@@ -49,8 +49,8 @@ if [ ! -f ".elasticbeanstalk/config.yml" ]; then
 fi
 
 # Get environment name
-read -p "Enter environment name (default: sems-server-prod): " ENV_NAME
-ENV_NAME=${ENV_NAME:-sems-server-prod}
+read -p "Enter environment name (default: capabble-server-prod): " ENV_NAME
+ENV_NAME=${ENV_NAME:-capabble-server-prod}
 
 # Check if environment exists
 if eb list | grep -q "$ENV_NAME"; then

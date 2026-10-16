@@ -612,7 +612,7 @@ exports.uploadReportCardImage = asyncHandler(async (req, res) => {
 
   const tenantSlug = req.tenant?.slug || 'unknown';
   const publicId = `report_card_img_${tenantSlug}_${Date.now()}`;
-  const uploadResult = await uploadToCloudinary(file.tempFilePath, 'sems/report-card-canvas', publicId);
+  const uploadResult = await uploadToCloudinary(file.tempFilePath, 'capabble/report-card-canvas', publicId);
 
   if (file.tempFilePath) {
     fs.unlink(file.tempFilePath, () => {});

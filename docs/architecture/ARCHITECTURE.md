@@ -7,7 +7,7 @@
 ## 🗂️ Project Structure
 
 ```
-SEMS/
+capabble/
 ├── client/                          # React Frontend (Vite + TypeScript)
 │   ├── public/
 │   │   ├── index.html

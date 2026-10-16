@@ -1,6 +1,6 @@
 module.exports = {
   apps: [{
-    name: 'sems-server',
+    name: 'capabble-server',
     script: './src/server.js',
     instances: 1,
     exec_mode: 'fork',

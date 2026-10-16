@@ -423,7 +423,7 @@ exports.getAbsentees = async (req, res) => {
  * Uses upload_stream since we have a Buffer, not a file path.
  */
 const uploadPhotoBufferToCloudinary = async (buffer, rollNumber) => {
-  const folder = 'sems/candidate-photos';
+  const folder = 'capabble/candidate-photos';
   const publicId = `${rollNumber}_${Date.now()}`;
 
   const options = {
@@ -479,7 +479,7 @@ exports.uploadAttendanceSheet = async (req, res) => {
     let fileUrl = null;
     let filePublicId = null;
     try {
-      const folder = 'sems/attendance-sheets';
+      const folder = 'capabble/attendance-sheets';
       const uploadResult = await uploadDocumentToCloudinary(tempFilePath, folder);
       fileUrl = uploadResult.url;
       filePublicId = uploadResult.publicId;

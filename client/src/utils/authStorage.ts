@@ -8,7 +8,7 @@
  * checks every request.
  */
 const USER_KEY = 'cb-user'
-const REMEMBER_ME_KEY = 'becms-stay-signed-in'
+const REMEMBER_ME_KEY = 'capabble-stay-signed-in'
 // Keys from the previous token-in-storage scheme, removed on sight.
 const LEGACY_KEYS = ['token', 'refreshToken', 'user']
 
@@ -29,8 +29,6 @@ const removeLegacyKeys = () => {
   ;[getStorage('local'), getStorage('session')].forEach((storage) => {
     LEGACY_KEYS.forEach((key) => storage?.removeItem(key))
   })
-  // redux-persist used to keep the auth slice (including the token) here.
-  getStorage('local')?.removeItem('persist:becms-root')
 }
 
 export const getRememberPreference = (): boolean => {

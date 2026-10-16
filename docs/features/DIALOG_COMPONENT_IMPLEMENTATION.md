@@ -308,4 +308,4 @@ The Dialog component is a significant upgrade from the existing Modal, providing
 
 **Implementation Team**: AI Assistant  
 **Date**: Saturday, January 31, 2026  
-**Project**: SEMS (School Examination Management System)
+**Project**: Capabble

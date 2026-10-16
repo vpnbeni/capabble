@@ -1,7 +1,7 @@
 services:
   # Backend API Server
   - type: web
-    name: sems-server
+    name: capabble-server
     env: node
     rootDir: server
     buildCommand: npm install && npx puppeteer browsers install chrome --install-deps
@@ -13,7 +13,7 @@ services:
         value: "false"
       - key: CLIENT_URL
         # Replace YOUR_CLIENT_URL with your actual Render client URL
-        # Example: https://sems-client.onrender.com
+        # Example: https://capabble-client.onrender.com
         value: https://YOUR_CLIENT_URL.onrender.com
       # Add your other server environment variables in Render dashboard:
       # - MONGODB_URI
@@ -23,7 +23,7 @@ services:
 
   # Frontend Static Site
   - type: web
-    name: sems-client
+    name: capabble-client
     env: static
     rootDir: client
     buildCommand: npm install && npm run build
@@ -31,17 +31,17 @@ services:
     envVars:
       - key: VITE_API_URL
         # Replace YOUR_SERVER_URL with your actual Render server URL
-        # Example: https://sems-server.onrender.com/api
+        # Example: https://capabble-server.onrender.com/api
         value: https://YOUR_SERVER_URL.onrender.com/api
       # Optional:
       # - key: VITE_APP_NAME
-      #   value: SEMS
+      #   value: Capabble
       # - key: VITE_APP_VERSION
       #   value: 1.0.0
 
   # Platform Admin Static Site
   - type: web
-    name: sems-admin
+    name: capabble-admin
     env: static
     rootDir: admin
     buildCommand: npm install && npm run build

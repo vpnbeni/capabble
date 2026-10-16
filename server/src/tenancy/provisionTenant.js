@@ -14,7 +14,7 @@ const resolveDbName = (slug, customDbName) => {
     return customDbName.trim();
   }
 
-  const prefix = process.env.TENANT_DB_PREFIX || 'sems_tenant_';
+  const prefix = process.env.TENANT_DB_PREFIX || 'capabble_tenant_';
   return `${prefix}${slug.replace(/-/g, '_')}`;
 };
 
