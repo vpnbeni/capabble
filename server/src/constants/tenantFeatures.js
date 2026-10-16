@@ -83,6 +83,12 @@ const TENANT_MODULE_CATALOG = Object.freeze({
     description: 'School asset lifecycle: ownership, locations, allocations, stock, maintenance, audits, and disposal.',
     dependencies: ['core'],
   },
+  libry: {
+    key: 'libry',
+    label: 'LIBRY — Library Management',
+    description: 'Library catalogue, accession register and circulation operations.',
+    dependencies: ['core'],
+  },
   cpitl: {
     key: 'cpitl',
     label: 'CPITL — Capital & Finance',

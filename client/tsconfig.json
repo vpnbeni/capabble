@@ -23,6 +23,7 @@
     /* Path mapping */
     "baseUrl": ".",
     "paths": {
+      "@capabble/shared/*": ["../packages/shared/src/*"],
       "@/*": ["./src/*"],
       "@/components/*": ["./src/components/*"],
       "@/pages/*": ["./src/pages/*"],

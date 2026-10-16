@@ -6,6 +6,7 @@ import { isFeatureEnabledForPath } from '@/constants/featureAccess'
 import { usePermissions } from '@/hooks/usePermissions'
 import { useCentreDetails } from '@/hooks/useCentreDetails'
 import { useOnboardingStatus } from '@/hooks/useOnboarding'
+import { useSchoolProfile } from '@/hooks/useSchoolProfile'
 import { AttndModeSwitch } from '@/components/attnd/AttndModeSwitch'
 import { Bell, CalendarDays, PanelLeft, Search } from 'lucide-react'
 import { Badge, Button } from '@/components/ui'
@@ -32,10 +33,12 @@ const Header: React.FC<HeaderProps> = ({ isSidebarCollapsed, onToggleSidebar }) 
   const [searchParams, setSearchParams] = useSearchParams()
   const { access } = usePermissions()
   const isDashboardRoute = location.pathname === '/dashboard'
+  const isHomeRoute = location.pathname === '/home' || location.pathname === '/school-hub'
   const isStudentAttendanceRoute = /\/attnd\/student-attendance\/?$/.test(location.pathname)
   const isStaffAttendanceRoute = /\/attnd\/staff-attendance\/?$/.test(location.pathname)
   const canAccessCentreDetails = isFeatureEnabledForPath('/centre-details', access)
   const { currentSession } = useAcademicSession()
+  const { data: schoolProfile } = useSchoolProfile(isHomeRoute)
   const { periodsPerWeek, setPeriodsPerWeek } = useTimetable()
   const [editingPeriodsPerWeek, setEditingPeriodsPerWeek] = useState(false)
   const [draftPeriodsPerWeek, setDraftPeriodsPerWeek] = useState(periodsPerWeek)
@@ -516,6 +519,25 @@ const Header: React.FC<HeaderProps> = ({ isSidebarCollapsed, onToggleSidebar }) 
           backTo: detailBack,
         }
       }
+      case 'libry': {
+        const subPage = segments[1] || ''
+        const titleMap: Record<string, { title: string; subtitle: string }> = {
+          overview: { title: 'Library overview', subtitle: 'Catalogue health and availability at a glance.' },
+          catalogue: { title: 'Catalogue', subtitle: 'Search and maintain the school library catalogue.' },
+          inventory: { title: 'Inventory', subtitle: 'Accessioned copies, barcodes and shelf locations.' },
+          circulation: { title: 'Circulation desk', subtitle: 'Issue, return and renew physical library copies.' },
+          members: { title: 'Library members', subtitle: 'Eligible readers and their library membership status.' },
+          acquisitions: { title: 'Acquisitions', subtitle: 'Book suggestions and approval workflow.' },
+          stocktakes: { title: 'Stock verification', subtitle: 'Verify physical library copies against the accession register.' },
+          reports: { title: 'Library reports', subtitle: 'Inventory, overdue and fine summaries from current records.' },
+          audit: { title: 'Audit history', subtitle: 'Traceable library operations and stocktake events.' },
+          digital: { title: 'Digital library', subtitle: 'Licensed and approved digital learning resources.' },
+          reading: { title: 'Reading engagement', subtitle: 'Reading lists, challenges and moderated student activity.' },
+          'barcode-desk': { title: 'Barcode circulation desk', subtitle: 'Scan borrower and copy barcodes for rapid library operations.' },
+        }
+        const info = titleMap[subPage] || { title: 'Library', subtitle: 'School library management.' }
+        return { pageTitle: info.title, pageSubtitle: info.subtitle, showBackButton: false, backTo: null }
+      }
       case 'trnst': {
         const subPage = segments[1] || ''
         const titleMap: Record<string, { title: string; subtitle: string }> = {
@@ -624,6 +646,13 @@ const Header: React.FC<HeaderProps> = ({ isSidebarCollapsed, onToggleSidebar }) 
     const date = now.toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' })
     return `${weekday}, ${date}`
   }, [])
+  const homeHeaderMeta = useMemo(() => {
+    const now = new Date()
+    const greeting = now.getHours() < 12 ? 'Good morning' : now.getHours() < 17 ? 'Good afternoon' : 'Good evening'
+    const date = now.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })
+    return `${greeting} · ${date}`
+  }, [])
+  const homeSchoolName = String(schoolProfile?.name || 'International Bharti School').trim()
 
   const { data: onboardingStatus } = useOnboardingStatus()
   const showOnboardingBanner =
@@ -718,8 +747,8 @@ const Header: React.FC<HeaderProps> = ({ isSidebarCollapsed, onToggleSidebar }) 
               ) : null
             ) : (
               <div className="min-w-0">
-                <h1 className="cb-shellhead__title truncate">{pageTitle}</h1>
-                <p className="cb-shellhead__subtitle hidden sm:block truncate">{pageSubtitle}</p>
+                <h1 className="cb-shellhead__title truncate">{isHomeRoute ? homeSchoolName : pageTitle}</h1>
+                {!isHomeRoute ? <p className="cb-shellhead__subtitle hidden sm:block truncate">{pageSubtitle}</p> : null}
               </div>
             )}
             {isStudentAttendanceRoute || isStaffAttendanceRoute ? <AttndModeSwitch /> : null}
@@ -805,6 +834,7 @@ const Header: React.FC<HeaderProps> = ({ isSidebarCollapsed, onToggleSidebar }) 
                 Session {formatSessionLabel(currentSession)}
               </span>
             )}
+            {isHomeRoute ? <span className="cb-shellhead__home-meta hidden lg:inline-flex">{homeHeaderMeta}</span> : null}
             {isDashboardRoute && (
               <div className="hidden lg:block">
                 <span className="text-sm font-semibold text-secondary-700 dark:text-secondary-200">

@@ -147,6 +147,7 @@ import {
   AsetsReports,
   AsetsSettings,
 } from './pages/asets/AsetsWorkflowPages'
+import { LibryOverview, LibryCatalogue, LibryInventory, LibryCirculation, LibryMembers, LibryAcquisitions, LibryStocktakes, LibryReports, LibryAudit, LibryDigitalLibrary, LibryReading, LibryBarcodeDesk } from './pages/libry/LibryPages'
 import CpitlDashboard from './pages/cpitl/CpitlDashboard'
 import CpitlFeeStructures from './pages/cpitl/CpitlFeeStructures'
 import CpitlFeeStructureDetail from './pages/cpitl/CpitlFeeStructureDetail'
@@ -461,6 +462,19 @@ function App() {
               <Route path="asets/reports" element={<AsetsReports />} />
               <Route path="asets/settings" element={<AsetsSettings />} />
               <Route path="asets" element={<Navigate to="/asets/dashboard" replace />} />
+              <Route path="libry/overview" element={<LibryOverview />} />
+              <Route path="libry/catalogue" element={<LibryCatalogue />} />
+              <Route path="libry/inventory" element={<LibryInventory />} />
+              <Route path="libry/circulation" element={<LibryCirculation />} />
+              <Route path="libry/members" element={<LibryMembers />} />
+              <Route path="libry/acquisitions" element={<LibryAcquisitions />} />
+              <Route path="libry/stocktakes" element={<LibryStocktakes />} />
+              <Route path="libry/reports" element={<LibryReports />} />
+              <Route path="libry/audit" element={<LibryAudit />} />
+              <Route path="libry/digital" element={<LibryDigitalLibrary />} />
+              <Route path="libry/reading" element={<LibryReading />} />
+              <Route path="libry/barcode-desk" element={<LibryBarcodeDesk />} />
+              <Route path="libry" element={<Navigate to="/libry/overview" replace />} />
               <Route path="cpitl/dashboard" element={<CpitlDashboard />} />
               <Route path="cpitl/fee-structures" element={<CpitlFeeStructures />} />
               <Route path="cpitl/fee-structures/:id" element={<CpitlFeeStructureDetail />} />

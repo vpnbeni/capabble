@@ -122,6 +122,7 @@ const MODULE_PATH_ROOTS: Array<[prefix: string, module: string]> = [
   ['/actvt', 'actvt'],
   ['/mdcl', 'mdcl'],
   ['/asets', 'asets'],
+  ['/libry', 'libry'],
   ['/cpitl', 'cpitl'],
   ['/trnst', 'trnst'],
   ['/exmcl', 'exmcl'],

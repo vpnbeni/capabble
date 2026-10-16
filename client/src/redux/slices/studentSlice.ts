@@ -93,6 +93,8 @@ export interface StudentStats {
     _id: { class: string; section: string }
     count: number
     active: number
+    boys: number
+    girls: number
   }>
   byGender: Array<{
     _id: string

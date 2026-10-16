@@ -9,7 +9,7 @@ import { Badge, Button, Card, DataTable, EmptyState, Icon, Page, Progress, StatC
 import { classLabel, formatCount, sectionLabel } from '@/components/students/studentFormat'
 import '@/components/students/students.css'
 
-type SectionCount = { section: string; count: number; active: number }
+type SectionCount = { section: string; count: number; active: number; boys: number; girls: number }
 type ClassGroup = { className: string; sections: SectionCount[]; total: number; active: number }
 
 const GENDER_SERIES = [
@@ -34,7 +34,13 @@ const StudentInfo: React.FC = () => {
     const grouped = new Map<string, SectionCount[]>()
     ;(stats?.byClassSection || []).forEach((entry) => {
       const list = grouped.get(entry._id.class) || []
-      list.push({ section: entry._id.section, count: entry.count, active: entry.active })
+      list.push({
+        section: entry._id.section,
+        count: entry.count,
+        active: entry.active,
+        boys: entry.boys || 0,
+        girls: entry.girls || 0,
+      })
       grouped.set(entry._id.class, list)
     })
     return Array.from(grouped.entries())
@@ -169,19 +175,21 @@ const StudentInfo: React.FC = () => {
                     </span>
                   </div>
                   <ul className="stdnt-sections">
-                    {group.sections.map((s, sectionIndex) => {
-                      const inactiveHere = s.count - s.active
-                      return (
+                    {group.sections.map((s, sectionIndex) => (
                         <li key={s.section} className={`stdnt-section stdnt-section--c${((groupIndex + sectionIndex) % 6) + 1}`}>
                           <span className="stdnt-section__name">{sectionLabel(s.section) || '—'}</span>
                           <span className="stdnt-section__count is-num">{s.count}</span>
                           <Progress value={s.count} max={largestSection} showValue={false} size="sm" />
-                          <span className="stdnt-section__meta">
-                            {inactiveHere > 0 ? `${inactiveHere} inactive` : 'All active'}
+                          <span className="stdnt-section__gender" aria-label={`${s.boys} boys and ${s.girls} girls`}>
+                            <span className="stdnt-section__gender-item stdnt-section__gender-item--boys">
+                              <span className="stdnt-section__gender-icon" aria-hidden="true">♂</span> Boys <strong className="is-num">{s.boys}</strong>
+                            </span>
+                            <span className="stdnt-section__gender-item stdnt-section__gender-item--girls">
+                              <span className="stdnt-section__gender-icon" aria-hidden="true">♀</span> Girls <strong className="is-num">{s.girls}</strong>
+                            </span>
                           </span>
                         </li>
-                      )
-                    })}
+                    ))}
                   </ul>
                 </li>
               ))}

@@ -12,7 +12,8 @@
     { "key": "mdcl", "label": "Clinic" },
     { "key": "trnst", "label": "Transport" },
     { "key": "asets", "label": "Assets" },
-    { "key": "cpitl", "label": "Finance" }
+    { "key": "cpitl", "label": "Finance" },
+    { "key": "libry", "label": "Library" }
   ],
   "actionLabels": {
     "read": "View",
@@ -82,7 +83,24 @@
       "label": "Fees, expenses and payroll",
       "enforce": "route",
       "actions": ["view", "collect", "manage_structures", "manage_accounts", "cancel_receipt", "settings", "expense_log", "expense_void", "budgets", "payroll"]
-    }
+    },
+    {
+      "key": "libry.catalogue",
+      "module": "libry",
+      "label": "Catalogue and inventory",
+      "enforce": "route",
+      "actions": ["view", "create", "edit"]
+    },
+    { "key": "libry.members", "module": "libry", "label": "Library members", "enforce": "route", "actions": ["view", "manage"] },
+    { "key": "libry.circulation", "module": "libry", "label": "Circulation desk", "enforce": "route", "actions": ["view", "manage", "issue", "return", "renew"] },
+    { "key": "libry.reservations", "module": "libry", "label": "Library reservations", "enforce": "route", "actions": ["view", "manage"] },
+    { "key": "libry.fines", "module": "libry", "label": "Fines and charges", "enforce": "route", "actions": ["view", "assess", "waive"] },
+    { "key": "libry.acquisitions", "module": "libry", "label": "Acquisition requests", "enforce": "route", "actions": ["view", "request", "approve", "manage", "receive"] },
+    { "key": "libry.reports", "module": "libry", "label": "Library reports", "enforce": "route", "actions": ["view"] },
+    { "key": "libry.stocktake", "module": "libry", "label": "Stock verification", "enforce": "route", "actions": ["view", "manage"] },
+    { "key": "libry.audit", "module": "libry", "label": "Library audit history", "enforce": "route", "actions": ["view"] },
+    { "key": "libry.digital", "module": "libry", "label": "Digital library", "enforce": "route", "actions": ["view", "manage"] },
+    { "key": "libry.reading", "module": "libry", "label": "Reading engagement", "enforce": "route", "actions": ["view", "manage", "log", "moderate"] }
   ],
   "routes": [
     { "prefix": "/users", "resource": "core.users", "writeAction": "manage" },
@@ -150,7 +168,20 @@
     { "prefix": "/mdcl", "resource": "mdcl.clinic" },
     { "prefix": "/trnst", "resource": "trnst.transport" },
     { "prefix": "/asets", "resource": "asets.assets" },
-    { "prefix": "/cpitl", "resource": "cpitl.finance" }
+    { "prefix": "/cpitl", "resource": "cpitl.finance" },
+    { "prefix": "/libry", "path": "^/(loans|policies)", "resource": "libry.circulation" },
+    { "prefix": "/libry", "path": "^/members", "resource": "libry.members", "readAction": "view", "writeAction": "manage" },
+    { "prefix": "/libry", "path": "^/reservations", "resource": "libry.reservations", "readAction": "view", "writeAction": "manage" },
+    { "prefix": "/libry", "path": "^/fines", "resource": "libry.fines" },
+    { "prefix": "/libry", "path": "^/acquisitions", "resource": "libry.acquisitions" },
+    { "prefix": "/libry", "path": "^/(suppliers|purchase-orders)", "resource": "libry.acquisitions" },
+    { "prefix": "/libry", "path": "^/reports", "resource": "libry.reports" },
+    { "prefix": "/libry", "path": "^/stocktakes", "resource": "libry.stocktake" },
+    { "prefix": "/libry", "path": "^/audit", "resource": "libry.audit" },
+    { "prefix": "/libry", "path": "^/digital-resources", "resource": "libry.digital" },
+    { "prefix": "/libry", "path": "^/(reading-lists|reading-logs|reviews|challenges)", "resource": "libry.reading" },
+    { "prefix": "/libry", "methods": ["POST"], "permission": "libry.catalogue.create" },
+    { "prefix": "/libry", "resource": "libry.catalogue", "readAction": "view", "writeAction": "edit" }
   ],
   "features": {
     "dashboard": "core.dashboard.read",
@@ -179,6 +210,7 @@
     "cpitl_fees": "cpitl.finance.view",
     "cpitl_expenses": "cpitl.finance.view",
     "cpitl_payroll": "cpitl.finance.payroll",
+    "libry_catalogue": "libry.catalogue.view",
     "centre_details": "exam.setup.read",
     "exam_functionaries": "staaf.staff.read",
     "centre_guidelines": "exam.setup.read",
@@ -248,7 +280,7 @@
         "exam.setup.read", "exam.candidates.read", "exam.conduct.read", "exam.duties.read", "exam.results.read", "exam.results.write",
         "actvt.activities.read", "actvt.activities.write",
         "mdcl.clinic.read", "trnst.transport.read",
-        "asets.assets.view", "asets.assets.report",
+        "asets.assets.view", "asets.assets.report", "libry.catalogue.view", "libry.catalogue.create", "libry.catalogue.edit", "libry.members.view", "libry.members.manage", "libry.circulation.view", "libry.circulation.manage", "libry.circulation.issue", "libry.circulation.return", "libry.circulation.renew", "libry.reservations.view", "libry.reservations.manage", "libry.fines.view", "libry.fines.assess", "libry.fines.waive", "libry.acquisitions.view", "libry.acquisitions.request", "libry.acquisitions.approve", "libry.acquisitions.manage", "libry.acquisitions.receive", "libry.reports.view", "libry.stocktake.view", "libry.stocktake.manage", "libry.audit.view", "libry.digital.view", "libry.digital.manage", "libry.reading.view", "libry.reading.manage", "libry.reading.log", "libry.reading.moderate",
         "cpitl.finance.view"
       ]
     },
@@ -334,8 +366,16 @@
         "trnst.transport.read", "trnst.transport.write", "trnst.transport.delete",
         "asets.assets.view", "asets.assets.create", "asets.assets.edit", "asets.assets.allocate", "asets.assets.transfer",
         "asets.assets.maintain", "asets.assets.audit", "asets.assets.procure", "asets.assets.report",
-        "cpitl.finance.view", "cpitl.finance.collect", "cpitl.finance.expense_log"
+        "cpitl.finance.view", "cpitl.finance.collect", "cpitl.finance.expense_log",
+        "libry.catalogue.view", "libry.catalogue.create", "libry.catalogue.edit", "libry.members.view", "libry.members.manage", "libry.circulation.view", "libry.circulation.manage", "libry.circulation.issue", "libry.circulation.return", "libry.circulation.renew", "libry.reservations.view", "libry.reservations.manage"
       ]
+    },
+    {
+      "key": "librarian",
+      "name": "Librarian",
+      "description": "Maintains the library catalogue and accession register.",
+      "designations": ["librarian", "library"],
+      "permissions": ["core.dashboard.read", "stdnt.students.read", "libry.catalogue.view", "libry.catalogue.create", "libry.catalogue.edit", "libry.members.view", "libry.members.manage", "libry.circulation.view", "libry.circulation.manage", "libry.circulation.issue", "libry.circulation.return", "libry.circulation.renew", "libry.reservations.view", "libry.reservations.manage", "libry.fines.view", "libry.fines.assess", "libry.acquisitions.view", "libry.acquisitions.request", "libry.acquisitions.manage", "libry.acquisitions.receive", "libry.reports.view", "libry.stocktake.view", "libry.stocktake.manage", "libry.digital.view", "libry.digital.manage", "libry.reading.view", "libry.reading.manage", "libry.reading.log", "libry.reading.moderate"]
     },
     {
       "key": "transport_incharge",

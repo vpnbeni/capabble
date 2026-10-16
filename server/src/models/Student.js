@@ -368,6 +368,8 @@ studentSchema.statics.getStats = async function(filters = {}) {
           _id: { class: '$class', section: '$section' },
           count: { $sum: 1 },
           active: { $sum: { $cond: [{ $eq: ['$isActive', true] }, 1, 0] } },
+          boys: { $sum: { $cond: [{ $eq: ['$gender', 'Boy'] }, 1, 0] } },
+          girls: { $sum: { $cond: [{ $eq: ['$gender', 'Girl'] }, 1, 0] } },
         },
       },
     ]);
@@ -410,6 +412,8 @@ studentSchema.statics.getStats = async function(filters = {}) {
           _id: { class: '$class', section: '$section' },
           count: { $sum: 1 },
           active: { $sum: { $cond: [{ $eq: ['$isActive', true] }, 1, 0] } },
+          boys: { $sum: { $cond: [{ $eq: ['$gender', 'Boy'] }, 1, 0] } },
+          girls: { $sum: { $cond: [{ $eq: ['$gender', 'Girl'] }, 1, 0] } },
         },
       },
     ]),

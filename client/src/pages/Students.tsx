@@ -1314,7 +1314,7 @@ const Students: React.FC = () => {
         </Banner>
       ) : null}
 
-      <section className="cb-stats" aria-label="Student totals">
+      <section className="cb-stats stdnt-stats" aria-label="Student totals">
         <StatCard
           label="Students"
           value={formatCount(totalCount)}
@@ -1334,6 +1334,7 @@ const Students: React.FC = () => {
       <Card flush className="stdnt-list-card">
         <div className="stdnt-toolbar">
           <FilterBar
+            className="stdnt-filterbar"
             search={{
               placeholder: 'Search name, admission no. or phone',
               value: searchTerm,
