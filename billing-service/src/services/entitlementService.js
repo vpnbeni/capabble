@@ -1,176 +1,79 @@
-const {
-  BillingAccount,
-  BillingEntitlementSnapshot,
-  BillingSubscription,
-} = require('../models');
-const {
-  ACCESS_MODES,
-  CORE_ALLOWED_MODULES,
-  SUBSCRIPTION_STATES,
-} = require('../domain/constants');
-const { getTenantSubscription } = require('./subscriptionStateService');
+// What a school may use right now. The main server caches this and enforces it.
+const { eq } = require('drizzle-orm');
+const { transaction } = require('../db/client');
+const s = require('../db/schema');
+const config = require('../config');
+const accounts = require('./accountService');
+const subscriptions = require('./subscriptionService');
+const sm = require('../domain/stateMachine');
+const { SUBSCRIPTION_STATES: S, ACCESS_MODES, CORE_ALLOWED_MODULES } = require('../domain/constants');
+const { SYSTEM_ACTOR } = require('./auditService');
 
-const parseIntEnv = (name, fallback) => {
-  const value = Number.parseInt(process.env[name] || '', 10);
-  return Number.isFinite(value) && value > 0 ? value : fallback;
-};
+const ALL = ['*'];
 
-const addSeconds = (date, seconds) => {
-  const copy = new Date(date.getTime());
-  copy.setSeconds(copy.getSeconds() + seconds);
-  return copy;
-};
-
-function computeAccessMode(state) {
-  if (state === SUBSCRIPTION_STATES.TRIALING_CORE) {
-    return ACCESS_MODES.CORE_ONLY;
-  }
-
-  if (
-    state === SUBSCRIPTION_STATES.SUSPENDED_READ_ONLY
-    || state === SUBSCRIPTION_STATES.CANCELED
-  ) {
-    return ACCESS_MODES.READ_ONLY;
-  }
-
-  return ACCESS_MODES.FULL;
-}
-
-function buildAllowedModules(accessMode) {
-  if (accessMode === ACCESS_MODES.CORE_ONLY) {
-    return CORE_ALLOWED_MODULES;
-  }
-
-  return ['*'];
-}
-
-async function computeEntitlement(tenantSlug) {
-  const [account, subscription] = await Promise.all([
-    BillingAccount.findOne({ tenantSlug }),
-    getTenantSubscription(tenantSlug),
-  ]);
-
-  if (!account || !subscription) {
+/**
+ * Entitlement contract (v2). Every v1 field keeps its meaning:
+ * tenantSlug, state, accessMode, allowedModules, isReadOnly, reason, planCode,
+ * trialEndsAt, graceEndsAt, computedAt, validUntil.
+ * Added: entitledModules (module codes or ['*']), periodEndsAt, studentsBilled,
+ * cancelAtPeriodEnd, subscriptionId.
+ */
+function buildEntitlement({ slug, sub, moduleCodes, coreCodes, now }) {
+  const validUntil = new Date(now.getTime() + config.entitlementTtlSeconds * 1000);
+  if (!sub) {
     return {
-      tenantSlug,
-      state: SUBSCRIPTION_STATES.SUSPENDED_READ_ONLY,
+      tenantSlug: slug,
+      state: S.SUSPENDED_READ_ONLY,
       accessMode: ACCESS_MODES.READ_ONLY,
       allowedModules: CORE_ALLOWED_MODULES,
+      entitledModules: coreCodes,
       isReadOnly: true,
       reason: 'billing_account_missing',
       planCode: null,
       trialEndsAt: null,
       graceEndsAt: null,
-      computedAt: new Date(),
-      validUntil: addSeconds(new Date(), parseIntEnv('BILLING_ENTITLEMENT_TTL_SECONDS', 60)),
+      periodEndsAt: null,
+      studentsBilled: 0,
+      cancelAtPeriodEnd: false,
+      subscriptionId: null,
+      computedAt: now,
+      validUntil,
     };
   }
-
-  const accessMode = computeAccessMode(subscription.state);
-  const computedAt = new Date();
-  const validUntil = addSeconds(computedAt, parseIntEnv('BILLING_ENTITLEMENT_TTL_SECONDS', 60));
-
+  const state = sm.normalizeState(sub.state);
+  const accessMode = sm.accessModeFor(state);
+  const everything = state === S.TRIALING || state === S.GRANDFATHERED;
   return {
-    tenantSlug,
-    state: subscription.state,
+    tenantSlug: slug,
+    state,
     accessMode,
-    allowedModules: buildAllowedModules(accessMode),
+    allowedModules: ALL,
+    entitledModules: everything ? ALL : [...new Set([...coreCodes, ...moduleCodes])].sort(),
     isReadOnly: accessMode === ACCESS_MODES.READ_ONLY,
-    reason: subscription.state,
-    planCode: subscription.planCode,
-    trialEndsAt: subscription.trialEndAt,
-    graceEndsAt: subscription.graceEndsAt,
-    computedAt,
+    reason: state,
+    planCode: sub.bundleCode || (moduleCodes.length ? 'modules' : null),
+    trialEndsAt: sub.trialEndsAt || null,
+    graceEndsAt: sub.graceEndsAt || null,
+    periodEndsAt: sub.currentPeriodEnd || null,
+    studentsBilled: sub.billedStudents || 0,
+    cancelAtPeriodEnd: Boolean(sub.cancelAtPeriodEnd),
+    subscriptionId: sub.id,
+    computedAt: now,
     validUntil,
   };
 }
 
-async function getEntitlement(tenantSlug) {
-  const now = new Date();
-
-  const snapshot = await BillingEntitlementSnapshot.findOne({
-    tenantSlug,
-    validUntil: { $gt: now },
+async function getEntitlement(slug, now = new Date()) {
+  const tenantSlug = String(slug).toLowerCase();
+  return transaction(async (tx) => {
+    const coreCodes = (await tx.select({ code: s.modules.code }).from(s.modules).where(eq(s.modules.isCore, true))).map((r) => r.code);
+    const account = await accounts.findAccountBySlug(tenantSlug, tx);
+    if (!account) return buildEntitlement({ slug: tenantSlug, sub: null, moduleCodes: [], coreCodes, now });
+    let sub = await subscriptions.findSubscription(tx, account.id, { lock: true });
+    sub = await subscriptions.refreshState(tx, sub, SYSTEM_ACTOR, now);
+    const items = sub ? await subscriptions.liveItems(tx, sub.id) : [];
+    return buildEntitlement({ slug: tenantSlug, sub, moduleCodes: items.map((i) => i.moduleCode), coreCodes, now });
   });
-
-  if (snapshot) {
-    return snapshot.toObject();
-  }
-
-  const entitlement = await computeEntitlement(tenantSlug);
-
-  await BillingEntitlementSnapshot.findOneAndUpdate(
-    { tenantSlug },
-    { $set: entitlement },
-    { upsert: true, new: true },
-  );
-
-  return entitlement;
 }
 
-async function markTenantActiveByProviderSubscription(providerSubscriptionId, providerPaymentId = '') {
-  if (!providerSubscriptionId) return null;
-
-  const subscription = await BillingSubscription.findOne({ providerSubscriptionId });
-  if (!subscription) return null;
-
-  subscription.state = SUBSCRIPTION_STATES.ACTIVE;
-  subscription.graceEndsAt = null;
-
-  const now = new Date();
-  subscription.cycleStartAt = now;
-
-  const nextCycle = new Date(now.getTime());
-  nextCycle.setMonth(nextCycle.getMonth() + (subscription.planCode.includes('yearly') ? 12 : 1));
-  subscription.cycleEndAt = nextCycle;
-
-  await subscription.save();
-
-  await BillingEntitlementSnapshot.deleteOne({ tenantSlug: subscription.tenantSlug });
-
-  return {
-    subscription,
-    providerPaymentId,
-  };
-}
-
-async function markTenantPastDueByProviderSubscription(providerSubscriptionId, _reason = 'payment_failed') {
-  if (!providerSubscriptionId) return null;
-
-  const subscription = await BillingSubscription.findOne({ providerSubscriptionId });
-  if (!subscription) return null;
-
-  const graceDays = parseIntEnv('BILLING_GRACE_DAYS', 7);
-  const now = new Date();
-
-  subscription.state = SUBSCRIPTION_STATES.PAST_DUE_GRACE;
-  subscription.graceEndsAt = addSeconds(now, graceDays * 24 * 60 * 60);
-  await subscription.save();
-
-  await BillingEntitlementSnapshot.deleteOne({ tenantSlug: subscription.tenantSlug });
-
-  return subscription;
-}
-
-async function markTenantCanceledByProviderSubscription(providerSubscriptionId) {
-  if (!providerSubscriptionId) return null;
-
-  const subscription = await BillingSubscription.findOne({ providerSubscriptionId });
-  if (!subscription) return null;
-
-  subscription.state = SUBSCRIPTION_STATES.CANCELED;
-  subscription.canceledAt = new Date();
-  await subscription.save();
-
-  await BillingEntitlementSnapshot.deleteOne({ tenantSlug: subscription.tenantSlug });
-
-  return subscription;
-}
-
-module.exports = {
-  getEntitlement,
-  computeEntitlement,
-  markTenantActiveByProviderSubscription,
-  markTenantPastDueByProviderSubscription,
-  markTenantCanceledByProviderSubscription,
-};
+module.exports = { getEntitlement, buildEntitlement };

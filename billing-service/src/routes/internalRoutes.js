@@ -1,28 +1,55 @@
 const express = require('express');
 const asyncHandler = require('../utils/asyncHandler');
 const { ensureServiceAuth } = require('../middleware/serviceAuth');
-const internalController = require('../controllers/internalController');
+const attachActor = require('../middleware/actor');
+const validate = require('../middleware/validate');
+const v = require('../validation/schemas');
+const c = require('../controllers/internalController');
 
 const router = express.Router();
 
 router.use(ensureServiceAuth);
+router.use(attachActor);
 
-router.post('/tenants/onboard', asyncHandler(internalController.onboardTenant));
-router.post('/tenants/grandfather', asyncHandler(internalController.grandfatherTenantHandler));
+// Onboarding and entitlements (contract used by the main server's billingEntitlement middleware).
+router.post('/tenants/onboard', validate(v.tenantIdentity), asyncHandler(c.onboardTenant));
+router.post('/tenants/grandfather', validate(v.tenantIdentity), asyncHandler(c.grandfatherTenantHandler));
+router.get('/entitlements/:tenantSlug', asyncHandler(c.getTenantEntitlement));
 
-router.get('/entitlements/:tenantSlug', asyncHandler(internalController.getTenantEntitlement));
+// One school (school app).
+router.get('/catalog', asyncHandler(c.getCatalog));
+router.get('/tenant/:tenantSlug', asyncHandler(c.getTenantBilling));
+router.get('/tenant/:tenantSlug/catalog', asyncHandler(c.getCatalog));
+router.get('/tenant/:tenantSlug/invoices', asyncHandler(c.listTenantInvoices));
+router.get('/tenant/:tenantSlug/invoices/:invoiceId', asyncHandler(c.getTenantInvoice));
+router.get('/tenant/:tenantSlug/payments', asyncHandler(c.listTenantPayments));
+router.post('/tenant/:tenantSlug/profile', validate(v.profile), asyncHandler(c.updateTenantProfile));
+router.post('/tenant/:tenantSlug/subscription/preview', validate(v.selection), asyncHandler(c.previewSubscription));
+router.post('/tenant/:tenantSlug/subscription', validate(v.selection), asyncHandler(c.subscribe));
+router.post('/tenant/:tenantSlug/cancel', validate(v.cancel), asyncHandler(c.cancelSubscription));
+router.post('/tenant/:tenantSlug/resume', asyncHandler(c.resumeSubscription));
 
-router.get('/tenant/:tenantSlug', asyncHandler(internalController.getTenantBilling));
-router.get('/tenant/:tenantSlug/invoices', asyncHandler(internalController.listTenantInvoices));
-router.post('/tenant/:tenantSlug/pay-now', asyncHandler(internalController.payNow));
-router.post('/tenant/:tenantSlug/profile', asyncHandler(internalController.updateTenantProfile));
+// Platform admin: schools.
+router.get('/admin/tenants', validate(v.listQuery, 'query'), asyncHandler(c.listBillingTenants));
+router.get('/admin/tenants/:tenantId', asyncHandler(c.getBillingTenantById));
+router.post('/admin/tenants/:tenantId/change-plan/preview', validate(v.selection), asyncHandler(c.previewTenantPlan));
+router.post('/admin/tenants/:tenantId/change-plan', validate(v.selection), asyncHandler(c.changeTenantPlan));
+router.post('/admin/tenants/:tenantId/grant-extension', validate(v.extension), asyncHandler(c.grantTenantExtension));
+router.post('/admin/tenants/:tenantId/students', validate(v.students), asyncHandler(c.setTenantStudents));
+router.post('/admin/tenants/:tenantId/cancel', validate(v.cancel), asyncHandler(c.cancelTenant));
+router.post('/admin/tenants/:tenantId/profile', validate(v.profile), asyncHandler(c.updateTenantProfileAdmin));
+router.post('/admin/tenants/:tenantId/invoices/:invoiceId/payments/offline', validate(v.offlinePayment), asyncHandler(c.recordOfflinePayment));
+router.post('/admin/tenants/:tenantId/invoices/:invoiceId/void', validate(v.voidInput), asyncHandler(c.voidInvoice));
+router.post('/admin/tenants/:tenantId/invoices/:invoiceId/credit-notes', validate(v.creditNote), asyncHandler(c.createCreditNote));
+router.get('/admin/audit', validate(v.auditQuery, 'query'), asyncHandler(c.listAudit));
 
-router.get('/admin/tenants', asyncHandler(internalController.listBillingTenants));
-router.get('/admin/tenants/:tenantId', asyncHandler(internalController.getBillingTenantById));
-router.post('/admin/tenants/:tenantId/change-plan', asyncHandler(internalController.changeTenantPlan));
-router.post('/admin/tenants/:tenantId/grant-extension', asyncHandler(internalController.grantTenantExtension));
-router.post('/admin/plans', asyncHandler(internalController.createPlan));
-router.post('/admin/coupons', asyncHandler(internalController.createCoupon));
-router.post('/admin/addons', asyncHandler(internalController.createAddon));
+// Platform admin: catalog.
+router.get('/admin/catalog', asyncHandler(c.getAdminCatalog));
+router.post('/admin/modules', validate(v.moduleInput), asyncHandler(c.upsertModule));
+router.get('/admin/modules/:code/prices', asyncHandler(c.priceHistory));
+router.post('/admin/modules/:code/prices', validate(v.priceInput), asyncHandler(c.setModulePrice));
+router.post('/admin/bundles', validate(v.bundleInput), asyncHandler(c.upsertBundle));
+router.post('/admin/addons', validate(v.addonInput), asyncHandler(c.upsertAddon));
+router.post('/admin/coupons', validate(v.couponInput), asyncHandler(c.upsertCoupon));
 
 module.exports = router;

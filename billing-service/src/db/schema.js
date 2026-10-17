@@ -206,6 +206,7 @@ const subscriptionAddons = billing.table('subscription_addons', {
   quantity: integer('quantity').notNull().default(1),
   startedAt: ts('started_at').notNull().defaultNow(),
   endedAt: ts('ended_at'),
+  endsAtPeriodEnd: boolean('ends_at_period_end').notNull().default(false),
   // One-time add-ons are billed once, then marked here.
   billedAt: ts('billed_at'),
 }, (t) => [
@@ -248,6 +249,8 @@ const invoices = billing.table('invoices', {
   paidAt: ts('paid_at'),
   voidedAt: ts('voided_at'),
   studentsBilled: integer('students_billed').notNull().default(0),
+  bundleCode: text('bundle_code'),
+  couponCode: text('coupon_code'),
   // Supplier and buyer are snapshotted so a later profile edit never changes an issued invoice.
   supplier: jsonb('supplier').notNull(),
   buyer: jsonb('buyer').notNull(),

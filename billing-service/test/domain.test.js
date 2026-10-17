@@ -225,3 +225,16 @@ describe('subscription state machine', () => {
     expect(sm.addInterval(new Date('2028-02-29T00:00:00Z'), 'year').toISOString()).toBe('2029-02-28T00:00:00.000Z');
   });
 });
+
+describe('overdue invoices', () => {
+  test('an active subscription with an overdue invoice moves to grace', () => {
+    const now = new Date('2026-10-17T00:00:00Z');
+    const r = sm.advance(
+      { state: 'active', currentPeriodEnd: sm.addDays(now, 100) },
+      now,
+      { unpaidDueAt: sm.addDays(now, -2) },
+    );
+    expect(r.state).toBe('past_due_grace');
+    expect(r.reasons).toEqual(['invoice_overdue']);
+  });
+});

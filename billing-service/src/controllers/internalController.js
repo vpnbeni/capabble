@@ -1,408 +1,248 @@
-const HttpError = require('../utils/httpError');
-const {
-  BillingAccount,
-  BillingAddon,
-  BillingCoupon,
-  BillingInvoice,
-  BillingPlan,
-  BillingSubscription,
-} = require('../models');
+// Internal API used by the main server (school app and platform admin). JSON: { success, data, message? }.
+const { and, eq, desc, inArray } = require('drizzle-orm');
+const { getDb, transaction } = require('../db/client');
+const s = require('../db/schema');
+const accounts = require('../services/accountService');
+const catalog = require('../services/catalogService');
+const subscriptions = require('../services/subscriptionService');
+const invoices = require('../services/invoiceService');
 const { getEntitlement } = require('../services/entitlementService');
-const {
-  onboardTenantWithTrial,
-  grandfatherTenant,
-} = require('../services/onboardingService');
-const { createPaymentLinkForTenant } = require('../services/invoiceService');
+const sm = require('../domain/stateMachine');
+const HttpError = require('../utils/httpError');
 
-const parsePagination = (query) => {
-  const page = Math.max(Number.parseInt(query.page || '1', 10), 1);
-  const limit = Math.min(Math.max(Number.parseInt(query.limit || '20', 10), 1), 100);
-  return { page, limit, skip: (page - 1) * limit };
-};
+const ok = (res, data, status = 200, message) => res.status(status).json({ success: true, data, ...(message ? { message } : {}) });
 
-const onboardTenant = async (req, res) => {
-  const {
-    tenantId,
-    tenantSlug,
-    tenantName,
-    billingEmail,
-    planCode,
-  } = req.body;
+/* ------------------------------------------------------------- onboarding */
 
-  if (!tenantId || !tenantSlug || !tenantName || !billingEmail) {
-    throw new HttpError(400, 'tenantId, tenantSlug, tenantName and billingEmail are required');
-  }
+async function onboardTenant(req, res) {
+  const { account, subscription, created } = await subscriptions.onboardTrial(req.actor, req.body);
+  const entitlement = await getEntitlement(account.tenantSlug);
+  ok(res, { account, subscription, entitlement }, created ? 201 : 200, created ? 'Trial started' : 'Already onboarded');
+}
 
-  const result = await onboardTenantWithTrial({
-    tenantId,
-    tenantSlug,
-    tenantName,
-    billingEmail,
-    planCode,
-  });
+async function grandfatherTenantHandler(req, res) {
+  const { account, subscription } = await subscriptions.grandfather(req.actor, req.body);
+  const entitlement = await getEntitlement(account.tenantSlug);
+  ok(res, { account, subscription, entitlement });
+}
 
-  const entitlement = await getEntitlement(tenantSlug);
+async function getTenantEntitlement(req, res) {
+  ok(res, await getEntitlement(req.params.tenantSlug));
+}
 
-  return res.status(200).json({
-    success: true,
-    message: 'Tenant billing onboarding completed',
-    data: {
-      account: result.account,
-      subscription: result.subscription,
-      entitlement,
-    },
-  });
-};
+/* --------------------------------------------------------------- per school */
 
-const grandfatherTenantHandler = async (req, res) => {
-  const {
-    tenantId,
-    tenantSlug,
-    tenantName,
-    billingEmail,
-    days,
-  } = req.body;
-
-  if (!tenantId || !tenantSlug || !tenantName || !billingEmail) {
-    throw new HttpError(400, 'tenantId, tenantSlug, tenantName and billingEmail are required');
-  }
-
-  const result = await grandfatherTenant({
-    tenantId,
-    tenantSlug,
-    tenantName,
-    billingEmail,
-    days,
-  });
-
-  const entitlement = await getEntitlement(tenantSlug);
-
-  return res.status(200).json({
-    success: true,
-    message: 'Tenant marked as grandfathered',
-    data: {
-      account: result.account,
-      subscription: result.subscription,
-      entitlement,
-    },
-  });
-};
-
-const getTenantEntitlement = async (req, res) => {
-  const { tenantSlug } = req.params;
-
-  const entitlement = await getEntitlement(tenantSlug);
-
-  res.status(200).json({
-    success: true,
-    data: entitlement,
-  });
-};
-
-const getTenantBilling = async (req, res) => {
-  const { tenantSlug } = req.params;
-
-  const [account, subscription, entitlement] = await Promise.all([
-    BillingAccount.findOne({ tenantSlug }),
-    BillingSubscription.findOne({ tenantSlug }),
-    getEntitlement(tenantSlug),
+async function tenantSummary(key) {
+  const db = getDb();
+  const account = await accounts.requireAccount(key, db);
+  const entitlement = await getEntitlement(account.tenantSlug);
+  const sub = await subscriptions.findSubscription(db, account.id);
+  const [subscription, openInvoices, upcoming] = await Promise.all([
+    subscriptions.describeSubscription(db, sub),
+    sub ? invoices.openInvoicesFor(sub.id, db) : [],
+    subscriptions.estimateRenewal(db, account, sub),
   ]);
+  return {
+    account,
+    subscription,
+    entitlement,
+    openInvoices: openInvoices.map((inv) => ({ ...inv, outstandingPaise: invoices.outstanding(inv) })),
+    upcomingRenewal: upcoming,
+  };
+}
 
-  if (!account || !subscription) {
-    throw new HttpError(404, 'Billing data not found for tenant');
+async function getTenantBilling(req, res) {
+  ok(res, await tenantSummary(req.params.tenantSlug));
+}
+
+async function listTenantInvoices(req, res) {
+  const account = await accounts.requireAccount(req.params.tenantSlug);
+  const rows = await invoices.listInvoices(account.id);
+  ok(res, rows.map((inv) => ({ ...inv, outstandingPaise: invoices.outstanding(inv) })));
+}
+
+async function getTenantInvoice(req, res) {
+  const account = await accounts.requireAccount(req.params.tenantSlug);
+  const invoice = await invoices.getInvoice(req.params.invoiceId);
+  if (!invoice || invoice.accountId !== account.id) throw new HttpError(404, 'Invoice not found');
+  ok(res, invoice);
+}
+
+async function listTenantPayments(req, res) {
+  const account = await accounts.requireAccount(req.params.tenantSlug);
+  ok(res, await invoices.listPayments(account.id));
+}
+
+async function updateTenantProfile(req, res) {
+  ok(res, await accounts.updateProfile(req.actor, req.params.tenantSlug, req.body), 200, 'Billing profile saved');
+}
+
+async function getCatalog(_req, res) {
+  ok(res, await catalog.publicCatalog());
+}
+
+async function previewSubscription(req, res) {
+  const { reportedStudents, ...selection } = req.body;
+  ok(res, await subscriptions.preview(req.params.tenantSlug, selection, { reportedStudents }));
+}
+
+async function subscribe(req, res) {
+  const { reportedStudents, ...selection } = req.body;
+  const result = await subscriptions.changeSubscription(req.actor, req.params.tenantSlug, selection, { reportedStudents });
+  ok(res, result, 200, result.invoice ? `Invoice ${result.invoice.number} issued` : 'Plan updated');
+}
+
+async function cancelSubscription(req, res) {
+  ok(res, await subscriptions.cancel(req.actor, req.params.tenantSlug, req.body), 200, req.body.immediately ? 'Subscription canceled' : 'Subscription will end at the end of the period');
+}
+
+async function resumeSubscription(req, res) {
+  ok(res, await subscriptions.resume(req.actor, req.params.tenantSlug), 200, 'Cancellation withdrawn');
+}
+
+/* -------------------------------------------------------------------- admin */
+
+async function listBillingTenants(req, res) {
+  const db = getDb();
+  const page = await accounts.listAccounts(req.query, db);
+  const ids = page.items.map((a) => a.id);
+  const subs = ids.length
+    ? await db.select().from(s.subscriptions).where(inArray(s.subscriptions.accountId, ids)).orderBy(desc(s.subscriptions.createdAt))
+    : [];
+  const latest = new Map();
+  for (const sub of subs) {
+    const prev = latest.get(sub.accountId);
+    if (!prev || (prev.state === 'canceled' && sub.state !== 'canceled')) latest.set(sub.accountId, sub);
   }
-
-  res.status(200).json({
-    success: true,
-    data: {
-      account,
-      subscription,
-      entitlement,
-    },
-  });
-};
-
-const listTenantInvoices = async (req, res) => {
-  const { tenantSlug } = req.params;
-
-  const invoices = await BillingInvoice.find({ tenantSlug }).sort({ createdAt: -1 }).limit(200);
-
-  res.status(200).json({
-    success: true,
-    data: invoices,
-  });
-};
-
-const payNow = async (req, res) => {
-  const { tenantSlug } = req.params;
-  const result = await createPaymentLinkForTenant(tenantSlug);
-
-  res.status(200).json({
-    success: true,
-    message: 'Payment link generated',
-    data: result,
-  });
-};
-
-const updateTenantProfile = async (req, res) => {
-  const { tenantSlug } = req.params;
-  const {
-    billingEmail,
-    legalName,
-    address,
-    gstin,
-    placeOfSupply,
-    hsnSacDefault,
-  } = req.body;
-
-  const account = await BillingAccount.findOneAndUpdate(
-    { tenantSlug },
-    {
-      $set: {
-        ...(billingEmail !== undefined ? { billingEmail: String(billingEmail).trim().toLowerCase() } : {}),
-        ...(legalName !== undefined ? { legalName } : {}),
-        ...(address !== undefined ? { address } : {}),
-        ...(gstin !== undefined ? { gstin: String(gstin).trim().toUpperCase() } : {}),
-        ...(placeOfSupply !== undefined ? { placeOfSupply } : {}),
-        ...(hsnSacDefault !== undefined ? { hsnSacDefault } : {}),
-      },
-    },
-    { new: true },
-  );
-
-  if (!account) {
-    throw new HttpError(404, 'Billing account not found');
-  }
-
-  res.status(200).json({
-    success: true,
-    data: account,
-  });
-};
-
-const listBillingTenants = async (req, res) => {
-  const { page, limit, skip } = parsePagination(req.query);
-  const search = String(req.query.search || '').trim();
-
-  const query = search
-    ? {
-      $or: [
-        { tenantSlug: { $regex: search, $options: 'i' } },
-        { tenantName: { $regex: search, $options: 'i' } },
-        { billingEmail: { $regex: search, $options: 'i' } },
-      ],
-    }
-    : {};
-
-  const [accounts, total] = await Promise.all([
-    BillingAccount.find(query)
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit)
-      .lean(),
-    BillingAccount.countDocuments(query),
-  ]);
-
-  const slugs = accounts.map((item) => item.tenantSlug);
-  const subscriptions = await BillingSubscription.find({ tenantSlug: { $in: slugs } }).lean();
-  const subMap = new Map(subscriptions.map((item) => [item.tenantSlug, item]));
-
-  const items = await Promise.all(accounts.map(async (account) => {
-    const subscription = subMap.get(account.tenantSlug) || null;
-    const entitlement = await getEntitlement(account.tenantSlug);
+  const items = page.items.map((account) => {
+    const sub = latest.get(account.id) || null;
+    const state = sub ? sm.normalizeState(sub.state) : null;
     return {
       account,
-      subscription,
-      entitlement,
+      subscription: sub,
+      entitlement: sub ? { state, accessMode: sm.accessModeFor(state), nextDeadline: sm.nextDeadline(sub) } : null,
     };
-  }));
-
-  res.status(200).json({
-    success: true,
-    data: {
-      items,
-      total,
-      page,
-      pages: Math.ceil(total / limit) || 1,
-      limit,
-    },
   });
-};
+  ok(res, { ...page, items });
+}
 
-const getBillingTenantById = async (req, res) => {
-  const { tenantId } = req.params;
-
-  const account = await BillingAccount.findOne({ tenantId });
-  if (!account) {
-    throw new HttpError(404, 'Billing account not found');
-  }
-
-  const [subscription, invoices, entitlement] = await Promise.all([
-    BillingSubscription.findOne({ tenantSlug: account.tenantSlug }),
-    BillingInvoice.find({ tenantSlug: account.tenantSlug }).sort({ createdAt: -1 }).limit(50),
-    getEntitlement(account.tenantSlug),
+async function getBillingTenantById(req, res) {
+  const summary = await tenantSummary(req.params.tenantId);
+  const [invoiceRows, paymentRows, creditNotes] = await Promise.all([
+    invoices.listInvoices(summary.account.id, { limit: 50 }),
+    invoices.listPayments(summary.account.id, { limit: 50 }),
+    invoices.listCreditNotes(summary.account.id),
   ]);
-
-  res.status(200).json({
-    success: true,
-    data: {
-      account,
-      subscription,
-      invoices,
-      entitlement,
-    },
+  ok(res, {
+    ...summary,
+    invoices: invoiceRows.map((inv) => ({ ...inv, outstandingPaise: invoices.outstanding(inv) })),
+    payments: paymentRows,
+    creditNotes,
   });
-};
+}
 
-const changeTenantPlan = async (req, res) => {
-  const { tenantId } = req.params;
-  const { planCode } = req.body;
+async function changeTenantPlan(req, res) {
+  const { reportedStudents, ...selection } = req.body;
+  const result = await subscriptions.changeSubscription(req.actor, req.params.tenantId, selection, { reportedStudents });
+  ok(res, result, 200, result.invoice ? `Invoice ${result.invoice.number} issued` : 'Plan updated');
+}
 
-  if (!planCode) {
-    throw new HttpError(400, 'planCode is required');
-  }
+async function previewTenantPlan(req, res) {
+  const { reportedStudents, ...selection } = req.body;
+  ok(res, await subscriptions.preview(req.params.tenantId, selection, { reportedStudents }));
+}
 
-  const plan = await BillingPlan.findOne({ code: String(planCode).toLowerCase(), isActive: true });
-  if (!plan) {
-    throw new HttpError(404, 'Plan not found or inactive');
-  }
+async function grantTenantExtension(req, res) {
+  const subscription = await subscriptions.grantExtension(req.actor, req.params.tenantId, req.body.days);
+  const account = await accounts.requireAccount(req.params.tenantId);
+  ok(res, { subscription, entitlement: await getEntitlement(account.tenantSlug) }, 200, `Extended by ${req.body.days} days`);
+}
 
-  const account = await BillingAccount.findOne({ tenantId });
-  if (!account) {
-    throw new HttpError(404, 'Billing account not found');
-  }
+async function setTenantStudents(req, res) {
+  ok(res, await subscriptions.setDeclaredStudents(req.actor, req.params.tenantId, req.body.declaredStudents), 200, 'Student count saved');
+}
 
-  const subscription = await BillingSubscription.findOneAndUpdate(
-    { tenantSlug: account.tenantSlug },
-    {
-      $set: {
-        planCode: plan.code,
-      },
-    },
-    { new: true },
-  );
+async function cancelTenant(req, res) {
+  ok(res, await subscriptions.cancel(req.actor, req.params.tenantId, req.body));
+}
 
-  const entitlement = await getEntitlement(account.tenantSlug);
+async function updateTenantProfileAdmin(req, res) {
+  ok(res, await accounts.updateProfile(req.actor, req.params.tenantId, req.body), 200, 'Billing profile saved');
+}
 
-  res.status(200).json({
-    success: true,
-    message: 'Plan changed successfully',
-    data: {
-      subscription,
-      entitlement,
-    },
-  });
-};
+async function requireInvoiceOfTenant(tenantKey, invoiceId) {
+  const account = await accounts.requireAccount(tenantKey);
+  const [invoice] = await getDb().select().from(s.invoices).where(and(eq(s.invoices.id, invoiceId), eq(s.invoices.accountId, account.id)));
+  if (!invoice) throw new HttpError(404, 'Invoice not found');
+  return { account, invoice };
+}
 
-const grantTenantExtension = async (req, res) => {
-  const { tenantId } = req.params;
-  const extensionDays = Math.max(Number.parseInt(req.body.days || '0', 10), 1);
+async function recordOfflinePayment(req, res) {
+  await requireInvoiceOfTenant(req.params.tenantId, req.params.invoiceId);
+  const result = await invoices.recordOfflinePayment(req.actor, req.params.invoiceId, req.body);
+  ok(res, result, 201, `Receipt ${result.payment.receiptNumber} recorded`);
+}
 
-  const account = await BillingAccount.findOne({ tenantId });
-  if (!account) {
-    throw new HttpError(404, 'Billing account not found');
-  }
+async function voidInvoice(req, res) {
+  await requireInvoiceOfTenant(req.params.tenantId, req.params.invoiceId);
+  const invoice = await transaction((tx) => invoices.voidInvoice(tx, req.actor, req.params.invoiceId, req.body.reason));
+  ok(res, invoice, 200, `Invoice ${invoice.number} voided`);
+}
 
-  const subscription = await BillingSubscription.findOne({ tenantSlug: account.tenantSlug });
-  if (!subscription) {
-    throw new HttpError(404, 'Billing subscription not found');
-  }
+// Overridden in paymentController once refunds go through the provider.
+async function createCreditNote(req, res) {
+  await requireInvoiceOfTenant(req.params.tenantId, req.params.invoiceId);
+  const result = await transaction((tx) => invoices.createCreditNote(tx, req.actor, req.params.invoiceId, req.body));
+  ok(res, result, 201, `Credit note ${result.creditNote.number} issued`);
+}
 
-  const now = new Date();
-  const base = subscription.graceEndsAt || subscription.grandfatherEndsAt || subscription.trialEndAt || now;
-  const next = new Date(base.getTime());
-  next.setDate(next.getDate() + extensionDays);
+async function listAudit(req, res) {
+  const { accountId, entityType, entityId, limit } = req.query;
+  const where = [];
+  if (accountId) where.push(eq(s.auditLog.accountId, accountId));
+  if (entityType) where.push(eq(s.auditLog.entityType, entityType));
+  if (entityId) where.push(eq(s.auditLog.entityId, entityId));
+  const rows = await getDb().select().from(s.auditLog)
+    .where(where.length ? and(...where) : undefined)
+    .orderBy(desc(s.auditLog.id)).limit(limit);
+  ok(res, rows);
+}
 
-  if (subscription.state === 'past_due_grace' || subscription.state === 'suspended_read_only') {
-    subscription.state = 'past_due_grace';
-    subscription.graceEndsAt = next;
-  } else if (subscription.state === 'trialing_core') {
-    subscription.trialEndAt = next;
-  } else {
-    subscription.grandfatherEndsAt = next;
-    subscription.state = 'grandfathered';
-  }
+/* ------------------------------------------------------------ admin catalog */
 
-  await subscription.save();
+async function getAdminCatalog(_req, res) {
+  const [modules, bundles, addons, coupons] = await Promise.all([
+    catalog.listModules({ includeInactive: true }),
+    catalog.listBundles({ includeInactive: true }),
+    catalog.listAddons({ includeInactive: true }),
+    catalog.listCoupons(),
+  ]);
+  ok(res, { modules, bundles, addons, coupons });
+}
 
-  const entitlement = await getEntitlement(account.tenantSlug);
+async function upsertModule(req, res) {
+  ok(res, await catalog.upsertModule(req.actor, req.body), 200, 'Module saved');
+}
 
-  res.status(200).json({
-    success: true,
-    message: `Extension granted for ${extensionDays} day(s)`,
-    data: {
-      subscription,
-      entitlement,
-    },
-  });
-};
+async function setModulePrice(req, res) {
+  ok(res, await catalog.setModulePrice(req.actor, { ...req.body, moduleCode: req.params.code }), 201, 'New price saved');
+}
 
-const createPlan = async (req, res) => {
-  const payload = {
-    ...req.body,
-    code: String(req.body.code || '').trim().toLowerCase(),
-    currency: String(req.body.currency || process.env.BILLING_DEFAULT_CURRENCY || 'INR').toUpperCase(),
-  };
+async function priceHistory(req, res) {
+  ok(res, await catalog.priceHistory(req.params.code));
+}
 
-  if (!payload.code || !payload.name || !payload.billingCycle || payload.amountMinor === undefined) {
-    throw new HttpError(400, 'code, name, billingCycle and amountMinor are required');
-  }
+async function upsertBundle(req, res) {
+  ok(res, await catalog.upsertBundle(req.actor, req.body), 200, 'Bundle saved');
+}
 
-  const plan = await BillingPlan.findOneAndUpdate(
-    { code: payload.code },
-    { $set: payload },
-    { upsert: true, new: true },
-  );
+async function upsertAddon(req, res) {
+  ok(res, await catalog.upsertAddon(req.actor, req.body), 200, 'Add-on saved');
+}
 
-  res.status(201).json({
-    success: true,
-    data: plan,
-  });
-};
-
-const createCoupon = async (req, res) => {
-  const payload = {
-    ...req.body,
-    code: String(req.body.code || '').trim().toUpperCase(),
-  };
-
-  if (!payload.code || !payload.discountType || payload.discountValue === undefined) {
-    throw new HttpError(400, 'code, discountType and discountValue are required');
-  }
-
-  const coupon = await BillingCoupon.findOneAndUpdate(
-    { code: payload.code },
-    { $set: payload },
-    { upsert: true, new: true },
-  );
-
-  res.status(201).json({
-    success: true,
-    data: coupon,
-  });
-};
-
-const createAddon = async (req, res) => {
-  const payload = {
-    ...req.body,
-    code: String(req.body.code || '').trim().toLowerCase(),
-  };
-
-  if (!payload.code || !payload.name || payload.amountMinor === undefined) {
-    throw new HttpError(400, 'code, name and amountMinor are required');
-  }
-
-  const addon = await BillingAddon.findOneAndUpdate(
-    { code: payload.code },
-    { $set: payload },
-    { upsert: true, new: true },
-  );
-
-  res.status(201).json({
-    success: true,
-    data: addon,
-  });
-};
+async function upsertCoupon(req, res) {
+  ok(res, await catalog.upsertCoupon(req.actor, req.body), 200, 'Coupon saved');
+}
 
 module.exports = {
   onboardTenant,
@@ -410,13 +250,32 @@ module.exports = {
   getTenantEntitlement,
   getTenantBilling,
   listTenantInvoices,
-  payNow,
+  getTenantInvoice,
+  listTenantPayments,
   updateTenantProfile,
+  getCatalog,
+  previewSubscription,
+  subscribe,
+  cancelSubscription,
+  resumeSubscription,
   listBillingTenants,
   getBillingTenantById,
   changeTenantPlan,
+  previewTenantPlan,
   grantTenantExtension,
-  createPlan,
-  createCoupon,
-  createAddon,
+  setTenantStudents,
+  cancelTenant,
+  updateTenantProfileAdmin,
+  recordOfflinePayment,
+  voidInvoice,
+  createCreditNote,
+  listAudit,
+  getAdminCatalog,
+  upsertModule,
+  setModulePrice,
+  priceHistory,
+  upsertBundle,
+  upsertAddon,
+  upsertCoupon,
+  requireInvoiceOfTenant,
 };

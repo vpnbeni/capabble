@@ -31,8 +31,11 @@ function accessModeFor(state) {
   }
 }
 
-/** One time-driven step, or null when nothing is due. */
-function step(sub, now) {
+/**
+ * One time-driven step, or null when nothing is due.
+ * `unpaidDueAt` is the due date of the oldest unpaid invoice, if any.
+ */
+function step(sub, now, unpaidDueAt = null) {
   const state = normalizeState(sub.state);
   const passed = (date) => date && new Date(date) <= now;
 
@@ -47,6 +50,9 @@ function step(sub, now) {
       return { state: S.CANCELED, canceledAt: new Date(sub.currentPeriodEnd), reason: 'canceled_at_period_end' };
     }
     return { state: S.PAST_DUE_GRACE, graceEndsAt: addDays(sub.currentPeriodEnd, graceDays()), reason: 'renewal_unpaid' };
+  }
+  if (state === S.ACTIVE && passed(unpaidDueAt)) {
+    return { state: S.PAST_DUE_GRACE, graceEndsAt: addDays(unpaidDueAt, graceDays()), reason: 'invoice_overdue' };
   }
   if (state === S.GRANDFATHERED && passed(sub.grandfatherEndsAt)) {
     return { state: S.PAST_DUE_GRACE, graceEndsAt: addDays(sub.grandfatherEndsAt, graceDays()), reason: 'grandfather_ended' };
@@ -65,12 +71,12 @@ function step(sub, now) {
  * Apply every transition that time has made due. Returns the changes to write
  * (empty when nothing changed) and the reasons in order.
  */
-function advance(sub, now = new Date()) {
+function advance(sub, now = new Date(), { unpaidDueAt = null } = {}) {
   let current = { ...sub };
   const changes = {};
   const reasons = [];
   for (let i = 0; i < 6; i += 1) {
-    const next = step(current, now);
+    const next = step(current, now, unpaidDueAt);
     if (!next) break;
     const { reason, ...fields } = next;
     reasons.push(reason);
