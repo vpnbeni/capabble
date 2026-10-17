@@ -181,11 +181,13 @@ export function MasterDatesheetPage() {
 
   return (
     <div className="grid" style={{ gap: 24 }}>
+      <header className="page-header">
+        <h1 className="section-title">Master CBSE datesheet</h1>
+        <p className="page-subtitle">Upload one datesheet PDF and roll it out to all active tenants.</p>
+      </header>
+
       <section className="card">
-        <h1 className="section-title" style={{ marginBottom: 8 }}>Master CBSE Datesheet</h1>
-        <p style={{ color: 'var(--text-secondary)', marginTop: 0 }}>
-          Upload one datesheet PDF and roll it out to all active tenants.
-        </p>
+        <h2 className="card-title">Upload datesheet</h2>
 
         {error && <div className="error-text">{error}</div>}
         {success && <div className="success-text">{success}</div>}
@@ -224,7 +226,7 @@ export function MasterDatesheetPage() {
       </section>
 
       <section className="card">
-        <h2 className="card-title">Uploaded Datesheets</h2>
+        <h2 className="card-title">Uploaded datesheets</h2>
         <DataTable
           columns={columns}
           data={datesheets}
@@ -235,7 +237,7 @@ export function MasterDatesheetPage() {
       </section>
 
       <section className="card">
-        <h2 className="card-title">Datesheet Detail</h2>
+        <h2 className="card-title">Datesheet detail</h2>
 
         {!selectedDatesheet && <div className="empty-state">Select a datesheet row to view all entries.</div>}
 

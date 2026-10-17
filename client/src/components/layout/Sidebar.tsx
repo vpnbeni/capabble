@@ -7,6 +7,7 @@ import type { AppDispatch } from '../../redux/store'
 import { useAcademicSession } from '../../contexts/AcademicSessionContext'
 import { isFeatureEnabledForPath, getModuleForPath, getAccessibleModules, getFirstEnabledPathForModule } from '../../constants/featureAccess'
 import { usePermissions } from '@/hooks/usePermissions'
+import { deskTitle } from '@/utils/deskTitle'
 import { MODULE_REGISTRY, type ModuleId } from '../../constants/moduleRegistry'
 import {
   Check,
@@ -61,6 +62,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   const dispatch = useDispatch<AppDispatch>()
   const queryClient = useQueryClient()
   const currentUser = useSelector(selectUser)
+  const homeTitle = deskTitle(currentUser)
   const location = useLocation()
   const navigate = useNavigate()
   const { currentSession, clearSession } = useAcademicSession()
@@ -852,6 +854,60 @@ const Sidebar: React.FC<SidebarProps> = ({
       module: 'libry',
       icon: (
         <svg className="w-5 h-5 transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6l4 2m5-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+      ),
+      badge: null,
+    },
+    {
+      name: 'Today',
+      href: '/appnt/today',
+      module: 'appnt',
+      icon: (
+        <svg className="w-5 h-5 transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+      ),
+      badge: null,
+    },
+    {
+      name: 'Appointments',
+      href: '/appnt/appointments',
+      module: 'appnt',
+      icon: (
+        <svg className="w-5 h-5 transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+      ),
+      badge: null,
+    },
+    {
+      name: 'My availability',
+      href: '/appnt/availability',
+      module: 'appnt',
+      icon: (
+        <svg className="w-5 h-5 transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+      ),
+      badge: null,
+    },
+    {
+      name: 'Who takes appointments',
+      href: '/appnt/hosts',
+      module: 'appnt',
+      icon: (
+        <svg className="w-5 h-5 transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a4 4 0 00-4-4h-1m-10 6H2v-2a4 4 0 014-4h1m10-4a4 4 0 10-8 0 4 4 0 008 0zM7 10a4 4 0 100-8 4 4 0 000 8z" /></svg>
+      ),
+      badge: null,
+    },
+    {
+      name: 'Reports',
+      href: '/appnt/reports',
+      module: 'appnt',
+      icon: (
+        <svg className="w-5 h-5 transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+      ),
+      badge: null,
+    },
+    {
+      name: 'Appointment settings',
+      href: '/appnt/settings',
+      module: 'appnt',
+      icon: (
+        <svg className="w-5 h-5 transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065zM15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
       ),
       badge: null,
     },
@@ -1793,16 +1849,16 @@ const Sidebar: React.FC<SidebarProps> = ({
       style={{ width: currentSidebarWidth }}
     >
       <nav className={`cb-sidenav${isCollapsed ? ' is-collapsed' : ''}`} aria-label="Main">
-        {/* Principal Desk: the main Home dashboard, above every module */}
+        {/* Role desk (e.g. Principal Desk): the main Home dashboard, above every module */}
         <div className="cb-shellnav__homewrap">
           <NavLink
             to="/home"
             className={navItemClass(location.pathname === '/home', 'cb-shellnav__home')}
             aria-current={location.pathname === '/home' ? 'page' : undefined}
-            title={isCollapsed ? 'Principal Desk' : undefined}
+            title={isCollapsed ? homeTitle : undefined}
           >
-            {renderIcon('Principal Desk', '/home', null)}
-            {!isCollapsed ? <span className="cb-navitem__label truncate">Principal Desk</span> : null}
+            {renderIcon(homeTitle, '/home', null)}
+            {!isCollapsed ? <span className="cb-navitem__label truncate">{homeTitle}</span> : null}
           </NavLink>
           {location.pathname === '/home' ? (
             <button

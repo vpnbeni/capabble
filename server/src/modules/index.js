@@ -23,12 +23,13 @@ const actvtModule = require('./actvt');
 const mdclModule = require('./mdcl');
 const asetsModule = require('./asets');
 const libryModule = require('./libry');
+const appntModule = require('./appnt');
 const cpitlModule = require('./cpitl');
 const searchModule = require('./search');
 
 const modules = [
   coreModule, cntrModule, timetableModule, attndModule, almniModule, trnstModule,
-  acdmcModule, actvtModule, mdclModule, asetsModule, libryModule, cpitlModule, searchModule
+  acdmcModule, actvtModule, mdclModule, asetsModule, libryModule, appntModule, cpitlModule, searchModule
 ];
 
 /**

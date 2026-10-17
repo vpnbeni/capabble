@@ -1,4 +1,5 @@
 import { ChangeEvent, DragEvent, useMemo, useState } from 'react'
+import { Upload } from './icons'
 
 interface FileUploadProps {
   accept: string
@@ -57,6 +58,7 @@ export function FileUpload({ accept, onUpload, label, disabled = false }: FileUp
         onDragLeave={() => setIsDragOver(false)}
         onDrop={onDrop}
       >
+        <Upload size={22} className="upload-icon" />
         <label className="upload-label" htmlFor={`upload-${label.replace(/\s+/g, '-').toLowerCase()}`}>
           {label}
         </label>
@@ -82,7 +84,7 @@ export function FileUpload({ accept, onUpload, label, disabled = false }: FileUp
         onClick={handleUpload}
         disabled={disabled || isUploading || !selectedFile}
       >
-        {isUploading ? 'Uploading...' : 'Upload'}
+        {isUploading ? 'Uploading…' : 'Upload file'}
       </button>
     </div>
   )

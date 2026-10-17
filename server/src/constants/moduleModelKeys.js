@@ -169,6 +169,12 @@ const MODULE_MODEL_KEYS = Object.freeze({
     'LibraryBookReview',
     'LibraryReadingChallenge',
   ]),
+  appnt: Object.freeze([
+    'Student',
+    'AppointmentHost',
+    'Appointment',
+    'AppointmentSettings',
+  ]),
   cpitl: Object.freeze([
     'Student',
     'TransportVehicle',
@@ -209,6 +215,7 @@ const MODULE_FEATURE_KEYS = Object.freeze({
   mdcl: Object.freeze(getModuleFeatureKeys('mdcl')),
   asets: Object.freeze(getModuleFeatureKeys('asets')),
   libry: Object.freeze(getModuleFeatureKeys('libry')),
+  appnt: Object.freeze(getModuleFeatureKeys('appnt')),
   cpitl: Object.freeze(getModuleFeatureKeys('cpitl')),
 });
 
@@ -280,6 +287,10 @@ const getActiveModelKeys = (featureToggles) => {
 
   if (isModuleActive('libry', featureToggles)) {
     keys.push(...MODULE_MODEL_KEYS.libry);
+  }
+
+  if (isModuleActive('appnt', featureToggles)) {
+    keys.push(...MODULE_MODEL_KEYS.appnt);
   }
 
   if (isModuleActive('cpitl', featureToggles)) {

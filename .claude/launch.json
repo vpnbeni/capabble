@@ -41,13 +41,15 @@
     },
     {
       "name": "admin",
-      "runtimeExecutable": "npm",
+      "runtimeExecutable": "npx",
       "runtimeArgs": [
-        "run",
-        "dev"
+        "vite",
+        "--port",
+        "5176",
+        "--strictPort"
       ],
       "cwd": "admin",
-      "port": 5174
+      "port": 5176
     },
     {
       "name": "schol",

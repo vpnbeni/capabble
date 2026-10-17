@@ -114,7 +114,7 @@ export function RemunerationPage() {
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
         <div style={{ padding: 18, borderBottom: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
           <div>
-            <div className="card-title" style={{ margin: 0 }}>Duty Types</div>
+            <div className="card-title" style={{ margin: 0 }}>Duty types</div>
             <div style={{ color: 'var(--text-secondary)', fontSize: 13, marginTop: 6 }}>
               Enter per-day rates in rupees (₹). These will be used by all tenants.
             </div>

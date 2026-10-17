@@ -89,6 +89,7 @@ const getHome = asyncHandler(async (req, res) => {
     fees: featureOn(req, 'cpitl_fees'),
     notices: featureOn(req, 'exmcl_centre_guidelines'),
     transport: featureOn(req, 'trnst_transport'),
+    appointments: featureOn(req, 'appnt_desk') && Boolean(req.models?.Appointment),
     profile: true
   }[section]));
 

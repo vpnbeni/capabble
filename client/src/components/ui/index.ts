@@ -10,6 +10,8 @@ export { Icon, Button, Badge, Progress, Ring, ColumnChart, Avatar } from './prim
 export type { Tone, ButtonProps, RingSegment, ColumnChartItem } from './primitives'
 export { TextField, TextArea, Select, Checkbox, Switch, RadioGroup } from './forms'
 export { Combobox } from './Combobox'
+export { SlotPicker } from './SlotPicker'
+export type { SlotPickerSlot } from './SlotPicker'
 export type { ComboboxOption } from './Combobox'
 export type { SelectOption } from './forms'
 export { Page, Card, StatCard, PageHeader, Tabs, FilterBar, EmptyState, Banner, DetailList, Figure, MetricTile, MetricTiles, Entity, CardToolbar, Pagination, PdfFrame } from './layout'

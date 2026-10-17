@@ -11,8 +11,12 @@ import {
   UserRound,
   Users,
 } from 'lucide-react'
-import { Button, Card, ColumnChart, EmptyState, Icon, Ring } from '@/components/ui'
+import { Badge, Button, Card, DataTable, EmptyState, Entity, Icon, Ring, ColumnChart, formatTime, type DataTableColumn } from '@/components/ui'
 import attndService from '@/services/attndService'
+import appntService, { type Appointment } from '@/services/appntService'
+import { usePermissions } from '@/hooks/usePermissions'
+import { isFeatureEnabledForPath } from '@/constants/featureAccess'
+import { STATUS_META } from '@/components/appnt/AppntUi'
 import { formatCount } from '@/components/students/studentFormat'
 import type { QuickAction } from './quickActions'
 
@@ -50,6 +54,22 @@ export const PrincipalDesk: React.FC<{ actions: QuickAction[]; onEditActions: ()
     queryFn: () => attndService.getDashboard(date.slice(0, 7), date),
     staleTime: 60_000,
   })
+  const { access } = usePermissions()
+  const appointmentsOn = isFeatureEnabledForPath('/appnt/today', access)
+  const appointments = useQuery({
+    queryKey: ['appnt', 'today', date],
+    queryFn: () => appntService.today(date),
+    enabled: appointmentsOn,
+    staleTime: 60_000,
+  })
+  const appt = appointments.data
+  const upcomingToday = (appt?.items || []).filter((a) => ['confirmed', 'checked_in', 'requested'].includes(a.status))
+  const pendingRequests = appt?.pendingRequests || 0
+  const appointmentColumns: DataTableColumn<Appointment>[] = [
+    { key: 'time', header: 'Time', width: 84, mobile: 'subtitle', render: (a) => <span className="is-num">{formatTime(a.startTime)}</span> },
+    { key: 'visitor', header: 'Visitor', mobile: 'title', render: (a) => <Entity primary={a.visitor.name} secondary={appt?.isHostView ? a.purpose : `with ${a.hostName}`} /> },
+    { key: 'status', header: 'Status', mobile: 'aside', render: (a) => <Badge tone={STATUS_META[a.status].tone}>{STATUS_META[a.status].label}</Badge> },
+  ]
   const students = attendance.data?.students
   const staff = attendance.data?.staff
   const attendanceRate = students ? rate(students.todayPresent, students.strength) : 0
@@ -84,8 +104,26 @@ export const PrincipalDesk: React.FC<{ actions: QuickAction[]; onEditActions: ()
           detail={staff ? `Of ${formatCount(staff.strength)} staff · marked absent today` : 'Loading staff attendance'}
           onClick={() => navigate('/attnd/staff-attendance')}
         />
-        <DeskMetric icon={CalendarDays} tone="orange" label="Appointments today" value="0" detail="No appointments scheduled" />
-        <DeskMetric icon={ClipboardCheck} tone="violet" label="Pending approvals" value="0" detail="Leave, bills and other requests" />
+        {appointmentsOn ? (
+          <DeskMetric
+            icon={CalendarDays}
+            tone="orange"
+            label="Appointments today"
+            value={appointments.isLoading ? '…' : formatCount(appt?.total || 0)}
+            detail={appt?.next ? `Next ${formatTime(appt.next.startTime)} · ${appt.next.visitorName}` : appt?.total ? 'No more today' : 'No appointments scheduled'}
+            onClick={() => navigate('/appnt/today')}
+          />
+        ) : (
+          <DeskMetric icon={CalendarDays} tone="orange" label="Appointments today" value="—" detail="Appointments are not set up" />
+        )}
+        <DeskMetric
+          icon={ClipboardCheck}
+          tone="violet"
+          label="Pending approvals"
+          value={formatCount(pendingRequests)}
+          detail={pendingRequests ? `Meeting ${pendingRequests === 1 ? 'request' : 'requests'} to answer` : 'Leave, bills and other requests'}
+          onClick={pendingRequests ? () => navigate('/appnt/appointments?status=requested') : undefined}
+        />
       </section>
 
       <section className="principal-main">
@@ -151,14 +189,36 @@ export const PrincipalDesk: React.FC<{ actions: QuickAction[]; onEditActions: ()
       </section>
 
       <section className="principal-queues">
-        <Card title="Pending approvals" action={<Button variant="tertiary" size="sm">View all</Button>}>
-          <EmptyState compact icon={CheckCircle2} title="No approvals waiting" body="Leave, bill and other approval requests will appear here." />
+        <Card
+          title="Pending approvals"
+          action={pendingRequests ? <Button variant="tertiary" size="sm" onClick={() => navigate('/appnt/appointments?status=requested')}>View all</Button> : undefined}
+        >
+          {pendingRequests ? (
+            <p className="principal-queue-copy"><strong className="is-num">{formatCount(pendingRequests)}</strong> meeting {pendingRequests === 1 ? 'request is' : 'requests are'} waiting for an answer.</p>
+          ) : <EmptyState compact icon={CheckCircle2} title="No approvals waiting" body="Leave, bill and other approval requests will appear here." />}
         </Card>
         <Card title="Teachers on leave" action={<Button variant="tertiary" size="sm" onClick={() => navigate('/attnd/staff-attendance')}>View attendance</Button>}>
           {staff?.todayAbsent ? <p className="principal-queue-copy"><strong className="is-num">{formatCount(staff.todayAbsent)}</strong> staff member{staff.todayAbsent === 1 ? '' : 's'} marked absent today.</p> : <EmptyState compact icon={UserRound} title="No staff marked absent" body="Staff attendance updates will show here." />}
         </Card>
-        <Card title="Today's appointments" action={<Button variant="tertiary" size="sm">View all</Button>}>
-          <EmptyState compact icon={Clock3} title="No appointments today" body="Parent, visitor and staff appointments will appear here." />
+        <Card
+          title="Today's appointments"
+          flush={upcomingToday.length > 0}
+          action={appointmentsOn ? <Button variant="tertiary" size="sm" onClick={() => navigate('/appnt/today')}>View all</Button> : undefined}
+        >
+          {!appointmentsOn ? (
+            <EmptyState compact icon={Clock3} title="Appointments are not set up" body="Ask your administrator to turn on Appointments for parent, visitor and staff meetings." />
+          ) : upcomingToday.length ? (
+            <DataTable
+              caption="Today's appointments"
+              columns={appointmentColumns}
+              rows={upcomingToday.slice(0, 5)}
+              getRowKey={(a) => a._id}
+              onRowClick={() => navigate('/appnt/today')}
+              density="compact"
+            />
+          ) : (
+            <EmptyState compact icon={Clock3} title="No appointments today" body="Parent, visitor and staff appointments will appear here." />
+          )}
         </Card>
       </section>
 

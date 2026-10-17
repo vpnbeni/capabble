@@ -195,11 +195,13 @@ export function MasterGuidelinesPage() {
 
   return (
     <div className="grid" style={{ gap: 24 }}>
+      <header className="page-header">
+        <h1 className="section-title">Master centre guidelines</h1>
+        <p className="page-subtitle">Uploading replaces the shared guidelines PDF for all tenants.</p>
+      </header>
+
       <section className="card">
-        <h1 className="section-title" style={{ marginBottom: 8 }}>Master Centre Guidelines</h1>
-        <p style={{ color: 'var(--text-secondary)', marginTop: 0, marginBottom: 8 }}>
-          Uploading replaces the shared guidelines PDF for all tenants.
-        </p>
+        <h2 className="card-title">Upload guidelines</h2>
 
         <p style={{ color: 'var(--text-secondary)', marginTop: 0 }}>
           Rollout only syncs guideline metadata records in tenant databases.
@@ -243,7 +245,7 @@ export function MasterGuidelinesPage() {
       </section>
 
       <section className="card">
-        <h2 className="card-title">Current Guideline</h2>
+        <h2 className="card-title">Current guideline</h2>
 
         {!currentGuideline && <div className="empty-state">No active guideline uploaded yet.</div>}
 
@@ -276,7 +278,7 @@ export function MasterGuidelinesPage() {
       </section>
 
       <section className="card">
-        <h2 className="card-title">All Uploaded Guidelines</h2>
+        <h2 className="card-title">All uploaded guidelines</h2>
         <DataTable
           columns={columns}
           data={guidelines}
@@ -287,7 +289,7 @@ export function MasterGuidelinesPage() {
       </section>
 
       <section className="card">
-        <h2 className="card-title">Parsed Structure Preview</h2>
+        <h2 className="card-title">Parsed structure preview</h2>
 
         {!selectedGuideline && <div className="empty-state">Select a guideline to preview parsed structure.</div>}
 

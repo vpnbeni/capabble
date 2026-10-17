@@ -1,0 +1,44 @@
+/* Appointments module. Tokens only; every class is scoped to .cb-app and prefixed ap-. */
+
+.cb-app .ap-toolbar { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+.cb-app .ap-toolbar .cb-field { width: auto; }
+.cb-app .ap-toolbar__date, .cb-app .ap-toolbar__actions { display: flex; align-items: center; gap: var(--space-2); }
+.cb-app .ap-filters { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+.cb-app .ap-filters .cb-field { width: auto; }
+
+.cb-app .ap-time { display: flex; flex-direction: column; font-variant-numeric: tabular-nums; }
+.cb-app .ap-time strong { font-weight: 600; }
+.cb-app .ap-time span { font-size: 12px; line-height: 16px; color: var(--ink-muted); }
+.cb-app .ap-host { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+
+.cb-app .ap-sheet-status { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+
+.cb-app .ap-timeline { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-3); }
+.cb-app .ap-timeline li { padding-left: var(--space-3); border-left: 2px solid var(--border); font-size: 13px; line-height: 18px; }
+.cb-app .ap-timeline p { margin: 2px 0 0; }
+
+.cb-app .ap-hours { display: flex; flex-direction: column; gap: var(--space-2); }
+.cb-app .ap-hours__row { display: grid; grid-template-columns: minmax(120px, 1fr) minmax(110px, 1fr) auto minmax(110px, 1fr) auto; align-items: center; gap: var(--space-2); }
+.cb-app .ap-hours__row--off { grid-template-columns: minmax(140px, 1fr) minmax(0, 2fr) auto; }
+.cb-app .ap-hours__row .cb-field { width: auto; min-width: 0; }
+
+.cb-app .ap-purposes { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+.cb-app .ap-purpose { display: inline-flex; align-items: center; gap: var(--space-1); padding: 2px var(--space-1) 2px var(--space-3); border: 1px solid var(--border-control); border-radius: var(--radius-full); font-size: 13px; line-height: 18px; background: var(--surface); }
+.cb-app .ap-purpose-add { display: flex; align-items: flex-end; gap: var(--space-2); }
+.cb-app .ap-purpose-add .cb-field { flex: 1; }
+
+.cb-app .ap-settings { max-width: 720px; }
+.cb-app .ap-report-range { display: flex; align-items: flex-end; gap: var(--space-2); flex-wrap: wrap; }
+.cb-app .ap-report-range .cb-field { width: auto; }
+
+@media (max-width: 640px) {
+  .cb-app .ap-toolbar { width: 100%; }
+  .cb-app .ap-toolbar__date { width: 100%; }
+  .cb-app .ap-toolbar__date .cb-field { flex: 1; }
+  .cb-app .ap-toolbar__actions { width: 100%; }
+  .cb-app .ap-toolbar__actions > * { flex: 1; }
+  .cb-app .ap-hours__row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .cb-app .ap-hours__row > .cb-muted { display: none; }
+  .cb-app .ap-hours__row--off { grid-template-columns: minmax(0, 1fr) auto; }
+  .cb-app .ap-hours__row--off > .cb-field:nth-child(2) { grid-column: 1 / -1; grid-row: 2; }
+}

@@ -8,7 +8,7 @@
  */
 export type PageModule =
   | 'core' | 'cntr' | 'exmcl' | 'timetable' | 'stdnt' | 'staaf' | 'attnd'
-  | 'trnst' | 'acdmc' | 'actvt' | 'mdcl' | 'asets' | 'cpitl'
+  | 'trnst' | 'acdmc' | 'actvt' | 'mdcl' | 'asets' | 'appnt' | 'cpitl'
 
 export type PageEntry = {
   title: string
@@ -91,6 +91,14 @@ export const PAGE_INDEX: PageEntry[] = [
   ...group('mdcl', [
     ['Medical cases', '/mdcl/cases', 'Medical', 'clinic infirmary health'],
     ['Medical supplies', '/mdcl/supplies', 'Medical', 'medicine stock'],
+  ]),
+  ...group('appnt', [
+    ['Today\'s appointments', '/appnt/today', 'Appointments', 'visitors front desk meeting parent check in walk-in'],
+    ['All appointments', '/appnt/appointments', 'Appointments', 'meetings bookings requests ptm parent'],
+    ['My availability', '/appnt/availability', 'Appointments', 'hours meeting times'],
+    ['Who takes appointments', '/appnt/hosts', 'Appointments', 'hosts principal teacher meeting'],
+    ['Appointment reports', '/appnt/reports', 'Appointments', 'no-show summary'],
+    ['Appointment settings', '/appnt/settings', 'Appointments', 'parent requests notice purposes'],
   ]),
   ...group('asets', [
     ['Asset overview', '/asets/dashboard', 'Assets', 'dashboard'],

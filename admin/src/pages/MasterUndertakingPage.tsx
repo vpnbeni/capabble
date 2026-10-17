@@ -152,11 +152,13 @@ export function MasterUndertakingPage() {
 
   return (
     <div className="grid" style={{ gap: 24 }}>
+      <header className="page-header">
+        <h1 className="section-title">Master undertaking form</h1>
+        <p className="page-subtitle">Upload the undertaking PDF and roll it out to all active tenants.</p>
+      </header>
+
       <section className="card">
-        <h1 className="section-title" style={{ marginBottom: 8 }}>Master Undertaking Form</h1>
-        <p style={{ color: 'var(--text-secondary)', marginTop: 0 }}>
-          Upload the undertaking PDF and roll it out to all active tenants.
-        </p>
+        <h2 className="card-title">Upload undertaking</h2>
 
         {error && <div className="error-text">{error}</div>}
         {success && <div className="success-text">{success}</div>}
@@ -196,7 +198,7 @@ export function MasterUndertakingPage() {
       </section>
 
       <section className="card">
-        <h2 className="card-title">Current Undertaking</h2>
+        <h2 className="card-title">Current undertaking</h2>
 
         {!currentUndertaking && <div className="empty-state">No active undertaking uploaded yet.</div>}
 
@@ -225,7 +227,7 @@ export function MasterUndertakingPage() {
       </section>
 
       <section className="card">
-        <h2 className="card-title">All Uploaded Undertakings</h2>
+        <h2 className="card-title">All uploaded undertakings</h2>
         <DataTable
           columns={columns}
           data={undertakings}

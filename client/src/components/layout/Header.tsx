@@ -538,6 +538,19 @@ const Header: React.FC<HeaderProps> = ({ isSidebarCollapsed, onToggleSidebar }) 
         const info = titleMap[subPage] || { title: 'Library', subtitle: 'School library management.' }
         return { pageTitle: info.title, pageSubtitle: info.subtitle, showBackButton: false, backTo: null }
       }
+      case 'appnt': {
+        const subPage = segments[1] || ''
+        const titleMap: Record<string, { title: string; subtitle: string }> = {
+          today: { title: 'Appointments', subtitle: "Today's meetings with parents, visitors and staff." },
+          appointments: { title: 'All appointments', subtitle: 'Bookings, parent requests and past meetings.' },
+          hosts: { title: 'Who takes appointments', subtitle: 'The people who can be booked, and their hours.' },
+          availability: { title: 'My availability', subtitle: 'Your hours for meetings and your days off.' },
+          reports: { title: 'Appointment reports', subtitle: 'Meetings by person, purpose and outcome.' },
+          settings: { title: 'Appointment settings', subtitle: 'Parent requests, notice and purposes.' },
+        }
+        const info = titleMap[subPage] || { title: 'Appointments', subtitle: 'Meetings with parents, visitors and staff.' }
+        return { pageTitle: info.title, pageSubtitle: info.subtitle, showBackButton: false, backTo: null }
+      }
       case 'trnst': {
         const subPage = segments[1] || ''
         const titleMap: Record<string, { title: string; subtitle: string }> = {

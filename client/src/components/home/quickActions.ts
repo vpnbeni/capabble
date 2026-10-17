@@ -48,6 +48,7 @@ export const QUICK_ACTIONS: QuickAction[] = [
   { id: 'class-timetable', label: 'View class timetable', path: '/time-table/class-wise', icon: CalendarDays, permission: 'timetable.timetable.read' },
   { id: 'lesson-plan', label: 'Write a lesson plan', path: '/acdmc/lesson-plan', icon: PenLine, permission: 'acdmc.classwork.write' },
   { id: 'admit-cards', label: 'Print admit cards', path: '/exmcl/admit-cards', icon: Ticket, permission: 'exam.setup.read' },
+  { id: 'book-appointment', label: 'Book an appointment', path: '/appnt/today?book=1', icon: CalendarDays, permission: 'appnt.appointments.book' },
   { id: 'add-asset', label: 'Add an asset', path: '/asets/assets', icon: PackagePlus, permission: 'asets.assets.create' },
   { id: 'asset-maintenance', label: 'Log maintenance', path: '/asets/maintenance', icon: Wrench, permission: 'asets.assets.maintain' },
   { id: 'bus-routes', label: 'Manage bus routes', path: '/trnst/routes', icon: Bus, permission: 'trnst.transport.write' },

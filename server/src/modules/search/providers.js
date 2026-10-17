@@ -170,6 +170,24 @@ const PROVIDERS = [
     })
   },
   {
+    type: 'appointment',
+    label: 'Appointments',
+    modelKey: 'Appointment',
+    // Hosts without the view permission only see their own appointments in the module itself.
+    enabled: ({ toggles, can }) => on(toggles, 'appnt_desk') && can('appnt.appointments.view'),
+    fields: {
+      prefix: ['refNo', 'visitor.phone'],
+      contains: ['visitor.name', 'studentSnapshot.name']
+    },
+    select: 'refNo date startTime hostName status visitor.name studentSnapshot.name',
+    map: (doc) => ({
+      title: doc.visitor?.name || doc.refNo,
+      subtitle: join([doc.refNo, doc.date, doc.hostName && `with ${doc.hostName}`, doc.studentSnapshot?.name]),
+      path: withQuery('/appnt/appointments', doc.refNo),
+      badge: humanize(doc.status)
+    })
+  },
+  {
     type: 'candidate',
     label: 'Exam candidates',
     modelKey: 'Candidate',

@@ -1,0 +1,77 @@
+/* Platform admin sign-in. Design system tokens only (follows the light/dark theme on <body>); classes prefixed al-. */
+
+.cb-app .al-page {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-6);
+  padding: var(--space-6) var(--space-4);
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+}
+
+.cb-app .al-panel {
+  width: 100%;
+  max-width: 400px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  padding: var(--space-8);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.cb-app .al-brand { display: flex; align-items: center; gap: var(--space-2); }
+.cb-app .al-brand__mark { width: 28px; height: 28px; }
+.cb-app .al-brand__name { font: 600 16px/24px var(--font-sans); }
+.cb-app .al-brand__tag {
+  margin-left: auto;
+  padding: 2px var(--space-2);
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius-sm);
+  font: 500 12px/16px var(--font-sans);
+  color: var(--ink-muted);
+}
+
+.cb-app .al-head { display: flex; flex-direction: column; gap: var(--space-1); }
+.cb-app .al-title { margin: 0; font: 600 24px/32px var(--font-sans); letter-spacing: -.01em; }
+.cb-app .al-subtitle { margin: 0; font-size: 14px; line-height: 20px; color: var(--ink-muted); }
+
+.cb-app .al-form { display: flex; flex-direction: column; gap: var(--space-4); }
+.cb-app .al-form .cb-btn { margin-top: var(--space-2); }
+
+/* Show/hide password: an icon button inside the input, like the kit's affix. */
+.cb-app .al-reveal {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  margin-right: calc(var(--space-2) * -1);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink-muted);
+  cursor: pointer;
+}
+.cb-app .al-reveal:hover { background: var(--surface-hover); color: var(--ink); }
+.cb-app .al-reveal:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+
+.cb-app .al-foot { margin: 0; max-width: 400px; text-align: center; font-size: 12px; line-height: 16px; color: var(--ink-subtle); }
+
+/* The admin app's global input/button rules must not leak into the kit controls. */
+.cb-app .al-page .cb-input input { width: auto; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; font-size: 16px; }
+.cb-app .al-page .cb-btn { padding: 0 18px; font-weight: 500; }
+
+@media (max-width: 480px) {
+  .cb-app .al-panel { padding: var(--space-6) var(--space-5); }
+}
+
+.cb-app .al-theme { position: absolute; top: var(--space-4); right: var(--space-4); }

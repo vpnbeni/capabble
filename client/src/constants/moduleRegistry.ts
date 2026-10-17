@@ -11,8 +11,9 @@ import mdclIcon from '../assets/MDCL.png'
 import asetsIcon from '../assets/ASETS.png'
 import cpitlIcon from '../assets/CPITL.svg'
 import libryIcon from '../assets/LIBRY.svg'
+import appntIcon from '../assets/APPNT.svg'
 
-export type ModuleId = 'cntr' | 'exmcl' | 'timetable' | 'stdnt' | 'staaf' | 'attnd' | 'trnst' | 'acdmc' | 'actvt' | 'mdcl' | 'asets' | 'libry' | 'cpitl'
+export type ModuleId = 'cntr' | 'exmcl' | 'timetable' | 'stdnt' | 'staaf' | 'attnd' | 'trnst' | 'acdmc' | 'actvt' | 'mdcl' | 'asets' | 'libry' | 'appnt' | 'cpitl'
 
 export type ModuleDefinition = {
   id: ModuleId
@@ -85,6 +86,13 @@ export const MODULE_REGISTRY: ModuleDefinition[] = [
     title: 'Library Management',
     defaultRoute: '/libry/overview',
     icon: libryIcon,
+  },
+  {
+    id: 'appnt',
+    abbreviation: 'APPNT',
+    title: 'Appointments',
+    defaultRoute: '/appnt/today',
+    icon: appntIcon,
   },
   {
     id: 'cpitl',

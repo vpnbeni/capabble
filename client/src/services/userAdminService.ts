@@ -105,6 +105,19 @@ export interface StudentCandidate {
   hasParentLogin: boolean
 }
 
+/** Students in a class or section, and how many still need a login of the chosen kind. */
+export interface BulkClassCounts {
+  total: number
+  withoutLogin: number
+  /** Parents only: of those without a login, how many have no guardian email (they get skipped). */
+  missingGuardianEmail: number
+}
+
+export interface BulkClassOption extends BulkClassCounts {
+  className: string
+  sections: Array<BulkClassCounts & { section: string }>
+}
+
 export interface BulkPortalResult {
   created: Array<{
     userId: string
@@ -197,6 +210,10 @@ const userAdminService = {
   async studentCandidates(params: { search?: string; className?: string; section?: string }): Promise<StudentCandidate[]> {
     const response = await api.get('/users/candidates/students', { params })
     return response.data.data
+  },
+  async classOptions(kind: 'parent' | 'student'): Promise<BulkClassOption[]> {
+    const response = await api.get('/users/candidates/classes', { params: { kind } })
+    return response.data.data.classOptions
   },
   async auditLog(params: { userId?: string; page?: number }): Promise<{ events: AuditEvent[]; pagination: Pagination }> {
     const response = await api.get('/users/audit', { params })

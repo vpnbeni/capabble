@@ -13,7 +13,8 @@
     { "key": "trnst", "label": "Transport" },
     { "key": "asets", "label": "Assets" },
     { "key": "cpitl", "label": "Finance" },
-    { "key": "libry", "label": "Library" }
+    { "key": "libry", "label": "Library" },
+    { "key": "appnt", "label": "Appointments" }
   ],
   "actionLabels": {
     "read": "View",
@@ -38,7 +39,10 @@
     "expense_log": "Log expenses",
     "expense_void": "Void expenses",
     "budgets": "Budgets",
-    "payroll": "Payroll"
+    "payroll": "Payroll",
+    "book": "Book for anyone",
+    "host": "Take appointments (own only)",
+    "notes": "Read private meeting notes"
   },
   "resources": [
     { "key": "core.users", "module": "core", "label": "User logins and roles", "actions": ["read", "manage"] },
@@ -100,7 +104,15 @@
     { "key": "libry.stocktake", "module": "libry", "label": "Stock verification", "enforce": "route", "actions": ["view", "manage"] },
     { "key": "libry.audit", "module": "libry", "label": "Library audit history", "enforce": "route", "actions": ["view"] },
     { "key": "libry.digital", "module": "libry", "label": "Digital library", "enforce": "route", "actions": ["view", "manage"] },
-    { "key": "libry.reading", "module": "libry", "label": "Reading engagement", "enforce": "route", "actions": ["view", "manage", "log", "moderate"] }
+    { "key": "libry.reading", "module": "libry", "label": "Reading engagement", "enforce": "route", "actions": ["view", "manage", "log", "moderate"] },
+
+    {
+      "key": "appnt.appointments",
+      "module": "appnt",
+      "label": "Appointments and meeting hosts",
+      "enforce": "route",
+      "actions": ["view", "book", "manage", "host", "notes", "settings", "report"]
+    }
   ],
   "routes": [
     { "prefix": "/users", "resource": "core.users", "writeAction": "manage" },
@@ -181,7 +193,8 @@
     { "prefix": "/libry", "path": "^/digital-resources", "resource": "libry.digital" },
     { "prefix": "/libry", "path": "^/(reading-lists|reading-logs|reviews|challenges)", "resource": "libry.reading" },
     { "prefix": "/libry", "methods": ["POST"], "permission": "libry.catalogue.create" },
-    { "prefix": "/libry", "resource": "libry.catalogue", "readAction": "view", "writeAction": "edit" }
+    { "prefix": "/libry", "resource": "libry.catalogue", "readAction": "view", "writeAction": "edit" },
+    { "prefix": "/appnt", "resource": "appnt.appointments" }
   ],
   "features": {
     "dashboard": "core.dashboard.read",
@@ -211,6 +224,7 @@
     "cpitl_expenses": "cpitl.finance.view",
     "cpitl_payroll": "cpitl.finance.payroll",
     "libry_catalogue": "libry.catalogue.view",
+    "appnt_desk": ["appnt.appointments.view", "appnt.appointments.book", "appnt.appointments.host"],
     "centre_details": "exam.setup.read",
     "exam_functionaries": "staaf.staff.read",
     "centre_guidelines": "exam.setup.read",
@@ -281,7 +295,9 @@
         "actvt.activities.read", "actvt.activities.write",
         "mdcl.clinic.read", "trnst.transport.read",
         "asets.assets.view", "asets.assets.report", "libry.catalogue.view", "libry.catalogue.create", "libry.catalogue.edit", "libry.members.view", "libry.members.manage", "libry.circulation.view", "libry.circulation.manage", "libry.circulation.issue", "libry.circulation.return", "libry.circulation.renew", "libry.reservations.view", "libry.reservations.manage", "libry.fines.view", "libry.fines.assess", "libry.fines.waive", "libry.acquisitions.view", "libry.acquisitions.request", "libry.acquisitions.approve", "libry.acquisitions.manage", "libry.acquisitions.receive", "libry.reports.view", "libry.stocktake.view", "libry.stocktake.manage", "libry.audit.view", "libry.digital.view", "libry.digital.manage", "libry.reading.view", "libry.reading.manage", "libry.reading.log", "libry.reading.moderate",
-        "cpitl.finance.view"
+        "cpitl.finance.view",
+        "appnt.appointments.view", "appnt.appointments.book", "appnt.appointments.manage", "appnt.appointments.host",
+        "appnt.appointments.notes", "appnt.appointments.settings", "appnt.appointments.report"
       ]
     },
     {
@@ -367,7 +383,8 @@
         "asets.assets.view", "asets.assets.create", "asets.assets.edit", "asets.assets.allocate", "asets.assets.transfer",
         "asets.assets.maintain", "asets.assets.audit", "asets.assets.procure", "asets.assets.report",
         "cpitl.finance.view", "cpitl.finance.collect", "cpitl.finance.expense_log",
-        "libry.catalogue.view", "libry.catalogue.create", "libry.catalogue.edit", "libry.members.view", "libry.members.manage", "libry.circulation.view", "libry.circulation.manage", "libry.circulation.issue", "libry.circulation.return", "libry.circulation.renew", "libry.reservations.view", "libry.reservations.manage"
+        "libry.catalogue.view", "libry.catalogue.create", "libry.catalogue.edit", "libry.members.view", "libry.members.manage", "libry.circulation.view", "libry.circulation.manage", "libry.circulation.issue", "libry.circulation.return", "libry.circulation.renew", "libry.reservations.view", "libry.reservations.manage",
+        "appnt.appointments.view", "appnt.appointments.book", "appnt.appointments.manage", "appnt.appointments.report"
       ]
     },
     {
@@ -376,6 +393,12 @@
       "description": "Maintains the library catalogue and accession register.",
       "designations": ["librarian", "library"],
       "permissions": ["core.dashboard.read", "stdnt.students.read", "libry.catalogue.view", "libry.catalogue.create", "libry.catalogue.edit", "libry.members.view", "libry.members.manage", "libry.circulation.view", "libry.circulation.manage", "libry.circulation.issue", "libry.circulation.return", "libry.circulation.renew", "libry.reservations.view", "libry.reservations.manage", "libry.fines.view", "libry.fines.assess", "libry.acquisitions.view", "libry.acquisitions.request", "libry.acquisitions.manage", "libry.acquisitions.receive", "libry.reports.view", "libry.stocktake.view", "libry.stocktake.manage", "libry.digital.view", "libry.digital.manage", "libry.reading.view", "libry.reading.manage", "libry.reading.log", "libry.reading.moderate"]
+    },
+    {
+      "key": "appointment_host",
+      "name": "Appointment host",
+      "description": "Can be booked for meetings with parents and visitors. Sees and handles only their own appointments.",
+      "permissions": ["core.dashboard.read", "appnt.appointments.host"]
     },
     {
       "key": "transport_incharge",
@@ -393,7 +416,7 @@
     }
   ],
   "portal": {
-    "parent": ["profile", "attendance", "timetable", "results", "fees", "notices", "transport"],
+    "parent": ["profile", "attendance", "timetable", "results", "fees", "notices", "transport", "appointments"],
     "student": ["profile", "attendance", "timetable", "results", "notices", "transport"]
   }
 }

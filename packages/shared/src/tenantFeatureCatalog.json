@@ -584,6 +584,15 @@
     "fallbackPriority": 42
   },
   {
+    "key": "appnt_desk",
+    "label": "APPNT - Appointments",
+    "path": "/appnt/today",
+    "group": "Appointments Hub",
+    "module": "appnt",
+    "prefixes": ["/appnt"],
+    "fallbackPriority": 43
+  },
+  {
     "key": "billing",
     "label": "Billing",
     "path": "/billing",
