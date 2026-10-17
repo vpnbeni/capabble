@@ -9,6 +9,8 @@ const invoices = require('../services/invoiceService');
 const { getEntitlement } = require('../services/entitlementService');
 const sm = require('../domain/stateMachine');
 const HttpError = require('../utils/httpError');
+const pdf = require('../services/pdfService');
+const billingJob = require('../jobs/billingJob');
 
 const ok = (res, data, status = 200, message) => res.status(status).json({ success: true, data, ...(message ? { message } : {}) });
 
@@ -98,6 +100,40 @@ async function cancelSubscription(req, res) {
 
 async function resumeSubscription(req, res) {
   ok(res, await subscriptions.resume(req.actor, req.params.tenantSlug), 200, 'Cancellation withdrawn');
+}
+
+/* --------------------------------------------------------------------- PDFs */
+
+async function invoicePdf(req, res) {
+  const account = await accounts.requireAccount(req.params.tenantSlug);
+  const invoice = await invoices.getInvoice(req.params.invoiceId);
+  if (!invoice || invoice.accountId !== account.id) throw new HttpError(404, 'Invoice not found');
+  pdf.renderInvoice(res, invoice);
+}
+
+async function receiptPdf(req, res) {
+  const account = await accounts.requireAccount(req.params.tenantSlug);
+  const [payment] = await getDb().select().from(s.payments).where(and(eq(s.payments.id, req.params.paymentId), eq(s.payments.accountId, account.id)));
+  if (!payment || !payment.receiptNumber) throw new HttpError(404, 'Receipt not found');
+  const invoice = await invoices.getInvoice(payment.invoiceId);
+  pdf.renderReceipt(res, { payment, invoice });
+}
+
+async function creditNotePdf(req, res) {
+  const account = await accounts.requireAccount(req.params.tenantSlug);
+  const [note] = await getDb().select().from(s.creditNotes).where(and(eq(s.creditNotes.id, req.params.creditNoteId), eq(s.creditNotes.accountId, account.id)));
+  if (!note) throw new HttpError(404, 'Credit note not found');
+  const invoice = await invoices.getInvoice(note.invoiceId);
+  pdf.renderCreditNote(res, { note, invoice });
+}
+
+async function listTenantCreditNotes(req, res) {
+  const account = await accounts.requireAccount(req.params.tenantSlug);
+  ok(res, await invoices.listCreditNotes(account.id));
+}
+
+async function runJobs(_req, res) {
+  ok(res, await billingJob.runOnce());
 }
 
 /* -------------------------------------------------------------------- admin */
@@ -238,6 +274,11 @@ async function upsertCoupon(req, res) {
 }
 
 module.exports = {
+  invoicePdf,
+  receiptPdf,
+  creditNotePdf,
+  listTenantCreditNotes,
+  runJobs,
   onboardTenant,
   grandfatherTenantHandler,
   getTenantEntitlement,

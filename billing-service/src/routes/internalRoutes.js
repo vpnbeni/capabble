@@ -27,6 +27,10 @@ router.get('/tenant/:tenantSlug/catalog', asyncHandler(c.getCatalog));
 router.get('/tenant/:tenantSlug/invoices', asyncHandler(c.listTenantInvoices));
 router.get('/tenant/:tenantSlug/invoices/:invoiceId', asyncHandler(c.getTenantInvoice));
 router.get('/tenant/:tenantSlug/payments', asyncHandler(c.listTenantPayments));
+router.get('/tenant/:tenantSlug/credit-notes', asyncHandler(c.listTenantCreditNotes));
+router.get('/tenant/:tenantSlug/invoices/:invoiceId/pdf', asyncHandler(c.invoicePdf));
+router.get('/tenant/:tenantSlug/receipts/:paymentId/pdf', asyncHandler(c.receiptPdf));
+router.get('/tenant/:tenantSlug/credit-notes/:creditNoteId/pdf', asyncHandler(c.creditNotePdf));
 router.post('/tenant/:tenantSlug/profile', validate(v.profile), asyncHandler(c.updateTenantProfile));
 router.post('/tenant/:tenantSlug/subscription/preview', validate(v.selection), asyncHandler(c.previewSubscription));
 router.post('/tenant/:tenantSlug/subscription', validate(v.selection), asyncHandler(c.subscribe));
@@ -48,6 +52,7 @@ router.post('/admin/tenants/:tenantId/invoices/:invoiceId/payments/offline', val
 router.post('/admin/tenants/:tenantId/invoices/:invoiceId/void', validate(v.voidInput), asyncHandler(c.voidInvoice));
 router.post('/admin/tenants/:tenantId/invoices/:invoiceId/credit-notes', validate(v.creditNote), asyncHandler(pay.createCreditNote));
 router.post('/admin/tenants/:tenantId/autodebit', asyncHandler(pay.setupAutoDebit));
+router.post('/admin/jobs/run', asyncHandler(c.runJobs));
 router.get('/admin/audit', validate(v.auditQuery, 'query'), asyncHandler(c.listAudit));
 
 // Platform admin: catalog.

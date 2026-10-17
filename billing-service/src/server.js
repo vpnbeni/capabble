@@ -2,6 +2,7 @@ require('dotenv').config();
 
 const app = require('./app');
 const { ping, closeDb } = require('./db/client');
+const billingJob = require('./jobs/billingJob');
 
 const PORT = Number.parseInt(process.env.PORT || '5100', 10);
 
@@ -20,9 +21,11 @@ async function bootstrap() {
   const server = app.listen(PORT, () => {
     console.log(`[billing-service] running on port ${PORT}`);
   });
+  billingJob.start();
 
   const shutdown = async (signal) => {
     console.log(`[billing-service] ${signal} received, shutting down`);
+    billingJob.stop();
     server.close(async () => {
       await closeDb().catch(() => {});
       process.exit(0);

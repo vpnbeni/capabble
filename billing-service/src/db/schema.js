@@ -408,8 +408,18 @@ const notifications = billing.table('notifications', {
   sentAt: ts('sent_at').notNull().defaultNow(),
 }, (t) => [uniqueIndex('notifications_once_uq').on(t.accountId, t.kind, t.subjectId, t.dueOn)]);
 
+// A lease instead of an advisory lock: it works through Neon's transaction-mode pooler.
+const jobLeases = billing.table('job_leases', {
+  name: text('name').primaryKey(),
+  holder: text('holder').notNull().default(''),
+  lockedUntil: ts('locked_until').notNull().defaultNow(),
+  lastRunAt: ts('last_run_at'),
+  lastResult: jsonb('last_result'),
+});
+
 module.exports = {
   billing,
+  jobLeases,
   subscriptionState,
   billingInterval,
   collectionMode,
