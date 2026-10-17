@@ -189,13 +189,6 @@ async function voidInvoice(req, res) {
   ok(res, invoice, 200, `Invoice ${invoice.number} voided`);
 }
 
-// Overridden in paymentController once refunds go through the provider.
-async function createCreditNote(req, res) {
-  await requireInvoiceOfTenant(req.params.tenantId, req.params.invoiceId);
-  const result = await transaction((tx) => invoices.createCreditNote(tx, req.actor, req.params.invoiceId, req.body));
-  ok(res, result, 201, `Credit note ${result.creditNote.number} issued`);
-}
-
 async function listAudit(req, res) {
   const { accountId, entityType, entityId, limit } = req.query;
   const where = [];
@@ -268,7 +261,6 @@ module.exports = {
   updateTenantProfileAdmin,
   recordOfflinePayment,
   voidInvoice,
-  createCreditNote,
   listAudit,
   getAdminCatalog,
   upsertModule,

@@ -5,6 +5,10 @@ const attachActor = require('../middleware/actor');
 const validate = require('../middleware/validate');
 const v = require('../validation/schemas');
 const c = require('../controllers/internalController');
+const pay = require('../controllers/paymentController');
+const Joi = require('joi');
+
+const payNowBody = Joi.object({ invoiceId: Joi.string().guid(), callbackUrl: Joi.string().uri({ scheme: ['http', 'https'] }).max(500) });
 
 const router = express.Router();
 
@@ -28,6 +32,8 @@ router.post('/tenant/:tenantSlug/subscription/preview', validate(v.selection), a
 router.post('/tenant/:tenantSlug/subscription', validate(v.selection), asyncHandler(c.subscribe));
 router.post('/tenant/:tenantSlug/cancel', validate(v.cancel), asyncHandler(c.cancelSubscription));
 router.post('/tenant/:tenantSlug/resume', asyncHandler(c.resumeSubscription));
+router.post('/tenant/:tenantSlug/pay-now', validate(payNowBody), asyncHandler(pay.payNow));
+router.post('/tenant/:tenantSlug/pay-now/reconcile', validate(payNowBody), asyncHandler(pay.reconcile));
 
 // Platform admin: schools.
 router.get('/admin/tenants', validate(v.listQuery, 'query'), asyncHandler(c.listBillingTenants));
@@ -40,7 +46,8 @@ router.post('/admin/tenants/:tenantId/cancel', validate(v.cancel), asyncHandler(
 router.post('/admin/tenants/:tenantId/profile', validate(v.profile), asyncHandler(c.updateTenantProfileAdmin));
 router.post('/admin/tenants/:tenantId/invoices/:invoiceId/payments/offline', validate(v.offlinePayment), asyncHandler(c.recordOfflinePayment));
 router.post('/admin/tenants/:tenantId/invoices/:invoiceId/void', validate(v.voidInput), asyncHandler(c.voidInvoice));
-router.post('/admin/tenants/:tenantId/invoices/:invoiceId/credit-notes', validate(v.creditNote), asyncHandler(c.createCreditNote));
+router.post('/admin/tenants/:tenantId/invoices/:invoiceId/credit-notes', validate(v.creditNote), asyncHandler(pay.createCreditNote));
+router.post('/admin/tenants/:tenantId/autodebit', asyncHandler(pay.setupAutoDebit));
 router.get('/admin/audit', validate(v.auditQuery, 'query'), asyncHandler(c.listAudit));
 
 // Platform admin: catalog.

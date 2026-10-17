@@ -2,6 +2,7 @@ const express = require('express');
 const morgan = require('morgan');
 
 const internalRoutes = require('./routes/internalRoutes');
+const webhookRoutes = require('./routes/webhookRoutes');
 const errorHandler = require('./middleware/errorHandler');
 const { ping } = require('./db/client');
 
@@ -28,6 +29,7 @@ app.get('/health', async (_req, res) => {
   }
 });
 
+app.use('/webhooks', webhookRoutes);
 app.use('/internal', internalRoutes);
 
 app.use((req, res) => {
