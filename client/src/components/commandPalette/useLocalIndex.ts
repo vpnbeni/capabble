@@ -55,6 +55,7 @@ const RECORD_FILTERS: Array<RecordFilter & { features: string[] }> = [
   { type: 'room', label: 'Rooms', features: ['examrooms'] },
   { type: 'alumni', label: 'Alumni', features: ['almni_directory'] },
   { type: 'candidate', label: 'Candidates', features: ['candidates'] },
+  { type: 'appointment', label: 'Appointments', features: ['appnt_desk'] },
 ]
 
 export const useLocalIndex = () => {

@@ -20,4 +20,8 @@ module.exports = Object.freeze({
   // ── Timetable module ──────────────────────────────────────────────────────
   TIMETABLE_GENERATED: 'timetable:generated',
   TIMETABLE_PUBLISHED: 'timetable:published',
+
+  // ── Appointments module ───────────────────────────────────────────────────
+  APPOINTMENT_BOOKED: 'appnt:appointment:booked',
+  APPOINTMENT_STATUS_CHANGED: 'appnt:appointment:status_changed',
 });

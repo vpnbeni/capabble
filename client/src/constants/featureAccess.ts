@@ -47,7 +47,24 @@ const FEATURE_RULES = FEATURE_CATALOG.map(({ key, prefixes }) => ({
 
 // Opt-in features are hidden by default and only shown when explicitly enabled
 // by a platform admin. Add feature keys here to make them opt-in.
-const OPT_IN_FEATURES = new Set(['school_hub'])
+const OPT_IN_FEATURES = new Set(['school_hub', 'appnt_desk'])
+
+// Pages inside a feature that need a narrower permission than the feature itself.
+// Checked on top of the feature's toggle and permission.
+const PAGE_PERMISSIONS: Array<[prefix: string, permission: string | string[]]> = [
+  ['/appnt/today', ['appnt.appointments.view', 'appnt.appointments.host']],
+  ['/appnt/appointments', ['appnt.appointments.view', 'appnt.appointments.host']],
+  ['/appnt/hosts', ['appnt.appointments.settings', 'appnt.appointments.view', 'appnt.appointments.book']],
+  ['/appnt/availability', 'appnt.appointments.host'],
+  ['/appnt/reports', 'appnt.appointments.report'],
+  ['/appnt/settings', 'appnt.appointments.settings'],
+]
+
+const isPagePermitted = (pathname: string, can?: PermissionChecker): boolean => {
+  if (!can) return true
+  const rule = PAGE_PERMISSIONS.find(([prefix]) => matchesPrefix(pathname, prefix))
+  return !rule || can(rule[1])
+}
 
 const FALLBACK_ROUTE_PRIORITY = FEATURE_CATALOG
   .filter((entry) => typeof entry.fallbackPriority === 'number')
@@ -102,7 +119,7 @@ export const isFeatureEnabledForPath = (pathname: string, input: AccessInput): b
       && isFeaturePermitted(entry.key, can))
   }
 
-  return isToggleOn(featureKey, toggles) && isFeaturePermitted(featureKey, can)
+  return isToggleOn(featureKey, toggles) && isFeaturePermitted(featureKey, can) && isPagePermitted(pathname, can)
 }
 
 export const getFirstEnabledPath = (input: AccessInput): string | null => {
@@ -123,6 +140,7 @@ const MODULE_PATH_ROOTS: Array<[prefix: string, module: string]> = [
   ['/mdcl', 'mdcl'],
   ['/asets', 'asets'],
   ['/libry', 'libry'],
+  ['/appnt', 'appnt'],
   ['/cpitl', 'cpitl'],
   ['/trnst', 'trnst'],
   ['/exmcl', 'exmcl'],

@@ -147,6 +147,7 @@ import {
   AsetsReports,
   AsetsSettings,
 } from './pages/asets/AsetsWorkflowPages'
+import { AppntToday, AppntList, AppntHosts, AppntAvailability, AppntReports, AppntSettings } from './pages/appnt/AppntPages'
 import { LibryOverview, LibryCatalogue, LibryInventory, LibryCirculation, LibryMembers, LibryAcquisitions, LibryStocktakes, LibryReports, LibryAudit, LibryDigitalLibrary, LibryReading, LibryBarcodeDesk } from './pages/libry/LibryPages'
 import CpitlDashboard from './pages/cpitl/CpitlDashboard'
 import CpitlFeeStructures from './pages/cpitl/CpitlFeeStructures'
@@ -475,6 +476,13 @@ function App() {
               <Route path="libry/reading" element={<LibryReading />} />
               <Route path="libry/barcode-desk" element={<LibryBarcodeDesk />} />
               <Route path="libry" element={<Navigate to="/libry/overview" replace />} />
+              <Route path="appnt/today" element={<AppntToday />} />
+              <Route path="appnt/appointments" element={<AppntList />} />
+              <Route path="appnt/hosts" element={<AppntHosts />} />
+              <Route path="appnt/availability" element={<AppntAvailability />} />
+              <Route path="appnt/reports" element={<AppntReports />} />
+              <Route path="appnt/settings" element={<AppntSettings />} />
+              <Route path="appnt" element={<Navigate to="/appnt/today" replace />} />
               <Route path="cpitl/dashboard" element={<CpitlDashboard />} />
               <Route path="cpitl/fee-structures" element={<CpitlFeeStructures />} />
               <Route path="cpitl/fee-structures/:id" element={<CpitlFeeStructureDetail />} />

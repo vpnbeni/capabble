@@ -1,6 +1,9 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { featuresAdminApi } from '../services/platformApi'
 import type { TenantFeaturePage, TenantWithFeatureSummary } from '../types/platform'
+import { Dialog } from '../components/Dialog'
+import { MODULE_REGISTRY } from '@capabble/modules'
+import { ChevronRight, LayoutGrid, Search } from '../components/icons'
 
 const SUPPLEMENTAL_FEATURE_PAGES: TenantFeaturePage[] = [
   { key: 'pwd_info', label: 'PwD Info', path: '/pwd-info', group: 'Centre Records', module: 'cntr' },
@@ -12,447 +15,322 @@ const SUPPLEMENTAL_FEATURE_PAGES: TenantFeaturePage[] = [
   { key: 'remuneration', label: 'Remuneration', path: '/remuneration', group: 'Centre Records', module: 'cntr' },
 ]
 
+/** Order on this page, with one line on what each module covers. */
+const MODULES: Array<{ key: string; description: string }> = [
+  { key: 'core', description: 'Dashboard, billing and account settings' },
+  { key: 'stdnt', description: 'Student records, classes and alumni' },
+  { key: 'staaf', description: 'Staff records' },
+  { key: 'attnd', description: 'Student and staff attendance' },
+  { key: 'timetable', description: 'Timetable, bell timings and allocation' },
+  { key: 'acdmc', description: 'Curriculum, lesson plans and homework' },
+  { key: 'exmcl', description: 'School exams, results and report cards' },
+  { key: 'cntr', description: 'CBSE exam centre operations' },
+  { key: 'actvt', description: 'Houses, clubs and events' },
+  { key: 'appnt', description: 'Parent, visitor and staff meetings' },
+  { key: 'cpitl', description: 'Fees, expenses and payroll' },
+  { key: 'trnst', description: 'Vehicles and routes' },
+  { key: 'libry', description: 'Catalogue and circulation' },
+  { key: 'asets', description: 'School assets and stock' },
+  { key: 'mdcl', description: 'Medical cases and supplies' },
+]
+
+// Codes, names and icons come from the school app's module switcher, so both apps match.
+const REGISTRY = new Map(MODULE_REGISTRY.map((module) => [module.id as string, module]))
+const moduleIdentity = (key: string) => {
+  const entry = REGISTRY.get(key)
+  if (entry) return { code: entry.abbreviation, label: entry.title, icon: entry.icon as string | null }
+  if (key === 'core') return { code: 'CORE', label: 'Core', icon: null }
+  return { code: key.toUpperCase(), label: key, icon: null }
+}
+
+const DEFAULT_TARGET = 'default'
+
 const mergeFeaturePages = (pages: TenantFeaturePage[]): TenantFeaturePage[] => {
   const byKey = new Map<string, TenantFeaturePage>()
-
   pages.forEach((page) => byKey.set(page.key, page))
   SUPPLEMENTAL_FEATURE_PAGES.forEach((page) => {
-    if (!byKey.has(page.key)) {
-      byKey.set(page.key, page)
-    }
+    if (!byKey.has(page.key)) byKey.set(page.key, page)
   })
-
   return Array.from(byKey.values())
 }
 
+/** "ExmCl - Centre Details" → "Centre details"; "Time Table - Classes" → "Classes". */
+const pageName = (label: string) => {
+  const name = label.includes(' - ') ? label.slice(label.indexOf(' - ') + 3) : label
+  return name.charAt(0).toUpperCase() + name.slice(1)
+}
+
+const errorMessage = (err: unknown, fallback: string) =>
+  (err as { response?: { data?: { message?: string } } })?.response?.data?.message || fallback
+
+const isOn = (toggles: Record<string, boolean>, key: string) => toggles[key] !== false
+
+/** Design-system switch; `mixed` shows a module with some pages on. */
+function Switch({ checked, mixed = false, label, disabled, onChange }: {
+  checked: boolean
+  mixed?: boolean
+  label: string
+  disabled?: boolean
+  onChange: (next: boolean) => void
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={mixed ? 'mixed' : checked}
+      aria-label={label}
+      disabled={disabled}
+      className={`cb-switch__track${checked ? ' is-on' : ''}${mixed ? ' is-mixed' : ''}`}
+      onClick={(event) => {
+        event.stopPropagation()
+        onChange(mixed ? true : !checked)
+      }}
+    >
+      <span className="cb-switch__thumb" />
+    </button>
+  )
+}
+
 export function FeaturesPage() {
-  const [search, setSearch] = useState('')
   const [pages, setPages] = useState<TenantFeaturePage[]>([])
   const [tenants, setTenants] = useState<TenantWithFeatureSummary[]>([])
-  const [selectedTenantId, setSelectedTenantId] = useState<string>('')
-  const [defaultToggles, setDefaultToggles] = useState<Record<string, boolean>>({})
+  const [target, setTarget] = useState<string>(DEFAULT_TARGET)
   const [toggles, setToggles] = useState<Record<string, boolean>>({})
-  const [loading, setLoading] = useState(false)
-  const [defaultLoading, setDefaultLoading] = useState(false)
-  const [detailLoading, setDetailLoading] = useState(false)
-  const [defaultSavingKey, setDefaultSavingKey] = useState<string | null>(null)
-  const [savingKey, setSavingKey] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [query, setQuery] = useState('')
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({})
+  const [confirmOff, setConfirmOff] = useState(false)
   const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
+  const [notice, setNotice] = useState('')
 
-  const selectedTenant = useMemo(
-    () => tenants.find((tenant) => tenant._id === selectedTenantId) || null,
-    [selectedTenantId, tenants],
-  )
+  const isDefault = target === DEFAULT_TARGET
+  const tenant = tenants.find((row) => row._id === target) || null
+  const targetName = isDefault ? 'new schools' : tenant?.name || tenant?.slug || 'this school'
 
-  const groupedPages = useMemo(() => {
-    return pages.reduce<Record<string, TenantFeaturePage[]>>((acc, page) => {
-      if (!acc[page.group]) {
-        acc[page.group] = []
-      }
-      acc[page.group].push(page)
-      return acc
-    }, {})
-  }, [pages])
-
-  const showSuccess = (message: string) => {
-    setSuccess(message)
-    window.setTimeout(() => setSuccess(''), 3000)
+  const flash = (message: string) => {
+    setNotice(message)
+    window.setTimeout(() => setNotice(''), 2500)
   }
 
-  const loadPages = async () => {
-    const response = await featuresAdminApi.listPages()
-    setPages(mergeFeaturePages(response))
-  }
-
-  const loadDefaultFeatures = async () => {
-    setDefaultLoading(true)
-    try {
-      const response = await featuresAdminApi.getDefaultFeatures()
-      setDefaultToggles(response.toggles)
-    } finally {
-      setDefaultLoading(false)
-    }
-  }
-
-  const loadTenants = async (searchText = search) => {
-    const response = await featuresAdminApi.listTenants(searchText)
-    setTenants(response)
-
-    if (response.length > 0 && !response.some((item) => item._id === selectedTenantId)) {
-      setSelectedTenantId(response[0]._id)
-    }
-  }
-
-  const loadTenantFeatures = async (tenantId: string) => {
-    setDetailLoading(true)
-    try {
-      const response = await featuresAdminApi.getTenantFeatures(tenantId)
-      setToggles(response.toggles)
-    } finally {
-      setDetailLoading(false)
-    }
-  }
-
+  // Pages and schools once; the toggles each time the target changes.
   useEffect(() => {
-    setLoading(true)
-    Promise.all([loadPages(), loadDefaultFeatures(), loadTenants('')])
-      .catch((err: unknown) => {
-        const message = typeof err === 'object' && err && 'response' in err
-          ? ((err as { response?: { data?: { message?: string } } }).response?.data?.message || 'Failed to load features')
-          : 'Failed to load features'
-        setError(message)
+    Promise.all([featuresAdminApi.listPages(), featuresAdminApi.listTenants('')])
+      .then(([pageList, tenantList]) => {
+        setPages(mergeFeaturePages(pageList))
+        setTenants(tenantList)
       })
-      .finally(() => setLoading(false))
+      .catch((err) => setError(errorMessage(err, "Couldn't load features.")))
   }, [])
 
   useEffect(() => {
-    if (!selectedTenantId) return
-
-    loadTenantFeatures(selectedTenantId).catch((err: unknown) => {
-      const message = typeof err === 'object' && err && 'response' in err
-        ? ((err as { response?: { data?: { message?: string } } }).response?.data?.message || 'Failed to load tenant features')
-        : 'Failed to load tenant features'
-      setError(message)
-    })
-  }, [selectedTenantId])
-
-  const handleSearchSubmit = async (event: FormEvent) => {
-    event.preventDefault()
     setLoading(true)
     setError('')
-    try {
-      await loadTenants(search)
-    } catch (err: unknown) {
-      const message = typeof err === 'object' && err && 'response' in err
-        ? ((err as { response?: { data?: { message?: string } } }).response?.data?.message || 'Failed to search tenants')
-        : 'Failed to search tenants'
-      setError(message)
-    } finally {
-      setLoading(false)
-    }
-  }
+    const load = isDefault ? featuresAdminApi.getDefaultFeatures() : featuresAdminApi.getTenantFeatures(target)
+    load
+      .then((response) => setToggles(response.toggles))
+      .catch((err) => setError(errorMessage(err, "Couldn't load this school's features.")))
+      .finally(() => setLoading(false))
+  }, [target, isDefault])
 
-  const saveToggles = async (nextToggles: Record<string, boolean>, successMessage: string, key: string | null) => {
-    if (!selectedTenantId) return
-
-    setSavingKey(key)
+  const save = useCallback(async (next: Record<string, boolean>, message: string) => {
+    const previous = toggles
+    setToggles(next)
+    setSaving(true)
     setError('')
     try {
-      const response = await featuresAdminApi.updateTenantFeatures(selectedTenantId, nextToggles)
+      const response = isDefault
+        ? await featuresAdminApi.updateDefaultFeatures(next)
+        : await featuresAdminApi.updateTenantFeatures(target, next)
       setToggles(response.toggles)
-      showSuccess(successMessage)
-      await loadTenants(search)
-    } catch (err: unknown) {
-      const message = typeof err === 'object' && err && 'response' in err
-        ? ((err as { response?: { data?: { message?: string } } }).response?.data?.message || 'Failed to update features')
-        : 'Failed to update features'
-      setError(message)
-      throw err
-    } finally {
-      setSavingKey(null)
-    }
-  }
-
-  const saveDefaultToggles = async (
-    nextToggles: Record<string, boolean>,
-    successMessage: string,
-    key: string | null,
-  ) => {
-    setDefaultSavingKey(key)
-    setError('')
-    try {
-      const response = await featuresAdminApi.updateDefaultFeatures(nextToggles)
-      setDefaultToggles(response.toggles)
-      showSuccess(successMessage)
-    } catch (err: unknown) {
-      const message = typeof err === 'object' && err && 'response' in err
-        ? ((err as { response?: { data?: { message?: string } } }).response?.data?.message || 'Failed to update default features')
-        : 'Failed to update default features'
-      setError(message)
-      throw err
-    } finally {
-      setDefaultSavingKey(null)
-    }
-  }
-
-  const handleToggle = async (featureKey: string, enabled: boolean) => {
-    const previous = toggles
-    const nextToggles = { ...previous, [featureKey]: enabled }
-    setToggles(nextToggles)
-
-    try {
-      await saveToggles(
-        nextToggles,
-        `Feature ${enabled ? 'enabled' : 'disabled'} successfully`,
-        featureKey,
-      )
-    } catch {
+      flash(message)
+      if (!isDefault) featuresAdminApi.listTenants('').then(setTenants).catch(() => undefined)
+    } catch (err) {
       setToggles(previous)
+      setError(errorMessage(err, "Couldn't save. Nothing was changed."))
+    } finally {
+      setSaving(false)
     }
+  }, [toggles, isDefault, target])
+
+  const modules = useMemo(() => {
+    const known = new Set(MODULES.map((m) => m.key))
+    const extra = [...new Set(pages.map((p) => p.module))].filter((key) => !known.has(key))
+    return [...MODULES, ...extra.map((key) => ({ key, description: '' }))]
+      .map((module) => ({ ...module, ...moduleIdentity(module.key), pages: pages.filter((p) => p.module === module.key) }))
+      .filter((module) => module.pages.length > 0)
+  }, [pages])
+
+  const needle = query.trim().toLowerCase()
+  const visibleModules = useMemo(() => {
+    if (!needle) return modules
+    return modules
+      .map((module) => (`${module.code} ${module.label}`.toLowerCase().includes(needle)
+        ? module
+        : { ...module, pages: module.pages.filter((p) => p.label.toLowerCase().includes(needle)) }))
+      .filter((module) => module.pages.length > 0)
+  }, [modules, needle])
+
+  const totalOn = pages.filter((p) => isOn(toggles, p.key)).length
+
+  const setMany = (keys: string[], value: boolean) => {
+    const next = { ...toggles }
+    keys.forEach((key) => { next[key] = value })
+    return next
   }
-
-  const handleToggleAll = async (enabled: boolean) => {
-    const previous = toggles
-    const nextToggles = pages.reduce<Record<string, boolean>>((acc, page) => {
-      acc[page.key] = enabled
-      return acc
-    }, {})
-    setToggles(nextToggles)
-
-    try {
-      await saveToggles(nextToggles, `All features ${enabled ? 'enabled' : 'disabled'} for tenant`, null)
-    } catch {
-      setToggles(previous)
-    }
-  }
-
-  const handleDefaultToggle = async (featureKey: string, enabled: boolean) => {
-    const previous = defaultToggles
-    const nextToggles = { ...previous, [featureKey]: enabled }
-    setDefaultToggles(nextToggles)
-
-    try {
-      await saveDefaultToggles(
-        nextToggles,
-        `Default feature ${enabled ? 'enabled' : 'disabled'} successfully`,
-        featureKey,
-      )
-    } catch {
-      setDefaultToggles(previous)
-    }
-  }
-
-  const handleDefaultToggleAll = async (enabled: boolean) => {
-    const previous = defaultToggles
-    const nextToggles = pages.reduce<Record<string, boolean>>((acc, page) => {
-      acc[page.key] = enabled
-      return acc
-    }, {})
-    setDefaultToggles(nextToggles)
-
-    try {
-      await saveDefaultToggles(
-        nextToggles,
-        `All default features ${enabled ? 'enabled' : 'disabled'}`,
-        null,
-      )
-    } catch {
-      setDefaultToggles(previous)
-    }
-  }
-
-  const renderFeatureGroups = (
-    currentToggles: Record<string, boolean>,
-    activeSavingKey: string | null,
-    onToggle: (featureKey: string, enabled: boolean) => void,
-    disabled: boolean,
-  ) => (
-    <div className="grid" style={{ gap: 14 }}>
-      {Object.entries(groupedPages).map(([groupName, groupItems]) => (
-        <div key={groupName} style={{ border: '1px solid var(--border-color)', borderRadius: 10, padding: 12 }}>
-          <h3 style={{ margin: '0 0 10px', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>{groupName}</h3>
-          <div className="grid" style={{ gap: 8 }}>
-            {groupItems.map((page) => {
-              const enabled = currentToggles[page.key] !== false
-              const isSaving = activeSavingKey === page.key
-
-              return (
-                <div
-                  key={page.key}
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: '1fr auto',
-                    gap: 12,
-                    alignItems: 'center',
-                    padding: '10px 12px',
-                    borderRadius: 8,
-                    border: '1px solid var(--border-color)',
-                    background: 'rgba(255, 255, 255, 0.02)',
-                  }}
-                >
-                  <div>
-                    <div style={{ fontWeight: 600 }}>{page.label}</div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{page.path}</div>
-                  </div>
-                  <button
-                    type="button"
-                    className={enabled ? 'secondary' : 'ghost'}
-                    disabled={disabled}
-                    onClick={() => onToggle(page.key, !enabled)}
-                    style={{ minWidth: 108 }}
-                  >
-                    {isSaving ? 'Saving...' : enabled ? 'Enabled' : 'Disabled'}
-                  </button>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      ))}
-    </div>
-  )
-
-  const defaultDisabledCount = Object.values(defaultToggles).filter((value) => value === false).length
-  const disabledCount = Object.values(toggles).filter((value) => value === false).length
 
   return (
-    <>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 28, gap: 16 }}>
-        <div>
-          <h1 className="section-title" style={{ marginBottom: 8 }}>Features</h1>
-          <p style={{ margin: 0, color: 'var(--text-secondary)' }}>
-            Enable or disable tenant pages for end users.
-          </p>
-        </div>
-        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-          {error && <span className="error-text" style={{ margin: 0 }}>{error}</span>}
-          {success && <span className="success-text" style={{ margin: 0 }}>{success}</span>}
-        </div>
-      </div>
+    <div className="grid" style={{ gap: 24 }}>
+      <header className="page-header">
+        <h1 className="section-title">Features</h1>
+        <p className="page-subtitle">Choose which modules and pages a school can use, or what new schools start with.</p>
+      </header>
 
-      <section className="card" style={{ marginBottom: 20 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, gap: 12 }}>
-          <div>
-            <h2 className="card-title" style={{ marginBottom: 6 }}>Default Features</h2>
-            <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-              Controls which pages are enabled for newly created tenants.
-              Existing tenants can still be updated manually below.
-            </p>
-            <p style={{ margin: '6px 0 0', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-              {defaultLoading
-                ? 'Loading default feature configuration...'
-                : `${defaultDisabledCount} disabled of ${pages.length}`}
-            </p>
+      <section className="card admin-list-card">
+        <div className="ft-toolbar">
+          <label className="ft-target">
+            <span className="input-label">Settings for</span>
+            <select value={target} onChange={(event) => { setTarget(event.target.value); setExpanded({}) }}>
+              <option value={DEFAULT_TARGET}>New schools (default)</option>
+              {tenants.map((row) => (
+                <option key={row._id} value={row._id}>
+                  {row.name || row.slug} ({row.slug})
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <div className="ft-search">
+            <Search size={16} className="ft-search__icon" />
+            <input
+              type="search"
+              aria-label="Find a module or page"
+              placeholder="Find a module or page"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+            />
           </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button
-              type="button"
-              className="ghost"
-              disabled={defaultLoading || defaultSavingKey !== null}
-              onClick={() => handleDefaultToggleAll(false)}
-            >
-              Disable All
+
+          <div className="ft-bulk">
+            <span className="admin-count">{loading ? 'Loading…' : `${totalOn} of ${pages.length} pages on`}</span>
+            <button type="button" className="ghost" disabled={loading || saving} onClick={() => setConfirmOff(true)}>
+              Turn all off
             </button>
             <button
               type="button"
               className="secondary"
-              disabled={defaultLoading || defaultSavingKey !== null}
-              onClick={() => handleDefaultToggleAll(true)}
+              disabled={loading || saving}
+              onClick={() => save(setMany(pages.map((p) => p.key), true), `Everything is on for ${targetName}.`)}
             >
-              Enable All
+              Turn all on
             </button>
           </div>
         </div>
 
-        {defaultLoading
-          ? <div className="empty-state">Loading default feature configuration...</div>
-          : renderFeatureGroups(defaultToggles, defaultSavingKey, handleDefaultToggle, defaultSavingKey !== null)}
+        {isDefault ? (
+          <p className="ft-note">Only schools created from now on start with these settings. Existing schools keep theirs.</p>
+        ) : null}
+        {error ? <div className="error-text ft-message" role="alert">{error}</div> : null}
+        {notice ? <div className="success-text ft-message" role="status">{notice}</div> : null}
+
+        <ul className="ft-modules" aria-busy={loading}>
+          {visibleModules.map((module) => {
+            const on = module.pages.filter((p) => isOn(toggles, p.key)).length
+            const all = on === module.pages.length
+            const none = on === 0
+            const single = module.pages.length === 1
+            const open = Boolean(expanded[module.key] || (needle && !single))
+            return (
+              <li key={module.key} className={`ft-module${open ? ' is-open' : ''}`}>
+                <div
+                  className={`ft-module__row${single ? '' : ' is-expandable'}`}
+                  onClick={single ? undefined : () => setExpanded((prev) => ({ ...prev, [module.key]: !prev[module.key] }))}
+                >
+                  {single ? <span className="ft-module__spacer" /> : (
+                    <button
+                      type="button"
+                      className="icon-button ft-module__chevron"
+                      aria-expanded={open}
+                      aria-label={`${open ? 'Hide' : 'Show'} ${module.code} ${module.label} pages`}
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        setExpanded((prev) => ({ ...prev, [module.key]: !prev[module.key] }))
+                      }}
+                    >
+                      <ChevronRight size={16} />
+                    </button>
+                  )}
+                  <span className="ft-module__icon" aria-hidden="true">
+                    {module.icon ? <img src={module.icon} alt="" /> : <LayoutGrid size={18} />}
+                  </span>
+                  <div className="ft-module__text">
+                    <span className="ft-module__name"><strong>{module.code}</strong> {module.label}</span>
+                    <span className="ft-module__meta">
+                      {single ? module.description : `${on} of ${module.pages.length} pages on${module.description ? ` · ${module.description}` : ''}`}
+                    </span>
+                  </div>
+                  <Switch
+                    checked={!none}
+                    mixed={!all && !none}
+                    label={`${module.code} ${module.label} for ${targetName}`}
+                    disabled={loading || saving}
+                    onChange={(next) => save(
+                      setMany(module.pages.map((p) => p.key), next),
+                      `${module.code} ${module.label} turned ${next ? 'on' : 'off'} for ${targetName}.`,
+                    )}
+                  />
+                </div>
+
+                {open && !single ? (
+                  <ul className="ft-pages">
+                    {module.pages.map((page) => {
+                      const pageOn = isOn(toggles, page.key)
+                      return (
+                        <li key={page.key} className="ft-page">
+                          <span className="ft-page__name" title={page.path}>{pageName(page.label)}</span>
+                          <Switch
+                            checked={pageOn}
+                            label={`${pageName(page.label)} for ${targetName}`}
+                            disabled={loading || saving}
+                            onChange={(next) => save({ ...toggles, [page.key]: next }, `${pageName(page.label)} turned ${next ? 'on' : 'off'}.`)}
+                          />
+                        </li>
+                      )
+                    })}
+                  </ul>
+                ) : null}
+              </li>
+            )
+          })}
+          {!loading && visibleModules.length === 0 ? (
+            <li className="cb-empty cb-empty--compact">
+              <p className="cb-empty__title">Nothing matches "{query}"</p>
+              <p className="cb-empty__body">Try a module code or name, such as CPITL or Attendance.</p>
+            </li>
+          ) : null}
+        </ul>
       </section>
 
-      <div className="grid grid-2" style={{ gap: 20 }}>
-        <section className="card">
-          <h2 className="card-title">Tenants</h2>
-          <form onSubmit={handleSearchSubmit} className="grid" style={{ gap: 12, marginBottom: 16 }}>
-            <input
-              placeholder="Search tenant slug, name or email..."
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-            />
-            <div style={{ display: 'flex', gap: 10 }}>
-              <button type="submit" className="secondary" disabled={loading} style={{ flex: 1 }}>
-                {loading ? 'Searching...' : 'Apply Filter'}
-              </button>
-              <button
-                type="button"
-                className="ghost"
-                onClick={() => {
-                  setSearch('')
-                  loadTenants('').catch(() => {
-                    setError('Failed to reset tenant list')
-                  })
-                }}
-              >
-                Clear
-              </button>
-            </div>
-          </form>
-
-          <div className="tenant-list" style={{ maxHeight: 480, overflowY: 'auto' }}>
-            {tenants.map((tenant) => {
-              const isSelected = tenant._id === selectedTenantId
-              return (
-                <button
-                  key={tenant._id}
-                  type="button"
-                  className={isSelected ? 'secondary' : 'ghost'}
-                  onClick={() => setSelectedTenantId(tenant._id)}
-                  style={{
-                    width: '100%',
-                    justifyContent: 'space-between',
-                    textAlign: 'left',
-                    padding: '10px 12px',
-                  }}
-                >
-                  <div>
-                    <div style={{ fontWeight: 600 }}>{tenant.slug}</div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{tenant.name}</div>
-                  </div>
-                  <span className="rollout-badge sm">
-                    {tenant.featureSummary?.disabled || 0} off
-                  </span>
-                </button>
-              )
-            })}
-            {tenants.length === 0 && (
-              <div className="empty-state">No tenants found.</div>
-            )}
-          </div>
-        </section>
-
-        <section className="card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, gap: 12 }}>
-            <div>
-              <h2 className="card-title" style={{ marginBottom: 6 }}>Page Access</h2>
-              <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-                {selectedTenant
-                  ? `${selectedTenant.slug} (${disabledCount} disabled of ${pages.length})`
-                  : 'Select a tenant to manage page access'}
-              </p>
-            </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button
-                type="button"
-                className="ghost"
-                disabled={!selectedTenant || detailLoading || savingKey !== null}
-                onClick={() => handleToggleAll(false)}
-              >
-                Disable All
-              </button>
-              <button
-                type="button"
-                className="secondary"
-                disabled={!selectedTenant || detailLoading || savingKey !== null}
-                onClick={() => handleToggleAll(true)}
-              >
-                Enable All
-              </button>
-            </div>
-          </div>
-
-          {!selectedTenant && (
-            <div className="empty-state">Select a tenant from the left list.</div>
-          )}
-
-          {selectedTenant && detailLoading && (
-            <div className="empty-state">Loading tenant feature configuration...</div>
-          )}
-
-          {selectedTenant && !detailLoading && (
-            renderFeatureGroups(toggles, savingKey, handleToggle, savingKey !== null)
-          )}
-        </section>
-      </div>
-    </>
+      <Dialog isOpen={confirmOff} onClose={() => setConfirmOff(false)} title={`Turn everything off for ${targetName}?`}>
+        <p style={{ marginTop: 0, color: 'var(--ink-muted)' }}>
+          {isDefault
+            ? 'New schools will start with every page hidden until you turn modules on.'
+            : 'Staff at this school lose access to every page straight away. You can turn modules back on at any time.'}
+        </p>
+        <div className="form-actions">
+          <button type="button" className="ghost" onClick={() => setConfirmOff(false)}>Keep as is</button>
+          <button
+            type="button"
+            className="danger"
+            onClick={() => {
+              setConfirmOff(false)
+              save(setMany(pages.map((p) => p.key), false), `Everything is off for ${targetName}.`)
+            }}
+          >
+            Turn everything off
+          </button>
+        </div>
+      </Dialog>
+    </div>
   )
 }

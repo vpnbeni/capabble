@@ -92,10 +92,12 @@ export function BillingTenantsPage() {
 
   return (
     <div style={{ display: 'grid', gap: 20 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
-        <h1 className="section-title" style={{ margin: 0 }}>Billing Tenants</h1>
+      <div className="page-head-row" style={{ marginBottom: 0 }}>
+        <h1 className="section-title" style={{ margin: 0 }}>Billing tenants</h1>
         <div style={{ display: 'flex', gap: 10 }}>
           <input
+            type="search"
+            aria-label="Search billing tenants"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             placeholder="Search tenant, slug, email"
@@ -107,16 +109,16 @@ export function BillingTenantsPage() {
       </div>
 
       {error && <div className="error-text">{error}</div>}
-      {success && <div style={{ color: 'var(--success)' }}>{success}</div>}
+      {success && <div className="success-text">{success}</div>}
 
       <div className="grid grid-2" style={{ alignItems: 'start' }}>
         <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <table className="data-table">
             <thead>
-              <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
-                <th style={{ textAlign: 'left', padding: '12px 16px' }}>Tenant</th>
-                <th style={{ textAlign: 'left', padding: '12px 16px' }}>State</th>
-                <th style={{ textAlign: 'left', padding: '12px 16px' }}>Access</th>
+              <tr>
+                <th>Tenant</th>
+                <th>State</th>
+                <th>Access</th>
               </tr>
             </thead>
             <tbody>
@@ -124,18 +126,14 @@ export function BillingTenantsPage() {
                 <tr
                   key={item.account._id}
                   onClick={() => setSelectedTenantId(item.account.tenantId)}
-                  style={{
-                    cursor: 'pointer',
-                    borderBottom: '1px solid var(--border-color)',
-                    backgroundColor: selectedTenantId === item.account.tenantId ? 'rgba(59,130,246,0.08)' : 'transparent',
-                  }}
+                  className={`clickable-row${selectedTenantId === item.account.tenantId ? ' is-selected' : ''}`}
                 >
-                  <td style={{ padding: '12px 16px' }}>
+                  <td>
                     <div style={{ fontWeight: 600 }}>{item.account.tenantName}</div>
                     <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>{item.account.tenantSlug}</div>
                   </td>
-                  <td style={{ padding: '12px 16px' }}>{item.entitlement.state}</td>
-                  <td style={{ padding: '12px 16px' }}>{item.entitlement.accessMode}</td>
+                  <td>{item.entitlement.state}</td>
+                  <td>{item.entitlement.accessMode}</td>
                 </tr>
               ))}
               {items.length === 0 && (
@@ -197,22 +195,22 @@ export function BillingTenantsPage() {
               </div>
 
               <div>
-                <h3 className="card-title" style={{ fontSize: 14, marginBottom: 8 }}>Recent Invoices</h3>
+                <h3 className="card-title" style={{ fontSize: 14, marginBottom: 8 }}>Recent invoices</h3>
                 <div style={{ maxHeight: 220, overflow: 'auto', border: '1px solid var(--border-color)', borderRadius: 8 }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <table className="data-table">
                     <thead>
-                      <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
-                        <th style={{ textAlign: 'left', padding: '8px 10px', fontSize: 12 }}>Invoice</th>
-                        <th style={{ textAlign: 'left', padding: '8px 10px', fontSize: 12 }}>Status</th>
-                        <th style={{ textAlign: 'left', padding: '8px 10px', fontSize: 12 }}>Amount</th>
+                      <tr>
+                        <th>Invoice</th>
+                        <th>Status</th>
+                        <th>Amount</th>
                       </tr>
                     </thead>
                     <tbody>
                       {details.invoices.map((invoice) => (
-                        <tr key={invoice._id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                          <td style={{ padding: '8px 10px', fontSize: 12 }}>{invoice.invoiceNo}</td>
-                          <td style={{ padding: '8px 10px', fontSize: 12 }}>{invoice.status}</td>
-                          <td style={{ padding: '8px 10px', fontSize: 12 }}>{formatMoney(invoice.totalMinor, invoice.currency)}</td>
+                        <tr key={invoice._id}>
+                          <td>{invoice.invoiceNo}</td>
+                          <td>{invoice.status}</td>
+                          <td>{formatMoney(invoice.totalMinor, invoice.currency)}</td>
                         </tr>
                       ))}
                     </tbody>

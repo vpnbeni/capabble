@@ -2,8 +2,8 @@ import React, { useEffect, useState } from 'react'
 import { classLabel } from '@/utils/classLabel'
 import toast from 'react-hot-toast'
 import { Printer, Users } from 'lucide-react'
-import { Banner, Button, DataTable, Dialog, RadioGroup, Sheet, TextField, type DataTableColumn } from '@/components/ui'
-import { useBulkPortalLogins } from '@/hooks/useUserAdmin'
+import { Banner, Button, DataTable, Dialog, RadioGroup, Select, Sheet, type DataTableColumn } from '@/components/ui'
+import { useBulkClassOptions, useBulkPortalLogins } from '@/hooks/useUserAdmin'
 import type { BulkPortalResult, CredentialMethod } from '@/services/userAdminService'
 import { errorMessage, printCredentialSlips } from './AccessUi'
 
@@ -24,6 +24,31 @@ const BulkPortalSheet: React.FC<{
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<BulkPortalResult | null>(null)
 
+  const classes = useBulkClassOptions(kind, open)
+  const classOptions = classes.data || []
+  const selectedClass = classOptions.find((option) => option.className === className)
+  const selectedCounts = selectedClass?.sections.find((option) => option.section === section) || selectedClass
+  // Parents with no guardian email are skipped, so they don't count as ready.
+  const ready = selectedCounts ? selectedCounts.withoutLogin - selectedCounts.missingGuardianEmail : 0
+
+  const selectionHint = (() => {
+    if (classes.isLoading) return 'Loading classes…'
+    if (classes.isError) return 'Could not load classes. Close this and try again.'
+    if (classOptions.length === 0) return 'No students on record yet. Add students first, then come back.'
+    if (!selectedCounts) return 'Students who already have a login are skipped.'
+    const where = classLabel(className, section)
+    const loginWord = kind === 'parent' ? 'a parent login' : 'a login'
+    if (selectedCounts.withoutLogin === 0) {
+      return `Every student in ${where} already has ${loginWord}.`
+    }
+    const noun = selectedCounts.total === 1 ? 'student' : 'students'
+    const verb = selectedCounts.withoutLogin === 1 ? "doesn't" : "don't"
+    const base = `${selectedCounts.withoutLogin} of ${selectedCounts.total} ${noun} in ${where} ${verb} have ${loginWord} yet.`
+    const missing = selectedCounts.missingGuardianEmail
+    if (!missing) return base
+    return `${base} ${missing} ${missing === 1 ? 'has' : 'have'} no guardian email and will be skipped.`
+  })()
+
   useEffect(() => {
     if (!open) return
     setClassName('')
@@ -34,12 +59,12 @@ const BulkPortalSheet: React.FC<{
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault()
-    if (!className.trim()) {
-      setError('Enter a class, for example 7')
+    if (!className) {
+      setError('Choose a class')
       return
     }
     try {
-      const data = await bulk.mutateAsync({ kind, className: className.trim(), section: section.trim() || undefined, method })
+      const data = await bulk.mutateAsync({ kind, className, section: section || undefined, method })
       setResult(data)
       onClose()
       toast.success(`${data.created.length} login${data.created.length === 1 ? '' : 's'} created`)
@@ -80,30 +105,49 @@ const BulkPortalSheet: React.FC<{
         footer={
           <>
             <Button variant="secondary" onClick={onClose}>Cancel</Button>
-            <Button variant="primary" type="submit" loading={bulk.isPending}>Create logins</Button>
+            <Button
+              variant="primary"
+              type="submit"
+              loading={bulk.isPending}
+              disabled={Boolean(selectedCounts) && ready === 0}
+            >
+              Create logins
+            </Button>
           </>
         }
       >
         <div className="cb-form-section">
-          <div className="cb-form-grid">
-            <TextField
+          {/* Stacked, not a grid: the option labels carry counts and get cut off side by side. */}
+          <div className="ua-bulk-pickers">
+            <Select
               label="Class"
-              placeholder="e.g. 7"
+              placeholder={classes.isLoading ? 'Loading classes…' : 'Choose class'}
+              disabled={classes.isLoading || classOptions.length === 0}
+              options={classOptions.map((option) => ({
+                value: option.className,
+                label: `${classLabel(option.className)} · ${option.withoutLogin} without a login`,
+              }))}
               value={className}
               error={error || undefined}
               onChange={(event) => {
                 setClassName(event.target.value)
+                setSection('')
                 setError(null)
               }}
             />
-            <TextField
+            <Select
               label="Section (optional)"
               placeholder="All sections"
+              disabled={!selectedClass || selectedClass.sections.length === 0}
+              options={(selectedClass?.sections || []).map((option) => ({
+                value: option.section,
+                label: `${option.section} · ${option.withoutLogin} without a login`,
+              }))}
               value={section}
               onChange={(event) => setSection(event.target.value)}
             />
           </div>
-          <p className="cb-muted">Students who already have a login are skipped.</p>
+          <p className="cb-muted">{selectionHint}</p>
         </div>
         <div className="cb-form-section">
           <div className="cb-form-section__title">How they get their password</div>

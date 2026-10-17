@@ -13,6 +13,26 @@ import { RemunerationPage } from './pages/RemunerationPage'
 import { PackingDispatchPage } from './pages/PackingDispatchPage'
 import { platformAuthApi } from './services/platformApi'
 import type { PlatformAdmin } from './types/platform'
+import LoginScreen from './components/LoginScreen'
+import { ThemeToggle } from './components/ThemeToggle'
+import { useTheme } from './theme'
+import mark from '@capabble/brand/capabble-mark.svg'
+import {
+  BookOpen,
+  Building2,
+  CalendarDays,
+  ClipboardCheck,
+  CreditCard,
+  FileText,
+  IndianRupee,
+  LogOut,
+  MenuIcon,
+  Package,
+  RefreshCw,
+  School,
+  Tag,
+  ToggleRight,
+} from './components/icons'
 
 const getInitialPath = () => window.location.pathname || '/'
 
@@ -55,9 +75,26 @@ function App() {
   const [admin, setAdmin] = useState<PlatformAdmin | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [email, setEmail] = useState('admin.capabble')
-  const [password, setPassword] = useState('admin.capabble')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [currentPath, setCurrentPath] = useState(getInitialPath)
+  const [navOpen, setNavOpen] = useState(false)
+  const { theme, toggle: toggleTheme } = useTheme()
+
+  // The phone drawer closes on Escape and keeps the page behind it still.
+  useEffect(() => {
+    if (!navOpen) return undefined
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setNavOpen(false)
+    }
+    document.body.style.overflow = 'hidden'
+    window.addEventListener('keydown', onKey)
+    return () => {
+      document.body.style.overflow = ''
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [navOpen])
+
 
   const navigateTo = (path: string) => {
     if (window.location.pathname !== path) {
@@ -122,20 +159,35 @@ function App() {
     }
   }
 
-  const navItems = useMemo(
+  const navGroups = useMemo(
     () => [
-      { label: 'Tenants', icon: '[]', path: '/', matcher: (path: string) => path === '/' || path.startsWith('/tenants/') },
-      { label: 'Subjects', icon: '=', path: '/master-subjects', matcher: (path: string) => path === '/master-subjects' },
-      { label: 'Datesheet', icon: '#', path: '/master-datesheet', matcher: (path: string) => path === '/master-datesheet' },
-      { label: 'Guidelines', icon: '||', path: '/master-guidelines', matcher: (path: string) => path === '/master-guidelines' },
-      { label: 'Undertaking', icon: 'U', path: '/master-undertaking', matcher: (path: string) => path === '/master-undertaking' },
-      { label: 'Remuneration', icon: 'Rs', path: '/remuneration', matcher: (path: string) => path === '/remuneration' },
-      { label: 'Packing & Dispatch', icon: 'P', path: '/packing-dispatch', matcher: (path: string) => path === '/packing-dispatch' },
-      { label: 'Features', icon: 'F', path: '/features', matcher: (path: string) => path.startsWith('/features') },
-      { label: 'Rollouts', icon: 'R', path: '/rollouts', matcher: (path: string) => path.startsWith('/rollouts') },
-      { label: 'Billing Tenants', icon: '$', path: '/billing/tenants', matcher: (path: string) => path === '/billing/tenants' },
-      { label: 'Billing Catalog', icon: '%', path: '/billing/catalog', matcher: (path: string) => path === '/billing/catalog' },
-      { label: 'School Directory', icon: 'S', path: '/school-directory', matcher: (path: string) => path === '/school-directory' },
+      {
+        label: 'Schools',
+        items: [
+          { label: 'Tenants', icon: Building2, path: '/', matcher: (path: string) => path === '/' || path.startsWith('/tenants/') },
+          { label: 'School directory', icon: School, path: '/school-directory', matcher: (path: string) => path === '/school-directory' },
+          { label: 'Features', icon: ToggleRight, path: '/features', matcher: (path: string) => path.startsWith('/features') },
+          { label: 'Rollouts', icon: RefreshCw, path: '/rollouts', matcher: (path: string) => path.startsWith('/rollouts') },
+        ],
+      },
+      {
+        label: 'Exam master data',
+        items: [
+          { label: 'Subjects', icon: BookOpen, path: '/master-subjects', matcher: (path: string) => path === '/master-subjects' },
+          { label: 'Datesheet', icon: CalendarDays, path: '/master-datesheet', matcher: (path: string) => path === '/master-datesheet' },
+          { label: 'Guidelines', icon: FileText, path: '/master-guidelines', matcher: (path: string) => path === '/master-guidelines' },
+          { label: 'Undertaking', icon: ClipboardCheck, path: '/master-undertaking', matcher: (path: string) => path === '/master-undertaking' },
+          { label: 'Remuneration', icon: IndianRupee, path: '/remuneration', matcher: (path: string) => path === '/remuneration' },
+          { label: 'Packing and dispatch', icon: Package, path: '/packing-dispatch', matcher: (path: string) => path === '/packing-dispatch' },
+        ],
+      },
+      {
+        label: 'Billing',
+        items: [
+          { label: 'Billing tenants', icon: CreditCard, path: '/billing/tenants', matcher: (path: string) => path === '/billing/tenants' },
+          { label: 'Billing catalog', icon: Tag, path: '/billing/catalog', matcher: (path: string) => path === '/billing/catalog' },
+        ],
+      },
     ],
     [],
   )
@@ -196,86 +248,84 @@ function App() {
 
   if (!admin) {
     return (
-      <main className="auth-page">
-        <div className="card" style={{ width: '100%', maxWidth: 400 }}>
-          <div className="logo">
-            <span style={{ color: 'var(--accent)' }}>*</span>
-            <span className="logo-text">Capabble ADMIN</span>
-          </div>
-          <h1 className="card-title">Welcome back</h1>
-          <p style={{ color: 'var(--text-secondary)', marginBottom: 24, marginTop: -12 }}>
-            Sign in to manage your platform tenants.
-          </p>
-
-          {error && <div className="error-text">{error}</div>}
-
-          <form onSubmit={handleLogin} className="grid" style={{ gap: 16 }}>
-            <div className="input-group" style={{ marginBottom: 0 }}>
-              <label className="input-label">Username</label>
-              <input
-                type="text"
-                placeholder="admin.capabble"
-                autoComplete="username"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                required
-              />
-            </div>
-            <div className="input-group" style={{ marginBottom: 0 }}>
-              <label className="input-label">Password</label>
-              <input
-                type="password"
-                placeholder="admin.capabble"
-                autoComplete="current-password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                required
-              />
-            </div>
-            <button type="submit" className="primary" disabled={loading} style={{ marginTop: 8 }}>
-              {loading ? 'Signing in...' : 'Sign in'}
-            </button>
-          </form>
-        </div>
-      </main>
+      <LoginScreen
+        email={email}
+        password={password}
+        onEmailChange={setEmail}
+        onPasswordChange={setPassword}
+        onSubmit={handleLogin}
+        loading={loading}
+        error={error}
+        themeToggle={<ThemeToggle theme={theme} onToggle={toggleTheme} />}
+      />
     )
   }
 
+  const go = (path: string) => {
+    navigateTo(path)
+    setNavOpen(false)
+  }
+
   return (
-    <div className="layout">
-      <aside className="sidebar">
+    <div className={`layout${navOpen ? ' nav-open' : ''}`}>
+      <header className="topbar">
+        <button type="button" className="icon-button" aria-label="Open menu" aria-expanded={navOpen} onClick={() => setNavOpen(true)}>
+          <MenuIcon />
+        </button>
         <div className="logo">
-          <span style={{ color: 'var(--accent)' }}>*</span>
-          <span className="logo-text">Capabble ADMIN</span>
+          <img src={mark} alt="" />
+          <span className="logo-text">Capabble</span>
+          <span className="logo-tag">Platform admin</span>
+        </div>
+        <div className="topbar__end">
+          <ThemeToggle theme={theme} onToggle={toggleTheme} />
+        </div>
+      </header>
+
+      <div className="nav-backdrop" onClick={() => setNavOpen(false)} aria-hidden="true" />
+
+      <aside className="sidebar" aria-label="Platform admin">
+        <div className="logo">
+          <img src={mark} alt="" />
+          <span className="logo-text">Capabble</span>
+          <span className="logo-tag">Platform admin</span>
         </div>
 
-        <nav style={{ flex: 1 }}>
-          {navItems.map((item) => (
-            <a
-              key={item.path}
-              href="#"
-              className={`nav-link ${item.matcher(currentPath) ? 'active' : ''}`}
-              onClick={(event) => {
-                event.preventDefault()
-                navigateTo(item.path)
-              }}
-            >
-              <span style={{ fontSize: 18 }}>{item.icon}</span>
-              <span className="nav-text">{item.label}</span>
-            </a>
+        <nav className="nav">
+          {navGroups.map((group) => (
+            <div key={group.label} className="nav-group">
+              <div className="nav-group__label">{group.label}</div>
+              {group.items.map((item) => {
+                const active = item.matcher(currentPath)
+                const ItemIcon = item.icon
+                return (
+                  <a
+                    key={item.path}
+                    href={item.path}
+                    className={`nav-link${active ? ' active' : ''}`}
+                    aria-current={active ? 'page' : undefined}
+                    onClick={(event) => {
+                      event.preventDefault()
+                      go(item.path)
+                    }}
+                  >
+                    <ItemIcon />
+                    <span className="nav-text">{item.label}</span>
+                  </a>
+                )
+              })}
+            </div>
           ))}
         </nav>
 
         <div className="sidebar-footer">
           <div className="user-info">
-            <div className="user-avatar">{admin.email[0].toUpperCase()}</div>
-            <div className="user-name" style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              {admin.email}
-            </div>
+            <div className="user-avatar" aria-hidden="true">{admin.email[0].toUpperCase()}</div>
+            <div className="user-name" title={admin.email}>{admin.email}</div>
           </div>
-          <button className="ghost" onClick={handleLogout} style={{ width: '100%', justifyContent: 'flex-start' }}>
-            <span style={{ marginRight: 8 }}>X</span>
-            Logout
+          <ThemeToggle theme={theme} onToggle={toggleTheme} />
+          <button type="button" className="icon-button" onClick={handleLogout} aria-label="Sign out" title="Sign out">
+            <LogOut />
           </button>
         </div>
       </aside>

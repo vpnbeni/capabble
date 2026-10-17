@@ -71,6 +71,7 @@ Lucide (`lucide-react`), passed as components: `icon={Plus}`. 1.75 stroke is app
 - Choice by count: `RadioGroup` 2–5; `Select` ≤15; `Combobox` for long/searchable lists (students, teachers, subjects).
 - On/off: `Switch` applies immediately; `Checkbox` inside a saved form.
 - Dates: `TextField type="date"` (the system's DatePicker/Calendar aren't ported yet).
+- Times from a fixed set of slots: `SlotPicker`. A free-form time: `TextField type="time"`.
 
 ## Kit components (`import { … } from '@/components/ui'`)
 
@@ -95,12 +96,15 @@ Lucide (`lucide-react`), passed as components: `icon={Plus}`. 1.75 stroke is app
 | `Entity` | `primary, secondary` | First table column / list row |
 | `Button` | `variant: primary \| secondary \| tertiary \| danger, size: sm \| md \| lg, icon, iconRight, loading, fullWidth` | One primary per view. Card actions are `sm`/`tertiary` |
 | `Badge` | `tone, dot (default true), size: 'sm' \| 'lg'` | Status, 1–3 words |
+| `Ring` | `segments[{value,tone}], max, size: 'sm' \| 'lg', label, children` | Donut for a part-of-whole (present / absent / half day). Centre content in children; keep centre numbers ≤ 28px (lg) or 13px (sm). Never the only carrier of the number: legend or label beside it |
+| `ColumnChart` | `items[{label,value,caption,tone}], max, target{value,label}, unit, label` | Same measure across categories (attendance % per class). Fixed 0–max scale, value above each column, optional dashed target. Accent by default; warning/danger only for columns below target |
 | `Progress` | `value, max, label, valueLabel, showValue, tone, size: 'sm'` | Per-class figures: label + valueLabel ("12 of 30 topics"); stack in `.cb-progress-list` |
 | `Avatar` | `name, src, size, square` | People; school logo is `square` |
 | `Icon` | `icon, size, label` | Lucide glyph at system stroke |
 | `TextField` / `TextArea` | `label, hint, error, required` + input props; TextField `prefix, suffix, icon, size` | Every field has a visible label |
 | `Select` | `label, options (string \| {value,label,disabled}), placeholder, size` | Native dropdown |
 | `Combobox` | `options[{value,label,meta,keywords}], value, onChange, selectedLabel, clearable, placeholder` | Searchable picker; no free text |
+| `SlotPicker` | `slots[{start, end, state: 'free' \| 'busy' \| 'caution', reason}], value, onChange, allowCaution, loading, emptyText` + field chrome | Picking a time slot (appointments). Busy slots stay visible and struck through; `caution` (e.g. a teaching period) is dashed and pickable only with `allowCaution`. Not in the artifact yet: added to our kit |
 | `Checkbox` / `Switch` / `RadioGroup` | `checked, onChange(bool)`; RadioGroup `options, value, onChange, variant: 'list' \| 'cards'` | |
 | `Dialog` | `open, onClose, title, description, tone: 'default' \| 'danger', size: sm \| md \| lg, footer` | Confirmations, ≤4 fields |
 | `Sheet` | `open, onClose, title, description, icon, size: sm \| md \| lg \| xl, footer, onSubmit` | Forms; `onSubmit` wraps body+footer in a `<form>`. Bottom sheet on phones |

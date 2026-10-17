@@ -85,6 +85,8 @@ const {
   AssetSettings,
 } = require('../models/AssetRecords');
 const { LibraryTitle, LibraryCopy, LibraryMember, LibraryPolicy, LibraryLoan, LibraryReservation, LibraryFine, LibraryAcquisitionRequest, LibrarySupplier, LibraryPurchaseOrder, LibraryGoodsReceipt, LibraryStocktake, LibraryAuditLog, LibraryDigitalResource, LibraryReadingList, LibraryReadingLog, LibraryBookReview, LibraryReadingChallenge } = require('../models/LibraryRecords');
+const { AppointmentHost, Appointment, AppointmentSettings } = require('../models/AppointmentRecords');
+const { applyLazyCollections } = require('./lazyCollections');
 const {
   FeeHead,
   FeeStructure,
@@ -189,6 +191,9 @@ const tenantModelExports = {
   AssetStockItem,
   AssetStockTransaction,
   AssetSettings,
+  AppointmentHost,
+  Appointment,
+  AppointmentSettings,
   LibraryTitle,
   LibraryCopy,
   LibraryMember,
@@ -228,6 +233,8 @@ const tenantModelExports = {
 };
 
 const registerModelOnConnection = (modelExport, connection) => {
+  // Create the collection and its indexes on first write only (see lazyCollections.js).
+  applyLazyCollections(modelExport?.schema);
   if (modelExport && typeof modelExport.getModel === 'function') {
     return modelExport.getModel(connection);
   }

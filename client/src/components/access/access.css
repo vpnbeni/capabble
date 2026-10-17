@@ -48,5 +48,8 @@
   .cb-app .ua-matrix__row { grid-template-columns: minmax(0, 1fr); gap: var(--space-2); }
 }
 
+/* Bulk create: class and section pickers */
+.ua-bulk-pickers { display: flex; flex-direction: column; gap: var(--space-3); }
+
 /* Bulk results */
 .cb-app .ua-results { display: flex; flex-direction: column; gap: var(--space-4); }

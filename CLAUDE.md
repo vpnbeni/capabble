@@ -18,6 +18,7 @@ Each module is fully functional as a standalone product and supports integration
 | **STDNT** | Student Management | Manage students | Near-complete |
 | **EXMCL** | Internal Exams | Manage internal/class exams | Near-complete |
 | **ASETS** | Asset Management | School physical asset lifecycle: ownership, locations, allocations, stock, maintenance, audits, disposal | Done |
+| **APPNT** | Appointments | Parent, visitor and staff meetings: opt-in hosts with weekly hours, front-desk booking and walk-ins, check-in, private notes, family-portal requests; uses timetable (teaching periods busy), attendance (absent hosts) and students (guardian prefill) when active. Off by default per tenant (`appnt_desk`); hosts get the `appointment_host` role | Done |
 
 #### Planned
 | Code | Name | Description | Status |
@@ -142,6 +143,7 @@ npm run test                          # Jest tests with watch mode
 npm run lint:fix                      # ESLint with auto-fix
 npm run seed:subjects                 # Seed subjects only
 npm run bootstrap:platform            # Bootstrap platform admin + central DB
+npm run platform:admin -- --email <new> --password --apply  # Change platform admin login/password (prompts; dry run without --apply)
 npm run backfill:tenant-user-directory # Backfill tenant user directory
 ```
 

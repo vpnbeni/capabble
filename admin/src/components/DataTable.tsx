@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { useEffect, useMemo, useState } from 'react'
+import { ChevronLeft, ChevronRight, Inbox } from './icons'
 
 export interface DataTableColumn<T> {
   header: string
@@ -45,62 +46,62 @@ export function DataTable<T>({
   }, [page, totalPages])
 
   return (
-    <div>
-      <table className="data-table">
-        <thead>
-          <tr>
-            {columns.map((column) => (
-              <th key={column.header} className={column.className}>
-                {column.header}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {paginatedData.map((row, index) => {
-            const key = rowKey ? rowKey(row, index) : String(index)
+    <div className="cb-table-wrap admin-table">
+      <div className="cb-table-scroll">
+        <table className={`cb-table${onRowClick ? ' is-clickable' : ''}`}>
+          <thead>
+            <tr>
+              {columns.map((column) => (
+                <th key={column.header} className={column.className} scope="col">
+                  {column.header}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {paginatedData.map((row, index) => {
+              const key = rowKey ? rowKey(row, index) : String(index)
 
-            return (
-              <tr
-                key={key}
-                className={onRowClick ? 'clickable-row' : ''}
-                onClick={() => onRowClick?.(row)}
-              >
-                {columns.map((column) => {
-                  const value = typeof column.accessor === 'function'
-                    ? column.accessor(row)
-                    : ((row as Record<string, unknown>)[column.accessor as string] as ReactNode)
+              return (
+                <tr key={key} onClick={() => onRowClick?.(row)}>
+                  {columns.map((column) => {
+                    const value = typeof column.accessor === 'function'
+                      ? column.accessor(row)
+                      : ((row as Record<string, unknown>)[column.accessor as string] as ReactNode)
 
-                  return (
-                    <td key={column.header} className={column.className}>
-                      {value}
-                    </td>
-                  )
-                })}
-              </tr>
-            )
-          })}
-        </tbody>
-      </table>
+                    return (
+                      <td key={column.header} className={column.className}>
+                        {value ?? '—'}
+                      </td>
+                    )
+                  })}
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
 
-      {data.length === 0 && <div className="empty-state">{emptyMessage}</div>}
+      {data.length === 0 && (
+        <div className="cb-empty cb-empty--compact">
+          <span className="cb-empty__icon"><Inbox /></span>
+          <p className="cb-empty__body">{emptyMessage}</p>
+        </div>
+      )}
 
       {pageSize && totalPages > 1 && (
-        <div className="table-pagination">
-          <button type="button" className="ghost" disabled={page <= 1} onClick={() => setPage((prev) => prev - 1)}>
-            Previous
-          </button>
+        <div className="cb-table-foot">
           <span>
-            Page {page} of {totalPages}
+            Page {page} of {totalPages} · {data.length} rows
           </span>
-          <button
-            type="button"
-            className="ghost"
-            disabled={page >= totalPages}
-            onClick={() => setPage((prev) => prev + 1)}
-          >
-            Next
-          </button>
+          <div className="admin-table__pager">
+            <button type="button" className="icon-button" aria-label="Previous page" disabled={page <= 1} onClick={() => setPage((prev) => prev - 1)}>
+              <ChevronLeft />
+            </button>
+            <button type="button" className="icon-button" aria-label="Next page" disabled={page >= totalPages} onClick={() => setPage((prev) => prev + 1)}>
+              <ChevronRight />
+            </button>
+          </div>
         </div>
       )}
     </div>

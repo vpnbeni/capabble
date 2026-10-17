@@ -175,11 +175,13 @@ export function RolloutsPage() {
 
   return (
     <div className="grid" style={{ gap: 24 }}>
+      <header className="page-header">
+        <h1 className="section-title">Data rollouts</h1>
+        <p className="page-subtitle">Trigger module rollouts and track tenant-level rollout status.</p>
+      </header>
+
       <section className="card">
-        <h1 className="section-title" style={{ marginBottom: 8 }}>Data Rollouts</h1>
-        <p style={{ color: 'var(--text-secondary)', marginTop: 0 }}>
-          Trigger module rollouts and track tenant-level rollout status.
-        </p>
+        <h2 className="card-title">Start a rollout</h2>
 
         {error && <div className="error-text">{error}</div>}
         {success && <div className="success-text">{success}</div>}
@@ -187,7 +189,7 @@ export function RolloutsPage() {
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
           <button
             type="button"
-            className="primary"
+            className="secondary"
             onClick={() => initiateQuickRollout('subjects')}
             disabled={rollingOutModule !== null}
           >
@@ -195,7 +197,7 @@ export function RolloutsPage() {
           </button>
           <button
             type="button"
-            className="primary"
+            className="secondary"
             onClick={() => initiateQuickRollout('datesheet')}
             disabled={rollingOutModule !== null}
           >
@@ -203,7 +205,7 @@ export function RolloutsPage() {
           </button>
           <button
             type="button"
-            className="primary"
+            className="secondary"
             onClick={() => initiateQuickRollout('guidelines')}
             disabled={rollingOutModule !== null}
           >
@@ -211,7 +213,7 @@ export function RolloutsPage() {
           </button>
           <button
             type="button"
-            className="primary"
+            className="secondary"
             onClick={() => initiateQuickRollout('undertaking')}
             disabled={rollingOutModule !== null}
           >
@@ -221,7 +223,7 @@ export function RolloutsPage() {
       </section>
 
       <section className="card">
-        <h2 className="card-title">Rollout History</h2>
+        <h2 className="card-title">Rollout history</h2>
 
         {loading && <div className="empty-state">Loading rollouts...</div>}
 

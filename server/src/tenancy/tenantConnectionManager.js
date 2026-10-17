@@ -1,5 +1,6 @@
 const { getPlatformConnection } = require('../config/platformDatabase');
 const { registerTenantModels, getTenantModelKeys } = require('./registerTenantModels');
+const { disableAutoCreate, syncExistingIndexes } = require('./lazyCollections');
 
 const tenantRegistry = new Map();
 
@@ -23,6 +24,8 @@ const getOrCreateTenantContext = (dbName) => {
 
   const platformConnection = getPlatformConnection();
   const tenantConnection = platformConnection.useDb(dbName, { useCache: true });
+  // Collections are created on first write, not when a model is loaded (see lazyCollections.js).
+  disableAutoCreate(tenantConnection);
   const tenantContext = {
     connection: tenantConnection,
     models: {}
@@ -40,6 +43,7 @@ const getTenantConnectionAndModels = (dbName, modelKeys = null) => {
   if (missingKeys.length > 0) {
     const registeredModels = registerTenantModels(tenantContext.connection, missingKeys);
     Object.assign(tenantContext.models, registeredModels);
+    syncExistingIndexes(tenantContext.connection, registeredModels);
   }
 
   const requestedModels = {};

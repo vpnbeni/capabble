@@ -16,7 +16,16 @@ export const userAdminKeys = {
   audit: (userId?: string, page = 1) => [...userAdminKeys.all, 'audit', userId || 'all', page] as const,
   staffCandidates: (search: string) => [...userAdminKeys.all, 'staff-candidates', search] as const,
   studentCandidates: (params: Record<string, string>) => [...userAdminKeys.all, 'student-candidates', params] as const,
+  classOptions: (kind: string) => [...userAdminKeys.all, 'class-options', kind] as const,
 }
+
+/** Classes and sections with students, for the "Create for a class" pickers. */
+export const useBulkClassOptions = (kind: 'parent' | 'student', enabled: boolean) =>
+  useQuery({
+    queryKey: userAdminKeys.classOptions(kind),
+    queryFn: () => userAdminService.classOptions(kind),
+    enabled,
+  })
 
 export const useManagedUsers = (params: UserListParams) =>
   useQuery({

@@ -89,6 +89,12 @@ const TENANT_MODULE_CATALOG = Object.freeze({
     description: 'Library catalogue, accession register and circulation operations.',
     dependencies: ['core'],
   },
+  appnt: {
+    key: 'appnt',
+    label: 'APPNT — Appointments',
+    description: 'Parent, visitor and staff appointments: meeting hosts, availability, front desk check-in and family portal requests.',
+    dependencies: ['core'],
+  },
   cpitl: {
     key: 'cpitl',
     label: 'CPITL — Capital & Finance',
@@ -127,7 +133,7 @@ const createModuleToggles = (moduleKey, enabled) => {
 
 // Features listed here are disabled by default for new tenants.
 // Platform admins can enable them per-tenant from the admin panel.
-const FEATURES_DISABLED_BY_DEFAULT = new Set(['school_hub']);
+const FEATURES_DISABLED_BY_DEFAULT = new Set(['school_hub', 'appnt_desk']);
 
 const createAllEnabledFeatureToggles = () => {
   return TENANT_FEATURE_KEYS.reduce((acc, key) => {

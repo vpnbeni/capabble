@@ -4,8 +4,9 @@ import baseApi from '@/services/api'
 // Portal pages show their own empty/error states; skip the global toasts.
 const silent = (config?: AxiosRequestConfig): AxiosRequestConfig => ({ ...(config || {}), _silent: true } as AxiosRequestConfig)
 const get = (url: string, config?: AxiosRequestConfig) => baseApi.get(url, silent(config))
+const post = (url: string, data?: unknown) => baseApi.post(url, data, silent())
 
-export type PortalSection = 'profile' | 'attendance' | 'timetable' | 'results' | 'fees' | 'notices' | 'transport'
+export type PortalSection = 'profile' | 'attendance' | 'timetable' | 'results' | 'fees' | 'notices' | 'transport' | 'appointments'
 
 export interface PortalChild {
   studentId: string
@@ -125,6 +126,58 @@ export interface PortalTransport {
   routes?: Array<{ name: string; stops: Array<{ name: string; landmark?: string; pickupTime?: string; dropTime?: string }> }>
 }
 
+export type PortalAppointmentStatus = 'requested' | 'confirmed' | 'checked_in' | 'completed' | 'declined' | 'cancelled' | 'no_show'
+
+export interface PortalAppointment {
+  _id: string
+  refNo: string
+  date: string
+  startTime: string
+  endTime: string
+  hostName: string
+  mode: 'in_person' | 'phone' | 'video'
+  location?: string
+  purpose: string
+  agenda?: string
+  status: PortalAppointmentStatus
+  cancelReason?: string
+  studentSnapshot?: { name?: string; className?: string; section?: string }
+}
+
+export interface PortalAppointments {
+  items: PortalAppointment[]
+  allowRequests: boolean
+  purposes: string[]
+  minNoticeHours: number
+  maxAdvanceDays: number
+}
+
+export interface PortalAppointmentHost {
+  _id: string
+  displayName: string
+  title?: string
+  location?: string
+  slotMinutes: number
+  days: number[]
+}
+
+export interface PortalSlotDay {
+  date: string
+  closed: boolean
+  reason: string
+  slots: Array<{ start: string; end: string; open: boolean }>
+}
+
+export interface PortalAppointmentRequest {
+  hostId: string
+  date: string
+  startTime: string
+  purpose: string
+  agenda?: string
+  mode?: 'in_person' | 'phone' | 'video'
+  phone?: string
+}
+
 const student = (id: string) => `/portal/students/${encodeURIComponent(id)}`
 
 const portalService = {
@@ -138,6 +191,14 @@ const portalService = {
   transport: async (id: string): Promise<PortalTransport> => (await get(`${student(id)}/transport`)).data.data,
   notices: async (): Promise<PortalNotice[]> => (await get('/portal/notices')).data.data,
   notice: async (id: string): Promise<PortalNotice> => (await get(`/portal/notices/${encodeURIComponent(id)}`)).data.data,
+  appointments: async (): Promise<PortalAppointments> => (await get('/portal/appointments')).data.data,
+  appointmentHosts: async (id: string): Promise<PortalAppointmentHost[]> => (await get(`${student(id)}/appointment-hosts`)).data.data,
+  appointmentSlots: async (id: string, hostId: string, date: string): Promise<PortalSlotDay> =>
+    (await get(`${student(id)}/appointment-hosts/${encodeURIComponent(hostId)}/slots`, { params: { date } })).data.data,
+  requestAppointment: async (id: string, payload: PortalAppointmentRequest): Promise<PortalAppointment> =>
+    (await post(`${student(id)}/appointments`, payload)).data.data,
+  cancelAppointment: async (appointmentId: string, reason?: string): Promise<PortalAppointment> =>
+    (await post(`/portal/appointments/${encodeURIComponent(appointmentId)}/cancel`, { reason: reason || '' })).data.data,
   receiptPdf: async (studentId: string, paymentId: string): Promise<Blob> =>
     (await get(`${student(studentId)}/fees/receipts/${encodeURIComponent(paymentId)}`, { responseType: 'blob' })).data,
 }

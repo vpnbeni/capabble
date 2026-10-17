@@ -6,6 +6,7 @@ import {
   ArrowDown,
   ArrowUp,
   BookOpen,
+  CalendarDays,
   ClipboardList,
   Clock,
   CornerDownLeft,
@@ -55,6 +56,7 @@ const RECORD_ICONS: Record<SearchRecordType, LucideIcon> = {
   room: DoorOpen,
   alumni: School,
   candidate: ClipboardList,
+  appointment: CalendarDays,
 }
 
 type Filter = 'all' | 'pages' | SearchRecordType

@@ -12,7 +12,7 @@ jest.mock('../../services/billingServiceClient', () => ({ getTenantEntitlement: 
 const mongoose = require('mongoose');
 const User = require('../../models/User');
 const { login, buildLoginQuery } = require('../../controllers/authController');
-const { updateUser, createUser } = require('../../controllers/userAdminController');
+const { updateUser, createUser, listClassCandidates } = require('../../controllers/userAdminController');
 const { PermissionSet } = require('../permissions');
 
 const createRes = () => {
@@ -175,5 +175,42 @@ describe('user administration guardrails', () => {
     createUser(req, res, jest.fn());
     await flush();
     expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ errorCode: 'cannot_grant' }));
+  });
+});
+
+describe('class pickers for bulk logins', () => {
+  const lean = (rows) => ({ select: () => ({ lean: () => Promise.resolve(rows) }) });
+  const students = [
+    { rollNumber: 'A1', class: '10th', section: 'B', guardianEmail: 'a@x.test' },
+    { rollNumber: 'A2', class: '10th ', section: 'a', guardianEmail: '' },
+    { rollNumber: 'A3', class: '10TH', section: 'A', guardianEmail: '' },
+    { rollNumber: 'A4', class: '7th', section: 'A', guardianEmail: 'd@x.test' }
+  ];
+  const run = async (kind, users) => {
+    const req = {
+      query: { kind },
+      models: { Student: { find: jest.fn(() => lean(students)) }, User: { find: jest.fn(() => lean(users)) } }
+    };
+    const res = createRes();
+    listClassCandidates(req, res, jest.fn());
+    await flush();
+    return { req, data: res.json.mock.calls[0][0].data };
+  };
+
+  it('groups case-insensitively, sorts, and counts who still needs a login', async () => {
+    const { req, data } = await run('student', [{ linkedStudents: [{ rollNumber: 'A3' }] }]);
+    expect(req.models.User.find).toHaveBeenCalledWith({ kind: 'student' });
+    expect(data.classOptions.map((c) => c.className)).toEqual(['7th', '10th']);
+    const tenth = data.classOptions[1];
+    expect(tenth).toMatchObject({ total: 3, withoutLogin: 2 });
+    expect(tenth.sections).toEqual([
+      { section: 'a', total: 2, withoutLogin: 1, missingGuardianEmail: 0 },
+      { section: 'B', total: 1, withoutLogin: 1, missingGuardianEmail: 0 }
+    ]);
+  });
+
+  it('flags parents who would be skipped for having no guardian email', async () => {
+    const { data } = await run('parent', []);
+    expect(data.classOptions[1]).toMatchObject({ total: 3, withoutLogin: 3, missingGuardianEmail: 2 });
   });
 });

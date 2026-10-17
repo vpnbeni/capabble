@@ -13,6 +13,7 @@ import PortalResults from './pages/PortalResults'
 import PortalFees from './pages/PortalFees'
 import { PortalNoticeDetail, PortalNotices } from './pages/PortalNotices'
 import PortalTransport from './pages/PortalTransport'
+import PortalAppointments from './pages/PortalAppointments'
 import PortalProfile from './pages/PortalProfile'
 import PortalAccount from './pages/PortalAccount'
 import type { PortalSection } from './portalService'
@@ -55,6 +56,7 @@ const PortalApp: React.FC = () => {
           <Route path="notices" element={<Guard section="notices"><PortalNotices /></Guard>} />
           <Route path="notices/:id" element={<Guard section="notices"><PortalNoticeDetail /></Guard>} />
           <Route path="transport" element={<Guard section="transport"><PortalTransport /></Guard>} />
+          <Route path="appointments" element={<Guard section="appointments"><PortalAppointments /></Guard>} />
           <Route path="profile" element={<PortalProfile />} />
           <Route path="account" element={<PortalAccount />} />
           <Route path="*" element={<Navigate to="/portal" replace />} />

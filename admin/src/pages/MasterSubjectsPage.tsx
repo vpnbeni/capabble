@@ -210,11 +210,13 @@ export function MasterSubjectsPage() {
 
   return (
     <div className="grid" style={{ gap: 24 }}>
+      <header className="page-header">
+        <h1 className="section-title">Master subjects</h1>
+        <p className="page-subtitle">Upload one Excel/PDF file and roll out subjects to all active tenants.</p>
+      </header>
+
       <section className="card">
-        <h1 className="section-title" style={{ marginBottom: 8 }}>Master Subjects</h1>
-        <p style={{ color: 'var(--text-secondary)', marginTop: 0 }}>
-          Upload one Excel/PDF file and roll out subjects to all active tenants.
-        </p>
+        <h2 className="card-title">Upload subjects</h2>
 
         {error && <div className="error-text">{error}</div>}
         {success && <div className="success-text">{success}</div>}
@@ -287,7 +289,9 @@ export function MasterSubjectsPage() {
 
           <div className="input-group" style={{ marginBottom: 0, minWidth: 280, flex: '0 1 360px' }}>
             <input
-              placeholder="Search subject name or code..."
+              type="search"
+              aria-label="Search subjects"
+              placeholder="Search subject name or code"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
             />

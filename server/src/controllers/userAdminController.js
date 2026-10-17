@@ -28,6 +28,7 @@ const { revokeAllSessions } = require('../rbac/session');
 const { recordAuthEvent } = require('../rbac/audit');
 const { ensureUserIndexes } = require('../rbac/userIndexes');
 const { isPlaceholderEmail, realEmailOrEmpty } = require('../utils/placeholderEmail');
+const { sortClassNames, sortSectionNames } = require('../utils/sortSections');
 const {
   generateTemporaryPassword,
   createInvite,
@@ -755,6 +756,55 @@ const listStudentCandidates = handle(async (req, res) => {
   });
 });
 
+// GET /api/users/candidates/classes?kind=student|parent
+// Classes and sections that have active students, with how many still need a
+// login of that kind. Feeds the "Create for a class" pickers.
+const listClassCandidates = handle(async (req, res) => {
+  const { User, Student } = getModels(req);
+  if (!Student) return res.json({ success: true, data: { classOptions: [] } });
+  const kind = req.query.kind === USER_KINDS.PARENT ? USER_KINDS.PARENT : USER_KINDS.STUDENT;
+
+  const [students, users] = await Promise.all([
+    Student.find({ isActive: { $ne: false } }).select('rollNumber class section guardianEmail').lean(),
+    User.find({ kind }).select('linkedStudents.rollNumber').lean()
+  ]);
+  const hasLogin = new Set(users.flatMap((u) => (u.linkedStudents || []).map((l) => l.rollNumber)));
+
+  // Bulk create matches class and section case-insensitively, so group the same way.
+  const emptyCounts = () => ({ total: 0, withoutLogin: 0, missingGuardianEmail: 0 });
+  const classes = new Map();
+  students.forEach((student) => {
+    const className = String(student.class || '').trim();
+    const section = String(student.section || '').trim();
+    if (!className) return;
+    const classKey = className.toLowerCase();
+    if (!classes.has(classKey)) classes.set(classKey, { className, ...emptyCounts(), sections: new Map() });
+    const entry = classes.get(classKey);
+    const targets = [entry];
+    if (section) {
+      const sectionKey = section.toLowerCase();
+      if (!entry.sections.has(sectionKey)) entry.sections.set(sectionKey, { section, ...emptyCounts() });
+      targets.push(entry.sections.get(sectionKey));
+    }
+    const needsLogin = !hasLogin.has(student.rollNumber);
+    const noEmail = kind === USER_KINDS.PARENT && needsLogin && !String(student.guardianEmail || '').trim();
+    targets.forEach((target) => {
+      target.total += 1;
+      if (needsLogin) target.withoutLogin += 1;
+      if (noEmail) target.missingGuardianEmail += 1;
+    });
+  });
+
+  const classOptions = Array.from(classes.values())
+    .sort((a, b) => sortClassNames(a.className, b.className))
+    .map((entry) => ({
+      ...entry,
+      sections: Array.from(entry.sections.values())
+        .sort((a, b) => sortSectionNames(a.section, b.section, entry.className))
+    }));
+  res.json({ success: true, data: { classOptions } });
+});
+
 // GET /api/users/audit?userId=&page=
 const listAuditLog = handle(async (req, res) => {
   const { AuthAuditLog } = getModels(req);
@@ -782,6 +832,7 @@ module.exports = {
   bulkCreatePortalLogins,
   listStaffCandidates,
   listStudentCandidates,
+  listClassCandidates,
   listAuditLog,
   // exported for tests
   ADMIN_FILTER,

@@ -2,6 +2,8 @@ import { FormEvent, KeyboardEvent, useEffect, useMemo, useState } from 'react'
 import { Dialog } from '../components/Dialog'
 import { tenantAdminApi } from '../services/platformApi'
 import type { PlatformAdmin, Tenant } from '../types/platform'
+import { StatusBadge } from '../components/StatusBadge'
+import { Building2, ChevronLeft, ChevronRight, Plus } from '../components/icons'
 
 interface TenantDraft {
   name: string
@@ -23,7 +25,7 @@ const parseTenantIdFromPath = (pathname: string): string | null => {
 
 const buildTenantPath = (tenantId: string) => `/tenants/${tenantId}`
 
-export function TenantsPage({ admin, navigateTo, currentPath }: TenantsPageProps) {
+export function TenantsPage({ navigateTo, currentPath }: TenantsPageProps) {
   const [loading, setLoading] = useState(false)
   const [detailLoading, setDetailLoading] = useState(false)
   const [error, setError] = useState('')
@@ -37,7 +39,7 @@ export function TenantsPage({ admin, navigateTo, currentPath }: TenantsPageProps
   const [tenantDrafts, setTenantDrafts] = useState<Record<string, TenantDraft>>({})
   const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null)
   const [deleteSlugInput, setDeleteSlugInput] = useState('')
-  const [verifiedDeleteSlug, setVerifiedDeleteSlug] = useState('')
+  const [deleteError, setDeleteError] = useState('')
 
   const [newTenant, setNewTenant] = useState({
     slug: '',
@@ -236,42 +238,27 @@ export function TenantsPage({ admin, navigateTo, currentPath }: TenantsPageProps
 
   const openDeleteDialog = () => {
     setDeleteSlugInput('')
-    setVerifiedDeleteSlug('')
+    setDeleteError('')
     setIsDeleteDialogOpen(true)
   }
 
   const closeDeleteDialog = () => {
     setIsDeleteDialogOpen(false)
     setDeleteSlugInput('')
-    setVerifiedDeleteSlug('')
-  }
-
-  const handleVerifyDeleteSlug = () => {
-    if (!selectedTenant) return
-
-    const typedSlug = deleteSlugInput.trim().toLowerCase()
-    if (typedSlug !== selectedTenant.slug) {
-      setVerifiedDeleteSlug('')
-      setError('Entered slug does not match this tenant.')
-      return
-    }
-
-    setError('')
-    setVerifiedDeleteSlug(selectedTenant.slug)
-    refreshSuccess(`Slug ${selectedTenant.slug} verified. You can now delete this tenant.`)
+    setDeleteError('')
   }
 
   const handleDeleteTenant = async () => {
     if (!selectedTenant) return
 
     const typedSlug = deleteSlugInput.trim().toLowerCase()
-    if (typedSlug !== selectedTenant.slug || verifiedDeleteSlug !== selectedTenant.slug) {
-      setError('Please verify the tenant slug before deletion.')
+    if (typedSlug !== selectedTenant.slug.toLowerCase()) {
+      setDeleteError(`Type ${selectedTenant.slug} exactly to confirm.`)
       return
     }
 
     setIsDeleting(true)
-    setError('')
+    setDeleteError('')
 
     try {
       await tenantAdminApi.delete(selectedTenant._id, typedSlug)
@@ -283,9 +270,9 @@ export function TenantsPage({ admin, navigateTo, currentPath }: TenantsPageProps
     } catch (err: unknown) {
       if (typeof err === 'object' && err && 'response' in err) {
         const response = (err as { response?: { data?: { message?: string } } }).response
-        setError(response?.data?.message || 'Failed to delete tenant')
+        setDeleteError(response?.data?.message || "Couldn't delete the tenant. Nothing was removed.")
       } else {
-        setError('Failed to delete tenant')
+        setDeleteError("Couldn't delete the tenant. Nothing was removed.")
       }
     } finally {
       setIsDeleting(false)
@@ -300,14 +287,15 @@ export function TenantsPage({ admin, navigateTo, currentPath }: TenantsPageProps
     : null
 
   const filteredCount = tenants.length
-  const isDeleteVerified = Boolean(selectedTenant && verifiedDeleteSlug === selectedTenant.slug)
+  // The delete button enables as soon as the typed slug matches; no separate verify step.
+  const isDeleteVerified = Boolean(selectedTenant && deleteSlugInput.trim().toLowerCase() === selectedTenant.slug.toLowerCase())
 
   return (
     <>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 32 }}>
+      <div className="page-head-row">
         <div>
           <h1 className="section-title" style={{ marginBottom: 8 }}>
-            {isTenantDetailPage ? 'Tenant Details' : 'Platform Dashboard'}
+            {isTenantDetailPage ? 'Tenant details' : 'Tenants'}
           </h1>
           {isTenantDetailPage && selectedTenant && (
             <p style={{ margin: 0, color: 'var(--text-secondary)' }}>
@@ -315,7 +303,7 @@ export function TenantsPage({ admin, navigateTo, currentPath }: TenantsPageProps
             </p>
           )}
           {!isTenantDetailPage && (
-            <p style={{ margin: 0, color: 'var(--text-secondary)' }}>Signed in as {admin.email}</p>
+            <p className="page-subtitle">Schools using Capabble. Open one to edit its details or status.</p>
           )}
         </div>
 
@@ -326,10 +314,9 @@ export function TenantsPage({ admin, navigateTo, currentPath }: TenantsPageProps
             <button
               className="primary"
               onClick={() => setIsCreateDialogOpen(true)}
-              style={{ padding: '10px 20px', fontSize: '0.875rem' }}
             >
-              <span style={{ marginRight: 8, fontSize: 18 }}>+</span>
-              Create New Tenant
+              <Plus size={16} />
+              Create tenant
             </button>
           )}
         </div>
@@ -338,7 +325,7 @@ export function TenantsPage({ admin, navigateTo, currentPath }: TenantsPageProps
       <Dialog
         isOpen={isCreateDialogOpen}
         onClose={() => setIsCreateDialogOpen(false)}
-        title="Create New Tenant"
+        title="Create tenant"
       >
         <form onSubmit={handleCreateTenant} className="grid" style={{ gap: 20 }}>
           <div className="grid grid-2" style={{ gap: 16 }}>
@@ -408,41 +395,26 @@ export function TenantsPage({ admin, navigateTo, currentPath }: TenantsPageProps
               tenant database <strong style={{ color: 'var(--text-primary)' }}>{selectedTenant.dbName}</strong>.
             </p>
 
-            <div className="input-group" style={{ marginBottom: 0 }}>
-              <label className="input-label">Type tenant slug to confirm</label>
+            <label className="input-group" style={{ marginBottom: 0 }}>
+              <span className="input-label">
+                Type <strong style={{ color: 'var(--ink)' }}>{selectedTenant.slug}</strong> to confirm
+              </span>
               <input
-                placeholder={selectedTenant.slug}
+                autoFocus
+                autoComplete="off"
+                spellCheck={false}
                 value={deleteSlugInput}
                 onChange={(e) => {
                   setDeleteSlugInput(e.target.value)
-                  setVerifiedDeleteSlug('')
+                  setDeleteError('')
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && isDeleteVerified && !isDeleting) handleDeleteTenant()
                 }}
               />
-            </div>
+            </label>
 
-            <button
-              type="button"
-              className="secondary"
-              onClick={handleVerifyDeleteSlug}
-              disabled={isDeleting}
-            >
-              Verify Slug
-            </button>
-
-            {isDeleteVerified && (
-              <div
-                style={{
-                  border: '1px solid rgba(16, 185, 129, 0.35)',
-                  background: 'rgba(16, 185, 129, 0.1)',
-                  borderRadius: 8,
-                  padding: '10px 12px',
-                  fontSize: '0.875rem',
-                  color: 'var(--success)',
-                }}
-              >
-                Slug verified. Click "Delete Tenant" to permanently delete this tenant.
-              </div>
-            )}
+            {deleteError ? <div className="error-text" role="alert" style={{ margin: 0 }}>{deleteError}</div> : null}
 
             <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
               <button
@@ -456,16 +428,12 @@ export function TenantsPage({ admin, navigateTo, currentPath }: TenantsPageProps
               </button>
               <button
                 type="button"
+                className="danger"
                 onClick={handleDeleteTenant}
                 disabled={isDeleting || !isDeleteVerified}
-                style={{
-                  flex: 2,
-                  background: 'rgba(239, 68, 68, 0.2)',
-                  border: '1px solid rgba(239, 68, 68, 0.35)',
-                  color: 'var(--danger)',
-                }}
+                style={{ flex: 2 }}
               >
-                {isDeleting ? 'Deleting...' : 'Delete Tenant'}
+                {isDeleting ? 'Deleting…' : 'Delete tenant'}
               </button>
             </div>
           </div>
@@ -474,50 +442,50 @@ export function TenantsPage({ admin, navigateTo, currentPath }: TenantsPageProps
 
       {!isTenantDetailPage && (
         <>
-          <section className="card" style={{ marginBottom: 40 }}>
-            <h2 className="card-title">Global Search</h2>
-            <div className="grid" style={{ gap: 16 }}>
-              <div className="input-group" style={{ marginBottom: 0 }}>
-                <label className="input-label">Search Filter</label>
+          <section className="card admin-list-card">
+            <div className="admin-toolbar">
+              <form
+                className="admin-search"
+                role="search"
+                onSubmit={(event) => {
+                  event.preventDefault()
+                  loadTenants(search)
+                }}
+              >
                 <input
-                  placeholder="Filter by slug, name or email..."
+                  type="search"
+                  aria-label="Search tenants"
+                  placeholder="Search by slug, school name or email"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                 />
-              </div>
-              <div style={{ display: 'flex', gap: 12 }}>
-                <button
-                  type="button"
-                  className="secondary"
-                  onClick={() => loadTenants(search)}
-                  disabled={loading}
-                  style={{ flex: 1 }}
-                >
-                  {loading ? 'Searching...' : 'Apply Filter'}
+                <button type="submit" className="secondary" disabled={loading}>
+                  {loading ? 'Searching…' : 'Search'}
                 </button>
-                <button
-                  type="button"
-                  className="ghost"
-                  onClick={() => {
-                    setSearch('')
-                    loadTenants('')
-                  }}
-                >
-                  Clear
-                </button>
-              </div>
-              <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-                Showing {filteredCount} tenant records
-              </p>
-            </div>
-          </section>
-
-          <section>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-              <h2 className="card-title" style={{ margin: 0 }}>Tenants Management</h2>
+                {search ? (
+                  <button
+                    type="button"
+                    className="ghost"
+                    onClick={() => {
+                      setSearch('')
+                      loadTenants('')
+                    }}
+                  >
+                    Clear
+                  </button>
+                ) : null}
+              </form>
+              <span className="admin-count">{filteredCount} {filteredCount === 1 ? 'tenant' : 'tenants'}</span>
             </div>
 
-            <div className="tenant-list">
+            <div className="tenant-list tenant-list--flush">
+              <div className="tenant-item tenant-item--head" aria-hidden="true">
+                <div>Tenant</div>
+                <div>School</div>
+                <div>Admin email</div>
+                <div>Status</div>
+                <div />
+              </div>
               {tenants.map((tenant) => (
                 <div
                   key={tenant._id}
@@ -532,18 +500,18 @@ export function TenantsPage({ admin, navigateTo, currentPath }: TenantsPageProps
                     <div className="tenant-db">{tenant.dbName}</div>
                   </div>
                   <div>{tenant.name}</div>
-                  <div>{tenant.adminEmail}</div>
+                  <div className="tenant-email">{tenant.adminEmail}</div>
                   <div>
-                    <span className={`status-badge ${tenant.status}`}>{tenant.status}</span>
+                    <StatusBadge status={tenant.status} />
                   </div>
-                  <div style={{ textAlign: 'right', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
-                    Open ▸
-                  </div>
+                  <div className="tenant-open"><ChevronRight size={16} /></div>
                 </div>
               ))}
               {tenants.length === 0 && (
-                <div className="card" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>
-                  No tenants found matching your search.
+                <div className="cb-empty cb-empty--compact">
+                  <span className="cb-empty__icon"><Building2 /></span>
+                  <p className="cb-empty__title">No tenants match this search</p>
+                  <p className="cb-empty__body">Clear the search or try a different slug, name or email.</p>
                 </div>
               )}
             </div>
@@ -559,7 +527,7 @@ export function TenantsPage({ admin, navigateTo, currentPath }: TenantsPageProps
             onClick={() => navigateTo('/')}
             style={{ marginBottom: 20 }}
           >
-            ← Back to tenants
+            <ChevronLeft size={16} /> Back to tenants
           </button>
 
           {detailLoading && !selectedTenant && (
@@ -577,7 +545,7 @@ export function TenantsPage({ admin, navigateTo, currentPath }: TenantsPageProps
           {selectedTenant && selectedTenantDraft && (
             <div className="grid" style={{ gap: 24 }}>
               <div className="card">
-                <h2 className="card-title">Tenant Profile</h2>
+                <h2 className="card-title">Tenant profile</h2>
                 <div className="tenant-meta-grid" style={{ marginBottom: 24 }}>
                   <div>
                     <div className="input-label" style={{ marginBottom: 6 }}>Slug</div>
@@ -589,7 +557,7 @@ export function TenantsPage({ admin, navigateTo, currentPath }: TenantsPageProps
                   </div>
                   <div>
                     <div className="input-label" style={{ marginBottom: 6 }}>Status</div>
-                    <span className={`status-badge ${selectedTenant.status}`}>{selectedTenant.status}</span>
+                    <StatusBadge status={selectedTenant.status} />
                   </div>
                   <div>
                     <div className="input-label" style={{ marginBottom: 6 }}>Created</div>
@@ -630,13 +598,9 @@ export function TenantsPage({ admin, navigateTo, currentPath }: TenantsPageProps
                     </button>
                     <button
                       type="button"
-                      className="ghost"
+                      className="secondary"
                       onClick={() => handleStatusChange(selectedTenant)}
                       disabled={loading}
-                      style={{
-                        color: selectedTenant.status === 'active' ? 'var(--danger)' : 'var(--success)',
-                        borderColor: selectedTenant.status === 'active' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(16, 185, 129, 0.2)',
-                      }}
                     >
                       {selectedTenant.status === 'active' ? 'Suspend Tenant' : 'Activate Tenant'}
                     </button>
@@ -644,21 +608,17 @@ export function TenantsPage({ admin, navigateTo, currentPath }: TenantsPageProps
                 </div>
               </div>
 
-              <div className="card" style={{ borderColor: 'rgba(239, 68, 68, 0.35)' }}>
-                <h2 className="card-title" style={{ color: 'var(--danger)' }}>Danger Zone</h2>
+              <div className="card">
+                <h2 className="card-title">Delete tenant</h2>
                 <p style={{ marginTop: 0, marginBottom: 18, color: 'var(--text-secondary)' }}>
                   Delete this tenant from central records and permanently drop tenant database.
                 </p>
                 <button
                   type="button"
-                  className="ghost"
+                  className="secondary"
                   onClick={openDeleteDialog}
-                  style={{
-                    color: 'var(--danger)',
-                    borderColor: 'rgba(239, 68, 68, 0.4)',
-                  }}
                 >
-                  Delete Tenant
+                  Delete tenant…
                 </button>
               </div>
             </div>

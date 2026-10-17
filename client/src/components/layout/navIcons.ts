@@ -153,6 +153,13 @@ const BY_HREF: Record<string, LucideIcon> = {
   '/asets/reports': FileBarChart,
   '/asets/settings': Settings,
 
+  '/appnt/today': Clock,
+  '/appnt/appointments': CalendarDays,
+  '/appnt/availability': CalendarClock,
+  '/appnt/hosts': UserCheck,
+  '/appnt/reports': FileBarChart,
+  '/appnt/settings': Settings,
+
   '/cpitl/dashboard': Home,
   '/cpitl/collection': Banknote,
   '/cpitl/fee-structures': Layers,

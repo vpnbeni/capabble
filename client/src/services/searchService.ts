@@ -1,6 +1,6 @@
 import api from './api'
 
-export type SearchRecordType = 'student' | 'staff' | 'receipt' | 'asset' | 'subject' | 'room' | 'alumni' | 'candidate'
+export type SearchRecordType = 'student' | 'staff' | 'receipt' | 'asset' | 'subject' | 'room' | 'alumni' | 'candidate' | 'appointment'
 
 export interface SearchHit {
   id: string

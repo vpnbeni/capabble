@@ -72,7 +72,7 @@ export function PackingDispatchPage() {
   return (
     <form onSubmit={handleSubmit} style={{ display: 'grid', gap: 20 }}>
       <div>
-        <h1 className="section-title" style={{ marginBottom: 6 }}>Packing & Dispatch</h1>
+        <h1 className="section-title" style={{ marginBottom: 6 }}>Packing and dispatch</h1>
         <p style={{ color: 'var(--text-secondary)', margin: 0 }}>
           Configure shared exam-day packing colours and dispatch slip defaults for all tenants.
         </p>
@@ -84,7 +84,7 @@ export function PackingDispatchPage() {
       <div className="card" style={{ display: 'grid', gap: 20 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
           <div>
-            <div className="card-title" style={{ margin: 0 }}>Shared Settings</div>
+            <div className="card-title" style={{ margin: 0 }}>Shared settings</div>
             <div style={{ color: 'var(--text-secondary)', fontSize: 13, marginTop: 6 }}>
               These values are fetched by tenant centre details, dashboards, and dispatch slip generation.
             </div>
@@ -131,6 +131,7 @@ export function PackingDispatchPage() {
                 <td style={{ fontWeight: 600 }}>Class X</td>
                 <td>
                   <input
+                    aria-label="Class X cloth colour"
                     type="text"
                     placeholder="e.g. Blue"
                     value={form.packingClothColorClass10}
@@ -140,6 +141,7 @@ export function PackingDispatchPage() {
                 </td>
                 <td>
                   <input
+                    aria-label="Class X ink colour"
                     type="text"
                     placeholder="e.g. Red"
                     value={form.packingMarkerClass10}
@@ -152,6 +154,7 @@ export function PackingDispatchPage() {
                 <td style={{ fontWeight: 600 }}>Class XII</td>
                 <td>
                   <input
+                    aria-label="Class XII cloth colour"
                     type="text"
                     placeholder="e.g. Pink"
                     value={form.packingClothColorClass12}
@@ -161,6 +164,7 @@ export function PackingDispatchPage() {
                 </td>
                 <td>
                   <input
+                    aria-label="Class XII ink colour"
                     type="text"
                     placeholder="e.g. Blue"
                     value={form.packingMarkerClass12}

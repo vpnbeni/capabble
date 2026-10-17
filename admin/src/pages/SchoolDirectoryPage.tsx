@@ -361,9 +361,9 @@ export function SchoolDirectoryPage() {
     })
 
     return [
-      { label: 'Schools Listed', value: filteredSchools.length, tone: 'var(--accent)' },
-      { label: 'Districts Covered', value: districts.size, tone: 'var(--success)' },
-      { label: 'Statuses Found', value: statuses.size, tone: '#f59e0b' },
+      { label: 'Schools Listed', value: filteredSchools.length },
+      { label: 'Districts Covered', value: districts.size },
+      { label: 'Statuses Found', value: statuses.size },
     ]
   }, [filteredSchools])
 
@@ -397,7 +397,7 @@ export function SchoolDirectoryPage() {
   return (
     <div className="grid" style={{ gap: 20 }}>
       <div>
-        <h1 className="section-title" style={{ marginBottom: 6 }}>School Directory</h1>
+        <h1 className="section-title" style={{ marginBottom: 6 }}>School directory</h1>
         <p style={{ color: 'var(--text-secondary)', margin: 0 }}>
           Upload a filled school-directory CSV and review the records in one place.
         </p>
@@ -407,14 +407,14 @@ export function SchoolDirectoryPage() {
         {stats.map((item) => (
           <section key={item.label} className="card stat-card">
             <span className="stat-label">{item.label}</span>
-            <span className="stat-value" style={{ color: item.tone }}>{item.value}</span>
+            <span className="stat-value">{item.value}</span>
           </section>
         ))}
       </div>
 
       <section className="card" style={{ display: 'grid', gap: 18 }}>
         <div>
-          <h2 className="card-title" style={{ marginBottom: 8 }}>Directory Records</h2>
+          <h2 className="card-title" style={{ marginBottom: 8 }}>Directory records</h2>
           <p style={{ margin: 0, color: 'var(--text-secondary)' }}>
             Download the CSV template, fill in school details, and upload it here. Schools will be added or updated by school code.
           </p>
@@ -456,6 +456,7 @@ export function SchoolDirectoryPage() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
             <input
               type="text"
+              aria-label="Government school keywords"
               value={keywordInput}
               onChange={(event) => setKeywordInput(event.target.value)}
               placeholder="Govt keywords: Govt., Government, PM SHRI..."
@@ -481,13 +482,15 @@ export function SchoolDirectoryPage() {
           <div className="grid" style={{ gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', alignItems: 'center' }}>
             <input
               type="text"
-              placeholder="Search school code, aff. no., name..."
+              aria-label="Search schools"
+              placeholder="Search school code, aff. no., name"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               disabled={loading || uploading || deleting}
               style={{ minWidth: 0, gridColumn: 'span 2' }}
             />
             <select
+              aria-label="State"
               value={stateFilter}
               onChange={(event) => {
                 setStateFilter(event.target.value)
@@ -503,6 +506,7 @@ export function SchoolDirectoryPage() {
               ))}
             </select>
             <select
+              aria-label="District"
               value={districtFilter}
               onChange={(event) => {
                 setDistrictFilter(event.target.value)
@@ -517,6 +521,7 @@ export function SchoolDirectoryPage() {
               ))}
             </select>
             <select
+              aria-label="Status"
               value={statusFilter}
               onChange={(event) => setStatusFilter(event.target.value)}
               disabled={loading}
@@ -527,6 +532,7 @@ export function SchoolDirectoryPage() {
               ))}
             </select>
             <select
+              aria-label="School type"
               value={typeFilter}
               onChange={(event) => setTypeFilter(event.target.value)}
               disabled={loading}
@@ -544,7 +550,7 @@ export function SchoolDirectoryPage() {
                 className="ghost"
                 onClick={handleDeleteSelected}
                 disabled={deleting || loading || uploading}
-                style={{ color: 'var(--danger)', borderColor: 'rgba(239, 68, 68, 0.3)' }}
+                style={{ color: 'var(--danger)', borderColor: 'var(--danger-border)' }}
               >
                 {deleting ? 'Deleting...' : 'Delete Selected'}
               </button>
@@ -569,7 +575,7 @@ export function SchoolDirectoryPage() {
           <table className="data-table" style={{ minWidth: 1710 }}>
             <thead>
               <tr>
-                <th style={{ width: 56, position: 'sticky', top: 0, zIndex: 3, background: '#05070d', boxShadow: '0 1px 0 rgba(255, 255, 255, 0.06)' }}>
+                <th style={{ width: 56, position: 'sticky', top: 0, zIndex: 3, background: 'var(--surface-sunken)', boxShadow: '0 1px 0 var(--border)' }}>
                   <input
                     type="checkbox"
                     checked={filteredSchools.length > 0 && filteredSchools.every((school) => selectedIds.includes(school._id))}
@@ -578,17 +584,17 @@ export function SchoolDirectoryPage() {
                     disabled={loading || filteredSchools.length === 0}
                   />
                 </th>
-                <th style={{ width: 80, position: 'sticky', top: 0, zIndex: 3, background: '#05070d', boxShadow: '0 1px 0 rgba(255, 255, 255, 0.06)' }}>{renderSortButton('Sr No', 'srNo')}</th>
-                <th style={{ width: 120, position: 'sticky', top: 0, zIndex: 3, background: '#05070d', boxShadow: '0 1px 0 rgba(255, 255, 255, 0.06)' }}>{renderSortButton('Aff. No.', 'affiliationNo')}</th>
-                <th style={{ width: 120, position: 'sticky', top: 0, zIndex: 3, background: '#05070d', boxShadow: '0 1px 0 rgba(255, 255, 255, 0.06)' }}>{renderSortButton('Sch. Code', 'schoolCode')}</th>
-                <th style={{ width: 140, position: 'sticky', top: 0, zIndex: 3, background: '#05070d', boxShadow: '0 1px 0 rgba(255, 255, 255, 0.06)' }}>{renderSortButton('Status', 'status')}</th>
-                <th style={{ minWidth: 240, position: 'sticky', top: 0, zIndex: 3, background: '#05070d', boxShadow: '0 1px 0 rgba(255, 255, 255, 0.06)' }}>{renderSortButton('Name', 'name')}</th>
-                <th style={{ minWidth: 180, position: 'sticky', top: 0, zIndex: 3, background: '#05070d', boxShadow: '0 1px 0 rgba(255, 255, 255, 0.06)' }}>{renderSortButton('Head Name', 'headName')}</th>
-                <th style={{ minWidth: 220, position: 'sticky', top: 0, zIndex: 3, background: '#05070d', boxShadow: '0 1px 0 rgba(255, 255, 255, 0.06)' }}>{renderSortButton('Website', 'website')}</th>
-                <th style={{ width: 110, position: 'sticky', top: 0, zIndex: 3, background: '#05070d', boxShadow: '0 1px 0 rgba(255, 255, 255, 0.06)' }}>Type</th>
-                <th style={{ width: 130, position: 'sticky', top: 0, zIndex: 3, background: '#05070d', boxShadow: '0 1px 0 rgba(255, 255, 255, 0.06)' }}>State</th>
-                <th style={{ width: 150, position: 'sticky', top: 0, zIndex: 3, background: '#05070d', boxShadow: '0 1px 0 rgba(255, 255, 255, 0.06)' }}>District</th>
-                <th style={{ minWidth: 320, position: 'sticky', top: 0, zIndex: 3, background: '#05070d', boxShadow: '0 1px 0 rgba(255, 255, 255, 0.06)' }}>Address Details</th>
+                <th style={{ width: 80, position: 'sticky', top: 0, zIndex: 3, background: 'var(--surface-sunken)', boxShadow: '0 1px 0 var(--border)' }}>{renderSortButton('Sr No', 'srNo')}</th>
+                <th style={{ width: 120, position: 'sticky', top: 0, zIndex: 3, background: 'var(--surface-sunken)', boxShadow: '0 1px 0 var(--border)' }}>{renderSortButton('Aff. No.', 'affiliationNo')}</th>
+                <th style={{ width: 120, position: 'sticky', top: 0, zIndex: 3, background: 'var(--surface-sunken)', boxShadow: '0 1px 0 var(--border)' }}>{renderSortButton('Sch. Code', 'schoolCode')}</th>
+                <th style={{ width: 140, position: 'sticky', top: 0, zIndex: 3, background: 'var(--surface-sunken)', boxShadow: '0 1px 0 var(--border)' }}>{renderSortButton('Status', 'status')}</th>
+                <th style={{ minWidth: 240, position: 'sticky', top: 0, zIndex: 3, background: 'var(--surface-sunken)', boxShadow: '0 1px 0 var(--border)' }}>{renderSortButton('Name', 'name')}</th>
+                <th style={{ minWidth: 180, position: 'sticky', top: 0, zIndex: 3, background: 'var(--surface-sunken)', boxShadow: '0 1px 0 var(--border)' }}>{renderSortButton('Head Name', 'headName')}</th>
+                <th style={{ minWidth: 220, position: 'sticky', top: 0, zIndex: 3, background: 'var(--surface-sunken)', boxShadow: '0 1px 0 var(--border)' }}>{renderSortButton('Website', 'website')}</th>
+                <th style={{ width: 110, position: 'sticky', top: 0, zIndex: 3, background: 'var(--surface-sunken)', boxShadow: '0 1px 0 var(--border)' }}>Type</th>
+                <th style={{ width: 130, position: 'sticky', top: 0, zIndex: 3, background: 'var(--surface-sunken)', boxShadow: '0 1px 0 var(--border)' }}>State</th>
+                <th style={{ width: 150, position: 'sticky', top: 0, zIndex: 3, background: 'var(--surface-sunken)', boxShadow: '0 1px 0 var(--border)' }}>District</th>
+                <th style={{ minWidth: 320, position: 'sticky', top: 0, zIndex: 3, background: 'var(--surface-sunken)', boxShadow: '0 1px 0 var(--border)' }}>Address Details</th>
               </tr>
             </thead>
             <tbody>
@@ -649,8 +655,8 @@ export function SchoolDirectoryPage() {
                         padding: '6px 10px',
                         color: getSchoolType(school, govtKeywords) === 'Govt.' ? 'var(--success)' : 'var(--text-primary)',
                         borderColor: getSchoolType(school, govtKeywords) === 'Govt.'
-                          ? 'rgba(16, 185, 129, 0.35)'
-                          : 'rgba(148, 163, 184, 0.3)',
+                          ? 'var(--success-border)'
+                          : 'var(--border-control)',
                       }}
                     >
                       {updatingTypeId === school._id ? 'Saving...' : getSchoolType(school, govtKeywords)}
