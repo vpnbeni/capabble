@@ -46,7 +46,8 @@
     "type-check": "turbo run type-check",
     "sync:shared": "node scripts/sync-shared.mjs",
     "check:names": "node scripts/check-legacy-names.mjs",
-    "check:shared": "node scripts/sync-shared.mjs --check"
+    "check:shared": "node scripts/sync-shared.mjs --check",
+    "test:billing": "cd billing-service && npm test"
   },
   "keywords": [
     "examination",

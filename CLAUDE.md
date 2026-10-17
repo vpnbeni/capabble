@@ -155,7 +155,7 @@ npm run backfill:tenant-user-directory # Backfill tenant user directory
 - `/admin` - React 18 + TypeScript + Vite admin portal (port 5174)
 - `/schol` + `/school-intelligence` - SCHOL UI + Python API
 - `/capabble-landing` - Next.js marketing site (capabble.cloud)
-- `/billing-service` - Standalone billing service
+- `/billing-service` - Standalone billing service on its own Postgres database (Neon; Drizzle migrations in `billing-service/drizzle`). Only it reads or writes billing data; the server and admin call its `/internal/*` API. Money is integer paise. See `billing-service/README.md`
 - `/packages/shared` - `@capabble/shared`: code/data used by more than one app (e.g. `tenantFeatureCatalog.json`)
 
 **npm workspaces + Turborepo**: `client`, `admin`, `schol`, `capabble-landing` and `packages/*` are workspaces sharing one root `package-lock.json` — run `npm install` from the root, never inside an app. `npm run build:all` / `npm run type-check` run through Turborepo.
