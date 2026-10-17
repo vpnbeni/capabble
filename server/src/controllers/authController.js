@@ -17,7 +17,7 @@ const { recordAuthEvent } = require('../rbac/audit');
 const { ensureUserIndexes } = require('../rbac/userIndexes');
 const { generateResponse } = require('../utils/helpers');
 const { SUCCESS_MESSAGES, HTTP_STATUS } = require('../utils/constants');
-const { getTenantEntitlement } = require('../services/billingServiceClient');
+const { loadEntitlement } = require('../middleware/billingEntitlement');
 const { sendMail } = require('../utils/mailer');
 
 const PASSWORD_RESET_ERROR_CODES = {
@@ -137,12 +137,15 @@ const buildBillingSnapshot = async (tenantSlug) => {
   }
 
   try {
-    const entitlement = await getTenantEntitlement(tenantSlug);
+    const entitlement = await loadEntitlement(tenantSlug);
     return {
       accessMode: entitlement.accessMode || 'full',
       planCode: entitlement.planCode || null,
       trialEndsAt: entitlement.trialEndsAt || null,
       graceEndsAt: entitlement.graceEndsAt || null,
+      periodEndsAt: entitlement.periodEndsAt || null,
+      cancelAtPeriodEnd: Boolean(entitlement.cancelAtPeriodEnd),
+      entitledModules: entitlement.entitledModules || ['*'],
       isReadOnly: Boolean(entitlement.isReadOnly),
       state: entitlement.state || 'active',
     };

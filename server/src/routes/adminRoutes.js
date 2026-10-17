@@ -251,13 +251,31 @@ router.post('/rollouts/:id/retry', rolloutController.retryRollout);
 router.get('/master-teacher-template', masterTeacherTemplateController.getTemplate);
 router.put('/master-teacher-template', masterTeacherTemplateController.updateTemplate);
 
-// Billing admin routes
+// Billing admin routes (billing-service validates, stores and audits)
+const bv = require('../validations/billingValidation');
 router.get('/billing/tenants', billingAdminController.listTenants);
 router.get('/billing/tenants/:tenantId', billingAdminController.getTenantById);
-router.post('/billing/tenants/:tenantId/change-plan', billingAdminController.changePlan);
-router.post('/billing/tenants/:tenantId/grant-extension', billingAdminController.grantExtension);
-router.post('/billing/plans', billingAdminController.createPlan);
-router.post('/billing/coupons', billingAdminController.createCoupon);
-router.post('/billing/addons', billingAdminController.createAddon);
+router.post('/billing/tenants/:tenantId/change-plan/preview', validateJoi(bv.selectionSchema), billingAdminController.previewPlan);
+router.post('/billing/tenants/:tenantId/change-plan', validateJoi(bv.selectionSchema), billingAdminController.changePlan);
+router.post('/billing/tenants/:tenantId/grant-extension', validateJoi(bv.extensionSchema), billingAdminController.grantExtension);
+router.post('/billing/tenants/:tenantId/students', validateJoi(bv.studentsSchema), billingAdminController.setStudents);
+router.post('/billing/tenants/:tenantId/cancel', validateJoi(bv.cancelSchema), billingAdminController.cancel);
+router.post('/billing/tenants/:tenantId/profile', validateJoi(bv.billingProfileSchema), billingAdminController.updateProfile);
+router.post('/billing/tenants/:tenantId/autodebit', billingAdminController.setupAutoDebit);
+router.post('/billing/tenants/:tenantId/invoices/:invoiceId/payments/offline', validateJoi(bv.offlinePaymentSchema), billingAdminController.recordOfflinePayment);
+router.post('/billing/tenants/:tenantId/invoices/:invoiceId/void', validateJoi(bv.voidSchema), billingAdminController.voidInvoice);
+router.post('/billing/tenants/:tenantId/invoices/:invoiceId/credit-notes', validateJoi(bv.creditNoteSchema), billingAdminController.createCreditNote);
+router.get('/billing/tenants/:tenantId/invoices/:invoiceId/pdf', billingAdminController.invoicePdf);
+router.get('/billing/tenants/:tenantId/receipts/:paymentId/pdf', billingAdminController.receiptPdf);
+router.get('/billing/tenants/:tenantId/credit-notes/:creditNoteId/pdf', billingAdminController.creditNotePdf);
+router.get('/billing/audit', billingAdminController.listAudit);
+router.post('/billing/jobs/run', billingAdminController.runJobs);
+router.get('/billing/catalog', billingAdminController.getCatalog);
+router.post('/billing/modules', validateJoi(bv.moduleSchema), billingAdminController.upsertModule);
+router.get('/billing/modules/:code/prices', billingAdminController.getModulePrices);
+router.post('/billing/modules/:code/prices', validateJoi(bv.priceSchema), billingAdminController.setModulePrice);
+router.post('/billing/bundles', validateJoi(bv.bundleSchema), billingAdminController.upsertBundle);
+router.post('/billing/coupons', validateJoi(bv.couponSchema), billingAdminController.createCoupon);
+router.post('/billing/addons', validateJoi(bv.addonSchema), billingAdminController.createAddon);
 
 module.exports = router;

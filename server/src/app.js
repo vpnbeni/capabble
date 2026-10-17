@@ -235,6 +235,9 @@ app.get('/api', (req, res) => {
 // Platform admin routes (central control plane)
 platformModule.mountRoutes(app);
 
+// Billing service callbacks (service token, not tenant-scoped)
+app.use('/internal/billing', require('./routes/billingInternalRoutes'));
+
 // Tenant-scoped routes — each module registers its own routes via mountAll()
 const tenantScopedRouter = express.Router();
 tenantScopedRouter.use(tenantContextMiddleware);

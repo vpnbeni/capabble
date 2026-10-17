@@ -1,7 +1,12 @@
-const { getTenantEntitlement } = require('../services/billingServiceClient');
+const billingClient = require('../services/billingServiceClient');
+const { applyBillingEntitlement } = require('../constants/tenantFeatures');
 
+// Fresh for 45s. If billing is unreachable (e.g. its database is waking up), the last
+// known entitlement keeps being used for up to 24h instead of failing requests.
 const ENTITLEMENT_CACHE_TTL_MS = 45 * 1000;
+const ENTITLEMENT_STALE_MAX_MS = 24 * 60 * 60 * 1000;
 const entitlementCache = new Map();
+const inflight = new Map();
 
 const BILLING_ERROR_RESPONSE = {
   success: false,
@@ -12,6 +17,7 @@ const BILLING_ERROR_RESPONSE = {
 
 const CORE_ALLOWED_MODULES = new Set(['dashboard', 'candidates', 'subjects', 'datesheets', 'billing', 'auth']);
 const SAFE_ALWAYS_ALLOWED_PREFIXES = ['/auth', '/billing', '/onboarding', '/users', '/roles'];
+const WRITE_METHODS = ['POST', 'PUT', 'PATCH', 'DELETE'];
 
 const parseBooleanEnv = (value, fallback) => {
   if (value === undefined) return fallback;
@@ -70,23 +76,37 @@ const isReadOnlyBlockedPath = (path) => {
   return false;
 };
 
-const getCachedEntitlement = (tenantSlug) => {
+/**
+ * Entitlement for a school, from cache when fresh. Concurrent misses share one request.
+ * On failure a stale value (≤ 24h) is returned with `stale: true`; otherwise it throws.
+ */
+const loadEntitlement = async (tenantSlug, { now = Date.now() } = {}) => {
   const cached = entitlementCache.get(tenantSlug);
-  if (!cached) return null;
+  if (cached && now - cached.fetchedAt < ENTITLEMENT_CACHE_TTL_MS) return cached.value;
 
-  if (cached.expiresAt <= Date.now()) {
-    entitlementCache.delete(tenantSlug);
-    return null;
+  if (!inflight.has(tenantSlug)) {
+    inflight.set(tenantSlug, billingClient.getTenantEntitlement(tenantSlug)
+      .then((value) => {
+        entitlementCache.set(tenantSlug, { value, fetchedAt: Date.now() });
+        return value;
+      })
+      .finally(() => inflight.delete(tenantSlug)));
   }
 
-  return cached.value;
+  try {
+    return await inflight.get(tenantSlug);
+  } catch (error) {
+    if (cached && now - cached.fetchedAt < ENTITLEMENT_STALE_MAX_MS) {
+      console.warn('[billing-entitlement] using last known entitlement', { tenantSlug, message: error.message });
+      return { ...cached.value, stale: true };
+    }
+    throw error;
+  }
 };
 
-const setCachedEntitlement = (tenantSlug, value) => {
-  entitlementCache.set(tenantSlug, {
-    value,
-    expiresAt: Date.now() + ENTITLEMENT_CACHE_TTL_MS
-  });
+const invalidateEntitlement = (tenantSlug) => {
+  if (tenantSlug) entitlementCache.delete(tenantSlug);
+  else entitlementCache.clear();
 };
 
 const blockRequest = (res, accessMode) => res.status(402).json({
@@ -104,42 +124,52 @@ const billingEntitlementMiddleware = async (req, res, next) => {
   }
 
   const requestPath = req.path || '/';
-  if (shouldSkipForPath(requestPath)) {
-    return next();
-  }
-
+  const skipBlocking = shouldSkipForPath(requestPath);
   const tenantSlug = req.tenant.slug;
-  let entitlement = getCachedEntitlement(tenantSlug);
+  let entitlement;
 
-  if (!entitlement) {
-    try {
-      entitlement = await getTenantEntitlement(tenantSlug);
-      setCachedEntitlement(tenantSlug, entitlement);
-    } catch (error) {
-      console.error('[billing-entitlement] failed_to_fetch', {
-        tenantSlug,
-        message: error.message
+  try {
+    entitlement = await loadEntitlement(tenantSlug);
+  } catch (error) {
+    console.error('[billing-entitlement] failed_to_fetch', {
+      tenantSlug,
+      message: error.message
+    });
+
+    if (skipBlocking) return next();
+    // Nothing known about this school: reads go through, writes wait for billing.
+    if (WRITE_METHODS.includes(req.method)) {
+      return res.status(503).json({
+        success: false,
+        message: 'Billing service temporarily unavailable. Please try again.'
       });
-
-      // Fail-open for read requests to avoid hard downtime; fail-closed for mutating requests.
-      if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
-        return res.status(503).json({
-          success: false,
-          message: 'Billing service temporarily unavailable. Please try again.'
-        });
-      }
-
-      return next();
     }
+
+    return next();
   }
 
   req.billingEntitlement = entitlement;
   res.setHeader('x-billing-access-mode', entitlement.accessMode || 'full');
   res.setHeader('x-billing-state', entitlement.state || 'active');
 
+  // Modules the school hasn't paid for are switched off for everything downstream:
+  // requireTenantFeature (402), the user payload sent to the app, search and portals.
+  if (req.tenant.featureToggles) {
+    const { toggles, billingDisabled } = applyBillingEntitlement(
+      req.tenant.featureToggles,
+      entitlement.entitledModules
+    );
+    req.tenant.featureToggles = toggles;
+    req.tenant.billingDisabledFeatures = billingDisabled;
+  }
+
+  if (skipBlocking) {
+    return next();
+  }
+
   const accessMode = entitlement.accessMode || 'full';
   const moduleName = resolveModuleFromPath(requestPath);
-  const isWriteMethod = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method);
+  const isWriteMethod = WRITE_METHODS.includes(req.method);
 
   if (accessMode === 'core_only') {
     if (!parseBooleanEnv(process.env.BILLING_TRIAL_CORE_ONLY_ENABLED, true)) {
@@ -171,7 +201,10 @@ const billingEntitlementMiddleware = async (req, res, next) => {
 
 module.exports = {
   billingEntitlementMiddleware,
+  loadEntitlement,
+  invalidateEntitlement,
   resolveModuleFromPath,
   isReadOnlyBlockedPath,
-  shouldSkipForPath
+  shouldSkipForPath,
+  _cache: entitlementCache
 };
