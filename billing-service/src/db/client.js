@@ -3,6 +3,7 @@ const { Pool } = require('pg');
 const { drizzle } = require('drizzle-orm/node-postgres');
 const { sql } = require('drizzle-orm');
 const schema = require('./schema');
+const { connectionOptions } = require('./ssl');
 
 let pool = null;
 let db = null;
@@ -57,7 +58,7 @@ function createPool() {
     throw new Error('DATABASE_URL is not set (use the pooled Neon connection string)');
   }
   const created = new Pool({
-    connectionString,
+    ...connectionOptions(connectionString),
     max: Number.parseInt(process.env.DATABASE_POOL_MAX || '10', 10),
     // Neon can take a few seconds to wake a suspended compute.
     connectionTimeoutMillis: Number.parseInt(process.env.DATABASE_CONNECT_TIMEOUT_MS || '10000', 10),

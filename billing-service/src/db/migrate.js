@@ -4,17 +4,19 @@ const path = require('path');
 const { Client } = require('pg');
 const { drizzle } = require('drizzle-orm/node-postgres');
 const { migrate } = require('drizzle-orm/node-postgres/migrator');
+const { connectionOptions } = require('./ssl');
 
 const MIGRATIONS_FOLDER = path.join(__dirname, '..', '..', 'drizzle');
 
 async function run() {
-  const url = process.env.DATABASE_URL_UNPOOLED;
-  if (!url) throw new Error('DATABASE_URL_UNPOOLED is not set (use the direct Neon connection string)');
+  // Neon: the direct (unpooled) URL. Providers without a pooler only set DATABASE_URL.
+  const url = process.env.DATABASE_URL_UNPOOLED || process.env.DATABASE_URL;
+  if (!url) throw new Error('Set DATABASE_URL_UNPOOLED (direct Neon connection) or DATABASE_URL');
 
   const host = new URL(url).host;
   console.log(`[billing-migrate] applying migrations to ${host}`);
 
-  const client = new Client({ connectionString: url, connectionTimeoutMillis: 20000 });
+  const client = new Client({ ...connectionOptions(url), connectionTimeoutMillis: 20000 });
   await client.connect();
   try {
     await migrate(drizzle(client), { migrationsFolder: MIGRATIONS_FOLDER });
