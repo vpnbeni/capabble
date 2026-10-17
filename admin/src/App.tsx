@@ -184,8 +184,8 @@ function App() {
       {
         label: 'Billing',
         items: [
-          { label: 'Billing tenants', icon: CreditCard, path: '/billing/tenants', matcher: (path: string) => path === '/billing/tenants' },
-          { label: 'Billing catalog', icon: Tag, path: '/billing/catalog', matcher: (path: string) => path === '/billing/catalog' },
+          { label: 'Subscriptions', icon: CreditCard, path: '/billing/tenants', matcher: (path: string) => path === '/billing/tenants' },
+          { label: 'Prices and plans', icon: Tag, path: '/billing/catalog', matcher: (path: string) => path === '/billing/catalog' },
         ],
       },
     ],

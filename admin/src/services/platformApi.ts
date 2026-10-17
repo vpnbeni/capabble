@@ -1,8 +1,6 @@
 import axios from 'axios'
 import type {
   DefaultTenantFeatureConfigResponse,
-  BillingTenantDetails,
-  BillingTenantListResponse,
   DataRollout,
   MasterCBSEDatesheet,
   MasterGuideline,
@@ -420,66 +418,6 @@ export const rolloutApi = {
   async retry(id: string): Promise<DataRollout> {
     const response = await platformApi.post<ApiResponse<DataRollout>>(`/rollouts/${id}/retry`)
     return response.data.data
-  },
-}
-
-export const billingAdminApi = {
-  async listTenants(search = '', page = 1, limit = 20): Promise<BillingTenantListResponse> {
-    const response = await platformApi.get<ApiResponse<BillingTenantListResponse>>('/billing/tenants', {
-      params: {
-        search: search || undefined,
-        page,
-        limit,
-      },
-    })
-    return response.data.data
-  },
-
-  async getTenantById(tenantId: string): Promise<BillingTenantDetails> {
-    const response = await platformApi.get<ApiResponse<BillingTenantDetails>>(`/billing/tenants/${tenantId}`)
-    return response.data.data
-  },
-
-  async changePlan(tenantId: string, planCode: string): Promise<void> {
-    await platformApi.post(`/billing/tenants/${tenantId}/change-plan`, { planCode })
-  },
-
-  async grantExtension(tenantId: string, days: number): Promise<void> {
-    await platformApi.post(`/billing/tenants/${tenantId}/grant-extension`, { days })
-  },
-
-  async createPlan(payload: {
-    code: string
-    name: string
-    billingCycle: 'monthly' | 'yearly'
-    amountMinor: number
-    description?: string
-    trialDays?: number
-    currency?: string
-    features?: string[]
-  }): Promise<void> {
-    await platformApi.post('/billing/plans', payload)
-  },
-
-  async createCoupon(payload: {
-    code: string
-    discountType: 'percentage' | 'fixed_minor'
-    discountValue: number
-    durationType?: 'one_time' | 'forever' | 'repeating'
-    durationInMonths?: number
-    maxRedemptions?: number
-    expiresAt?: string
-  }): Promise<void> {
-    await platformApi.post('/billing/coupons', payload)
-  },
-
-  async createAddon(payload: {
-    code: string
-    name: string
-    amountMinor: number
-    cycle?: 'monthly' | 'yearly' | 'one_time'
-  }): Promise<void> {
-    await platformApi.post('/billing/addons', payload)
   },
 }
 
