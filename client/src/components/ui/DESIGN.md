@@ -95,6 +95,8 @@ Lucide (`lucide-react`), passed as components: `icon={Plus}`. 1.75 stroke is app
 | `Entity` | `primary, secondary` | First table column / list row |
 | `Button` | `variant: primary \| secondary \| tertiary \| danger, size: sm \| md \| lg, icon, iconRight, loading, fullWidth` | One primary per view. Card actions are `sm`/`tertiary` |
 | `Badge` | `tone, dot (default true), size: 'sm' \| 'lg'` | Status, 1–3 words |
+| `Ring` | `segments[{value,tone}], max, size: 'sm' \| 'lg', label, children` | Donut for a part-of-whole (present / absent / half day). Centre content in children; keep centre numbers ≤ 28px (lg) or 13px (sm). Never the only carrier of the number: legend or label beside it |
+| `ColumnChart` | `items[{label,value,caption,tone}], max, target{value,label}, unit, label` | Same measure across categories (attendance % per class). Fixed 0–max scale, value above each column, optional dashed target. Accent by default; warning/danger only for columns below target |
 | `Progress` | `value, max, label, valueLabel, showValue, tone, size: 'sm'` | Per-class figures: label + valueLabel ("12 of 30 topics"); stack in `.cb-progress-list` |
 | `Avatar` | `name, src, size, square` | People; school logo is `square` |
 | `Icon` | `icon, size, label` | Lucide glyph at system stroke |

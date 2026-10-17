@@ -11,7 +11,7 @@ import {
   UserRound,
   Users,
 } from 'lucide-react'
-import { Button, Card, EmptyState, Icon, Progress } from '@/components/ui'
+import { Button, Card, ColumnChart, EmptyState, Icon, Ring } from '@/components/ui'
 import attndService from '@/services/attndService'
 import { formatCount } from '@/components/students/studentFormat'
 import type { QuickAction } from './quickActions'
@@ -57,8 +57,8 @@ export const PrincipalDesk: React.FC<{ actions: QuickAction[]; onEditActions: ()
     const strength = row.sections.reduce((sum, section) => sum + section.strength, 0)
     const absent = row.sections.reduce((sum, section) => sum + section.todayAbsent, 0)
     const halfDay = row.sections.reduce((sum, section) => sum + section.todayHalfDay, 0)
-    return { className: row.className, rate: strength ? Math.max(0, rate(strength - absent - halfDay * .5, strength)) : 0 }
-  })
+    return { className: row.className, strength, absent, rate: strength ? Math.max(0, rate(strength - absent - halfDay * .5, strength)) : 0 }
+  }).filter((item) => item.strength > 0)
   const absentRate = students ? rate(students.todayAbsent, students.strength) : 0
   const halfDayRate = students ? rate(students.todayHalfDay, students.strength) : 0
   // Calendar events are not exposed by the current API. Keep the school-day label local
@@ -90,26 +90,55 @@ export const PrincipalDesk: React.FC<{ actions: QuickAction[]; onEditActions: ()
 
       <section className="principal-main">
         <Card
+          bodyClassName="principal-overview"
           title="Student attendance overview"
-          subtitle="Live attendance status for today."
+          subtitle={students ? `${formatCount(students.strength)} students · live for today` : 'Live attendance status for today.'}
           action={<Button variant="tertiary" size="sm" iconRight={ArrowRight} onClick={() => navigate('/attnd/attndboard')}>View details</Button>}
         >
           {attendance.isLoading ? <div className="cb-table-state"><span className="cb-spinner" /> Loading attendance</div> : students ? (
             <div className="principal-attendance">
-              <div className="principal-attendance__score" style={{ background: `conic-gradient(var(--success-solid) 0 ${attendanceRate}%, var(--danger-solid) ${attendanceRate}% ${attendanceRate + absentRate}%, var(--warning-solid) ${attendanceRate + absentRate}% ${Math.min(100, attendanceRate + absentRate + halfDayRate)}%, var(--surface-sunken) 0)` }}>
-                <span className="principal-attendance__score-inner"><strong className="is-num">{attendanceRate}%</strong><span>present</span></span>
-              </div>
-              <div className="principal-attendance__details">
-                <Progress value={attendanceRate} showValue={false} tone={attendanceRate >= 95 ? 'success' : attendanceRate >= 90 ? 'warning' : 'danger'} />
-                <dl>
-                  <div><dt>Present</dt><dd className="is-num">{formatCount(students.todayPresent)}</dd></div>
-                  <div><dt>Absent</dt><dd className="is-num">{formatCount(students.todayAbsent)}</dd></div>
-                  <div><dt>Half day</dt><dd className="is-num">{formatCount(students.todayHalfDay)}</dd></div>
-                </dl>
-              </div>
+              <Ring
+                label={`${attendanceRate}% of students present today`}
+                segments={[
+                  { value: students.todayPresent, tone: 'success' },
+                  { value: students.todayHalfDay, tone: 'warning' },
+                  { value: students.todayAbsent, tone: 'danger' },
+                ]}
+                max={students.strength || 1}
+              >
+                <strong className="principal-attendance__figure is-num">{attendanceRate}%</strong>
+                <span className="principal-attendance__caption">present</span>
+              </Ring>
+              <ul className="principal-attendance__legend">
+                {[
+                  { label: 'Present', count: students.todayPresent, share: attendanceRate, tone: 'success' },
+                  { label: 'Half day', count: students.todayHalfDay, share: halfDayRate, tone: 'warning' },
+                  { label: 'Absent', count: students.todayAbsent, share: absentRate, tone: 'danger' },
+                ].map((row) => (
+                  <li key={row.label}>
+                    <span className="principal-attendance__name"><span className={`principal-attendance__dot is-${row.tone}`} aria-hidden="true" />{row.label}</span>
+                    <strong className="principal-attendance__count is-num">{formatCount(row.count)}</strong>
+                    <span className="principal-attendance__share is-num">{row.share}% of students</span>
+                  </li>
+                ))}
+              </ul>
             </div>
           ) : <EmptyState compact icon={Users} title="Attendance is not available" body="Mark attendance to see today’s school overview." />}
-          {classAttendance.length ? <div className="principal-class-chart" role="img" aria-label={classAttendance.map((item) => `${item.className} ${item.rate}%`).join(', ')}>{classAttendance.map((item) => <div key={item.className} className="principal-class-chart__item"><span className="principal-class-chart__bar"><i style={{ height: `${item.rate}%` }} /></span><strong className="is-num">{item.rate}%</strong><span>{item.className}</span></div>)}</div> : null}
+          {classAttendance.length ? (
+            <div className="principal-classes">
+              <p className="cb-subhead">By class <span className="cb-muted">· dashed line is the 95% target</span></p>
+              <ColumnChart
+                label={`Attendance by class today: ${classAttendance.map((item) => `${item.className} ${item.rate}%`).join(', ')}`}
+                target={{ value: 95, label: '95% target' }}
+                items={classAttendance.map((item) => ({
+                  label: item.className,
+                  value: item.rate,
+                  caption: item.absent ? `${formatCount(item.absent)} absent` : undefined,
+                  tone: item.rate >= 95 ? 'accent' : item.rate >= 90 ? 'warning' : 'danger',
+                }))}
+              />
+            </div>
+          ) : null}
         </Card>
 
         <Card
