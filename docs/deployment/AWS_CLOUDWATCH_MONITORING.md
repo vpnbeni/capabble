@@ -1,9 +1,9 @@
 # AWS CloudWatch Monitoring Setup
 
-Alerting for the SEMS EC2 server: instance crashes, high CPU, high memory, low disk. Written so this can be recreated from scratch on a **new AWS account** (current instance's free tier is expiring and it'll be migrated).
+Alerting for the Capabble EC2 server: instance crashes, high CPU, high memory, low disk. Written so this can be recreated from scratch on a **new AWS account** (current instance's free tier is expiring and it'll be migrated).
 
 Everything below assumes:
-- EC2 instance running Ubuntu 24.04, backend processes managed by PM2 (`sems-server`, `sems-stage`, and other apps sharing the box).
+- EC2 instance running Ubuntu 24.04, backend processes managed by PM2 (`capabble-server`, `capabble-stage`, and other apps sharing the box).
 - AWS CLI available either via **CloudShell** (browser, no local setup) or a local terminal with `aws configure` done.
 - Replace `ACCOUNT_ID`, `REGION`, `IID` (instance ID), `HOST` (instance hostname) with the new account's actual values throughout.
 
@@ -29,8 +29,8 @@ aws sns list-subscriptions-by-topic --topic-arn arn:aws:sns:REGION:ACCOUNT_ID:se
 
 1. IAM console → Roles → **Create role** → Trusted entity: **AWS service** → Use case: **EC2**.
 2. Attach policy: **`CloudWatchAgentServerPolicy`**.
-3. Name it `sems-ec2-cloudwatch-role` → Create.
-4. EC2 console → Instances → select instance → **Actions → Security → Modify IAM role** → select `sems-ec2-cloudwatch-role` → Update IAM role.
+3. Name it `capabble-ec2-cloudwatch-role` → Create.
+4. EC2 console → Instances → select instance → **Actions → Security → Modify IAM role** → select `capabble-ec2-cloudwatch-role` → Update IAM role.
 
 Note: only default (system/instance) status check and CPU/network/disk-I/O metrics are free/automatic on EC2. **Memory and disk-space-used are NOT reported by default** — that's what the CloudWatch Agent below is for.
 
@@ -92,7 +92,7 @@ REGION=ap-south-1              # or your region
 
 # Hardware/hypervisor failure -> notify + auto-recover instance on new hardware
 aws cloudwatch put-metric-alarm \
-  --alarm-name "sems-status-check-failed" \
+  --alarm-name "capabble-status-check-failed" \
   --namespace AWS/EC2 --metric-name StatusCheckFailed_System \
   --dimensions Name=InstanceId,Value=$IID \
   --statistic Maximum --period 60 --evaluation-periods 3 \
@@ -102,7 +102,7 @@ aws cloudwatch put-metric-alarm \
 
 # OS-level failure -> notify only (auto-recover can't fix this)
 aws cloudwatch put-metric-alarm \
-  --alarm-name "sems-instance-check-failed" \
+  --alarm-name "capabble-instance-check-failed" \
   --namespace AWS/EC2 --metric-name StatusCheckFailed_Instance \
   --dimensions Name=InstanceId,Value=$IID \
   --statistic Maximum --period 60 --evaluation-periods 3 \
@@ -111,7 +111,7 @@ aws cloudwatch put-metric-alarm \
 
 # High CPU
 aws cloudwatch put-metric-alarm \
-  --alarm-name "sems-high-cpu" \
+  --alarm-name "capabble-high-cpu" \
   --namespace AWS/EC2 --metric-name CPUUtilization \
   --dimensions Name=InstanceId,Value=$IID \
   --statistic Average --period 300 --evaluation-periods 3 \
@@ -120,7 +120,7 @@ aws cloudwatch put-metric-alarm \
 
 # High memory (requires CloudWatch Agent from step 4)
 aws cloudwatch put-metric-alarm \
-  --alarm-name "sems-high-memory" \
+  --alarm-name "capabble-high-memory" \
   --namespace CustomEC2Metrics --metric-name mem_used_percent \
   --dimensions Name=host,Value=$HOST \
   --statistic Average --period 300 --evaluation-periods 3 \
@@ -129,7 +129,7 @@ aws cloudwatch put-metric-alarm \
 
 # Low disk space (requires CloudWatch Agent from step 4; adjust device/fstype from list-metrics output)
 aws cloudwatch put-metric-alarm \
-  --alarm-name "sems-low-disk" \
+  --alarm-name "capabble-low-disk" \
   --namespace CustomEC2Metrics --metric-name disk_used_percent \
   --dimensions Name=host,Value=$HOST Name=path,Value=/ Name=device,Value=nvme0n1p1 Name=fstype,Value=ext4 \
   --statistic Average --period 300 --evaluation-periods 1 \
@@ -140,7 +140,7 @@ aws cloudwatch put-metric-alarm \
 Verify:
 ```bash
 aws cloudwatch describe-alarms \
-  --alarm-names sems-status-check-failed sems-instance-check-failed sems-high-cpu sems-high-memory sems-low-disk \
+  --alarm-names capabble-status-check-failed capabble-instance-check-failed capabble-high-cpu capabble-high-memory capabble-low-disk \
   --query "MetricAlarms[].{Name:AlarmName,State:StateValue}" --output table
 ```
 `INSUFFICIENT_DATA` is normal for the first ~15 minutes; it resolves to `OK` once enough data points land.
@@ -191,11 +191,11 @@ cat > dashboard.json <<EOF
       "properties": {
         "title": "Alarm Status",
         "alarms": [
-          "arn:aws:cloudwatch:$REGION:ACCOUNT_ID:alarm:sems-status-check-failed",
-          "arn:aws:cloudwatch:$REGION:ACCOUNT_ID:alarm:sems-instance-check-failed",
-          "arn:aws:cloudwatch:$REGION:ACCOUNT_ID:alarm:sems-high-cpu",
-          "arn:aws:cloudwatch:$REGION:ACCOUNT_ID:alarm:sems-high-memory",
-          "arn:aws:cloudwatch:$REGION:ACCOUNT_ID:alarm:sems-low-disk"
+          "arn:aws:cloudwatch:$REGION:ACCOUNT_ID:alarm:capabble-status-check-failed",
+          "arn:aws:cloudwatch:$REGION:ACCOUNT_ID:alarm:capabble-instance-check-failed",
+          "arn:aws:cloudwatch:$REGION:ACCOUNT_ID:alarm:capabble-high-cpu",
+          "arn:aws:cloudwatch:$REGION:ACCOUNT_ID:alarm:capabble-high-memory",
+          "arn:aws:cloudwatch:$REGION:ACCOUNT_ID:alarm:capabble-low-disk"
         ]
       }
     }
@@ -203,10 +203,10 @@ cat > dashboard.json <<EOF
 }
 EOF
 
-aws cloudwatch put-dashboard --dashboard-name "SEMS-Server-Monitoring" --dashboard-body file://dashboard.json
+aws cloudwatch put-dashboard --dashboard-name "Capabble-Server-Monitoring" --dashboard-body file://dashboard.json
 ```
 
-View at: CloudWatch console → Dashboards → **SEMS-Server-Monitoring**.
+View at: CloudWatch console → Dashboards → **Capabble-Server-Monitoring**.
 
 ## 7. Optional billing alarm (unrelated to server health, but standard hygiene — especially relevant once off free tier)
 
@@ -224,6 +224,6 @@ Billing metrics/alarms only exist in `us-east-1` regardless of your instance's r
 
 ## Known gaps (not yet covered)
 
-- **App-level crash detection**: none of the above catches a Node process dying while the OS/instance stays healthy. PM2 is already managing the processes (`pm2 status` shows `sems-server`, `sems-stage`, `amoura-server`, `capabble-api`) and will auto-restart on crash, but there's no alarm on restart *count*. To add: use `pm2-logrotate` + a CloudWatch Logs metric filter on error patterns (`uncaughtException`, `FATAL`), or push a custom PM2 restart-count metric.
-- **Multiple apps share this instance.** CPU/memory thresholds (80%/85%) apply to the whole box, not just SEMS — check `pm2 status` to identify the actual offender when an alarm fires.
+- **App-level crash detection**: none of the above catches a Node process dying while the OS/instance stays healthy. PM2 is already managing the processes (`pm2 status` shows `capabble-server`, `capabble-stage`, `amoura-server`, `capabble-api`) and will auto-restart on crash, but there's no alarm on restart *count*. To add: use `pm2-logrotate` + a CloudWatch Logs metric filter on error patterns (`uncaughtException`, `FATAL`), or push a custom PM2 restart-count metric.
+- **Multiple apps share this instance.** CPU/memory thresholds (80%/85%) apply to the whole box, not just Capabble — check `pm2 status` to identify the actual offender when an alarm fires.
 - **Alarms are tied to this specific instance ID and hostname.** If the instance is stopped/started (private IP/hostname changes) or replaced, the memory/disk alarms (keyed on `host=`) will silently stop receiving data and need to be recreated. The CPU/status-check alarms (keyed on `InstanceId=`) survive stop/start but not termination+relaunch.

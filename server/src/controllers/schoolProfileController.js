@@ -130,7 +130,7 @@ exports.uploadLogo = asyncHandler(async (req, res) => {
 
   const tenantSlug = req.tenant?.slug || 'unknown';
   const publicId = `school_logo_${tenantSlug}`;
-  const uploadResult = await uploadToCloudinary(file.tempFilePath, 'sems/school-logos', publicId);
+  const uploadResult = await uploadToCloudinary(file.tempFilePath, 'capabble/school-logos', publicId);
 
   // Clean up temp file
   if (file.tempFilePath) {

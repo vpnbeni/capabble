@@ -177,7 +177,7 @@ Each generated PDF should include:
   author: 'Examination Management System',
   subject: 'Seating Arrangement',
   keywords: 'seating, examination, CBSE',
-  creator: 'BECMS',
+  creator: 'Capabble',
   producer: 'Puppeteer PDF Generator',
   creationDate: new Date(),
   format: 'A4',

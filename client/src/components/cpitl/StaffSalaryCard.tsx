@@ -1,10 +1,9 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
-import { useSelector } from 'react-redux'
 import { IndianRupee } from 'lucide-react'
 import { Icon } from '@/components/ui'
-import { selectUser } from '@/redux/slices/authSlice'
 import { getAccessibleModules, isFeatureEnabledForPath } from '@/constants/featureAccess'
+import { usePermissions } from '@/hooks/usePermissions'
 import { useSalarySummary } from '@/hooks/useCpitl'
 import { fmtDate, inr } from './CpitlUi'
 import './payroll.css'
@@ -18,11 +17,11 @@ import './payroll.css'
  * the older teacher modal.
  */
 const StaffSalaryCard: React.FC<{ teacherId?: string }> = ({ teacherId }) => {
-  const user = useSelector(selectUser)
+  const { access, can } = usePermissions()
   const enabled =
-    user?.role === 'admin' &&
-    getAccessibleModules(user?.featureToggles).has('cpitl') &&
-    isFeatureEnabledForPath('/cpitl/salary', user?.featureToggles)
+    can('cpitl.finance.payroll') &&
+    getAccessibleModules(access).has('cpitl') &&
+    isFeatureEnabledForPath('/cpitl/salary', access)
   const { data, isLoading, isError } = useSalarySummary(teacherId, enabled)
 
   if (!enabled || !teacherId || isError) return null

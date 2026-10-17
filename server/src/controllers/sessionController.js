@@ -109,6 +109,20 @@ const createSession = asyncHandler(async (req, res) => {
     return res.status(400).json({ success: false, error: 'Invalid session label (expected YYYY-YYYY)' });
   }
 
+  // Anyone on staff may enter a session that already exists; creating a new one
+  // is school setup and needs `core.school.write`.
+  const existing = await AcademicSession.findOne({ label });
+  if (existing) {
+    return res.status(200).json({ success: true, message: `Session ${label} is ready`, data: existing });
+  }
+  if (!req.rbac?.has('core.school.write')) {
+    return res.status(403).json({
+      success: false,
+      message: 'Only the school administrator can start a new academic session.',
+      errorCode: 'permission_denied',
+    });
+  }
+
   const session = await AcademicSession.ensureSession(label, req.user?._id);
   await syncClass12Alumni(req, label);
 

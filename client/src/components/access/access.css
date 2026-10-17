@@ -1,0 +1,52 @@
+/* Users and access — module-scoped layout only. Colours, type and radii come from tokens. */
+
+/* One-time credential (temporary password / invite link) */
+.cb-app .ua-credential { display: flex; flex-direction: column; gap: var(--space-3); }
+.cb-app .ua-credential__row { display: flex; flex-direction: column; gap: var(--space-1); }
+.cb-app .ua-credential__label { font: 500 13px/18px var(--font-sans); color: var(--ink-muted); }
+.cb-app .ua-credential__value {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--space-3);
+  padding: var(--space-2) var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--surface-sunken); font: 500 14px/20px ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--ink); word-break: break-all;
+}
+
+/* Chips for linked students / assigned classes */
+.cb-app .ua-chips { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+.cb-app .ua-chip {
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  padding: 2px var(--space-1) 2px var(--space-3); border: 1px solid var(--border-control);
+  border-radius: var(--radius-full); font-size: 13px; line-height: 18px; color: var(--ink);
+}
+.cb-app .ua-chip__remove {
+  display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px;
+  border: 0; border-radius: var(--radius-full); background: none; color: var(--ink-muted); cursor: pointer;
+}
+.cb-app .ua-chip__remove:hover { background: var(--surface-hover); color: var(--ink); }
+
+.cb-app .ua-inline { display: flex; align-items: flex-end; gap: var(--space-2); }
+.cb-app .ua-inline > .cb-field { flex: 1; min-width: 0; }
+
+/* Role checklist in the create sheet */
+.cb-app .ua-roles { display: flex; flex-direction: column; gap: var(--space-3); }
+
+/* Permission matrix */
+.cb-app .ua-matrix { display: flex; flex-direction: column; }
+.cb-app .ua-matrix__module { padding: var(--space-4) var(--space-5); border-top: 1px solid var(--border); }
+.cb-app .ua-matrix__module:first-child { border-top: 0; }
+.cb-app .ua-matrix__title { margin: 0 0 var(--space-3); font: 600 13px/18px var(--font-sans); color: var(--ink); }
+.cb-app .ua-matrix__row {
+  display: grid; grid-template-columns: minmax(180px, 1.2fr) 2fr minmax(176px, 0.8fr);
+  gap: var(--space-3); align-items: center; padding: var(--space-2) 0;
+}
+.cb-app .ua-matrix__row + .ua-matrix__row { border-top: 1px solid var(--border); }
+.cb-app .ua-matrix__label { font-size: 13px; line-height: 18px; color: var(--ink); }
+.cb-app .ua-matrix__actions { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); }
+.cb-app .ua-matrix__scope select { width: 100%; }
+@media (max-width: 760px) {
+  .cb-app .ua-matrix__module { padding: var(--space-4); }
+  .cb-app .ua-matrix__row { grid-template-columns: minmax(0, 1fr); gap: var(--space-2); }
+}
+
+/* Bulk results */
+.cb-app .ua-results { display: flex; flex-direction: column; gap: var(--space-4); }

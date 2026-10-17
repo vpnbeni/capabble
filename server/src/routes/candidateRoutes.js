@@ -18,7 +18,8 @@ const {
   reimportApply,
 } = require('../controllers/candidateReimportController');
 
-const { protect, authorize } = require('../middleware/auth');
+const { protect } = require('../middleware/auth');
+const { requirePermission } = require('../rbac/middleware');
 const { validateCandidate } = require('../validations/candidateValidation');
 
 const router = express.Router();
@@ -30,7 +31,7 @@ router.use(protect);
 router
   .route('/')
   .get(getCandidates)
-  .post(authorize('admin', 'staff'), validateCandidate, createCandidate);
+  .post(requirePermission('exam.candidates.write'), validateCandidate, createCandidate);
 
 router
   .route('/stats')
@@ -38,27 +39,27 @@ router
 
 router
   .route('/import')
-  .post(authorize('admin', 'staff'), importCandidatesFromPDF);
+  .post(requirePermission('exam.candidates.write'), importCandidatesFromPDF);
 
 router
   .route('/link-subjects')
-  .post(authorize('admin', 'staff'), linkCandidateSubjects);
+  .post(requirePermission('exam.candidates.write'), linkCandidateSubjects);
 
 router
   .route('/subject-code')
-  .delete(authorize('admin'), removeSubjectCodeFromCandidates);
+  .delete(requirePermission('exam.candidates.delete'), removeSubjectCodeFromCandidates);
 
 router
   .route('/reimport-compare')
-  .post(authorize('admin'), reimportCompare);
+  .post(requirePermission('exam.candidates.delete'), reimportCompare);
 
 router
   .route('/reimport-impact')
-  .post(authorize('admin'), reimportImpact);
+  .post(requirePermission('exam.candidates.delete'), reimportImpact);
 
 router
   .route('/reimport-apply')
-  .post(authorize('admin'), reimportApply);
+  .post(requirePermission('exam.candidates.delete'), reimportApply);
 
 router
   .route('/:id/subject-serials')
@@ -67,7 +68,7 @@ router
 router
   .route('/:id')
   .get(getCandidate)
-  .put(authorize('admin', 'staff'), validateCandidate, updateCandidate)
-  .delete(authorize('admin'), deleteCandidate);
+  .put(requirePermission('exam.candidates.write'), validateCandidate, updateCandidate)
+  .delete(requirePermission('exam.candidates.delete'), deleteCandidate);
 
 module.exports = router;

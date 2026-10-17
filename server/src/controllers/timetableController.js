@@ -861,8 +861,15 @@ const createBellTimingVersion = asyncHandler(async (req, res) => {
   const BellTimingVersionModel = req.models?.BellTimingVersion || BellTimingVersion;
   const TimetableStateModel = req.models?.TimetableState || TimetableState;
   const filter = getSessionScopedFilter(req);
-  const state = await TimetableStateModel.findOne(filter).lean();
-  const bellTimings = normalizeBellTimings(state?.bellTimings, req.academicSession);
+
+  // Prefer the timings sent by the client (what is on screen, saved or not);
+  // fall back to the persisted bell timings for older clients.
+  let sourceBellTimings = req.body?.bellTimings;
+  if (!isPlainObject(sourceBellTimings)) {
+    const state = await TimetableStateModel.findOne(filter).lean();
+    sourceBellTimings = state?.bellTimings;
+  }
+  const bellTimings = normalizeBellTimings(sourceBellTimings, req.academicSession);
 
   const currentCount = await BellTimingVersionModel.countDocuments(filter);
   const requestedName = typeof req.body?.name === 'string' ? req.body.name.trim() : '';

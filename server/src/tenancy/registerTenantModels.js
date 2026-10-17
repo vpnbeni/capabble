@@ -1,4 +1,6 @@
 const User = require('../models/User');
+const Role = require('../models/Role');
+const AuthAuditLog = require('../models/AuthAuditLog');
 const Teacher = require('../models/Teacher');
 const Student = require('../models/Student');
 const Subject = require('../models/Subject');
@@ -82,6 +84,7 @@ const {
   AssetStockTransaction,
   AssetSettings,
 } = require('../models/AssetRecords');
+const { LibraryTitle, LibraryCopy, LibraryMember, LibraryPolicy, LibraryLoan, LibraryReservation, LibraryFine, LibraryAcquisitionRequest, LibrarySupplier, LibraryPurchaseOrder, LibraryGoodsReceipt, LibraryStocktake, LibraryAuditLog, LibraryDigitalResource, LibraryReadingList, LibraryReadingLog, LibraryBookReview, LibraryReadingChallenge } = require('../models/LibraryRecords');
 const {
   FeeHead,
   FeeStructure,
@@ -105,6 +108,8 @@ const {
 
 const tenantModelExports = {
   User,
+  Role,
+  AuthAuditLog,
   Teacher,
   Student,
   Subject,
@@ -184,6 +189,24 @@ const tenantModelExports = {
   AssetStockItem,
   AssetStockTransaction,
   AssetSettings,
+  LibraryTitle,
+  LibraryCopy,
+  LibraryMember,
+  LibraryPolicy,
+  LibraryLoan,
+  LibraryReservation,
+  LibraryFine,
+  LibraryAcquisitionRequest,
+  LibrarySupplier,
+  LibraryPurchaseOrder,
+  LibraryGoodsReceipt,
+  LibraryStocktake,
+  LibraryAuditLog,
+  LibraryDigitalResource,
+  LibraryReadingList,
+  LibraryReadingLog,
+  LibraryBookReview,
+  LibraryReadingChallenge,
   FeeHead,
   FeeStructure,
   FeeStructureRevision,

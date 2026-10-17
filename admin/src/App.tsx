@@ -200,7 +200,7 @@ function App() {
         <div className="card" style={{ width: '100%', maxWidth: 400 }}>
           <div className="logo">
             <span style={{ color: 'var(--accent)' }}>*</span>
-            <span className="logo-text">BECMS ADMIN</span>
+            <span className="logo-text">Capabble ADMIN</span>
           </div>
           <h1 className="card-title">Welcome back</h1>
           <p style={{ color: 'var(--text-secondary)', marginBottom: 24, marginTop: -12 }}>
@@ -246,7 +246,7 @@ function App() {
       <aside className="sidebar">
         <div className="logo">
           <span style={{ color: 'var(--accent)' }}>*</span>
-          <span className="logo-text">BECMS ADMIN</span>
+          <span className="logo-text">Capabble ADMIN</span>
         </div>
 
         <nav style={{ flex: 1 }}>

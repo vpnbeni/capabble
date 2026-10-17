@@ -11,10 +11,9 @@ import {
   Receipt,
   Wallet,
 } from 'lucide-react'
-import { useSelector } from 'react-redux'
 import { useCpitlDashboard, useExpenseSummary } from '@/hooks/useCpitl'
-import { selectUser } from '@/redux/slices/authSlice'
 import { isFeatureEnabledForPath } from '@/constants/featureAccess'
+import { usePermissions } from '@/hooks/usePermissions'
 import type { ClassRow, CpitlDashboard as DashboardData } from '@/services/cpitlService'
 import { Banner, BulkBar, Button, Card, DataTable, EmptyState, Page, Progress, StatCard, cx, useRowSelection, type DataTableColumn } from '@/components/ui'
 import { MODE_LABELS, MONTHS, errorMessage, fmtDate, inr, inrShort } from '@/components/cpitl/CpitlUi'
@@ -62,8 +61,8 @@ type Defaulter = DashboardData['defaulters'][number]
 const CpitlDashboard: React.FC = () => {
   const navigate = useNavigate()
   const { data, isLoading, isError, refetch } = useCpitlDashboard()
-  const user = useSelector(selectUser)
-  const expensesEnabled = isFeatureEnabledForPath('/cpitl/expenses', user?.featureToggles)
+  const { access } = usePermissions()
+  const expensesEnabled = isFeatureEnabledForPath('/cpitl/expenses', access)
   const { data: summary } = useExpenseSummary({}, expensesEnabled)
 
   // A fixed 12-month window ending this month, so one month of data doesn't float alone in the chart.

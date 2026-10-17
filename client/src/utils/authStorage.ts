@@ -1,7 +1,16 @@
-const TOKEN_KEY = 'token'
-const REFRESH_TOKEN_KEY = 'refreshToken'
-const USER_KEY = 'user'
-const REMEMBER_ME_KEY = 'becms-stay-signed-in'
+/**
+ * Browser-side auth state.
+ *
+ * The session itself lives in httpOnly cookies set by the API: no access or
+ * refresh token is ever readable from JavaScript. What we keep here is only the
+ * signed-in user's profile (name, roles, permissions) so the app can paint
+ * before `/auth/me` confirms the session. It is a hint, not proof: the server
+ * checks every request.
+ */
+const USER_KEY = 'cb-user'
+const REMEMBER_ME_KEY = 'capabble-stay-signed-in'
+// Keys from the previous token-in-storage scheme, removed on sight.
+const LEGACY_KEYS = ['token', 'refreshToken', 'user']
 
 type StorageKind = 'local' | 'session'
 
@@ -16,33 +25,10 @@ const getStorage = (kind: StorageKind): Storage | null => {
   }
 }
 
-const readFromAnyStorage = (key: string): string | null => {
-  const local = getStorage('local')?.getItem(key)
-  if (local) return local
-  return getStorage('session')?.getItem(key) ?? null
-}
-
-const clearAuthKeys = (storage: Storage | null) => {
-  if (!storage) return
-  storage.removeItem(TOKEN_KEY)
-  storage.removeItem(REFRESH_TOKEN_KEY)
-  storage.removeItem(USER_KEY)
-}
-
-const resolveAuthStorage = (): Storage | null => {
-  const local = getStorage('local')
-  const session = getStorage('session')
-  if (!local && !session) return null
-
-  if (local?.getItem(TOKEN_KEY) || local?.getItem(REFRESH_TOKEN_KEY)) {
-    return local
-  }
-
-  if (session?.getItem(TOKEN_KEY) || session?.getItem(REFRESH_TOKEN_KEY)) {
-    return session
-  }
-
-  return getRememberPreference() ? local : session
+const removeLegacyKeys = () => {
+  ;[getStorage('local'), getStorage('session')].forEach((storage) => {
+    LEGACY_KEYS.forEach((key) => storage?.removeItem(key))
+  })
 }
 
 export const getRememberPreference = (): boolean => {
@@ -55,48 +41,16 @@ export const setRememberPreference = (remember: boolean): void => {
   getStorage('local')?.setItem(REMEMBER_ME_KEY, remember ? '1' : '0')
 }
 
-export const persistAuthData = ({
-  token,
-  refreshToken,
-  user,
-  remember = getRememberPreference(),
-}: {
-  token?: string | null
-  refreshToken?: string | null
-  user?: unknown
-  remember?: boolean
-}): void => {
-  const local = getStorage('local')
-  const session = getStorage('session')
-  const target = remember ? local : session
-  const other = remember ? session : local
-
-  setRememberPreference(remember)
-  clearAuthKeys(other)
-
-  if (!target) return
-  if (token) target.setItem(TOKEN_KEY, token)
-  if (refreshToken) target.setItem(REFRESH_TOKEN_KEY, refreshToken)
-  if (user !== undefined && user !== null) target.setItem(USER_KEY, JSON.stringify(user))
+export const setStoredUser = (user: unknown, remember = getRememberPreference()): void => {
+  removeLegacyKeys()
+  const target = getStorage(remember ? 'local' : 'session')
+  const other = getStorage(remember ? 'session' : 'local')
+  other?.removeItem(USER_KEY)
+  if (target && user !== undefined && user !== null) target.setItem(USER_KEY, JSON.stringify(user))
 }
-
-export const setStoredToken = (token: string): void => {
-  const storage = resolveAuthStorage()
-  storage?.setItem(TOKEN_KEY, token)
-}
-
-export const setStoredUser = (user: unknown): void => {
-  const storage = resolveAuthStorage()
-  if (!storage) return
-  storage.setItem(USER_KEY, JSON.stringify(user))
-}
-
-export const getAuthToken = (): string | null => readFromAnyStorage(TOKEN_KEY)
-
-export const getRefreshToken = (): string | null => readFromAnyStorage(REFRESH_TOKEN_KEY)
 
 export const getStoredUser = <T = unknown>(): T | null => {
-  const raw = readFromAnyStorage(USER_KEY)
+  const raw = getStorage('local')?.getItem(USER_KEY) ?? getStorage('session')?.getItem(USER_KEY)
   if (!raw) return null
   try {
     return JSON.parse(raw) as T
@@ -105,7 +59,11 @@ export const getStoredUser = <T = unknown>(): T | null => {
   }
 }
 
+/** True when this browser was signed in last time (worth asking the server). */
+export const hasSessionHint = (): boolean => Boolean(getStoredUser())
+
 export const clearAuthData = (): void => {
-  clearAuthKeys(getStorage('local'))
-  clearAuthKeys(getStorage('session'))
+  removeLegacyKeys()
+  getStorage('local')?.removeItem(USER_KEY)
+  getStorage('session')?.removeItem(USER_KEY)
 }

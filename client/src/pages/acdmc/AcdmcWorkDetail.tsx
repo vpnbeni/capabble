@@ -56,7 +56,7 @@ import {
   errorMessage,
   printElement,
   shortDate,
-  useIsAdmin,
+  useCanDeleteAcademics,
 } from '@/components/acdmc/AcdmcUi'
 import {
   ClassWorkFields,
@@ -112,7 +112,7 @@ const AcdmcWorkDetail: React.FC<{ kind: ClassWorkKind }> = ({ kind }) => {
   const meta = KIND_META[kind]
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const isAdmin = useIsAdmin()
+  const canDelete = useCanDeleteAcademics('classwork')
   const { data: work, isLoading, isError, error, refetch } = useClassWork(kind, id)
   const { data: roster, isLoading: rosterLoading } = useRoster(kind, id, Boolean(work))
   const saveWork = useSaveClassWork(kind)
@@ -323,7 +323,7 @@ const AcdmcWorkDetail: React.FC<{ kind: ClassWorkKind }> = ({ kind }) => {
       },
     },
     ...(work.status === 'published' ? [{ label: 'Move to draft', icon: RotateCcw, onSelect: () => changeStatus('draft', 'Moved to draft.') }] : []),
-    ...(isAdmin ? [{ divider: true } as const, { label: `Delete ${meta.noun}`, icon: Trash2, tone: 'danger' as const, onSelect: () => setDeleteOpen(true) }] : []),
+    ...(canDelete ? [{ divider: true } as const, { label: `Delete ${meta.noun}`, icon: Trash2, tone: 'danger' as const, onSelect: () => setDeleteOpen(true) }] : []),
   ]
 
   const rosterColumns: DataTableColumn<RosterRow>[] = [

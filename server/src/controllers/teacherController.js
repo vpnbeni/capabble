@@ -1,4 +1,5 @@
 const ExcelJS = require('exceljs');
+const { PLACEHOLDER_EMAIL_DOMAIN } = require('../utils/placeholderEmail');
 const fs = require('fs');
 const asyncHandler = require('../middleware/asyncHandler');
 const Teacher = require('../models/Teacher');
@@ -175,7 +176,7 @@ const buildGeneratedImportEmail = (employeeId, rowNumber, batchToken) => {
     .toLowerCase()
     .replace(/[^a-z0-9._-]/g, '');
   const localPart = safeLocalPart || `functionary${rowNumber}`;
-  return `${localPart}.${batchToken}.${rowNumber}@sems.local`;
+  return `${localPart}.${batchToken}.${rowNumber}@${PLACEHOLDER_EMAIL_DOMAIN}`;
 };
 
 // @desc    Get all teachers

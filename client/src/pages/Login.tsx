@@ -2,14 +2,14 @@ import React, { useEffect, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { Link, useNavigate } from 'react-router-dom'
 import { ArrowRight, Building2, KeyRound, LayoutGrid, Lock, Mail, RefreshCw } from 'lucide-react'
-import { clearError, login, selectAuth, setCredentials } from '../redux/slices/authSlice'
-import authService from '../services/authService'
+import { clearError, login, selectAuth, setSignedInUser } from '../redux/slices/authSlice'
+import authService, { schoolCodeFromLoginId } from '../services/authService'
 import { useAcademicSession } from '../contexts/AcademicSessionContext'
-import sessionService from '../services/sessionService'
-import { getRememberPreference, persistAuthData, setRememberPreference } from '../utils/authStorage'
+import { getRememberPreference, setRememberPreference } from '../utils/authStorage'
+import { enterStaffPanel, landingPathFor } from '../utils/landing'
 import { resolveTenantSlug } from '../utils/tenantRuntime'
 import type { AppDispatch } from '../redux/store'
-import type { LoginCredentials } from '../types/auth'
+import type { LoginCredentials, User } from '../types/auth'
 import Loader from '../components/common/Loader'
 import AuthLayout, { CardHeading } from '../components/auth/capabble/AuthLayout'
 import { Badge, Button, Callout, Checkbox, TextField } from '../components/auth/capabble/controls'
@@ -49,14 +49,23 @@ const Login: React.FC = () => {
 
   const dispatch = useDispatch<AppDispatch>()
   const navigate = useNavigate()
-  const { loading, error, isAuthenticated } = useSelector(selectAuth)
+  const { loading, error, isAuthenticated, user } = useSelector(selectAuth)
   const { hasSession, setSession } = useAcademicSession()
 
   useEffect(() => {
     if (isAuthenticated && !resolvingTenant) {
-      navigate(hasSession ? '/dashboard' : '/select-session')
+      navigate(landingPathFor(user, hasSession))
     }
-  }, [hasSession, isAuthenticated, navigate, resolvingTenant])
+  }, [hasSession, isAuthenticated, navigate, resolvingTenant, user])
+
+  /** After any successful sign-in: parents/students to the portal, staff into a session. */
+  const goToLanding = async (signedIn: User) => {
+    if (signedIn.mustChangePassword || signedIn.kind !== 'staff') {
+      navigate(landingPathFor(signedIn, hasSession), { replace: true })
+      return
+    }
+    navigate(await enterStaffPanel(setSession), { replace: true })
+  }
 
   useEffect(() => {
     return () => {
@@ -91,7 +100,7 @@ const Login: React.FC = () => {
       return
     }
     if (!identifier || !password) {
-      setFieldErrors(!identifier ? { email: 'Enter your email or username' } : { password: 'Enter your password' })
+      setFieldErrors(!identifier ? { email: 'Enter your email or login ID' } : { password: 'Enter your password' })
       requestAnimationFrame(() => document.getElementById(!identifier ? 'email' : 'password')?.focus())
       return
     }
@@ -101,44 +110,30 @@ const Login: React.FC = () => {
       dispatch(clearError())
       setResolvingTenant(true)
 
-      if (identifier.includes('@')) {
+      const loginIdSchool = schoolCodeFromLoginId(identifier)
+      if (loginIdSchool) {
+        // Student login ID such as 2024017@springdale: the school code is after the @.
+        localStorage.setItem('tenantSlug', loginIdSchool)
+        syncTenantInUrl(loginIdSchool)
+      } else if (identifier.includes('@')) {
         const tenant = await authService.resolveTenantByEmail(identifier)
         localStorage.setItem('tenantSlug', tenant.slug)
         syncTenantInUrl(tenant.slug)
       } else {
-        // Username login: resolve tenant from localStorage/JWT, or from the school code field.
-        const tenantSlug = resolveTenantSlug()
-        if (!tenantSlug) {
-          const code = schoolCode.trim().toLowerCase()
-          if (!code) {
-            setShowSchoolCode(true)
-            setTenantLookupError('Enter your workspace code to sign in with a username.')
-            return
-          }
-          localStorage.setItem('tenantSlug', code)
-          syncTenantInUrl(code)
+        // Bare login ID: use the school this browser knows, or ask for the school code.
+        const code = schoolCode.trim().toLowerCase() || resolveTenantSlug()
+        if (!code) {
+          setShowSchoolCode(true)
+          setTenantLookupError('Enter your school code, or sign in with your full login ID (for example 2024017@springdale).')
+          return
         }
+        localStorage.setItem('tenantSlug', code)
+        syncTenantInUrl(code)
       }
 
       setRememberPreference(rememberMe)
-      await dispatch(login({ email: identifier, password })).unwrap()
-
-      try {
-        const available = await sessionService.getAvailableSessions()
-        const fallbackCurrent = available?.data?.find((session) => session.isCurrent)?.label || null
-        const currentLabel = available?.meta?.currentLabel || fallbackCurrent
-
-        if (currentLabel) {
-          await sessionService.createSession(currentLabel)
-          setSession(currentLabel)
-          navigate('/dashboard', { replace: true })
-          return
-        }
-      } catch (sessionError) {
-        console.warn('Unable to auto-select current academic session:', sessionError)
-      }
-
-      navigate('/select-session', { replace: true })
+      const result = await dispatch(login({ email: identifier, password })).unwrap()
+      await goToLanding(result.data.user)
     } catch (loginError: any) {
       const errorCode = loginError?.response?.data?.errorCode
       const message =
@@ -177,28 +172,9 @@ const Login: React.FC = () => {
 
     try {
       const response = await authService.verifyEmail(email, normalizedOtp)
-      const data = response.data as any
-      const userWithBilling = {
-        ...data.user,
-        ...(data.billing ? { billing: data.billing } : {}),
-      }
-      persistAuthData({ token: data.token, refreshToken: data.refreshToken, user: userWithBilling, remember: rememberMe })
-      dispatch(setCredentials({ user: userWithBilling, token: data.token }))
-
-      try {
-        const available = await sessionService.getAvailableSessions()
-        const fallbackCurrent = available?.data?.find((s: any) => s.isCurrent)?.label || null
-        const currentLabel = available?.meta?.currentLabel || fallbackCurrent
-        if (currentLabel) {
-          await sessionService.createSession(currentLabel)
-          setSession(currentLabel)
-          navigate('/dashboard', { replace: true })
-          return
-        }
-      } catch {
-        // ignore session error
-      }
-      navigate('/select-session', { replace: true })
+      const signedIn = { ...response.data.user, ...(response.data.billing ? { billing: response.data.billing } : {}) }
+      dispatch(setSignedInUser(signedIn))
+      await goToLanding(signedIn)
     } catch (err: any) {
       const code = err?.response?.data?.errorCode
       const msg = err?.response?.data?.message || 'Verification failed. Please try again.'
@@ -316,7 +292,7 @@ const Login: React.FC = () => {
           <div className="cb-auth-head">
             <h1 className="cb-auth-title">Sign in to Capabble</h1>
             <p className="cb-auth-subtitle">
-              Use your workspace account. It works across every module your school has turned on.
+              Staff and parents sign in with their email. Students use the login ID from their school.
             </p>
           </div>
 
@@ -324,9 +300,9 @@ const Login: React.FC = () => {
             <TextField
               id="email"
               name="email"
-              label="Email or username"
+              label="Email or login ID"
               icon={Mail}
-              placeholder="name@yourschool.in"
+              placeholder="name@yourschool.in or 2024017@school"
               autoComplete="username"
               autoCapitalize="none"
               spellCheck={false}
@@ -339,10 +315,10 @@ const Login: React.FC = () => {
               <TextField
                 id="schoolCode"
                 name="schoolCode"
-                label="Workspace code"
+                label="School code"
                 icon={Building2}
                 placeholder="e.g. springdale"
-                hint="Your workspace or institution code, from your administrator."
+                hint="The code your school gave you with your login ID."
                 autoCapitalize="none"
                 value={schoolCode}
                 onChange={handleSchoolCodeChange}

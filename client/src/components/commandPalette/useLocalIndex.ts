@@ -3,8 +3,10 @@ import { useSelector } from 'react-redux'
 import type { LucideIcon } from 'lucide-react'
 import { CalendarClock, ClipboardCheck, FileText, IndianRupee, Repeat, UserCheck, Wand2 } from 'lucide-react'
 import { selectUser } from '@/redux/slices/authSlice'
+import { usePermissions } from '@/hooks/usePermissions'
 import {
   getAccessibleModules,
+  getFeaturePermission,
   getFirstEnabledPathForModule,
   isCoreAllowedPath,
   isFeatureEnabledForPath,
@@ -43,7 +45,7 @@ const QUICK_ACTIONS: Array<Omit<LocalEntry, 'id' | 'kind'>> = [
   { title: 'Switch academic session', path: '/select-session', icon: CalendarClock, keywords: 'year session change', run: 'switch-session' },
 ]
 
-// Mirrors server/src/modules/search/providers.js `enabled` gates (roles are enforced server-side).
+// Mirrors server/src/modules/search/providers.js `enabled` gates (the server enforces the same permissions).
 const RECORD_FILTERS: Array<RecordFilter & { features: string[] }> = [
   { type: 'student', label: 'Students', features: ['stdnt_students', 'cpitl_fees'] },
   { type: 'staff', label: 'Staff', features: ['staaf_staff_members', 'exam_functionaries'] },
@@ -57,13 +59,14 @@ const RECORD_FILTERS: Array<RecordFilter & { features: string[] }> = [
 
 export const useLocalIndex = () => {
   const user = useSelector(selectUser)
+  const { access } = usePermissions()
   const toggles = user?.featureToggles
   const coreOnly = user?.billing?.accessMode === 'core_only'
 
   return useMemo(() => {
-    const accessibleModules = getAccessibleModules(toggles)
+    const accessibleModules = getAccessibleModules(access)
     const isAllowed = (path: string, module?: string) =>
-      isFeatureEnabledForPath(path, toggles)
+      isFeatureEnabledForPath(path, access)
       && (!module || module === 'core' || accessibleModules.has(module))
       && (!coreOnly || isCoreAllowedPath(path))
 
@@ -89,7 +92,7 @@ export const useLocalIndex = () => {
           title: `${module.abbreviation} — ${module.title}`,
           subtitle: 'Switch module',
           keywords: `module app ${module.id}`,
-          path: getFirstEnabledPathForModule(module.id, toggles) || module.defaultRoute,
+          path: getFirstEnabledPathForModule(module.id, access) || module.defaultRoute,
           module: module.id,
           image: module.icon,
         }))
@@ -101,12 +104,16 @@ export const useLocalIndex = () => {
       subtitle: 'Quick action',
     }))
 
+    const featureOpen = (key: string) => {
+      const permission = getFeaturePermission(key)
+      return toggles?.[key] !== false && (!permission || Boolean(access.can?.(permission)))
+    }
     const recordFilters: RecordFilter[] = RECORD_FILTERS.filter(
-      (filter) => !coreOnly && filter.features.some((key) => toggles?.[key] !== false)
+      (filter) => !coreOnly && filter.features.some(featureOpen)
     ).map(({ type, label }) => ({ type, label }))
 
     const pageByPath = new Map(pages.map((page) => [page.path, page]))
 
     return { pages, modules, actions, entries: [...pages, ...actions, ...modules], recordFilters, pageByPath }
-  }, [toggles, coreOnly])
+  }, [access, toggles, coreOnly])
 }

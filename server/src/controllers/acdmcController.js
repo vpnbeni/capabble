@@ -383,6 +383,7 @@ const listLessonPlans = async (req, res) => {
     const LessonPlan = getModel(req, MODEL_KEYS.LessonPlan);
     const { page, limit, skip } = parsePagination(req.query);
     const and = buildListFilter(req.query, { searchFields: ['title', 'topic', 'teacherName'] });
+    if (req.sectionScope) and.push(req.sectionScope);
     if (str(req.query.from)) and.push({ date: { $gte: str(req.query.from) } });
     if (str(req.query.to)) and.push({ date: { $lte: str(req.query.to) } });
     const counts = await countByStatus(LessonPlan, and, ['draft', 'planned', 'delivered', 'cancelled'], { planned: ['published'] });
@@ -523,6 +524,7 @@ const makeClassWorkHandlers = (kind) => {
       const Model = getModel(req, config.key);
       const { page, limit, skip } = parsePagination(req.query);
       const and = buildListFilter(req.query, { searchFields: ['title', 'teacherName', 'instructions'] });
+      if (req.sectionScope) and.push(req.sectionScope);
       if (str(req.query.from)) and.push({ [config.dateField]: { $gte: str(req.query.from) } });
       if (str(req.query.to)) and.push({ [config.dateField]: { $lte: str(req.query.to) } });
       const counts = await countByStatus(Model, and, ['draft', 'published', 'closed']);

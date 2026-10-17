@@ -497,4 +497,6 @@ module.exports = {
   generateExcel,
   generateClassPDF,
   generateTeacherPDF,
+  computePeriodSchedule,
+  buildClassPDFContext,
 };

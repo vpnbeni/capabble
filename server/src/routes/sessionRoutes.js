@@ -1,5 +1,6 @@
 const express = require('express');
-const { protect, authorize } = require('../middleware/auth');
+const { protect } = require('../middleware/auth');
+const { requirePermission } = require('../rbac/middleware');
 const {
   getSessions,
   getAvailableSessions,
@@ -18,10 +19,10 @@ router.get('/', getSessions);
 // Available sessions (generated from calendar)
 router.get('/available', getAvailableSessions);
 
-// Create / ensure a session (admin only)
-router.post('/', authorize('admin'), createSession);
+// Enter an existing session (any staff) or create one (needs core.school.write; checked in the controller)
+router.post('/', createSession);
 
 // Carry forward data from one session to another (admin only)
-router.post('/:label/carry-forward', authorize('admin'), carryForward);
+router.post('/:label/carry-forward', requirePermission('core.school.write'), carryForward);
 
 module.exports = router;

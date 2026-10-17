@@ -116,7 +116,7 @@ const isCurrentInvigilator = (functionary?: Teacher) => {
   return Boolean(functionary && functionary.isActive !== false && functionary.dutyType === 'Invigilator')
 }
 
-const UI_ONLY_HIDDEN_KEY = 'sems:exam-functionaries:hidden-teacher-ids'
+const UI_ONLY_HIDDEN_KEY = 'capabble:exam-functionaries:hidden-teacher-ids'
 
 const getFunctionaryHideKeys = (functionary: Partial<Teacher>) => {
   const keys: string[] = []

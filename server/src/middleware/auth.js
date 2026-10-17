@@ -4,7 +4,10 @@ const {
   verifyTenantToken,
   verifyPlatformToken,
 } = require('../utils/jwt');
-const { getRequestContext } = require('../tenancy/requestContext');
+const { getRequestContext, setRequestContext } = require('../tenancy/requestContext');
+const { audienceFor, AUDIENCE } = require('../rbac/session');
+const { resolvePermissionSet, PermissionSet } = require('../rbac/permissions');
+const { ensureUserIndexes } = require('../rbac/userIndexes');
 const { getPlatformModels } = require('../tenancy/platformModels');
 
 const unauthorized = (res, message = 'Not authorized to access this route') => {
@@ -36,72 +39,81 @@ const getPlatformAdminModel = (req) => {
   return getPlatformModels().PlatformAdmin;
 };
 
-const protectTenant = asyncHandler(async (req, res, next) => {
-  const token = getTokenFromRequest(req);
+const UNSAFE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
-  if (!token) {
-    return unauthorized(res);
-  }
+/**
+ * Authenticate a tenant request and attach `req.user`, `req.auth` and, for
+ * staff, `req.rbac` (their effective permissions). Rejects tokens issued
+ * before the user's last password change or token-version bump, so password
+ * resets, role changes and deactivation cut access immediately.
+ */
+const authenticateTenant = async (req) => {
+  const { token, source } = getTokenFromRequest(req, { withSource: true });
+  if (!token) return { error: 'Not authorized to access this route' };
 
   let decoded;
   try {
     decoded = verifyTenantToken(token);
   } catch (error) {
-    return unauthorized(res);
+    return { error: 'Session expired', errorCode: 'token_expired' };
   }
 
   if (req.tenant && decoded.tenantSlug !== req.tenant.slug) {
-    return unauthorized(res, 'Token tenant does not match request tenant');
+    return { error: 'Token tenant does not match request tenant' };
+  }
+
+  // Cookie-authenticated writes must come from our own front-end (a custom
+  // header forces a CORS preflight that other origins cannot pass).
+  if (source === 'cookie' && UNSAFE_METHODS.has(req.method) && !req.headers['x-requested-with']) {
+    return { error: 'Missing request header', status: 403, errorCode: 'csrf_check_failed' };
   }
 
   const User = getTenantUserModel(req);
-  if (!User) {
-    return res.status(500).json({
+  if (!User) return { error: 'Tenant context is missing for authenticated route', status: 500 };
+  ensureUserIndexes(User);
+
+  const user = await User.findById(decoded.id).select('-password');
+  if (!user) return { error: 'No user found with this token' };
+  if (!user.isActive) return { error: 'User account is deactivated', errorCode: 'user_inactive' };
+  if ((decoded.tv ?? -1) !== (user.tokenVersion || 0)) {
+    return { error: 'Session expired', errorCode: 'token_revoked' };
+  }
+  if (user.changedPasswordAfter(decoded.iat)) {
+    return { error: 'Session expired', errorCode: 'token_revoked' };
+  }
+
+  const audience = audienceFor(user);
+  if (decoded.aud !== audience) return { error: 'Session expired', errorCode: 'token_revoked' };
+
+  return { user, audience, source };
+};
+
+const protectTenant = asyncHandler(async (req, res, next) => {
+  // Already authenticated by the tenant access gate.
+  if (req.auth?.authenticated && req.user) return next();
+
+  const result = await authenticateTenant(req);
+  if (result.error) {
+    return res.status(result.status || 401).json({
       success: false,
-      error: 'Tenant context is missing for authenticated route',
+      error: result.error,
+      message: result.error,
+      ...(result.errorCode ? { errorCode: result.errorCode } : {}),
     });
   }
 
-  req.user = await User.findById(decoded.id).select('-password');
-
-  if (!req.user) {
-    return unauthorized(res, 'No user found with this token');
-  }
-
-  if (!req.user.isActive) {
-    return unauthorized(res, 'User account is deactivated');
-  }
-
+  req.user = result.user;
+  req.auth = { authenticated: true, audience: result.audience, source: result.source };
+  req.rbac = result.audience === AUDIENCE.STAFF
+    ? await resolvePermissionSet(result.user, req.models?.Role)
+    : new PermissionSet();
+  setRequestContext({ user: req.user });
   return next();
 });
 
 const optionalAuth = asyncHandler(async (req, res, next) => {
-  const token = getTokenFromRequest(req);
-
-  if (!token) {
-    req.user = null;
-    return next();
-  }
-
-  try {
-    const decoded = verifyTenantToken(token);
-
-    if (req.tenant && decoded.tenantSlug !== req.tenant.slug) {
-      req.user = null;
-      return next();
-    }
-
-    const User = getTenantUserModel(req);
-    if (!User) {
-      req.user = null;
-      return next();
-    }
-
-    req.user = await User.findById(decoded.id).select('-password');
-  } catch (error) {
-    req.user = null;
-  }
-
+  const result = await authenticateTenant(req).catch(() => ({ error: 'invalid' }));
+  req.user = result.error ? null : result.user;
   return next();
 });
 
@@ -139,22 +151,27 @@ const protectPlatform = asyncHandler(async (req, res, next) => {
   return next();
 });
 
+/**
+ * @deprecated Use `requirePermission` from src/rbac/middleware. Kept for old
+ * call sites: 'admin' now means "holds the Administrator role".
+ */
 const authorize = (...roles) => {
   return (req, res, next) => {
-    if (!req.user || !roles.includes(req.user.role)) {
-      return res.status(403).json({
-        success: false,
-        error: `User role ${req.user?.role || 'unknown'} is not authorized to access this route`,
-      });
+    if (roles.includes('admin') && req.rbac?.isAdmin) {
+      return next();
     }
 
-    return next();
+    return res.status(403).json({
+      success: false,
+      error: 'You do not have permission to do this.',
+      errorCode: 'permission_denied',
+    });
   };
 };
 
 const ownershipOrAdmin = (resourceUserField = 'user') => {
   return (req, res, next) => {
-    if (req.user?.role === 'admin') {
+    if (req.rbac?.isAdmin) {
       return next();
     }
 
@@ -176,6 +193,7 @@ const auth = protectTenant;
 auth.protect = protectTenant;
 auth.protectTenant = protectTenant;
 auth.protectPlatform = protectPlatform;
+auth.authenticateTenant = authenticateTenant;
 auth.optionalAuth = optionalAuth;
 auth.authorize = authorize;
 auth.ownershipOrAdmin = ownershipOrAdmin;

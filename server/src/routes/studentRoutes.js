@@ -22,7 +22,9 @@ const {
   uploadProfileImage
 } = require('../controllers/studentController');
 
-const { protect, authorize } = require('../middleware/auth');
+const { protect } = require('../middleware/auth');
+const { requireSectionInScope } = require('../rbac/scope');
+const Student = require('../models/Student');
 const { validateJoi, validateParams, validateQuery } = require('../middleware/validation');
 const {
   createStudentSchema,
@@ -39,6 +41,25 @@ const router = express.Router();
 
 // Apply authentication to all routes
 router.use(protect);
+
+// A teacher whose write access is limited to their own sections may only
+// change individual students in those sections (no bulk or import routes).
+const STUDENT_ID_PATH = /^\/([0-9a-fA-F]{24})(\/|$)/;
+router.use((req, res, next) => {
+  if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return next();
+  const permission = req.method === 'DELETE' ? 'stdnt.students.delete' : 'stdnt.students.write';
+  return requireSectionInScope(permission, async () => {
+    const idMatch = req.path.match(STUDENT_ID_PATH);
+    if (idMatch) {
+      const student = await (req.models?.Student || Student).findById(idMatch[1]).select('class section').lean();
+      return student ? { className: student.class, section: student.section } : null;
+    }
+    if (req.method === 'POST' && req.path === '/') {
+      return { className: req.body?.class, section: req.body?.section };
+    }
+    return null;
+  })(req, res, next);
+});
 
 // Object ID validation schema
 const objectIdSchema = Joi.string()

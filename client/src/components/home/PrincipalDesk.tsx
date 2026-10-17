@@ -1,0 +1,146 @@
+import React from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
+import {
+  ArrowRight,
+  CalendarCheck,
+  CalendarDays,
+  CheckCircle2,
+  ClipboardCheck,
+  Clock3,
+  UserRound,
+  Users,
+} from 'lucide-react'
+import { Button, Card, EmptyState, Icon, Progress } from '@/components/ui'
+import attndService from '@/services/attndService'
+import { formatCount } from '@/components/students/studentFormat'
+import type { QuickAction } from './quickActions'
+
+const pad = (n: number) => String(n).padStart(2, '0')
+const todayKey = () => {
+  const today = new Date()
+  return `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`
+}
+const rate = (part: number, whole: number) => (whole ? Math.round((part / whole) * 1000) / 10 : 0)
+
+const DeskMetric: React.FC<{
+  icon: typeof Users
+  tone: 'blue' | 'green' | 'orange' | 'violet'
+  label: string
+  value: string
+  detail: string
+  onClick?: () => void
+}> = ({ icon, tone, label, value, detail, onClick }) => (
+  <button type="button" className={`principal-metric principal-metric--${tone}`} onClick={onClick}>
+    <span className="principal-metric__icon"><Icon icon={icon} size={21} /></span>
+    <span className="principal-metric__body">
+      <span className="principal-metric__label">{label}</span>
+      <strong className="principal-metric__value is-num">{value}</strong>
+      <span className="principal-metric__detail">{detail}</span>
+    </span>
+    {onClick ? <Icon icon={ArrowRight} size={18} className="principal-metric__arrow" /> : null}
+  </button>
+)
+
+export const PrincipalDesk: React.FC<{ actions: QuickAction[]; onEditActions: () => void }> = ({ actions, onEditActions }) => {
+  const navigate = useNavigate()
+  const date = todayKey()
+  const attendance = useQuery({
+    queryKey: ['principal-desk', 'attendance', date],
+    queryFn: () => attndService.getDashboard(date.slice(0, 7), date),
+    staleTime: 60_000,
+  })
+  const students = attendance.data?.students
+  const staff = attendance.data?.staff
+  const attendanceRate = students ? rate(students.todayPresent, students.strength) : 0
+  const classAttendance = (attendance.data?.classMatrix || []).map((row) => {
+    const strength = row.sections.reduce((sum, section) => sum + section.strength, 0)
+    const absent = row.sections.reduce((sum, section) => sum + section.todayAbsent, 0)
+    const halfDay = row.sections.reduce((sum, section) => sum + section.todayHalfDay, 0)
+    return { className: row.className, rate: strength ? Math.max(0, rate(strength - absent - halfDay * .5, strength)) : 0 }
+  })
+  const absentRate = students ? rate(students.todayAbsent, students.strength) : 0
+  const halfDayRate = students ? rate(students.todayHalfDay, students.strength) : 0
+  // Calendar events are not exposed by the current API. Keep the school-day label local
+  // so the desk does not issue a failing request while that integration is added.
+  const dayOfWeek = new Date().getDay()
+  const today = { isWeekend: dayOfWeek === 0 || dayOfWeek === 6, isHoliday: false, holidayName: '' }
+  return (
+    <div className="principal-desk">
+      <section className="principal-metrics" aria-label="Today's school overview">
+        <DeskMetric
+          icon={Users}
+          tone="blue"
+          label="Student attendance"
+          value={attendance.isLoading ? '…' : `${attendanceRate}%`}
+          detail={students ? `${formatCount(students.todayPresent)} / ${formatCount(students.strength)} present` : 'Loading attendance'}
+          onClick={() => navigate('/attnd/attndboard')}
+        />
+        <DeskMetric
+          icon={UserRound}
+          tone="green"
+          label="Teachers on leave"
+          value={attendance.isLoading ? '…' : formatCount(staff?.todayAbsent || 0)}
+          detail={staff ? `Of ${formatCount(staff.strength)} staff · marked absent today` : 'Loading staff attendance'}
+          onClick={() => navigate('/attnd/staff-attendance')}
+        />
+        <DeskMetric icon={CalendarDays} tone="orange" label="Appointments today" value="0" detail="No appointments scheduled" />
+        <DeskMetric icon={ClipboardCheck} tone="violet" label="Pending approvals" value="0" detail="Leave, bills and other requests" />
+      </section>
+
+      <section className="principal-main">
+        <Card
+          title="Student attendance overview"
+          subtitle="Live attendance status for today."
+          action={<Button variant="tertiary" size="sm" iconRight={ArrowRight} onClick={() => navigate('/attnd/attndboard')}>View details</Button>}
+        >
+          {attendance.isLoading ? <div className="cb-table-state"><span className="cb-spinner" /> Loading attendance</div> : students ? (
+            <div className="principal-attendance">
+              <div className="principal-attendance__score" style={{ background: `conic-gradient(var(--success-solid) 0 ${attendanceRate}%, var(--danger-solid) ${attendanceRate}% ${attendanceRate + absentRate}%, var(--warning-solid) ${attendanceRate + absentRate}% ${Math.min(100, attendanceRate + absentRate + halfDayRate)}%, var(--surface-sunken) 0)` }}>
+                <span className="principal-attendance__score-inner"><strong className="is-num">{attendanceRate}%</strong><span>present</span></span>
+              </div>
+              <div className="principal-attendance__details">
+                <Progress value={attendanceRate} showValue={false} tone={attendanceRate >= 95 ? 'success' : attendanceRate >= 90 ? 'warning' : 'danger'} />
+                <dl>
+                  <div><dt>Present</dt><dd className="is-num">{formatCount(students.todayPresent)}</dd></div>
+                  <div><dt>Absent</dt><dd className="is-num">{formatCount(students.todayAbsent)}</dd></div>
+                  <div><dt>Half day</dt><dd className="is-num">{formatCount(students.todayHalfDay)}</dd></div>
+                </dl>
+              </div>
+            </div>
+          ) : <EmptyState compact icon={Users} title="Attendance is not available" body="Mark attendance to see today’s school overview." />}
+          {classAttendance.length ? <div className="principal-class-chart" role="img" aria-label={classAttendance.map((item) => `${item.className} ${item.rate}%`).join(', ')}>{classAttendance.map((item) => <div key={item.className} className="principal-class-chart__item"><span className="principal-class-chart__bar"><i style={{ height: `${item.rate}%` }} /></span><strong className="is-num">{item.rate}%</strong><span>{item.className}</span></div>)}</div> : null}
+        </Card>
+
+        <Card
+          title="Today's schedule"
+          subtitle="Events from the academic calendar."
+          action={<Button variant="tertiary" size="sm" iconRight={ArrowRight} onClick={() => navigate('/actvt/calendar')}>Open calendar</Button>}
+        >
+          <EmptyState compact icon={CalendarDays} title="No scheduled events today" body="Academic events and appointments will appear here when they are added to the calendar." />
+        </Card>
+      </section>
+
+      <section className="principal-queues">
+        <Card title="Pending approvals" action={<Button variant="tertiary" size="sm">View all</Button>}>
+          <EmptyState compact icon={CheckCircle2} title="No approvals waiting" body="Leave, bill and other approval requests will appear here." />
+        </Card>
+        <Card title="Teachers on leave" action={<Button variant="tertiary" size="sm" onClick={() => navigate('/attnd/staff-attendance')}>View attendance</Button>}>
+          {staff?.todayAbsent ? <p className="principal-queue-copy"><strong className="is-num">{formatCount(staff.todayAbsent)}</strong> staff member{staff.todayAbsent === 1 ? '' : 's'} marked absent today.</p> : <EmptyState compact icon={UserRound} title="No staff marked absent" body="Staff attendance updates will show here." />}
+        </Card>
+        <Card title="Today's appointments" action={<Button variant="tertiary" size="sm">View all</Button>}>
+          <EmptyState compact icon={Clock3} title="No appointments today" body="Parent, visitor and staff appointments will appear here." />
+        </Card>
+      </section>
+
+      <section className="principal-bottom">
+        <Card title="Academic calendar · today" subtitle={today?.isHoliday ? today.holidayName || 'School holiday' : today?.isWeekend ? 'Weekend' : 'School day'} action={<Button variant="tertiary" size="sm" iconRight={ArrowRight} onClick={() => navigate('/actvt/calendar')}>View calendar</Button>}>
+          <div className="principal-day"><span className="principal-day__icon"><Icon icon={today?.isHoliday ? CalendarDays : CalendarCheck} size={22} /></span><div><strong>{today?.isHoliday ? 'No academic activity planned' : 'Regular academic day'}</strong><p>{today?.isHoliday ? 'Review the holiday schedule and notices for families.' : 'Classes, attendance and daily operations are in progress.'}</p></div></div>
+        </Card>
+        <Card title="Quick actions" action={<Button variant="tertiary" size="sm" onClick={onEditActions}>Choose actions</Button>}>
+          {actions.length ? <div className="principal-actions">{actions.slice(0, 6).map((action) => <button key={action.id} type="button" onClick={() => navigate(action.path)}><Icon icon={action.icon} size={18} /><span>{action.label}</span></button>)}</div> : <EmptyState compact icon={ClipboardCheck} title="No quick actions chosen" action={<Button size="sm" onClick={onEditActions}>Choose actions</Button>} />}
+        </Card>
+      </section>
+    </div>
+  )
+}

@@ -1,9 +1,8 @@
 import React, { useEffect, useMemo } from 'react'
-import { useSelector } from 'react-redux'
+import { usePermissions } from '@/hooks/usePermissions'
 import { BookOpen } from 'lucide-react'
 import { Badge, Checkbox, Combobox, EmptyState, Select, TextField, formatDate, type Tone } from '@/components/ui'
 import { useAcdmcOptions, useCoverage, useCurriculum, useCurriculumList } from '@/hooks/useAcdmc'
-import { selectUser } from '@/redux/slices/authSlice'
 import type {
   AcdmcOptions,
   ClassWorkKind,
@@ -59,8 +58,9 @@ export const classLabel = (className?: string, section?: string) => {
   return `Class ${classShort(className)}${section ? `-${section}` : ''}`
 }
 
-/** Deleting academic records is limited to school admins (the API enforces it too). */
-export const useIsAdmin = () => useSelector(selectUser)?.role === 'admin'
+/** Whether the user's role may delete curriculum or class work (the API enforces it too). */
+export const useCanDeleteAcademics = (area: 'curriculum' | 'classwork') =>
+  usePermissions().can(`acdmc.${area}.delete`)
 
 export const errorMessage = (error: unknown, fallback = 'Something went wrong. Try again.') => {
   const data = (error as { response?: { data?: { message?: string; error?: string } } })?.response?.data

@@ -1,18 +1,32 @@
 import React from 'react'
-import { Navigate, Outlet, useLocation } from 'react-router-dom'
+import { Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useSelector } from 'react-redux'
 import { selectIsAuthenticated, selectUser } from '../redux/slices/authSlice'
 import { useAcademicSession } from '../contexts/AcademicSessionContext'
 import { getFirstEnabledPath, isCoreAllowedPath, isFeatureEnabledForPath } from '../constants/featureAccess'
+import { usePermissions } from '@/hooks/usePermissions'
+import { Button, Card, EmptyState, Page } from '@/components/ui'
+import { Lock } from 'lucide-react'
 
+/** Guards the school (staff) panel. Parents and students are sent to the portal. */
 const ProtectedRoute: React.FC = () => {
   const isAuthenticated = useSelector(selectIsAuthenticated)
   const user = useSelector(selectUser)
   const location = useLocation()
+  const navigate = useNavigate()
   const { hasSession } = useAcademicSession()
+  const { access, isPortal } = usePermissions()
 
   if (!isAuthenticated) {
-    return <Navigate to="/" replace />
+    return <Navigate to="/login" replace state={{ from: location.pathname }} />
+  }
+
+  if (isPortal) {
+    return <Navigate to="/portal" replace />
+  }
+
+  if (user?.mustChangePassword) {
+    return <Navigate to="/change-password" replace />
   }
 
   // If no academic session selected, redirect to session selector
@@ -25,9 +39,9 @@ const ProtectedRoute: React.FC = () => {
     return <Navigate to="/billing?reason=core-only" replace />
   }
 
-  const featureAllowed = isFeatureEnabledForPath(location.pathname, user?.featureToggles)
-  if (!featureAllowed) {
-    const fallbackPath = getFirstEnabledPath(user?.featureToggles)
+  // School has the page turned on?
+  if (!isFeatureEnabledForPath(location.pathname, user?.featureToggles)) {
+    const fallbackPath = getFirstEnabledPath(access)
     if (fallbackPath && fallbackPath !== location.pathname) {
       return <Navigate to={fallbackPath} replace />
     }
@@ -41,6 +55,22 @@ const ProtectedRoute: React.FC = () => {
           </p>
         </div>
       </div>
+    )
+  }
+
+  // The user's role allows it? (The server enforces this too; this avoids a page of errors.)
+  if (!isFeatureEnabledForPath(location.pathname, access)) {
+    return (
+      <Page>
+        <Card>
+          <EmptyState
+            icon={Lock}
+            title="You don't have access to this page"
+            body="Your role doesn't include it. Ask your school administrator if you need it."
+            action={<Button variant="secondary" onClick={() => navigate('/home')}>Go to home</Button>}
+          />
+        </Card>
+      </Page>
     )
   }
 

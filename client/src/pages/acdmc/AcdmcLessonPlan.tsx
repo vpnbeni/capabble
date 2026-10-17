@@ -40,7 +40,7 @@ import {
   sectionSelectOptions,
   shortDate,
   todayKey,
-  useIsAdmin,
+  useCanDeleteAcademics,
   type ClassContextErrors,
 } from '@/components/acdmc/AcdmcUi'
 import '@/components/acdmc/acdmc.css'
@@ -131,7 +131,7 @@ const rangeFor = (when: When) => {
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
 const AcdmcLessonPlan: React.FC = () => {
-  const isAdmin = useIsAdmin()
+  const canDelete = useCanDeleteAcademics('classwork')
   const [searchParams, setSearchParams] = useSearchParams()
   const [q, setQ] = useState('')
   const [status, setStatus] = useState<LessonPlanStatus | ''>('')
@@ -275,7 +275,7 @@ const AcdmcLessonPlan: React.FC = () => {
       items.push({ label: 'Cancel lesson', icon: Ban, onSelect: () => changeStatus(plan, 'cancelled', 'Lesson cancelled.') })
     }
     items.push({ label: 'Duplicate for another section', icon: Copy, onSelect: () => openDuplicate(plan) })
-    if (isAdmin) items.push({ divider: true }, { label: 'Delete', icon: Trash2, tone: 'danger', onSelect: () => setDeleteTarget(plan) })
+    if (canDelete) items.push({ divider: true }, { label: 'Delete', icon: Trash2, tone: 'danger', onSelect: () => setDeleteTarget(plan) })
     return items
   }
 
@@ -323,7 +323,7 @@ const AcdmcLessonPlan: React.FC = () => {
       },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [isAdmin]
+    [canDelete]
   )
 
   const counts = data?.counts || { draft: 0, planned: 0, delivered: 0, cancelled: 0 }

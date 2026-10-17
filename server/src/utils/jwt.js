@@ -78,16 +78,23 @@ const decodeToken = (token) => {
   return jwt.decode(token);
 };
 
-const getTokenFromRequest = (req) => {
+/**
+ * Tenant access token from the Authorization header (API clients, tests) or
+ * the httpOnly `cb_at` cookie set at login (the web app).
+ */
+const getTokenFromRequest = (req, { withSource = false } = {}) => {
   let token = null;
+  let source = null;
 
-  if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
-    token = req.headers.authorization.split(' ')[1];
-  } else if (req.cookies && req.cookies.token) {
-    token = req.cookies.token;
+  if (req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
+    token = req.headers.authorization.split(' ')[1] || null;
+    source = 'header';
+  } else if (req.cookies && req.cookies.cb_at) {
+    token = req.cookies.cb_at;
+    source = 'cookie';
   }
 
-  return token;
+  return withSource ? { token, source } : token;
 };
 
 const createTokenResponse = (user, statusCode, res, tenantSlug, extraData = null) => {

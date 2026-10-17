@@ -1,7 +1,12 @@
 // User roles
+// Legacy single-role field. Access is decided by RBAC roles (src/rbac); this is
+// kept so older records and code paths still read sensibly.
 const USER_ROLES = {
   ADMIN: 'admin',
-  DATA_ENTRY_OPERATOR: 'data_entry_operator'
+  DATA_ENTRY_OPERATOR: 'data_entry_operator',
+  STAFF: 'staff',
+  PARENT: 'parent',
+  STUDENT: 'student'
 };
 
 // Student classes

@@ -1,6 +1,6 @@
 # Capabble Ledger Service
 
-Standalone billing service for SEMS.
+Standalone billing service for Capabble.
 
 ## Run
 

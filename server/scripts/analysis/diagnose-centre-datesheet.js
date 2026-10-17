@@ -8,7 +8,7 @@ async function diagnoseCentreDatesheet() {
     console.log('🔍 Diagnosing Centre Datesheet Issue...\n')
     
     // Connect to MongoDB
-    await mongoose.connect('mongodb://localhost:27017/sems')
+    await mongoose.connect('mongodb://localhost:27017/capabble')
     console.log('✅ Connected to MongoDB\n')
     
     // Check 1: CBSE Datesheet

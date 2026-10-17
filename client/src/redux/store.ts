@@ -23,12 +23,13 @@ const rootReducer = combineReducers({
   dispatches: dispatchSlice,
 })
 
-// Persist configuration
+// Persist configuration. Auth is not persisted here: the session lives in
+// httpOnly cookies and the profile hint in utils/authStorage.
 const persistConfig = {
-  key: 'becms-root',
+  key: 'capabble-root',
   storage,
-  whitelist: ['auth'], // Only persist auth state
-  version: 1,
+  whitelist: [] as string[],
+  version: 2,
 }
 
 // Create persisted reducer

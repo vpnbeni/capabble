@@ -25,6 +25,12 @@
 .cb-app .stdnt-section--c6 { --tile: var(--chart-6); background: color-mix(in srgb, var(--chart-6) 14%, var(--surface)); }
 .cb-app .stdnt-section__name { color: var(--ink); }
 .cb-app .stdnt-section__meta { grid-column: 1 / -1; font-size: 12px; line-height: 16px; color: var(--ink-muted); }
+.cb-app .stdnt-section__gender { grid-column: 1 / -1; display: flex; align-items: center; gap: var(--space-3); font-size: 12px; line-height: 16px; }
+.cb-app .stdnt-section__gender-item { display: inline-flex; align-items: center; gap: 3px; color: var(--ink-muted); }
+.cb-app .stdnt-section__gender-icon { font-size: 16px; line-height: 16px; font-weight: 600; }
+.cb-app .stdnt-section__gender-item strong { font-weight: 600; }
+.cb-app .stdnt-section__gender-item--boys { color: var(--chart-1); }
+.cb-app .stdnt-section__gender-item--girls { color: var(--chart-5); }
 
 /* ---------- Overview: gender split ---------- */
 .cb-app .stdnt-gender { display: flex; flex-direction: column; gap: var(--space-4); }
@@ -98,9 +104,21 @@
 .cb-app .stdnt-list__meta { font-size: 13px; line-height: 18px; color: var(--ink-muted); }
 
 /* ---------- Student list toolbar ---------- */
+.cb-app .stdnt-stats { gap: var(--space-3); }
+.cb-app .stdnt-stats .cb-stat { padding: var(--space-2) var(--space-4); }
+.cb-app .stdnt-stats .cb-stat__value { font-size: 22px; line-height: 28px; }
+
 .cb-app .stdnt-toolbar { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-1) var(--space-5) var(--space-4); }
 @media (max-width: 640px) { .cb-app .stdnt-toolbar { padding: var(--space-1) var(--space-4) var(--space-3); } }
 .cb-app .stdnt-list-card .cb-table-wrap { border-top: 1px solid var(--border); }
+
+/* Keep the list controls in one compact row beside the search field on desktop. */
+.cb-app .stdnt-filterbar .cb-filterbar__search { flex: 0 1 272px; max-width: 272px; min-width: 220px; }
+.cb-app .stdnt-filterbar .cb-filterbar__filters .cb-field { width: 136px; }
+@media (max-width: 640px) {
+  .cb-app .stdnt-filterbar .cb-filterbar__search { flex: 1 1 100%; max-width: none; }
+  .cb-app .stdnt-filterbar .cb-filterbar__filters .cb-field { width: auto; }
+}
 
 /* ---------- Overview: age table ---------- */
 .cb-app .stdnt-age .cb-table-scroll { overflow-x: auto; scrollbar-width: thin; }

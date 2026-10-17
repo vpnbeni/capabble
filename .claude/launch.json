@@ -12,6 +12,23 @@
       "port": 5000
     },
     {
+      "name": "server-local-db",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "MONGODB_URI=mongodb://127.0.0.1:27099/",
+        "CENTRAL_DB_NAME=rbac_local_central",
+        "TENANT_DB_PREFIX=rbac_local_tenant_",
+        "REDIS_URL=",
+        "EMAIL_HOST=127.0.0.1",
+        "EMAIL_PORT=1",
+        "npm",
+        "run",
+        "dev"
+      ],
+      "cwd": "server",
+      "port": 5000
+    },
+    {
       "name": "client",
       "runtimeExecutable": "npm",
       "runtimeArgs": [

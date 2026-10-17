@@ -434,6 +434,32 @@ const BellTimings: React.FC = () => {
     }
   }
 
+  /** The bell timings exactly as they are on screen, ready to send to the API. */
+  const buildBellTimingsPayload = (): BellTimingsPayload => ({
+    meta: {
+      schoolName: meta.schoolName.trim(),
+      title: meta.title.trim() || defaultMeta.title,
+      session: currentSession || meta.session || '',
+      effectiveDate: meta.effectiveDate,
+    },
+    startTime,
+    rows: rows.map((row, index) => {
+      const normalizedType: PeriodType = row.type === 'break' ? 'break' : 'period'
+      const parsedDuration = Number.parseInt(String(row.duration), 10)
+      const fallbackDuration = normalizedType === 'break' ? 15 : 40
+      const normalizedDuration = Number.isFinite(parsedDuration) && parsedDuration > 0
+        ? Math.min(480, parsedDuration)
+        : fallbackDuration
+
+      return {
+        id: row.id.trim() || `bt-row-${index + 1}`,
+        type: normalizedType,
+        label: row.label.trim() || (normalizedType === 'break' ? 'BREAK' : ordinal(index + 1)),
+        duration: normalizedDuration,
+      }
+    }),
+  })
+
   const handleSaveBellTimings = async () => {
     if (rows.length === 0) {
       toast.error('Add at least one period before saving.')
@@ -442,31 +468,7 @@ const BellTimings: React.FC = () => {
 
     setIsSaving(true)
     try {
-      const payload: BellTimingsPayload = {
-        meta: {
-          schoolName: meta.schoolName.trim(),
-          title: meta.title.trim() || defaultMeta.title,
-          session: currentSession || meta.session || '',
-          effectiveDate: meta.effectiveDate,
-        },
-        startTime,
-        rows: rows.map((row, index) => {
-          const normalizedType: PeriodType = row.type === 'break' ? 'break' : 'period'
-          const parsedDuration = Number.parseInt(String(row.duration), 10)
-          const fallbackDuration = normalizedType === 'break' ? 15 : 40
-          const normalizedDuration = Number.isFinite(parsedDuration) && parsedDuration > 0
-            ? Math.min(480, parsedDuration)
-            : fallbackDuration
-
-          return {
-            id: row.id.trim() || `bt-row-${index + 1}`,
-            type: normalizedType,
-            label: row.label.trim() || (normalizedType === 'break' ? 'BREAK' : ordinal(index + 1)),
-            duration: normalizedDuration,
-          }
-        }),
-      }
-
+      const payload = buildBellTimingsPayload()
       const saved = await bellTimingsService.saveBellTimings(payload)
       setMeta({
         schoolName: saved.meta.schoolName || '',
@@ -485,9 +487,19 @@ const BellTimings: React.FC = () => {
   }
 
   const handleSaveVersion = async () => {
+    if (isSavingVersion) return
+    if (rows.length === 0) {
+      toast.error('Add at least one period before saving a version.')
+      return
+    }
+
     setIsSavingVersion(true)
     try {
-      const created = await bellTimingsService.createVersion(versionName.trim() || undefined)
+      // Snapshot what is on screen, not just the last saved timings.
+      const created = await bellTimingsService.createVersion(
+        versionName.trim() || undefined,
+        buildBellTimingsPayload()
+      )
       await refreshVersions()
       setSelectedVersionId(created._id)
       setVersionName('')
@@ -870,6 +882,12 @@ const BellTimings: React.FC = () => {
                 label="Version name"
                 value={versionName}
                 onChange={(e) => setVersionName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !isLoadingSavedState) {
+                    e.preventDefault()
+                    handleSaveVersion()
+                  }
+                }}
                 placeholder="e.g. Winter timings"
                 hint="Optional."
                 className="tbt-inline__grow"

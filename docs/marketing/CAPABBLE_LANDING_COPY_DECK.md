@@ -239,32 +239,32 @@ For institutional onboarding and demo requests, contact the Capabble team.
 The copy above is grounded in implemented project capability. Use this mapping during design and final review.
 
 ### Core Product and Feature Coverage
-- Product scope, architecture, and feature baseline: `/Users/vipinbeniwal/Documents/GitHub/SEMS/README.md`
-- Tenant app route coverage and modules: `/Users/vipinbeniwal/Documents/GitHub/SEMS/client/src/App.tsx`
-- Server middleware, security, tenant/platform route wiring: `/Users/vipinbeniwal/Documents/GitHub/SEMS/server/src/app.js`
+- Product scope, architecture, and feature baseline: `/Users/vipinbeniwal/Documents/GitHub/capabble/README.md`
+- Tenant app route coverage and modules: `/Users/vipinbeniwal/Documents/GitHub/capabble/client/src/App.tsx`
+- Server middleware, security, tenant/platform route wiring: `/Users/vipinbeniwal/Documents/GitHub/capabble/server/src/app.js`
 
 ### Workflow Modules
-- Datesheet import and centre/full datesheet flows: `/Users/vipinbeniwal/Documents/GitHub/SEMS/server/src/controllers/datesheetController.js`
-- Candidate import and management: `/Users/vipinbeniwal/Documents/GitHub/SEMS/server/src/controllers/candidateController.js`
-- Form 66 processing: `/Users/vipinbeniwal/Documents/GitHub/SEMS/server/src/controllers/form66Controller.js`
-- Seating plan PDF generation: `/Users/vipinbeniwal/Documents/GitHub/SEMS/server/src/controllers/seatingPlanController.js`
-- Answer-sheet lifecycle handling: `/Users/vipinbeniwal/Documents/GitHub/SEMS/server/src/controllers/answerSheetController.js`
-- Duties assignment workflow: `/Users/vipinbeniwal/Documents/GitHub/SEMS/server/src/controllers/dutiesController.js`
+- Datesheet import and centre/full datesheet flows: `/Users/vipinbeniwal/Documents/GitHub/capabble/server/src/controllers/datesheetController.js`
+- Candidate import and management: `/Users/vipinbeniwal/Documents/GitHub/capabble/server/src/controllers/candidateController.js`
+- Form 66 processing: `/Users/vipinbeniwal/Documents/GitHub/capabble/server/src/controllers/form66Controller.js`
+- Seating plan PDF generation: `/Users/vipinbeniwal/Documents/GitHub/capabble/server/src/controllers/seatingPlanController.js`
+- Answer-sheet lifecycle handling: `/Users/vipinbeniwal/Documents/GitHub/capabble/server/src/controllers/answerSheetController.js`
+- Duties assignment workflow: `/Users/vipinbeniwal/Documents/GitHub/capabble/server/src/controllers/dutiesController.js`
 
 ### Information and Compliance Surfaces
-- Centre guidelines UI flow: `/Users/vipinbeniwal/Documents/GitHub/SEMS/client/src/pages/CentreGuidelines.tsx`
-- CBSE circulars management: `/Users/vipinbeniwal/Documents/GitHub/SEMS/client/src/pages/CBSECirculars.tsx`
-- CBSE portals quick links: `/Users/vipinbeniwal/Documents/GitHub/SEMS/client/src/pages/CBSEPortals.tsx`
+- Centre guidelines UI flow: `/Users/vipinbeniwal/Documents/GitHub/capabble/client/src/pages/CentreGuidelines.tsx`
+- CBSE circulars management: `/Users/vipinbeniwal/Documents/GitHub/capabble/client/src/pages/CBSECirculars.tsx`
+- CBSE portals quick links: `/Users/vipinbeniwal/Documents/GitHub/capabble/client/src/pages/CBSEPortals.tsx`
 
 ### Multi-Tenant Platform and Rollouts
-- Platform admin routes and tenant onboarding endpoints: `/Users/vipinbeniwal/Documents/GitHub/SEMS/server/src/routes/adminRoutes.js`
-- Tenant provisioning and onboarding controller flows: `/Users/vipinbeniwal/Documents/GitHub/SEMS/server/src/controllers/admin/tenantAdminController.js`
-- Platform rollouts and retry model: `/Users/vipinbeniwal/Documents/GitHub/SEMS/server/src/services/rolloutService.js`
-- Platform admin UX (tenants and rollouts): `/Users/vipinbeniwal/Documents/GitHub/SEMS/admin/src/pages/TenantsPage.tsx`, `/Users/vipinbeniwal/Documents/GitHub/SEMS/admin/src/pages/RolloutsPage.tsx`
+- Platform admin routes and tenant onboarding endpoints: `/Users/vipinbeniwal/Documents/GitHub/capabble/server/src/routes/adminRoutes.js`
+- Tenant provisioning and onboarding controller flows: `/Users/vipinbeniwal/Documents/GitHub/capabble/server/src/controllers/admin/tenantAdminController.js`
+- Platform rollouts and retry model: `/Users/vipinbeniwal/Documents/GitHub/capabble/server/src/services/rolloutService.js`
+- Platform admin UX (tenants and rollouts): `/Users/vipinbeniwal/Documents/GitHub/capabble/admin/src/pages/TenantsPage.tsx`, `/Users/vipinbeniwal/Documents/GitHub/capabble/admin/src/pages/RolloutsPage.tsx`
 
 ### Deployment Readiness
-- Frontend deployment model: `/Users/vipinbeniwal/Documents/GitHub/SEMS/docs/deployment/VERCEL_DEPLOYMENT.md`
-- Backend deployment model: `/Users/vipinbeniwal/Documents/GitHub/SEMS/docs/deployment/AWS_DEPLOYMENT.md`
+- Frontend deployment model: `/Users/vipinbeniwal/Documents/GitHub/capabble/docs/deployment/VERCEL_DEPLOYMENT.md`
+- Backend deployment model: `/Users/vipinbeniwal/Documents/GitHub/capabble/docs/deployment/AWS_DEPLOYMENT.md`
 
 ---
 

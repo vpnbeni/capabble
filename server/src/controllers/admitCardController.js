@@ -382,7 +382,7 @@ const uploadAdmitCardSignature = asyncHandler(async (req, res) => {
 
   const tenantSlug = req.tenant?.slug || 'unknown';
   const publicId = `admit_card_${role}_sign_${tenantSlug}`;
-  const uploadResult = await uploadToCloudinary(file.tempFilePath, 'sems/admit-card-signatures', publicId);
+  const uploadResult = await uploadToCloudinary(file.tempFilePath, 'capabble/admit-card-signatures', publicId);
 
   if (file.tempFilePath) {
     fs.unlink(file.tempFilePath, () => {});

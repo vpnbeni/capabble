@@ -21,21 +21,27 @@ const connectDB = require('../config/database');
 // Sample data
 const userData = [
   {
-    email: 'admin@sems.com',
+    email: 'admin@example.com',
     password: 'admin123',
     role: USER_ROLES.ADMIN,
+    kind: 'staff',
+    roles: ['administrator'],
     isActive: true
   },
   {
-    email: 'operator@sems.com',
+    email: 'operator@example.com',
     password: 'operator123',
     role: USER_ROLES.DATA_ENTRY_OPERATOR,
+    kind: 'staff',
+    roles: ['office_staff'],
     isActive: true
   },
   {
-    email: 'operator2@sems.com',
+    email: 'operator2@example.com',
     password: 'operator123',
     role: USER_ROLES.DATA_ENTRY_OPERATOR,
+    kind: 'staff',
+    roles: ['office_staff'],
     isActive: true
   }
 ];
@@ -344,8 +350,8 @@ const importData = async () => {
     
     console.log('Data imported successfully!'.green.inverse);
     console.log('\nSample Login Credentials:'.yellow.bold);
-    console.log('Admin: admin@sems.com / admin123'.cyan);
-    console.log('Operator: operator@sems.com / operator123'.cyan);
+    console.log('Admin: admin@example.com / admin123'.cyan);
+    console.log('Operator: operator@example.com / operator123'.cyan);
     
   } catch (error) {
     console.error('Error importing data:', error);

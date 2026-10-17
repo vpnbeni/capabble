@@ -120,7 +120,7 @@ const deleteRawFromCloudinary = async (publicId) => {
  */
 const uploadForm66ToCloudinary = async (buffer, filename, type = 'original') => {
   try {
-    const folder = 'sems/form66';
+    const folder = 'capabble/form66';
     const timestamp = Date.now();
     const baseName = filename.replace(/\.[^/.]+$/, ''); // Remove extension
     const publicId = `${baseName}_${type}_${timestamp}`;

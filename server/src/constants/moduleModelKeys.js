@@ -20,6 +20,8 @@ const { getModuleFeatureKeys } = require('./tenantFeatures');
 const MODULE_MODEL_KEYS = Object.freeze({
   core: Object.freeze([
     'User',
+    'Role',
+    'AuthAuditLog',
     'Teacher',
     'Subject',
     'Room',
@@ -147,6 +149,26 @@ const MODULE_MODEL_KEYS = Object.freeze({
     'AssetStockTransaction',
     'AssetSettings',
   ]),
+  libry: Object.freeze([
+    'LibraryTitle',
+    'LibraryCopy',
+    'LibraryMember',
+    'LibraryPolicy',
+    'LibraryLoan',
+    'LibraryReservation',
+    'LibraryFine',
+    'LibraryAcquisitionRequest',
+    'LibrarySupplier',
+    'LibraryPurchaseOrder',
+    'LibraryGoodsReceipt',
+    'LibraryStocktake',
+    'LibraryAuditLog',
+    'LibraryDigitalResource',
+    'LibraryReadingList',
+    'LibraryReadingLog',
+    'LibraryBookReview',
+    'LibraryReadingChallenge',
+  ]),
   cpitl: Object.freeze([
     'Student',
     'TransportVehicle',
@@ -186,6 +208,7 @@ const MODULE_FEATURE_KEYS = Object.freeze({
   actvt: Object.freeze(getModuleFeatureKeys('actvt')),
   mdcl: Object.freeze(getModuleFeatureKeys('mdcl')),
   asets: Object.freeze(getModuleFeatureKeys('asets')),
+  libry: Object.freeze(getModuleFeatureKeys('libry')),
   cpitl: Object.freeze(getModuleFeatureKeys('cpitl')),
 });
 
@@ -253,6 +276,10 @@ const getActiveModelKeys = (featureToggles) => {
 
   if (isModuleActive('asets', featureToggles)) {
     keys.push(...MODULE_MODEL_KEYS.asets);
+  }
+
+  if (isModuleActive('libry', featureToggles)) {
+    keys.push(...MODULE_MODEL_KEYS.libry);
   }
 
   if (isModuleActive('cpitl', featureToggles)) {

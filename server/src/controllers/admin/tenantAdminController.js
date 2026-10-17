@@ -12,7 +12,9 @@ const {
   removeTenantFromCache
 } = require('../../tenancy/tenantConnectionManager');
 const { getPlatformConnection } = require('../../config/platformDatabase');
-const { generateTenantToken, generateRefreshToken } = require('../../utils/jwt');
+const { issueSession } = require('../../rbac/session');
+const { buildAuthUserPayload } = require('../../rbac/userPayload');
+const { ADMINISTRATOR_ROLE } = require('../../rbac/catalog');
 const { sendMail } = require('../../utils/mailer');
 const { syncTenantUserDirectoryEntry } = require('../../tenancy/tenantUserDirectoryService');
 const {
@@ -773,8 +775,8 @@ const exchangePublicTenantSignup = asyncHandler(async (req, res) => {
     );
   }
 
-  const { models } = getTenantConnectionAndModels(tenantRecord.dbName, ['User']);
-  const user = await models.User.findById(consumedTicket.ticketRecord.tenantAdminUserId);
+  const { models } = getTenantConnectionAndModels(tenantRecord.dbName, ['User', 'Role']);
+  const user = await models.User.findById(consumedTicket.ticketRecord.tenantAdminUserId).select('+refreshTokens');
 
   if (!user || !user.isActive) {
     return sendSignupError(
@@ -785,19 +787,25 @@ const exchangePublicTenantSignup = asyncHandler(async (req, res) => {
     );
   }
 
-  const tokenPayload = { id: user._id.toString(), tenantSlug: tenantRecord.slug };
-  const token = generateTenantToken(tokenPayload);
-  const refreshToken = generateRefreshToken(tokenPayload);
-
   // Mark email as verified since OTP was successfully validated
   user.isEmailVerified = true;
-  await user.addRefreshToken(refreshToken); // saves the user including isEmailVerified
+  if (!Array.isArray(user.roles) || user.roles.length === 0) user.roles = [ADMINISTRATOR_ROLE];
+  // Signs the new admin in on this browser (httpOnly cookies; no tokens in the body).
+  await issueSession({ req, res, user, tenantSlug: tenantRecord.slug, rememberMe: true });
   await onboardTenantBillingBestEffort({
     tenant: tenantRecord,
     tenantAdmin: user,
   });
 
   const billing = await buildBillingSnapshot(tenantRecord.slug);
+  const userPayload = await buildAuthUserPayload(user, {
+    models,
+    tenant: {
+      slug: tenantRecord.slug,
+      name: tenantRecord.name,
+      featureToggles: normalizeTenantFeatureToggles(tenantRecord.featureToggles),
+    },
+  });
 
   console.info(`[tenant-signup:exchange] status=success tenantSlug=${tenantRecord.slug}`);
 
@@ -805,16 +813,7 @@ const exchangePublicTenantSignup = asyncHandler(async (req, res) => {
     success: true,
     message: 'Signup completed successfully',
     data: {
-      token,
-      refreshToken,
-      user: {
-        _id: user._id,
-        email: user.email,
-        role: user.role,
-        isActive: user.isActive,
-        createdAt: user.createdAt,
-        featureToggles: normalizeTenantFeatureToggles(tenantRecord.featureToggles),
-      },
+      user: { ...userPayload, billing },
       tenant: {
         slug: tenantRecord.slug,
         name: tenantRecord.name,

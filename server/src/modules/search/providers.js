@@ -2,15 +2,14 @@
  * Record providers for the global search (command palette).
  *
  * Each provider describes one searchable collection:
- * - `enabled(ctx)`  — feature-toggle / role gate; disabled providers never query.
+ * - `enabled(ctx)`  — feature-toggle / permission gate (`can(key)`); disabled providers never query.
+ * - `baseFilter`    — object, or `(ctx) => object` for per-user scoping (e.g. a teacher's sections).
  * - `fields`        — which fields to match and how:
  *     prefixUpper: anchored, case-sensitive prefix on fields stored uppercase (index-friendly)
  *     prefix:      anchored, case-insensitive prefix (codes, phone numbers)
  *     contains:    case-insensitive substring (names)
  * - `map(doc, ctx)` — shape a lean document into a palette item.
  */
-const { roleHasPermission: cpitlRoleHas, CPITL_PERMISSIONS } = require('../cpitl/constants');
-const { roleHasPermission: asetsRoleHas, ASETS_PERMISSIONS } = require('../asets/lifecycle');
 
 const on = (toggles, key) => toggles[key] !== false;
 const join = (parts, sep = ' · ') => parts.filter(Boolean).join(sep);
@@ -23,21 +22,25 @@ const PROVIDERS = [
     type: 'student',
     label: 'Students',
     modelKey: 'Student',
-    enabled: ({ toggles }) => on(toggles, 'stdnt_students') || on(toggles, 'cpitl_fees'),
+    enabled: ({ toggles, can }) => (on(toggles, 'stdnt_students') && can('stdnt.students.read'))
+      || (on(toggles, 'cpitl_fees') && can('cpitl.finance.view')),
+    baseFilter: ({ scopes }) => scopes?.student || {},
     fields: {
       prefixUpper: ['rollNumber'],
       prefix: ['guardianPhone', 'phone', 'penNumber'],
       contains: ['name', 'fatherName']
     },
     select: 'name rollNumber class section classRollNo fatherName guardianPhone isActive profileImage',
-    map: (doc, { toggles }) => ({
+    map: (doc, { toggles, can }) => ({
       title: doc.name,
       subtitle: join([
         classLabel(doc.class, doc.section),
         doc.rollNumber && `Adm ${doc.rollNumber}`,
         doc.fatherName && `F: ${doc.fatherName}`
       ]),
-      path: on(toggles, 'stdnt_students') ? `/stdnt/students/${doc._id}` : `/cpitl/students/${doc._id}`,
+      path: on(toggles, 'stdnt_students') && can('stdnt.students.read')
+        ? `/stdnt/students/${doc._id}`
+        : `/cpitl/students/${doc._id}`,
       badge: doc.isActive === false ? 'Inactive' : undefined,
       image: doc.profileImage || undefined
     })
@@ -46,7 +49,8 @@ const PROVIDERS = [
     type: 'staff',
     label: 'Staff',
     modelKey: 'Teacher',
-    enabled: ({ toggles }) => on(toggles, 'staaf_staff_members') || on(toggles, 'exam_functionaries'),
+    enabled: ({ toggles, can }) => (on(toggles, 'staaf_staff_members') || on(toggles, 'exam_functionaries'))
+      && can('staaf.staff.read'),
     fields: {
       prefix: ['employeeId', 'oasisId', 'mobileNo'],
       contains: ['name', 'email', 'designation']
@@ -68,7 +72,7 @@ const PROVIDERS = [
     type: 'receipt',
     label: 'Fee receipts',
     modelKey: 'FeePayment',
-    enabled: ({ toggles, role }) => on(toggles, 'cpitl_fees') && cpitlRoleHas(role, CPITL_PERMISSIONS.VIEW),
+    enabled: ({ toggles, can }) => on(toggles, 'cpitl_fees') && can('cpitl.finance.view'),
     fields: {
       prefix: ['receiptNo', 'studentSnapshot.rollNumber', 'cheque.number'],
       contains: ['studentSnapshot.name']
@@ -97,7 +101,7 @@ const PROVIDERS = [
     type: 'asset',
     label: 'Assets',
     modelKey: 'Asset',
-    enabled: ({ toggles, role }) => on(toggles, 'asets_dashboard') && asetsRoleHas(role, ASETS_PERMISSIONS.ASETS_VIEW),
+    enabled: ({ toggles, can }) => on(toggles, 'asets_dashboard') && can('asets.assets.view'),
     baseFilter: { isArchived: { $ne: true } },
     fields: {
       prefixUpper: ['assetId'],
@@ -116,7 +120,7 @@ const PROVIDERS = [
     type: 'subject',
     label: 'Subjects',
     modelKey: 'Subject',
-    enabled: ({ toggles }) => on(toggles, 'stdnt_subjects') || on(toggles, 'subjects'),
+    enabled: ({ toggles, can }) => (on(toggles, 'stdnt_subjects') || on(toggles, 'subjects')) && can('core.subjects.read'),
     fields: {
       prefix: ['code'],
       contains: ['name']
@@ -132,7 +136,7 @@ const PROVIDERS = [
     type: 'room',
     label: 'Rooms',
     modelKey: 'Room',
-    enabled: ({ toggles }) => on(toggles, 'examrooms'),
+    enabled: ({ toggles, can }) => on(toggles, 'examrooms') && can('exam.setup.read'),
     fields: {
       prefix: ['roomNo'],
       contains: ['roomName']
@@ -148,7 +152,7 @@ const PROVIDERS = [
     type: 'alumni',
     label: 'Alumni',
     modelKey: 'Alumni',
-    enabled: ({ toggles }) => on(toggles, 'almni_directory'),
+    enabled: ({ toggles, can }) => on(toggles, 'almni_directory') && can('stdnt.alumni.read'),
     fields: {
       prefix: ['rollNumber', 'phone'],
       contains: ['name']
@@ -169,7 +173,7 @@ const PROVIDERS = [
     type: 'candidate',
     label: 'Exam candidates',
     modelKey: 'Candidate',
-    enabled: ({ toggles }) => on(toggles, 'candidates'),
+    enabled: ({ toggles, can }) => on(toggles, 'candidates') && can('exam.candidates.read'),
     fields: {
       prefix: ['rollNumber', 'schoolCode'],
       contains: ['name', 'fatherName']

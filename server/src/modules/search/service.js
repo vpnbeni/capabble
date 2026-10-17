@@ -26,8 +26,12 @@ const parseSearchParams = (query = {}) => {
   return { q, limit, types };
 };
 
+const resolveBaseFilter = (provider, ctx = {}) => (
+  typeof provider.baseFilter === 'function' ? provider.baseFilter(ctx) : provider.baseFilter
+) || {};
+
 /** Build `{ $and: [base, { $or: [...] }] }` — nested so it never clashes with academicSessionPlugin's `$or`. */
-const buildFilter = (provider, q) => {
+const buildFilter = (provider, q, ctx = {}) => {
   const escaped = escapeRegex(q);
   const { prefixUpper = [], prefix = [], contains = [] } = provider.fields;
   const clauses = [
@@ -35,7 +39,7 @@ const buildFilter = (provider, q) => {
     ...prefix.map((field) => ({ [field]: { $regex: `^${escaped}`, $options: 'i' } })),
     ...contains.map((field) => ({ [field]: { $regex: escaped, $options: 'i' } }))
   ];
-  return { $and: [provider.baseFilter || {}, { $or: clauses }] };
+  return { $and: [resolveBaseFilter(provider, ctx), { $or: clauses }] };
 };
 
 const getPath = (doc, path) => path.split('.').reduce((value, key) => (value == null ? value : value[key]), doc);
@@ -69,7 +73,7 @@ const buildSelect = (provider) => {
 
 const searchProvider = async (provider, ctx) => {
   const Model = ctx.models[provider.modelKey];
-  const docs = await Model.find(buildFilter(provider, ctx.q))
+  const docs = await Model.find(buildFilter(provider, ctx.q, ctx))
     .select(buildSelect(provider))
     .sort(provider.sort || {})
     .limit(ctx.limit * FETCH_MULTIPLIER)
@@ -100,7 +104,7 @@ const fuzzySearchProvider = async (provider, ctx, tokens) => {
   const Model = ctx.models[provider.modelKey];
   const filter = {
     $and: [
-      provider.baseFilter || {},
+      resolveBaseFilter(provider, ctx),
       { $or: contains.map((field) => ({ [field]: { $regex: pattern, $options: 'i' } })) }
     ]
   };
@@ -151,16 +155,19 @@ const collectGroups = (providers, settled) => {
   return groups.sort((left, right) => (right.items[0]?.score || 0) - (left.items[0]?.score || 0));
 };
 
-const getActiveProviders = ({ models, toggles, role, types }) => PROVIDERS.filter((provider) => (
+// Without a permission checker (scripts, tests) every provider is allowed.
+const allowAll = () => true;
+
+const getActiveProviders = ({ models, toggles, can = allowAll, types }) => PROVIDERS.filter((provider) => (
   (!types || types.has(provider.type))
   && models[provider.modelKey]
-  && provider.enabled({ toggles, role })
+  && provider.enabled({ toggles, can })
 ));
 
-const runSearch = async ({ q, limit, types, models, toggles, role }) => {
+const runSearch = async ({ q, limit, types, models, toggles, can = allowAll, scopes = {} }) => {
   const startedAt = Date.now();
-  const ctx = { q, limit, models, toggles, role };
-  const providers = getActiveProviders({ models, toggles, role, types });
+  const ctx = { q, limit, models, toggles, can, scopes };
+  const providers = getActiveProviders({ models, toggles, can, types });
 
   const settled = await Promise.allSettled(providers.map((provider) => searchProvider(provider, ctx)));
   const groups = collectGroups(providers, settled);

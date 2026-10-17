@@ -1,5 +1,5 @@
 {
-  "name": "sems-server",
+  "name": "capabble-server",
   "version": "1.0.0",
   "description": "Backend API for Examination Management System",
   "main": "src/server.js",
@@ -13,6 +13,8 @@
     "bootstrap:platform": "node scripts/tenants/bootstrap-platform.js",
     "backfill:tenant-user-directory": "node scripts/tenants/backfill-tenant-user-directory.js",
     "backfill:academic-session": "node scripts/migrations/backfill-academic-session.js",
+    "migrate:rbac": "node scripts/migrations/migrate-rbac.js",
+    "migrate:placeholder-emails": "node scripts/migrations/migrate-placeholder-emails.js",
     "migrate:oasis-id": "node scripts/migrations/migrate-teacher-oasis-id.js",
     "billing:grandfather": "node scripts/tenants/grandfather-billing.js",
     "test": "jest --watchAll --verbose",
@@ -28,7 +30,7 @@
     "api",
     "examination"
   ],
-  "author": "BECMS Development Team",
+  "author": "Capabble Development Team",
   "license": "MIT",
   "dependencies": {
     "bcryptjs": "^2.4.3",

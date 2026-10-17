@@ -15,6 +15,7 @@ const os = require('os');
 // Import custom middleware
 const errorHandler = require('./middleware/errorHandler');
 const { billingEntitlementMiddleware } = require('./middleware/billingEntitlement');
+const { tenantAccessGate } = require('./rbac/gate');
 const { requestContextMiddleware } = require('./tenancy/requestContext');
 const { academicSessionMiddleware } = require('./middleware/academicSession');
 const { tenantContextMiddleware } = require('./tenancy/tenantContextMiddleware');
@@ -73,7 +74,8 @@ const isAllowedOrigin = (origin) => {
     const url = new URL(origin);
     const hostname = url.hostname.toLowerCase();
 
-    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+    if ((hostname === 'localhost' || hostname === '127.0.0.1' || hostname.endsWith('.localhost'))
+      && process.env.NODE_ENV !== 'production') {
       return true;
     }
 
@@ -238,6 +240,8 @@ const tenantScopedRouter = express.Router();
 tenantScopedRouter.use(tenantContextMiddleware);
 tenantScopedRouter.use(billingEntitlementMiddleware);
 tenantScopedRouter.use(academicSessionMiddleware);
+// Authentication + permission check for every tenant route (deny by default).
+tenantScopedRouter.use(tenantAccessGate);
 mountAll(tenantScopedRouter);
 
 app.use('/api', tenantScopedRouter);

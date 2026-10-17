@@ -9,7 +9,7 @@ async function main() {
   await mongoose.connect(uri)
 
   // This script runs against the current DB in MONGODB_URI.
-  // In SEMS, tenant DB selection is usually handled by tenancy middleware;
+  // In Capabble, tenant DB selection is usually handled by tenancy middleware;
   // for scripted cleanup, you should point MONGODB_URI at the tenant DB you want to fix.
   const db = mongoose.connection.db
   const teachers = db.collection('teachers')

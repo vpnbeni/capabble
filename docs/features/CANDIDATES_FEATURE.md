@@ -1,7 +1,7 @@
 # Candidates Feature Implementation
 
 ## Overview
-A complete candidates management system with PDF import functionality has been added to the SEMS application.
+A complete candidates management system with PDF import functionality has been added to the Capabble application.
 
 ## Backend Implementation
 

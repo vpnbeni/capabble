@@ -1,5 +1,5 @@
 const express = require('express');
-const { protect, authorize } = require('../middleware/auth');
+const { protect } = require('../middleware/auth');
 const { requireTenantFeature } = require('../middleware/tenantFeatureAccess');
 const { requireAsetsPermission, ASETS_PERMISSIONS } = require('../middleware/asetsPermissions');
 const ctrl = require('../controllers/asetsController');
@@ -22,7 +22,7 @@ router.delete('/assets/:id', requireAsetsPermission(ASETS_PERMISSIONS.ASETS_DELE
 router.get('/categories', requireAsetsPermission(ASETS_PERMISSIONS.ASETS_VIEW), ctrl.categories.list);
 router.post('/categories', requireAsetsPermission(ASETS_PERMISSIONS.ASETS_EDIT), ctrl.categories.create);
 router.put('/categories/:id', requireAsetsPermission(ASETS_PERMISSIONS.ASETS_EDIT), ctrl.categories.update);
-router.delete('/categories/:id', authorize('admin'), requireAsetsPermission(ASETS_PERMISSIONS.ASETS_DELETE), ctrl.categories.remove);
+router.delete('/categories/:id', requireAsetsPermission(ASETS_PERMISSIONS.ASETS_DELETE), ctrl.categories.remove);
 
 router.get('/locations/tree', requireAsetsPermission(ASETS_PERMISSIONS.ASETS_VIEW), ctrl.getLocationTree);
 router.get('/locations/summary', requireAsetsPermission(ASETS_PERMISSIONS.ASETS_VIEW), ctrl.getLocationSummary);
@@ -32,12 +32,12 @@ router.get('/locations', requireAsetsPermission(ASETS_PERMISSIONS.ASETS_VIEW), c
 router.post('/locations', requireAsetsPermission(ASETS_PERMISSIONS.ASETS_EDIT), ctrl.locations.create);
 router.get('/locations/:id', requireAsetsPermission(ASETS_PERMISSIONS.ASETS_VIEW), ctrl.getLocationOverview);
 router.put('/locations/:id', requireAsetsPermission(ASETS_PERMISSIONS.ASETS_EDIT), ctrl.locations.update);
-router.delete('/locations/:id', authorize('admin'), requireAsetsPermission(ASETS_PERMISSIONS.ASETS_DELETE), ctrl.locations.remove);
+router.delete('/locations/:id', requireAsetsPermission(ASETS_PERMISSIONS.ASETS_DELETE), ctrl.locations.remove);
 
 router.get('/vendors', requireAsetsPermission(ASETS_PERMISSIONS.ASETS_VIEW), ctrl.vendors.list);
 router.post('/vendors', requireAsetsPermission(ASETS_PERMISSIONS.ASETS_EDIT), ctrl.vendors.create);
 router.put('/vendors/:id', requireAsetsPermission(ASETS_PERMISSIONS.ASETS_EDIT), ctrl.vendors.update);
-router.delete('/vendors/:id', authorize('admin'), requireAsetsPermission(ASETS_PERMISSIONS.ASETS_DELETE), ctrl.vendors.remove);
+router.delete('/vendors/:id', requireAsetsPermission(ASETS_PERMISSIONS.ASETS_DELETE), ctrl.vendors.remove);
 
 router.get('/allocations', requireAsetsPermission(ASETS_PERMISSIONS.ASETS_VIEW), ctrl.listAllocations);
 router.post('/allocations', requireAsetsPermission(ASETS_PERMISSIONS.ASETS_ALLOCATE), ctrl.createAllocation);
@@ -56,7 +56,7 @@ router.get('/audits/:id', requireAsetsPermission(ASETS_PERMISSIONS.ASETS_VIEW), 
 router.post('/audits', requireAsetsPermission(ASETS_PERMISSIONS.ASETS_AUDIT), ctrl.createAudit);
 router.put('/audits/:id/items/:itemId', requireAsetsPermission(ASETS_PERMISSIONS.ASETS_AUDIT), ctrl.updateAuditItem);
 router.post('/audits/:id/scan', requireAsetsPermission(ASETS_PERMISSIONS.ASETS_AUDIT), ctrl.scanAuditItem);
-router.post('/audits/:id/close', authorize('admin'), requireAsetsPermission(ASETS_PERMISSIONS.ASETS_AUDIT), ctrl.closeAudit);
+router.post('/audits/:id/close', requireAsetsPermission(ASETS_PERMISSIONS.ASETS_AUDIT), ctrl.closeAudit);
 
 router.get('/stock', requireAsetsPermission(ASETS_PERMISSIONS.ASETS_VIEW), ctrl.listStock);
 router.post('/stock', requireAsetsPermission(ASETS_PERMISSIONS.ASETS_EDIT), ctrl.createStockItem);
@@ -69,11 +69,11 @@ router.post('/procurement/:id/receive', requireAsetsPermission(ASETS_PERMISSIONS
 
 router.get('/disposals', requireAsetsPermission(ASETS_PERMISSIONS.ASETS_VIEW), ctrl.listDisposals);
 router.post('/disposals', requireAsetsPermission(ASETS_PERMISSIONS.ASETS_DISPOSE), ctrl.createDisposal);
-router.post('/disposals/:id/approve', authorize('admin'), requireAsetsPermission(ASETS_PERMISSIONS.ASETS_DISPOSE), ctrl.approveDisposal);
+router.post('/disposals/:id/approve', requireAsetsPermission(ASETS_PERMISSIONS.ASETS_DISPOSE), ctrl.approveDisposal);
 
 router.get('/reports/:type', requireAsetsPermission(ASETS_PERMISSIONS.ASETS_REPORT), ctrl.getReport);
 
 router.get('/settings', requireAsetsPermission(ASETS_PERMISSIONS.ASETS_VIEW), ctrl.getSettings);
-router.put('/settings', authorize('admin'), requireAsetsPermission(ASETS_PERMISSIONS.ASETS_SETTINGS), ctrl.updateSettings);
+router.put('/settings', requireAsetsPermission(ASETS_PERMISSIONS.ASETS_SETTINGS), ctrl.updateSettings);
 
 module.exports = router;

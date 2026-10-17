@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const { ADMINISTRATOR_ROLE } = require('../rbac/catalog');
 const { getPlatformModels } = require('./platformModels');
 const { getTenantConnectionAndModels } = require('./tenantConnectionManager');
 const { syncTenantUserDirectoryEntry } = require('./tenantUserDirectoryService');
@@ -13,7 +14,7 @@ const resolveDbName = (slug, customDbName) => {
     return customDbName.trim();
   }
 
-  const prefix = process.env.TENANT_DB_PREFIX || 'sems_tenant_';
+  const prefix = process.env.TENANT_DB_PREFIX || 'capabble_tenant_';
   return `${prefix}${slug.replace(/-/g, '_')}`;
 };
 
@@ -92,6 +93,8 @@ const provisionTenant = async ({
     const tenantAdmin = await models.User.create({
       email,
       password: generatedPassword,
+      kind: 'staff',
+      roles: [ADMINISTRATOR_ROLE],
       role: 'admin',
       isActive: true,
       isEmailVerified: false

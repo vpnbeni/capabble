@@ -14,9 +14,11 @@ import {
   Page,
   Select,
   Sheet,
+  Switch,
   TextField,
   type DataTableColumn,
 } from '@/components/ui'
+import { usePermissions } from '@/hooks/usePermissions'
 import { errorMessage } from '@/components/exmcl/ExmclUi'
 import '@/components/exmcl/exmcl.css'
 
@@ -33,6 +35,7 @@ type ExamForm = { name: string; code: string; duration: string; maximumMarks: st
 const emptyForm = (): ExamForm => ({ name: '', code: '', duration: '', maximumMarks: '' })
 
 const ExmclExams: React.FC = () => {
+  const canPublish = usePermissions().can('exam.setup.write')
   const [items, setItems] = useState<ExmclExamDefinition[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -134,6 +137,17 @@ const ExmclExams: React.FC = () => {
     }
   }
 
+  const togglePublished = async (item: ExmclExamDefinition, published: boolean) => {
+    setItems((prev) => prev.map((exam) => (exam._id === item._id ? { ...exam, resultsPublished: published } : exam)))
+    try {
+      await exmclExamService.setResultsPublication(item._id, published)
+      toast.success(published ? `${item.code} results are now visible to parents.` : `${item.code} results are hidden from parents.`)
+    } catch (error) {
+      setItems((prev) => prev.map((exam) => (exam._id === item._id ? { ...exam, resultsPublished: !published } : exam)))
+      toast.error(errorMessage(error, 'That change wasn’t saved. Try again.'))
+    }
+  }
+
   const columns: DataTableColumn<ExmclExamDefinition>[] = [
     { key: 'order', header: '#', width: 48, numeric: true, mobile: 'hidden', render: (item) => items.indexOf(item) + 1 },
     { key: 'name', header: 'Exam', mobile: 'title', render: (item) => <span className="cb-strong">{item.name}</span> },
@@ -145,6 +159,20 @@ const ExmclExams: React.FC = () => {
       numeric: true,
       align: 'right',
       render: (item) => (item.maximumMarks ? item.maximumMarks : '—'),
+    },
+    {
+      key: 'published',
+      header: 'Results for parents',
+      mobile: 'subtitle',
+      interactive: true,
+      render: (item) => (
+        <Switch
+          label={item.resultsPublished ? 'Visible' : 'Hidden'}
+          checked={Boolean(item.resultsPublished)}
+          disabled={!canPublish}
+          onChange={(checked) => togglePublished(item, checked)}
+        />
+      ),
     },
     {
       key: 'actions',

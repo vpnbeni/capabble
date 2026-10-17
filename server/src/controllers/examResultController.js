@@ -3,6 +3,7 @@ const ExamResult = require('../models/ExamResult');
 const ExamDefinition = require('../models/ExamDefinition');
 const Student = require('../models/Student');
 const Subject = require('../models/Subject');
+const { isAssignedScope, getAssignedSections, sectionKey } = require('../rbac/scope');
 const { sortSectionNames } = require('../utils/sortSections');
 
 const normalizeSubjectKey = (name) =>
@@ -289,7 +290,14 @@ const getResultEntryStatus = asyncHandler(async (req, res) => {
     return sortSectionNames(left.section, right.section, left.class);
   });
 
-  res.status(200).json({ success: true, data: rows });
+  // Teachers limited to their own sections only see those sections' progress.
+  let visibleRows = rows;
+  if (isAssignedScope(req, 'exam.results.read')) {
+    const allowed = new Set((await getAssignedSections(req)).map((entry) => entry.key));
+    visibleRows = rows.filter((row) => allowed.has(sectionKey(row.class, row.section)));
+  }
+
+  res.status(200).json({ success: true, data: visibleRows });
 });
 
 module.exports = { getResults, upsertResults, getResultEntryStatus };

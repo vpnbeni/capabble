@@ -6,6 +6,7 @@ const path = require('path');
 const ExamDefinition = require('../models/ExamDefinition');
 const ExamResult = require('../models/ExamResult');
 const Student = require('../models/Student');
+const SchoolProfile = require('../models/SchoolProfile');
 const CbseClassSubjectMatrix = require('../models/CbseClassSubjectMatrix');
 const CbseRegistration = require('../models/CbseRegistration');
 const { uploadToCloudinary } = require('../config/cloudinary');
@@ -611,7 +612,7 @@ exports.uploadReportCardImage = asyncHandler(async (req, res) => {
 
   const tenantSlug = req.tenant?.slug || 'unknown';
   const publicId = `report_card_img_${tenantSlug}_${Date.now()}`;
-  const uploadResult = await uploadToCloudinary(file.tempFilePath, 'sems/report-card-canvas', publicId);
+  const uploadResult = await uploadToCloudinary(file.tempFilePath, 'capabble/report-card-canvas', publicId);
 
   if (file.tempFilePath) {
     fs.unlink(file.tempFilePath, () => {});
@@ -764,3 +765,14 @@ exports.generateBulk = asyncHandler(async (req, res) => {
   res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
   return res.status(HTTP_STATUS.OK).send(pdfBuffer);
 });
+
+/**
+ * Marks card for one student and exam (no PDF). Used by the parent/student portal.
+ */
+exports.buildCardData = async (req, student, exam, resultDoc) => {
+  const [subjectRoles, additionalByStudent] = await Promise.all([
+    resolveSubjectRolesFromCbseMatrix(req, student.class, student.section),
+    resolveAdditionalByStudent(req, student.class, student.section),
+  ]);
+  return buildStudentCard(student, exam, resultDoc, subjectRoles, additionalByStudent[String(student._id)] || '');
+};

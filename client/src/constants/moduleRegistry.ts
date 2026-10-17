@@ -10,8 +10,9 @@ import actvtIcon from '../assets/ACTVT.png'
 import mdclIcon from '../assets/MDCL.png'
 import asetsIcon from '../assets/ASETS.png'
 import cpitlIcon from '../assets/CPITL.svg'
+import libryIcon from '../assets/LIBRY.svg'
 
-export type ModuleId = 'cntr' | 'exmcl' | 'timetable' | 'stdnt' | 'staaf' | 'attnd' | 'trnst' | 'acdmc' | 'actvt' | 'mdcl' | 'asets' | 'cpitl'
+export type ModuleId = 'cntr' | 'exmcl' | 'timetable' | 'stdnt' | 'staaf' | 'attnd' | 'trnst' | 'acdmc' | 'actvt' | 'mdcl' | 'asets' | 'libry' | 'cpitl'
 
 export type ModuleDefinition = {
   id: ModuleId
@@ -77,6 +78,13 @@ export const MODULE_REGISTRY: ModuleDefinition[] = [
     title: 'Asset Management',
     defaultRoute: '/asets/dashboard',
     icon: asetsIcon,
+  },
+  {
+    id: 'libry',
+    abbreviation: 'LIBRY',
+    title: 'Library Management',
+    defaultRoute: '/libry/overview',
+    icon: libryIcon,
   },
   {
     id: 'cpitl',

@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 
-const STORAGE_KEY = 'becms-academic-session'
+const STORAGE_KEY = 'capabble-academic-session'
 
 interface AcademicSessionContextType {
   /** Currently selected session label, e.g. "2025-2026" */

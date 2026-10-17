@@ -575,6 +575,15 @@
     "prefixes": ["/exmcl/cbse-registration"]
   },
   {
+    "key": "libry_catalogue",
+    "label": "LIBRY - Library Management",
+    "path": "/libry/overview",
+    "group": "Library Hub",
+    "module": "libry",
+    "prefixes": ["/libry"],
+    "fallbackPriority": 42
+  },
+  {
     "key": "billing",
     "label": "Billing",
     "path": "/billing",

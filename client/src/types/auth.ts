@@ -7,31 +7,56 @@ export interface BillingSnapshot {
   isReadOnly: boolean
 }
 
-// User interface
+/** Staff use the school panel; parents and students use the family portal. */
+export type UserKind = 'staff' | 'parent' | 'student'
+
+export type PermissionScope = 'all' | 'assigned'
+
+export interface PermissionGrant {
+  key: string
+  scope: PermissionScope
+}
+
+export interface LinkedStudent {
+  studentId: string
+  rollNumber: string
+  relation: string
+  name: string
+  className: string
+  section: string
+  profileImage?: string | null
+}
+
+// Signed-in user (from /auth/me). Contains no tokens: the session is in httpOnly cookies.
 export interface User {
   _id: string
-  email: string
-  role: 'admin' | 'data_entry_operator'
+  email: string | null
+  username?: string | null
+  name?: string
+  displayName?: string
+  kind: UserKind
+  /** Legacy single role kept by the server for older screens. */
+  role: string
+  roles: Array<{ key: string; name: string }>
+  isAdmin: boolean
+  permissions: PermissionGrant[]
+  linkedStudents: LinkedStudent[]
+  mustChangePassword: boolean
   isActive: boolean
   createdAt: string
-  updatedAt: string
-  lastLogin?: string
+  updatedAt?: string
+  lastLogin?: string | null
   billing?: BillingSnapshot | null
   featureToggles?: Record<string, boolean> | null
+  tenant?: { slug: string; name: string } | null
 }
 
 // Login credentials interface
 export interface LoginCredentials {
+  /** Email, or a student's login ID (optionally `id@schoolcode`). */
   email: string
   password: string
-}
-
-// Register data interface
-export interface RegisterData {
-  email: string
-  password: string
-  confirmPassword: string
-  role?: 'admin' | 'data_entry_operator'
+  rememberMe?: boolean
 }
 
 // Auth response interface
@@ -40,15 +65,13 @@ export interface AuthResponse {
   message: string
   data: {
     user: User
-    token: string
-    refreshToken?: string
     billing?: BillingSnapshot | null
   }
 }
 
 // Profile update data interface
 export interface ProfileUpdateData {
-  email?: string
+  name?: string
 }
 
 // Password change data interface

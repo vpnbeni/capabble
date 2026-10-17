@@ -22,7 +22,7 @@ const uploadFormatCanvasImage = asyncHandler(async (req, res) => {
 
   const tenantSlug = req.tenant?.slug || 'unknown';
   const publicId = `format_canvas_${tenantSlug}_${Date.now()}`;
-  const uploadResult = await uploadToCloudinary(file.tempFilePath, 'sems/format-canvas', publicId);
+  const uploadResult = await uploadToCloudinary(file.tempFilePath, 'capabble/format-canvas', publicId);
 
   if (file.tempFilePath) {
     fs.unlink(file.tempFilePath, () => {});

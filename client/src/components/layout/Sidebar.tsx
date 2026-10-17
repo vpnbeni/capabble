@@ -6,12 +6,14 @@ import { logout, selectUser } from '../../redux/slices/authSlice'
 import type { AppDispatch } from '../../redux/store'
 import { useAcademicSession } from '../../contexts/AcademicSessionContext'
 import { isFeatureEnabledForPath, getModuleForPath, getAccessibleModules, getFirstEnabledPathForModule } from '../../constants/featureAccess'
+import { usePermissions } from '@/hooks/usePermissions'
 import { MODULE_REGISTRY, type ModuleId } from '../../constants/moduleRegistry'
 import {
   Check,
   ChevronRight,
   ChevronsUpDown,
   PartyPopper,
+  SlidersHorizontal,
 } from 'lucide-react'
 import { navIconFor } from './navIcons'
 import { useCentreDetails } from '../../hooks/useCentreDetails'
@@ -67,7 +69,9 @@ const Sidebar: React.FC<SidebarProps> = ({
   // Tracks expand/collapse state for group headers + nested sub-groups.
   // "Ungroup all" -> we expand everything based on accessible navigation.
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({})
-  const isPathAllowed = (href: string) => isFeatureEnabledForPath(href, currentUser?.featureToggles)
+  const { access } = usePermissions()
+  // A page shows when the school has it turned on and the user's role allows it.
+  const isPathAllowed = (href: string) => isFeatureEnabledForPath(href, access)
   const canAccessCentreDetails = isPathAllowed('/centre-details')
 
   const sidebarCountsAccess = useMemo(
@@ -79,7 +83,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       datesheetDays: isPathAllowed('/datesheets'),
       rooms: isPathAllowed('/examrooms'),
     }),
-    [currentUser?.featureToggles]
+    [access]
   )
 
   const { data: countsData } = useSidebarCounts(sidebarCountsAccess)
@@ -102,7 +106,7 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   // Module switcher state
   const [moduleSwitcherOpen, setModuleSwitcherOpen] = useState(false)
-  const [selectedModule, setSelectedModule] = useState<ModuleId>('cntr')
+  const [selectedModule, setSelectedModule] = useState<ModuleId>('acdmc')
 
   // Sync active module from URL when navigating to a module-specific route
   useEffect(() => {
@@ -147,9 +151,17 @@ const Sidebar: React.FC<SidebarProps> = ({
 
 
   const accessibleModules = useMemo(
-    () => getAccessibleModules(currentUser?.featureToggles),
-    [currentUser?.featureToggles]
+    () => getAccessibleModules(access),
+    [access]
   )
+
+  // Land on a module this user can actually use (e.g. a teacher has no Exam centre pages).
+  useEffect(() => {
+    if (accessibleModules.size > 0 && !accessibleModules.has(selectedModule)) {
+      const first = MODULE_REGISTRY.find((m) => accessibleModules.has(m.id))
+      if (first) setSelectedModule(first.id)
+    }
+  }, [accessibleModules, selectedModule])
 
   const activeModuleDef = MODULE_REGISTRY.find(m => m.id === activeModule)!
   const hasMultipleModules = accessibleModules.size > 1
@@ -547,6 +559,17 @@ const Sidebar: React.FC<SidebarProps> = ({
       badge: null,
     },
     {
+      name: 'Curriculum',
+      href: '/acdmc/curriculum',
+      module: 'acdmc',
+      icon: (
+        <svg className="w-5 h-5 transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 19.5A2.5 2.5 0 016.5 17H20M4 19.5V6.5A2.5 2.5 0 016.5 4H20v13H6.5A2.5 2.5 0 004 19.5z" />
+        </svg>
+      ),
+      badge: null,
+    },
+    {
       name: 'Lesson Plans',
       href: '/acdmc/lesson-plan',
       module: 'acdmc',
@@ -586,17 +609,6 @@ const Sidebar: React.FC<SidebarProps> = ({
       icon: (
         <svg className="w-5 h-5 transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-      ),
-      badge: null,
-    },
-    {
-      name: 'Curriculum',
-      href: '/acdmc/curriculum',
-      module: 'acdmc',
-      icon: (
-        <svg className="w-5 h-5 transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 19.5A2.5 2.5 0 016.5 17H20M4 19.5V6.5A2.5 2.5 0 016.5 4H20v13H6.5A2.5 2.5 0 004 19.5z" />
         </svg>
       ),
       badge: null,
@@ -732,6 +744,114 @@ const Sidebar: React.FC<SidebarProps> = ({
         <svg className="w-5 h-5 transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 13h8V3H3v10zm10 8h8V11h-8v10zM3 21h8v-6H3v6zm10-18v6h8V3h-8z" />
         </svg>
+      ),
+      badge: null,
+    },
+    {
+      name: 'Library overview',
+      href: '/libry/overview',
+      module: 'libry',
+      icon: (
+        <svg className="w-5 h-5 transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 19.5A2.5 2.5 0 016.5 17H20M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z" /></svg>
+      ),
+      badge: null,
+    },
+    {
+      name: 'Catalogue',
+      href: '/libry/catalogue',
+      module: 'libry',
+      icon: (
+        <svg className="w-5 h-5 transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5s3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18s-3.332.477-4.5 1.253" /></svg>
+      ),
+      badge: null,
+    },
+    {
+      name: 'Library inventory',
+      href: '/libry/inventory',
+      module: 'libry',
+      icon: (
+        <svg className="w-5 h-5 transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
+      ),
+      badge: null,
+    },
+    {
+      name: 'Circulation desk',
+      href: '/libry/circulation',
+      module: 'libry',
+      icon: (
+        <svg className="w-5 h-5 transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" /></svg>
+      ),
+      badge: null,
+    },
+    {
+      name: 'Barcode desk',
+      href: '/libry/barcode-desk',
+      module: 'libry',
+      icon: (
+        <svg className="w-5 h-5 transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6v12M7 6v12m3-12v12m4-12v12m2-12v12m4-12v12" /></svg>
+      ),
+      badge: null,
+    },
+    {
+      name: 'Members',
+      href: '/libry/members',
+      module: 'libry',
+      icon: (
+        <svg className="w-5 h-5 transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a4 4 0 00-4-4h-1m-10 6H2v-2a4 4 0 014-4h1m10-4a4 4 0 10-8 0 4 4 0 008 0zM7 10a4 4 0 100-8 4 4 0 000 8z" /></svg>
+      ),
+      badge: null,
+    },
+    {
+      name: 'Acquisitions',
+      href: '/libry/acquisitions',
+      module: 'libry',
+      icon: (
+        <svg className="w-5 h-5 transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0" /></svg>
+      ),
+      badge: null,
+    },
+    {
+      name: 'Stock verification',
+      href: '/libry/stocktakes',
+      module: 'libry',
+      icon: (
+        <svg className="w-5 h-5 transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a1 1 0 011 1v2m-6 8l2 2 4-4" /></svg>
+      ),
+      badge: null,
+    },
+    {
+      name: 'Reports',
+      href: '/libry/reports',
+      module: 'libry',
+      icon: (
+        <svg className="w-5 h-5 transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+      ),
+      badge: null,
+    },
+    {
+      name: 'Audit history',
+      href: '/libry/audit',
+      module: 'libry',
+      icon: (
+        <svg className="w-5 h-5 transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012 2v3m-6 4h6" /></svg>
+      ),
+      badge: null,
+    },
+    {
+      name: 'Digital library',
+      href: '/libry/digital',
+      module: 'libry',
+      icon: (
+        <svg className="w-5 h-5 transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18.5l-8 3.5V5l8-3 8 3v17l-8-3.5zm0 0V2" /></svg>
+      ),
+      badge: null,
+    },
+    {
+      name: 'Reading engagement',
+      href: '/libry/reading',
+      module: 'libry',
+      icon: (
+        <svg className="w-5 h-5 transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6l4 2m5-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
       ),
       badge: null,
     },
@@ -1507,7 +1627,7 @@ const Sidebar: React.FC<SidebarProps> = ({
 
     return acc
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []), [activeModule, currentUser?.featureToggles, counts])
+  }, []), [activeModule, access, counts])
 
   // Expand all groups/sub-groups once accessible navigation is resolved.
   useEffect(() => {
@@ -1531,6 +1651,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   const canAccessBilling = isPathAllowed('/billing')
   const canAccessAccountSettings = isPathAllowed('/account-settings')
   const canAccessHelpSupport = isPathAllowed('/help-support')
+  const canManageUsers = isPathAllowed('/settings/users')
   const currentSidebarWidth = isCollapsed ? collapsedWidth : expandedWidth
 
   useLayoutEffect(() => {
@@ -1672,17 +1793,28 @@ const Sidebar: React.FC<SidebarProps> = ({
       style={{ width: currentSidebarWidth }}
     >
       <nav className={`cb-sidenav${isCollapsed ? ' is-collapsed' : ''}`} aria-label="Main">
-        {/* School OS: the main Home dashboard, above every module */}
+        {/* Principal Desk: the main Home dashboard, above every module */}
         <div className="cb-shellnav__homewrap">
           <NavLink
             to="/home"
             className={navItemClass(location.pathname === '/home', 'cb-shellnav__home')}
             aria-current={location.pathname === '/home' ? 'page' : undefined}
-            title={isCollapsed ? 'School OS' : undefined}
+            title={isCollapsed ? 'Principal Desk' : undefined}
           >
-            {renderIcon('School OS', '/home', null)}
-            {!isCollapsed ? <span className="cb-navitem__label truncate">School OS</span> : null}
+            {renderIcon('Principal Desk', '/home', null)}
+            {!isCollapsed ? <span className="cb-navitem__label truncate">Principal Desk</span> : null}
           </NavLink>
+          {location.pathname === '/home' ? (
+            <button
+              type="button"
+              className="cb-shellnav__customize"
+              onClick={() => window.dispatchEvent(new Event('capabble:customize-home'))}
+              title="Customize Home"
+              aria-label="Customize Home"
+            >
+              <SlidersHorizontal size={16} strokeWidth={1.75} aria-hidden />
+            </button>
+          ) : null}
         </div>
 
         {/* Module switcher */}
@@ -1714,7 +1846,7 @@ const Sidebar: React.FC<SidebarProps> = ({
               aria-label="Modules"
             >
               <div className="cb-shellnav__menulabel">Switch module</div>
-              {MODULE_REGISTRY.filter((m) => accessibleModules.has(m.id)).map((mod) => {
+              {MODULE_REGISTRY.filter((m) => accessibleModules.has(m.id)).sort((left, right) => left.abbreviation.localeCompare(right.abbreviation)).map((mod) => {
                 const isActive = mod.id === activeModule
                 return (
                   <button
@@ -1726,7 +1858,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                     onClick={() => {
                       setModuleSwitcherOpen(false)
                       if (!isActive) {
-                        const targetPath = getFirstEnabledPathForModule(mod.id, currentUser?.featureToggles) || mod.defaultRoute
+                        const targetPath = getFirstEnabledPathForModule(mod.id, access) || mod.defaultRoute
                         setSelectedModule(mod.id)
                         navigate(targetPath)
                       }
@@ -1941,6 +2073,23 @@ const Sidebar: React.FC<SidebarProps> = ({
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                       </svg>
                       Account Settings
+                    </NavLink>
+                  )}
+                  {canManageUsers && (
+                    <NavLink
+                      to="/settings/users"
+                      className={({ isActive }) =>
+                        `flex items-center px-3 py-2.5 text-sm font-medium rounded-xl transition-colors ${
+                          isActive
+                            ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300'
+                            : 'text-secondary-700 dark:text-secondary-300 hover:bg-secondary-50 dark:hover:bg-secondary-800 hover:text-primary-600 dark:hover:text-primary-400'
+                        }`
+                      }
+                    >
+                      <svg className="w-4 h-4 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                      </svg>
+                      Users and access
                     </NavLink>
                   )}
                   {canAccessBilling && (

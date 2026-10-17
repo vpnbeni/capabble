@@ -1,4 +1,5 @@
 const asyncHandler = require('../middleware/asyncHandler');
+const { buildSectionFilter, withScope } = require('../rbac/scope');
 const Student = require('../models/Student');
 const Subject = require('../models/Subject');
 const { generateResponse, buildPaginationResponse } = require('../utils/helpers');
@@ -771,6 +772,8 @@ const getStudents = asyncHandler(async (req, res) => {
     filter.category = category;
   }
 
+  const scopedFilter = withScope(filter, await buildSectionFilter(req, 'stdnt.students.read'));
+
   const StudentModel = req.models?.Student || Student;
 
   // One-time Mr./Mrs. rewrite for already-imported students (cheap no-op after first run).
@@ -784,9 +787,9 @@ const getStudents = asyncHandler(async (req, res) => {
   }
 
   const [totalCount, students] = await Promise.all([
-    StudentModel.countDocuments(filter),
+    StudentModel.countDocuments(scopedFilter),
     (() => {
-      let query = StudentModel.find(filter);
+      let query = StudentModel.find(scopedFilter);
 
       if (isLite) {
         query = query.select(LITE_STUDENT_FIELDS);
@@ -823,7 +826,8 @@ const getStudents = asyncHandler(async (req, res) => {
 // @access  Private
 const getStudent = asyncHandler(async (req, res) => {
   const StudentModel = req.models?.Student || Student;
-  const student = await StudentModel.findById(req.params.id)
+  const scope = await buildSectionFilter(req, 'stdnt.students.read');
+  const student = await StudentModel.findOne(withScope({ _id: req.params.id }, scope))
     .populate('subjects', 'name code type description');
 
   if (!student) {
@@ -855,6 +859,8 @@ const createStudent = asyncHandler(async (req, res) => {
     subjects,
     fatherName,
     motherName,
+    guardianName,
+    guardianEmail,
     guardianPhone,
     address,
     dateOfBirth,
@@ -933,6 +939,8 @@ const createStudent = asyncHandler(async (req, res) => {
     subjects: subjects || [],
     fatherName: toTitleCaseName(fatherName) || fatherName,
     motherName: toTitleCaseName(motherName) || motherName,
+    guardianName: toTitleCaseName(guardianName) || optionalText(guardianName),
+    guardianEmail: optionalText(guardianEmail)?.toLowerCase(),
     guardianPhone,
     address,
     dateOfBirth,
@@ -1228,7 +1236,7 @@ const getStudentsByClass = asyncHandler(async (req, res) => {
     filter.section = { $regex: `^${escapeRegexValue(normalizeSectionValue(section))}$`, $options: 'i' };
   }
 
-  const students = await Student.find(filter)
+  const students = await Student.find(withScope(filter, await buildSectionFilter(req, 'stdnt.students.read')))
     .populate('subjects', 'name code type')
     .sort('section rollNumber')
     .lean();
@@ -1245,11 +1253,11 @@ const getStudentsByClassSection = asyncHandler(async (req, res) => {
   const { className, section } = req.params;
   const { isActive = true } = req.query;
 
-  const students = await Student.find({ 
+  const students = await Student.find(withScope({
     class: className,
     section: { $regex: `^${escapeRegexValue(normalizeSectionValue(section))}$`, $options: 'i' },
     isActive: isActive === 'true'
-  })
+  }, await buildSectionFilter(req, 'stdnt.students.read')))
     .populate('subjects', 'name code type')
     .sort('rollNumber')
     .lean();
@@ -1279,7 +1287,7 @@ const getStudentsBySubject = asyncHandler(async (req, res) => {
     filter.section = { $regex: `^${escapeRegexValue(normalizeSectionValue(section))}$`, $options: 'i' };
   }
 
-  const students = await Student.find(filter)
+  const students = await Student.find(withScope(filter, await buildSectionFilter(req, 'stdnt.students.read')))
     .populate('subjects', 'name code type')
     .sort('class section rollNumber')
     .lean();

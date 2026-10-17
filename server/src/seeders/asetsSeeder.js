@@ -182,7 +182,7 @@ const seedAsets = async (models) => {
       previousCustodianName: 'Store Keeper',
       newCustodianName: asset.custodianName,
       reason: 'Classroom allocation',
-      approvedBy: 'admin@sems.com',
+      approvedBy: 'admin@example.com',
       status: 'Active',
     });
   }
@@ -193,8 +193,8 @@ const seedAsets = async (models) => {
       assetId: transferable._id,
       sourceLocationId: class8a._id,
       destinationLocationId: class9b._id,
-      requestedBy: 'operator@sems.com',
-      approvedBy: 'admin@sems.com',
+      requestedBy: 'operator@example.com',
+      approvedBy: 'admin@example.com',
       reason: 'Section reallocation',
       status: 'Completed',
     });
@@ -205,7 +205,7 @@ const seedAsets = async (models) => {
     await AssetMaintenance.create({
       assetId: printer._id,
       issue: 'Paper jam and toner sensor fault',
-      reportedBy: 'admin@sems.com',
+      reportedBy: 'admin@example.com',
       priority: 'High',
       assignedTo: 'TechNova Support',
       status: 'In Progress',

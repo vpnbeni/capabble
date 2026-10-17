@@ -1,0 +1,93 @@
+/* Family portal (parents and students) — module-scoped layout only. Colours, type and radii come from tokens. */
+
+.pt-shell { min-height: 100vh; background: var(--bg); display: flex; flex-direction: column; }
+
+.pt-top {
+  position: sticky; top: 0; z-index: 30;
+  display: flex; align-items: center; gap: var(--space-3);
+  height: var(--header-height, 56px); padding: 0 var(--space-6);
+  background: var(--surface); border-bottom: 1px solid var(--border);
+}
+.pt-top__school { display: flex; align-items: center; gap: var(--space-3); min-width: 0; flex: 1; }
+.pt-top__name { font: 600 15px/22px var(--font-sans); color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pt-top__child { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
+.pt-top__child select { max-width: 220px; }
+.pt-top__childname { font-size: 13px; line-height: 18px; color: var(--ink-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.pt-body { flex: 1; display: flex; min-height: 0; }
+
+.pt-nav {
+  flex: none; width: 220px; padding: var(--space-4) var(--space-3);
+  border-right: 1px solid var(--border); background: var(--surface);
+  display: flex; flex-direction: column; gap: 2px;
+}
+.pt-nav__link {
+  display: flex; align-items: center; gap: var(--space-3);
+  height: 40px; padding: 0 var(--space-3); border-radius: var(--radius-sm);
+  font: 500 14px/20px var(--font-sans); color: var(--ink-muted); text-decoration: none;
+}
+.pt-nav__link:hover { background: var(--surface-hover); color: var(--ink); }
+.pt-nav__link.is-active { background: var(--accent-soft); color: var(--accent-soft-ink); }
+
+.pt-main { flex: 1; min-width: 0; }
+
+.pt-bottom { display: none; }
+
+@media (max-width: 767px) {
+  .pt-top { padding: 0 var(--space-4); }
+  .pt-top__child select { max-width: 150px; }
+  .pt-nav { display: none; }
+  .pt-main { padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
+  .pt-bottom {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
+    display: grid; grid-auto-flow: column; grid-auto-columns: 1fr;
+    padding-bottom: env(safe-area-inset-bottom);
+    background: var(--surface); border-top: 1px solid var(--border);
+  }
+  .pt-bottom__item {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+    min-height: 56px; padding: var(--space-1); border: 0; background: none;
+    font: 500 12px/16px var(--font-sans); color: var(--ink-muted); text-decoration: none; cursor: pointer;
+  }
+  .pt-bottom__item.is-active { color: var(--accent-strong); }
+}
+
+/* Attendance calendar */
+.pt-cal { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: var(--space-1); }
+.pt-cal__head { padding: var(--space-1) 0; text-align: center; font: 500 12px/16px var(--font-sans); color: var(--ink-subtle); }
+.pt-cal__day {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  min-height: 52px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+  font-size: 13px; line-height: 18px; color: var(--ink); font-variant-numeric: tabular-nums;
+}
+.pt-cal__day small { font-size: 12px; line-height: 16px; }
+.pt-cal__day[data-status="absent"] { background: var(--danger-soft); border-color: var(--danger-border); color: var(--danger-ink); }
+.pt-cal__day[data-status="half_day"] { background: var(--warning-soft); border-color: var(--warning-border); color: var(--warning-ink); }
+.pt-cal__day[data-status="holiday"],
+.pt-cal__day[data-status="weekly_off"] { background: var(--surface-sunken); color: var(--ink-muted); }
+.pt-cal__day[data-status="upcoming"] { color: var(--ink-subtle); }
+.pt-cal__blank { min-height: 52px; }
+
+/* Timetable grid (may scroll sideways on phones) */
+.pt-tt { overflow-x: auto; }
+.pt-tt table { width: 100%; border-collapse: collapse; font-size: 13px; line-height: 18px; min-width: 640px; }
+.pt-tt th, .pt-tt td { padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
+.pt-tt thead th { background: var(--surface-sunken); color: var(--ink-subtle); font-weight: 500; white-space: nowrap; }
+.pt-tt tbody th { color: var(--ink); font-weight: 600; white-space: nowrap; }
+.pt-tt td.is-break { background: var(--surface-sunken); color: var(--ink-subtle); text-align: center; }
+.pt-tt__subject { color: var(--ink); font-weight: 500; }
+.pt-tt__teacher { color: var(--ink-muted); }
+.pt-tt tr.is-today th, .pt-tt tr.is-today td:not(.is-break) { background: var(--accent-soft); }
+
+/* Today's periods list */
+.pt-periods { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
+.pt-periods li { display: flex; justify-content: space-between; gap: var(--space-3); padding: var(--space-2) 0; border-top: 1px solid var(--border); font-size: 14px; line-height: 20px; }
+.pt-periods li:first-child { border-top: 0; padding-top: 0; }
+.pt-periods__time { color: var(--ink-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* Notice body (sanitised HTML from the school) */
+.pt-notice { font-size: 14px; line-height: 22px; color: var(--ink); overflow-wrap: anywhere; }
+.pt-notice p { margin: 0 0 var(--space-3); }
+.pt-notice img { max-width: 100%; height: auto; }
+.pt-notice table { border-collapse: collapse; max-width: 100%; }
+.pt-notice td, .pt-notice th { border: 1px solid var(--border); padding: var(--space-1) var(--space-2); }
