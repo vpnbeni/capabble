@@ -159,7 +159,7 @@ describe('subscribing and paying', () => {
     invoice = res.body.data.invoice;
     expect(invoice.number).toMatch(/^CB\d{4}-\d{6}$/);
     expect(invoice.reason).toBe('subscription_create');
-    expect(new Date(invoice.periodStart).toISOString()).toBe(new Date(before.trialEndsAt).toISOString());
+    expect(new Date(invoice.periodStart).toISOString()).toBe(sm.startOfDay(before.trialEndsAt).toISOString());
     expect(invoice.studentsBilled).toBe(450);
     expect(invoice.discountPaise).toBe(Math.round((1500000 + 2000000) * 0.1));
     // Still trialing until paid.

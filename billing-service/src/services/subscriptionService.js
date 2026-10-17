@@ -190,9 +190,10 @@ async function planChange(tx, account, sub, selection, { reportedStudents = 0, n
 
   let charge;
   if (!inPaidPeriod) {
+    // Paid periods run from local midnight, so a yearly period ends the day before it renews.
     const periodStart = sub?.state === S.TRIALING && sub.trialEndsAt && new Date(sub.trialEndsAt) > now
-      ? new Date(sub.trialEndsAt)
-      : now;
+      ? sm.startOfDay(sub.trialEndsAt)
+      : sm.startOfDay(now);
     const periodEnd = sm.addInterval(periodStart, resolved.interval);
     const lines = buildLines({
       modules: resolved.modules,

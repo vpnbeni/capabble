@@ -238,3 +238,12 @@ describe('overdue invoices', () => {
     expect(r.reasons).toEqual(['invoice_overdue']);
   });
 });
+
+describe('billing calendar (Asia/Kolkata)', () => {
+  test('periods start at local midnight and months clamp on the local calendar', () => {
+    const start = sm.startOfDay(new Date('2026-10-31T17:13:00Z'), 'Asia/Kolkata'); // 31 Oct, 22:43 IST
+    expect(start.toISOString()).toBe('2026-10-30T18:30:00.000Z'); // 31 Oct 00:00 IST
+    expect(sm.addInterval(start, 'month', 1, 'Asia/Kolkata').toISOString()).toBe('2026-11-29T18:30:00.000Z'); // 30 Nov IST
+    expect(sm.addInterval(start, 'year', 1, 'Asia/Kolkata').toISOString()).toBe('2027-10-30T18:30:00.000Z'); // 31 Oct 2027 IST
+  });
+});

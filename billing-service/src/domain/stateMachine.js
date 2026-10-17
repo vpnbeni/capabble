@@ -7,16 +7,48 @@ const graceDays = () => Number.parseInt(process.env.BILLING_GRACE_DAYS || '7', 1
 
 const addDays = (date, days) => new Date(new Date(date).getTime() + days * DAY_MS);
 
-/** Add one billing interval, clamping month-ends (31 Jan + 1 month = 28/29 Feb). */
-function addInterval(date, interval, count = 1) {
+const zone = () => process.env.BILLING_TIMEZONE || 'Asia/Kolkata';
+
+function localParts(date, timeZone) {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit',
+  }).formatToParts(date);
+  const get = (type) => Number(parts.find((p) => p.type === type).value);
+  return { year: get('year'), month: get('month'), day: get('day'), hour: get('hour'), minute: get('minute'), second: get('second') };
+}
+
+// Minutes the zone is ahead of UTC at `date`.
+function offsetMinutes(date, timeZone) {
+  const p = localParts(date, timeZone);
+  const asUtc = Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second);
+  return Math.round((asUtc - Math.floor(date.getTime() / 1000) * 1000) / 60000);
+}
+
+function localMidnight(year, month, day, timeZone) {
+  const guess = new Date(Date.UTC(year, month - 1, day));
+  return new Date(guess.getTime() - offsetMinutes(guess, timeZone) * 60000);
+}
+
+/** Midnight at the start of `date`'s day in the billing time zone. */
+function startOfDay(date, timeZone = zone()) {
+  const p = localParts(new Date(date), timeZone);
+  return localMidnight(p.year, p.month, p.day, timeZone);
+}
+
+/**
+ * Add billing intervals on the local calendar, clamping month ends
+ * (31 Jan + 1 month = 28/29 Feb). The time of day is kept.
+ */
+function addInterval(date, interval, count = 1, timeZone = zone()) {
   const d = new Date(date);
   const months = interval === 'year' ? 12 * count : count;
-  const day = d.getUTCDate();
-  const target = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + months, 1,
-    d.getUTCHours(), d.getUTCMinutes(), d.getUTCSeconds(), d.getUTCMilliseconds()));
-  const lastDay = new Date(Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0)).getUTCDate();
-  target.setUTCDate(Math.min(day, lastDay));
-  return target;
+  const p = localParts(d, timeZone);
+  const sinceMidnight = d.getTime() - localMidnight(p.year, p.month, p.day, timeZone).getTime();
+  const monthIndex = p.month - 1 + months;
+  const year = p.year + Math.floor(monthIndex / 12);
+  const month = (((monthIndex % 12) + 12) % 12) + 1;
+  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  return new Date(localMidnight(year, month, Math.min(p.day, lastDay), timeZone).getTime() + sinceMidnight);
 }
 
 const normalizeState = (state) => LEGACY_STATE_ALIASES[state] || state;
@@ -133,6 +165,7 @@ function nextDeadline(sub) {
 module.exports = {
   addDays,
   addInterval,
+  startOfDay,
   normalizeState,
   accessModeFor,
   advance,
