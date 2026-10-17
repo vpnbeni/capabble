@@ -13,7 +13,8 @@ export const formatINR = (n: number | null | undefined, opts: { compact?: boolea
     if (a >= 1e7) return `₹${(n / 1e7).toFixed(2).replace(/\.?0+$/, '')} Cr`
     if (a >= 1e5) return `₹${(n / 1e5).toFixed(2).replace(/\.?0+$/, '')} L`
   }
-  return `₹${Number(n).toLocaleString('en-IN', { maximumFractionDigits: opts.decimals || 0 })}`
+  const digits = opts.decimals || 0
+  return `₹${Number(n).toLocaleString('en-IN', { minimumFractionDigits: digits, maximumFractionDigits: digits })}`
 }
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']

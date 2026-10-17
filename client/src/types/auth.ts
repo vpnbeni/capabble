@@ -4,6 +4,10 @@ export interface BillingSnapshot {
   planCode: string | null
   trialEndsAt: string | null
   graceEndsAt: string | null
+  periodEndsAt?: string | null
+  cancelAtPeriodEnd?: boolean
+  /** Module codes the school pays for, or ['*'] during a trial or complimentary period. */
+  entitledModules?: string[]
   isReadOnly: boolean
 }
 

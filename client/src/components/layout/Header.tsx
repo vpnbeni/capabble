@@ -208,7 +208,7 @@ const Header: React.FC<HeaderProps> = ({ isSidebarCollapsed, onToggleSidebar }) 
       case 'billing':
         return {
           pageTitle: 'Billing',
-          pageSubtitle: 'Manage subscription, invoices, and billing profile',
+          pageSubtitle: 'Your plan, invoices and billing profile',
           showBackButton: isDetailRoute,
           backTo: backToPath,
         }
