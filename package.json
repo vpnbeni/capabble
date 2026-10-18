@@ -15,21 +15,18 @@
   "scripts": {
     "dev": "concurrently -n server,client,admin,schol-api,schol -c blue,green,magenta,cyan,yellow \"npm run server\" \"npm run client\" \"npm run admin\" \"npm run school-intel:api\" \"npm run schol\"",
     "dev:all": "concurrently -n server,client,admin,schol-api,schol -c blue,green,magenta,cyan,yellow \"npm run server\" \"npm run client\" \"npm run admin\" \"npm run school-intel:api\" \"npm run schol\"",
-    "dev:all:billing": "concurrently -n server,client,admin,billing,schol-api,schol -c blue,green,magenta,red,cyan,yellow \"npm run server\" \"npm run client\" \"npm run admin\" \"npm run billing\" \"npm run school-intel:api\" \"npm run schol\"",
     "server": "cd server && npm run dev",
     "client": "cd client && npm run dev",
     "admin": "cd admin && npm run dev",
-    "billing": "cd billing-service && npm run dev",
     "install-server": "cd server && npm install",
-    "install-billing": "cd billing-service && npm install",
-    "install-all": "npm install && npm run install-server && npm run install-billing && npm run school-intel:install",
+    "install-all": "npm install && npm run install-server && npm run school-intel:install",
     "seed": "cd server && npm run seed",
     "build": "cd client && npm run build",
     "build:admin": "cd admin && npm run build",
     "start": "cd server && npm start",
     "test": "concurrently \"cd server && npm test\" \"cd client && npm test\"",
     "lint": "npm run check:shared && npm run check:names && concurrently \"cd server && npm run lint\" \"cd client && npm run lint\"",
-    "clean": "rimraf node_modules client/node_modules server/node_modules admin/node_modules schol/node_modules capabble-landing/node_modules billing-service/node_modules client/dist server/dist admin/dist schol/dist .turbo",
+    "clean": "rimraf node_modules client/node_modules server/node_modules admin/node_modules schol/node_modules capabble-landing/node_modules client/dist server/dist admin/dist schol/dist .turbo",
     "school-intel:install": "cd school-intelligence && sh -c 'if [ ! -x .venv/bin/python ]; then python3 -m venv .venv; fi; .venv/bin/pip install -e \".[dev]\"'",
     "school-intel:migrate": "cd school-intelligence && school-intel migrate",
     "school-intel:test": "cd school-intelligence && python -m pytest -q",
@@ -47,7 +44,7 @@
     "sync:shared": "node scripts/sync-shared.mjs",
     "check:names": "node scripts/check-legacy-names.mjs",
     "check:shared": "node scripts/sync-shared.mjs --check",
-    "test:billing": "cd billing-service && npm test"
+    "test:billing": "cd server && npm run test:billing"
   },
   "keywords": [
     "examination",

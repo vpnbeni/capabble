@@ -66,7 +66,7 @@ scp ubuntu@<old-ip>:<capabble-stage-path>/.env ./capabble-stage.env.bak
 ```
 
 These contain `MONGODB_URI`, `JWT_SECRET`, `JWT_REFRESH_SECRET`, `PLATFORM_JWT_SECRET`,
-`CLOUDINARY_*`, `SMTP_*`, `RAZORPAY_*`, `BILLING_SERVICE_TOKEN`. They only exist on this box —
+`CLOUDINARY_*`, `SMTP_*`, `RAZORPAY_*`, `BILLING_DATABASE_URL*`. They only exist on this box —
 they are gitignored and were never committed.
 
 ### 1.4 Check for local file storage

@@ -1,4 +1,4 @@
-// Shapes returned by /api/admin/billing (billing-service). Money is always integer paise.
+// Shapes returned by /api/admin/billing (server billing module). Money is always integer paise.
 
 export type SubscriptionState =
   | 'trialing'

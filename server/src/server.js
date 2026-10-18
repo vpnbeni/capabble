@@ -15,6 +15,11 @@ const {
 
 // Import app
 const app = require('./app');
+const billing = require('./modules/billing');
+const { countActiveStudents } = require('./services/billingStudentCount');
+
+// Billing reads the live student count from the school databases the server owns.
+billing.setStudentCounter(countActiveStudents);
 
 // Vercel serverless: export the Express app and run DB init in background (no listen)
 if (process.env.VERCEL) {
@@ -50,6 +55,16 @@ const initializeServer = async () => {
     console.log(`✅ Platform database '${getCentralDbName()}' connected successfully`.green.bold);
     await runTenantModelStartupSanityCheck();
     require('./events/registerAllListeners')();
+
+    if (billing.isConfigured()) {
+      // Wake the billing database (Neon may be suspended) without holding up startup.
+      billing.ping()
+        .then((ms) => console.log(`✅ Billing database reachable (${ms}ms)`.green.bold))
+        .catch((error) => console.warn('⚠️  Billing database not reachable yet; requests will retry:'.yellow, error.code || error.message));
+      billing.startScheduler();
+    } else {
+      console.warn('⚠️  Billing is off (set BILLING_DATABASE_URL to enable).'.yellow);
+    }
 
     // TODO: Re-enable calendar initialization after debugging
     // setTimeout(async () => {
@@ -123,6 +138,7 @@ process.on('unhandledRejection', (err) => {
 // Handle SIGTERM
 process.on('SIGTERM', () => {
   console.log('👋 SIGTERM RECEIVED. Shutting down gracefully');
+  billing.stopScheduler();
   if (isAttendanceQueueReady()) {
     const worker = require('./workers/attendanceWorker');
     worker.close().catch(() => {});
@@ -135,6 +151,7 @@ process.on('SIGTERM', () => {
 // Handle SIGINT (Ctrl+C)
 process.on('SIGINT', () => {
   console.log('\n👋 SIGINT RECEIVED. Shutting down gracefully');
+  billing.stopScheduler();
   if (isAttendanceQueueReady()) {
     const worker = require('./workers/attendanceWorker');
     worker.close().catch(() => {});

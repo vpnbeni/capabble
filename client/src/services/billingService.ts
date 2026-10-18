@@ -169,7 +169,7 @@ const billingService = {
     return response.data.data || []
   },
   async getCatalog(): Promise<Catalog> {
-    const response = await api.get('/billing/catalog', quiet)
+    const response = await api.get('/billing/me/catalog', quiet)
     return response.data.data
   },
   async preview(selection: Selection): Promise<Quote> {
@@ -195,7 +195,7 @@ const billingService = {
     return response.data.data
   },
   async updateProfile(payload: Partial<BillingProfile>): Promise<BillingAccount> {
-    const response = await api.post('/billing/me/update-billing-profile', payload)
+    const response = await api.post('/billing/me/profile', payload)
     return response.data.data
   },
   /** PDFs go through the API (it needs the school header), then open in a new tab or download. */

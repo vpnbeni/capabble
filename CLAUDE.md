@@ -151,16 +151,15 @@ npm run backfill:tenant-user-directory # Backfill tenant user directory
 
 ### Monorepo Structure
 - `/client` - React 18 + TypeScript + Vite frontend (port 5173)
-- `/server` - Node.js + Express backend with MongoDB (port 5000)
+- `/server` - Node.js + Express backend with MongoDB (port 5000). Billing (`server/src/modules/billing`) runs in the same server on its own Postgres database (Neon, Drizzle migrations); only that module touches it and money is integer paise. See its README
 - `/admin` - React 18 + TypeScript + Vite admin portal (port 5174)
 - `/schol` + `/school-intelligence` - SCHOL UI + Python API
 - `/capabble-landing` - Next.js marketing site (capabble.cloud)
-- `/billing-service` - Standalone billing service on its own Postgres database (Neon; Drizzle migrations in `billing-service/drizzle`). Only it reads or writes billing data; the server and admin call its `/internal/*` API. Money is integer paise. See `billing-service/README.md`
 - `/packages/shared` - `@capabble/shared`: code/data used by more than one app (e.g. `tenantFeatureCatalog.json`)
 
 **npm workspaces + Turborepo**: `client`, `admin`, `schol`, `capabble-landing` and `packages/*` are workspaces sharing one root `package-lock.json` — run `npm install` from the root, never inside an app. `npm run build:all` / `npm run type-check` run through Turborepo.
 
-`server`, `billing-service` and `school-intelligence` are **not** workspaces (server deploys standalone to EC2 via `cd server && npm ci`). Server gets shared files as committed copies: edit `packages/shared`, then `npm run sync:shared`; `npm run lint` fails if the copy drifts.
+`server` and `school-intelligence` are **not** workspaces (server deploys standalone to EC2 via `cd server && npm ci`). Server gets shared files as committed copies: edit `packages/shared`, then `npm run sync:shared`; `npm run lint` fails if the copy drifts.
 
 Each frontend `vercel.json` has `ignoreCommand: npx turbo-ignore`, so a Vercel project only rebuilds when its app or a workspace it depends on changed.
 

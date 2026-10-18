@@ -23,6 +23,7 @@ const { tenantContextMiddleware } = require('./tenancy/tenantContextMiddleware')
 // Import module registry — each module registers its own routes
 const { mountAll } = require('./modules');
 const platformModule = require('./modules/platform');
+const billing = require('./modules/billing');
 
 // Create Express app
 const app = express();
@@ -136,6 +137,9 @@ if (rateLimitEnabled) {
   app.use(limiter);
 }
 
+// Razorpay webhooks are signed over the raw body, so they mount before the parsers and sanitizers.
+app.use('/api/webhooks', billing.webhookRouter);
+
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
@@ -234,9 +238,6 @@ app.get('/api', (req, res) => {
 
 // Platform admin routes (central control plane)
 platformModule.mountRoutes(app);
-
-// Billing service callbacks (service token, not tenant-scoped)
-app.use('/internal/billing', require('./routes/billingInternalRoutes'));
 
 // Tenant-scoped routes — each module registers its own routes via mountAll()
 const tenantScopedRouter = express.Router();

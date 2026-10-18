@@ -3,7 +3,7 @@
 // left as they are.
 //
 //   npm run billing:grandfather                 dry run: lists what would change
-//   npm run billing:grandfather -- --apply      writes to the billing service
+//   npm run billing:grandfather -- --apply      writes to the billing database
 //   npm run billing:grandfather -- --apply --days 30
 //
 // Run this against an environment before turning on BILLING_ENFORCEMENT_ENABLED there:
@@ -22,7 +22,7 @@ const argValue = (name) => {
 
 async function run() {
   if (!billing.isConfigured()) {
-    throw new Error('BILLING_SERVICE_URL is not configured.');
+    throw new Error('BILLING_DATABASE_URL is not configured.');
   }
   const apply = process.argv.includes('--apply');
   const days = Number.parseInt(argValue('--days') || process.env.BILLING_GRANDFATHER_DAYS || '60', 10);
@@ -31,7 +31,7 @@ async function run() {
   const { Tenant } = getPlatformModels();
   const tenants = await Tenant.find({ status: TENANT_STATUS.ACTIVE }).select('slug name adminEmail').lean();
   console.log(`[billing-grandfather] ${tenants.length} active schools · ${days} days · ${apply ? 'APPLY' : 'dry run'}`);
-  console.log(`[billing-grandfather] billing service: ${process.env.BILLING_SERVICE_URL}`);
+  console.log(`[billing-grandfather] billing database: ${new URL(process.env.BILLING_DATABASE_URL).host}`);
 
   let changed = 0;
   let skipped = 0;
