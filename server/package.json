@@ -14,6 +14,7 @@
     "platform:admin": "node scripts/tenants/set-platform-admin.js",
     "db:collections": "node scripts/checks/list-empty-collections.js",
     "db:drop-empty": "node scripts/tenants/drop-empty-collections.js",
+    "db:drop-databases": "node scripts/tenants/drop-databases.js",
     "backfill:tenant-user-directory": "node scripts/tenants/backfill-tenant-user-directory.js",
     "backfill:academic-session": "node scripts/migrations/backfill-academic-session.js",
     "migrate:rbac": "node scripts/migrations/migrate-rbac.js",

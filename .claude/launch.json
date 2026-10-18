@@ -84,6 +84,45 @@
       ],
       "cwd": "capabble-landing",
       "port": 3100
+    },
+    {
+      "name": "client-billing-local",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "VITE_DEV_PROXY_TARGET=http://localhost:5010",
+        "VITE_LOCAL_API_URL=/api",
+        "npx",
+        "vite",
+        "--port",
+        "5183",
+        "--strictPort"
+      ],
+      "cwd": "client",
+      "port": 5183
+    },
+    {
+      "name": "admin-billing-local",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "ADMIN_API_PROXY=http://localhost:5010",
+        "npx",
+        "vite",
+        "--port",
+        "5186",
+        "--strictPort"
+      ],
+      "cwd": "admin",
+      "port": 5186
+    },
+    {
+      "name": "server-billing-local",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "cd server && env PORT=5010 MONGODB_URI=mongodb://127.0.0.1:27199/ CENTRAL_DB_NAME=billing_local_central TENANT_DB_PREFIX=billing_local_tenant_ REDIS_URL= EMAIL_HOST=127.0.0.1 EMAIL_PORT=2525 EMAIL_USER=local EMAIL_PASS=local EMAIL_FROM=noreply@capabble.localhost SMTP_SECURE=false BILLING_DATABASE_URL=postgres://billing@127.0.0.1:55432/billing_dev BILLING_APP_URL=http://localhost:5183/#/billing BILLING_SUPPLIER_LEGAL_NAME=Capabble_dev BILLING_SUPPLIER_GSTIN=07AAACC1234D1Z5 BILLING_SUPPLIER_STATE_CODE=07 BILLING_SCHEDULER_ENABLED=false CLIENT_URL=http://localhost:5183 npm run dev"
+      ],
+      "cwd": ".",
+      "port": 5010
     }
   ]
 }

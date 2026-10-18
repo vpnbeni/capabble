@@ -56,6 +56,15 @@ export type AttndClassMatrixCell = {
   monthHalfDay: number
 }
 
+export type AttndAbsentStudent = {
+  studentId: string
+  name: string
+  rollNumber: string
+  className: string
+  section: string
+  halfDay: boolean
+}
+
 export type AttndDashboardData = {
   month: string
   date: string
@@ -63,6 +72,8 @@ export type AttndDashboardData = {
   staff: AttndDashboardGroupStats
   students: AttndDashboardGroupStats
   classMatrix: Array<{ className: string; sections: AttndClassMatrixCell[] }>
+  /** Absent and half-day students on `date`; empty when the user can't read student attendance. */
+  studentsAbsentToday?: AttndAbsentStudent[]
   sections: string[]
   staffMatrix: Array<{
     group: string

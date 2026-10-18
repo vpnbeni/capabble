@@ -560,6 +560,37 @@ const getDashboard = async (req, res) => {
       };
     }).filter((item) => item.strength > 0 || item.monthAbsent > 0 || item.todayAbsent > 0);
 
+    // Names of students absent on the view date, for the desk's hover cards. Only for users who
+    // can read student attendance, and limited to their own sections on an "assigned" grant.
+    let studentsAbsentToday = [];
+    const studentScope = req.rbac?.scopeOf('attnd.students.read') || null;
+    if (studentScope) {
+      const allowedKeys = isAssignedScope(req, 'attnd.students.read')
+        ? new Set((await getAssignedSections(req)).map((entry) => entry.key))
+        : null;
+      const studentById = new Map(students.map((item) => [String(item._id), item]));
+      studentsAbsentToday = studentRecords
+        .filter((item) => item.attendanceDate === viewDate && (isAbsentRecord(item) || isHalfDayRecord(item)))
+        .map((item) => {
+          const student = studentById.get(String(item.studentId));
+          const className = normalizeString(item.className || student?.class);
+          const section = normalizeString(item.section || student?.section);
+          return {
+            studentId: String(item.studentId),
+            name: student?.name || 'Unknown student',
+            rollNumber: student?.rollNumber || '',
+            className,
+            section,
+            halfDay: isHalfDayRecord(item),
+          };
+        })
+        .filter((item) => !allowedKeys || allowedKeys.has(sectionKey(item.className, item.section)))
+        .sort((left, right) =>
+          sortClassNames(left.className, right.className)
+          || sortSectionNames(left.section, right.section, left.className)
+          || left.name.localeCompare(right.name));
+    }
+
     const dailyTrend = dayKeys.map((dateKey) => {
       const staffDay = summarizeRecords(staffRecords, dateKey);
       const studentDay = summarizeRecords(studentRecords, dateKey);
@@ -599,6 +630,7 @@ const getDashboard = async (req, res) => {
           attendancePercent: rate(studentMonthAbsent, studentMonthHalfDay, studentStrength),
         },
         classMatrix,
+        studentsAbsentToday,
         sections: allSections,
         staffMatrix,
         dailyTrend,

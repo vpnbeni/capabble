@@ -120,6 +120,9 @@
 .cb-app .principal-attendance .cb-ring { width: 112px; height: 112px; }
 .cb-app .principal-attendance__legend { flex: 1; min-width: 0; margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-4); }
 .cb-app .principal-attendance__legend li { display: flex; flex-direction: column; gap: 2px; min-width: 0; padding-left: var(--space-4); border-left: 1px solid var(--border); }
+.cb-app .principal-attendance__hover { display: flex; }
+.cb-app .principal-attendance__hover > .cb-hovercard__trigger { flex-direction: column; gap: 2px; align-items: flex-start; }
+.cb-app .principal-attendance__hover .principal-attendance__share { text-decoration: underline dotted; text-underline-offset: 3px; }
 .cb-app .principal-attendance__name { display: flex; align-items: center; gap: 8px; font-size: 13px; line-height: 18px; color: var(--ink-muted); }
 .cb-app .principal-attendance__count { font: 600 24px/32px var(--font-sans); color: var(--ink); }
 .cb-app .principal-attendance__share { font-size: 12px; line-height: 16px; color: var(--ink-muted); }

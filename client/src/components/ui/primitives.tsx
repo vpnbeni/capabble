@@ -1,6 +1,7 @@
 import React, { forwardRef, useState } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import { cx, initials } from './format'
+import { HoverCard } from './hovercard'
 
 export type Tone = 'success' | 'warning' | 'danger' | 'info' | 'neutral'
 
@@ -119,7 +120,15 @@ export const Ring: React.FC<{
   )
 }
 
-export type ColumnChartItem = { label: string; value: number; caption?: string; tone?: 'accent' | 'success' | 'warning' | 'danger' | 'info' }
+export type ColumnChartItem = {
+  label: string
+  value: number
+  caption?: string
+  tone?: 'accent' | 'success' | 'warning' | 'danger' | 'info'
+  /** Card shown on hover / focus / tap of the column (e.g. who is absent), labelled by `detailLabel`. */
+  detail?: React.ReactNode
+  detailLabel?: string
+}
 
 /** Column chart on a fixed 0–`max` scale, one column per item, with an optional dashed target line. */
 export const ColumnChart: React.FC<{
@@ -131,26 +140,39 @@ export const ColumnChart: React.FC<{
   className?: string
 }> = ({ items, max = 100, target, unit = '%', label, className }) => {
   const pos = (value: number) => Math.max(0, Math.min(100, max > 0 ? (value / max) * 100 : 0))
+  const withDetail = (item: ColumnChartItem, node: React.ReactNode, focusable = true) =>
+    item.detail ? (
+      <HoverCard className="cb-columns__hover" label={item.detailLabel || item.label} content={item.detail} focusable={focusable}>{node}</HoverCard>
+    ) : node
+  const interactive = items.some((item) => item.detail)
   return (
-    <div className={cx('cb-columns', className)} role="img" aria-label={label}>
+    <div className={cx('cb-columns', className)} role={interactive ? 'group' : 'img'} aria-label={label}>
       <div className="cb-columns__plot">
         {target ? (
           <div className="cb-columns__target" style={{ '--pos': pos(target.value) } as React.CSSProperties} title={target.label} />
         ) : null}
         {items.map((item) => (
           <div key={item.label} className="cb-columns__col">
-            <span className="cb-columns__value is-num">{`${item.value}${unit}`}</span>
-            <span className="cb-columns__track">
-              <i className={`cb-columns__bar cb-columns__bar--${item.tone || 'accent'}`} style={{ '--pos': pos(item.value) } as React.CSSProperties} />
-            </span>
+            {withDetail(item, (
+              <>
+                <span className="cb-columns__value is-num">{`${item.value}${unit}`}</span>
+                <span className="cb-columns__track">
+                  <i className={`cb-columns__bar cb-columns__bar--${item.tone || 'accent'}`} style={{ '--pos': pos(item.value) } as React.CSSProperties} />
+                </span>
+              </>
+            ))}
           </div>
         ))}
       </div>
       <div className="cb-columns__labels">
         {items.map((item) => (
           <div key={item.label} className="cb-columns__col">
-            <span className="cb-columns__name">{item.label}</span>
-            <span className="cb-columns__caption">{item.caption || '\u00a0'}</span>
+            {withDetail(item, (
+              <>
+                <span className="cb-columns__name">{item.label}</span>
+                <span className={cx('cb-columns__caption', item.detail ? 'has-detail' : null)}>{item.caption || '\u00a0'}</span>
+              </>
+            ), false)}
           </div>
         ))}
       </div>
