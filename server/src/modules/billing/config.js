@@ -15,15 +15,17 @@ const config = {
   get timezone() { return process.env.BILLING_TIMEZONE || 'Asia/Kolkata'; },
   get sacCode() { return process.env.BILLING_SAC_CODE || '998314'; },
   get autoDebitEnabled() { return String(process.env.BILLING_AUTODEBIT_ENABLED || 'false') === 'true'; },
+  // Printed on every invoice. Until Capabble is registered for GST these fall back to
+  // placeholders that say so; set the BILLING_SUPPLIER_* variables once the GSTIN arrives.
+  // The state code decides CGST+SGST (same state as the school) or IGST.
   get supplier() {
+    const gstin = (process.env.BILLING_SUPPLIER_GSTIN || '').trim().toUpperCase() || null;
     return {
       legalName: process.env.BILLING_SUPPLIER_LEGAL_NAME || 'Capabble',
-      gstin: (process.env.BILLING_SUPPLIER_GSTIN || '').trim().toUpperCase() || null,
-      address: process.env.BILLING_SUPPLIER_ADDRESS || '',
-      stateCode: process.env.BILLING_SUPPLIER_STATE_CODE
-        || (process.env.BILLING_SUPPLIER_GSTIN || '').slice(0, 2)
-        || null,
-      email: process.env.BILLING_SUPPLIER_EMAIL || '',
+      gstin,
+      address: process.env.BILLING_SUPPLIER_ADDRESS || 'Registered address to be added',
+      stateCode: process.env.BILLING_SUPPLIER_STATE_CODE || (gstin ? gstin.slice(0, 2) : '06'),
+      email: process.env.BILLING_SUPPLIER_EMAIL || 'billing@capabble.cloud',
       phone: process.env.BILLING_SUPPLIER_PHONE || ''
     };
   }

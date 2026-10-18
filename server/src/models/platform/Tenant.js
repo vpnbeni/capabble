@@ -57,6 +57,11 @@ const tenantSchema = new mongoose.Schema({
       trim: true,
       default: '',
     },
+    udiseCode: {
+      type: String,
+      trim: true,
+      default: '',
+    },
   },
 }, {
   timestamps: true,

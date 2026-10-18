@@ -15,8 +15,7 @@ const tenantSignupApi = axios.create({
 })
 
 export interface TenantSignupStartPayload {
-  schoolCode?: string
-  affiliationNo?: string
+  udiseCode: string
   name: string
   slug: string
   adminEmail: string

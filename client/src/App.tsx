@@ -181,12 +181,17 @@ const LegacyCandidatesRedirect = () => {
   return <Navigate to={`${nextPath}${location.search}${location.hash}`} replace />
 }
 
+// The school app (school./stageschool.capabble.cloud) opens on sign-in; marketing lives on
+// capabble.cloud. Product sites keep their landing pages, and ?brand= still previews them.
 const PublicLanding = () => {
+  const location = useLocation()
   const variant = getPublicBrandVariant()
+  const brandPreview = new URLSearchParams(location.search).has('brand')
 
   if (variant === 'tmtbl') return <TmtblLanding />
   if (variant === 'stdnt') return <StdntLanding />
-  return <CntrLanding />
+  if (brandPreview) return <CntrLanding />
+  return <Navigate to={`/login${location.search}`} replace />
 }
 
 function App() {

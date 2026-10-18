@@ -1,7 +1,11 @@
 // Tax invoice, payment receipt and credit note PDFs, rendered from stored (immutable) records.
+const path = require('path');
 const PDFDocument = require('pdfkit');
 const { STATE_NAMES } = require('../domain/gst');
 const config = require('../config');
+
+const LOGO = path.join(__dirname, '..', 'assets', 'capabble-mark.png');
+const LOGO_SIZE = 34;
 
 // The standard PDF fonts have no rupee glyph, so amounts print as "INR 1,234.50".
 const inr = (paise) => {
@@ -74,12 +78,14 @@ function streamDoc(res, filename, draw) {
 }
 
 function header(doc, title, supplier) {
-  doc.font('Helvetica-Bold').fontSize(16).text(supplier.legalName || 'Capabble', 40, 40);
+  const textX = 40 + LOGO_SIZE + 10;
+  doc.image(LOGO, 40, 38, { width: LOGO_SIZE, height: LOGO_SIZE });
+  doc.font('Helvetica-Bold').fontSize(16).fillColor('#000').text(supplier.legalName || 'Capabble', textX, 40, { width: 260 });
   doc.font('Helvetica').fontSize(9).fillColor('#444');
-  if (supplier.address) doc.text(supplier.address, { width: 300 });
-  if (supplier.gstin) doc.text(`GSTIN: ${supplier.gstin}`);
-  if (supplier.stateCode) doc.text(`State: ${stateLabel(supplier.stateCode)}`);
-  if (supplier.email) doc.text(supplier.email);
+  if (supplier.address) doc.text(supplier.address, textX, doc.y, { width: 260 });
+  doc.text(supplier.gstin ? `GSTIN: ${supplier.gstin}` : 'GSTIN: Registration pending', textX, doc.y);
+  if (supplier.stateCode) doc.text(`State: ${stateLabel(supplier.stateCode)}`, textX, doc.y);
+  if (supplier.email) doc.text(supplier.email, textX, doc.y);
   doc.fillColor('#000').font('Helvetica-Bold').fontSize(14).text(title, 360, 40, { width: 195, align: 'right' });
   doc.moveDown(0.5);
 }

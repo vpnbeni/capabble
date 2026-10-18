@@ -518,15 +518,13 @@ const createTenant = asyncHandler(async (req, res) => {
 
 const startPublicTenantSignup = asyncHandler(async (req, res) => {
   const {
-    schoolCode,
-    affiliationNo,
+    udiseCode,
     slug,
     name,
     adminEmail,
     adminPassword
   } = req.body;
-  const normalizedSchoolCode = String(schoolCode || '').trim();
-  const normalizedAffiliationNo = String(affiliationNo || '').trim();
+  const normalizedUdiseCode = String(udiseCode || '').trim();
   const normalizedSchoolName = String(name || '').trim();
 
   try {
@@ -535,8 +533,7 @@ const startPublicTenantSignup = asyncHandler(async (req, res) => {
       name: normalizedSchoolName,
       adminEmail,
       adminPassword,
-      schoolCode: normalizedSchoolCode,
-      affiliationNo: normalizedAffiliationNo,
+      udiseCode: normalizedUdiseCode,
       createdBy: null
     });
 

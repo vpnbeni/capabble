@@ -213,6 +213,7 @@ body.cb-app {
 .cb-app button.ghost { background: transparent; border-color: transparent; color: var(--ink-muted); box-shadow: none; }
 .cb-app button.ghost:hover:not(:disabled) { background: var(--surface-hover); color: var(--ink); }
 .cb-app button.danger { background: var(--danger-strong); border-color: transparent; color: var(--on-danger); }
+.cb-app button.danger:hover:not(:disabled) { background: color-mix(in srgb, var(--danger-strong) 86%, var(--ink)); color: var(--on-danger); }
 .cb-app button:disabled { cursor: not-allowed; background: var(--surface-sunken); border-color: var(--border); color: var(--ink-disabled); box-shadow: none; }
 /* Kit buttons and icon buttons keep their own rules. */
 .cb-app button.cb-btn { box-shadow: none; }

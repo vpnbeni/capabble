@@ -23,8 +23,10 @@ const createTenantSchema = Joi.object({
 });
 
 const publicTenantSignupStartSchema = Joi.object({
-  schoolCode: Joi.string().pattern(/^\d{5}$/).optional(),
-  affiliationNo: Joi.string().pattern(/^\d{6}$/).optional(),
+  udiseCode: Joi.string()
+    .pattern(/^\d{11}$/)
+    .required()
+    .messages({ 'string.pattern.base': 'UDISE+ code must be 11 digits' }),
   slug: Joi.string().pattern(tenantSlugRegex).required(),
   name: Joi.string().min(2).max(120).required(),
   adminEmail: Joi.string().email().required(),
