@@ -38,11 +38,32 @@ const isLocalApiUrl = (value: string): boolean => {
   }
 }
 
+const ADMIN_API_PATH = '/api/admin'
+
+/** `https://api.capabble.cloud` → `https://api.capabble.cloud/api/admin`; a full URL is kept. */
+const withAdminPath = (value: string): string => {
+  const trimmed = value.replace(/\/+$/, '')
+  return trimmed.endsWith(ADMIN_API_PATH) ? trimmed : `${trimmed}${ADMIN_API_PATH}`
+}
+
+/**
+ * Without VITE_PLATFORM_API_URL, the admin site finds its API from its own address:
+ * stageadmin.<domain> → stageapi.<domain>, admin.<domain> → api.<domain>. The admin
+ * site itself (Vercel) serves no API, so a relative /api/admin can't work there.
+ */
+const apiFromAdminHost = (): string | null => {
+  if (typeof window === 'undefined') return null
+  const { protocol, hostname } = window.location
+  const match = hostname.match(/^(stage)?admin\.(.+)$/)
+  if (!match) return null
+  return `${protocol}//${match[1] ? 'stageapi' : 'api'}.${match[2]}${ADMIN_API_PATH}`
+}
+
 const API_BASE_URL = import.meta.env.DEV
-  ? '/api/admin'
-  : ((!import.meta.env.DEV && isLocalApiUrl(configuredApiBaseUrl))
-    ? '/api/admin'
-    : (configuredApiBaseUrl || '/api/admin'))
+  ? ADMIN_API_PATH
+  : (isLocalApiUrl(configuredApiBaseUrl)
+    ? ADMIN_API_PATH
+    : (configuredApiBaseUrl ? withAdminPath(configuredApiBaseUrl) : (apiFromAdminHost() || ADMIN_API_PATH)))
 
 interface ApiResponse<T> {
   success: boolean
