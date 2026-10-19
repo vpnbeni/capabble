@@ -44,6 +44,16 @@ const samples = {
   'invoice-overdue': () => templates.invoiceEmail({
     variant: 'overdue', ...INVOICE
   }),
+  'payment-received': () => templates.paymentReceived({
+    name: SCHOOL,
+    amount: '₹39,648.00',
+    receiptNumber: 'RC2627-000001',
+    invoiceNumber: 'CB2627-000001',
+    paidOn: '19 Oct 2026',
+    method: 'Netbanking',
+    balanceDue: null,
+    url: PAY
+  }),
   'trial-ending': () => templates.accessEmail({ variant: 'trial_ending', name: SCHOOL, date: '25 Oct 2026', url: PAY }),
   'grandfather-ending': () => templates.accessEmail({
     variant: 'grandfather_ending', name: SCHOOL, date: '31 Mar 2027', url: PAY

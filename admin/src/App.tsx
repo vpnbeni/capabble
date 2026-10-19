@@ -21,6 +21,7 @@ import {
   BookOpen,
   Building2,
   CalendarDays,
+  ChevronDown,
   ClipboardCheck,
   CreditCard,
   FileText,
@@ -79,6 +80,7 @@ function App() {
   const [password, setPassword] = useState('')
   const [currentPath, setCurrentPath] = useState(getInitialPath)
   const [navOpen, setNavOpen] = useState(false)
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({})
   const { theme, toggle: toggleTheme } = useTheme()
 
   // The phone drawer closes on Escape and keeps the page behind it still.
@@ -172,6 +174,7 @@ function App() {
       },
       {
         label: 'Exam master data',
+        collapsible: true,
         items: [
           { label: 'Subjects', icon: BookOpen, path: '/master-subjects', matcher: (path: string) => path === '/master-subjects' },
           { label: 'Datesheet', icon: CalendarDays, path: '/master-datesheet', matcher: (path: string) => path === '/master-datesheet' },
@@ -292,30 +295,52 @@ function App() {
         </div>
 
         <nav className="nav">
-          {navGroups.map((group) => (
-            <div key={group.label} className="nav-group">
-              <div className="nav-group__label">{group.label}</div>
-              {group.items.map((item) => {
-                const active = item.matcher(currentPath)
-                const ItemIcon = item.icon
-                return (
-                  <a
-                    key={item.path}
-                    href={item.path}
-                    className={`nav-link${active ? ' active' : ''}`}
-                    aria-current={active ? 'page' : undefined}
-                    onClick={(event) => {
-                      event.preventDefault()
-                      go(item.path)
-                    }}
+          {navGroups.map((group) => {
+            const groupId = `nav-group-${group.label.toLowerCase().replace(/\s+/g, '-')}`
+            const containsActive = group.items.some((item) => item.matcher(currentPath))
+            const expanded = !group.collapsible || (expandedGroups[group.label] ?? containsActive)
+            return (
+              <div key={group.label} className="nav-group">
+                {group.collapsible ? (
+                  <button
+                    type="button"
+                    className="nav-group__toggle"
+                    aria-expanded={expanded}
+                    aria-controls={groupId}
+                    onClick={() => setExpandedGroups((prev) => ({ ...prev, [group.label]: !expanded }))}
                   >
-                    <ItemIcon />
-                    <span className="nav-text">{item.label}</span>
-                  </a>
-                )
-              })}
-            </div>
-          ))}
+                    <span>{group.label}</span>
+                    <ChevronDown className={`nav-group__chevron${expanded ? ' is-open' : ''}`} size={16} />
+                  </button>
+                ) : (
+                  <div className="nav-group__label">{group.label}</div>
+                )}
+                {expanded && (
+                  <div id={groupId} className="nav-group__items">
+                    {group.items.map((item) => {
+                      const active = item.matcher(currentPath)
+                      const ItemIcon = item.icon
+                      return (
+                        <a
+                          key={item.path}
+                          href={item.path}
+                          className={`nav-link${active ? ' active' : ''}`}
+                          aria-current={active ? 'page' : undefined}
+                          onClick={(event) => {
+                            event.preventDefault()
+                            go(item.path)
+                          }}
+                        >
+                          <ItemIcon />
+                          <span className="nav-text">{item.label}</span>
+                        </a>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            )
+          })}
         </nav>
 
         <div className="sidebar-footer">

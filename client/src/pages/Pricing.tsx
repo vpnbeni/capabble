@@ -1,8 +1,10 @@
 import React from 'react'
+import { useLightOnlyTheme } from '@/utils/theme'
 import { Boxes, ShieldCheck, Star } from 'lucide-react'
 import fullLogo from '../assets/full logo.png'
 
 const Pricing: React.FC = () => {
+  useLightOnlyTheme()
   return (
     <div className="min-h-screen w-full bg-gradient-to-b from-slate-50 via-white to-slate-100 flex flex-col items-center px-4 py-10 sm:py-12">
       <header className="w-full max-w-5xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">

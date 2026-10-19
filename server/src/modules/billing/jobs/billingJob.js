@@ -9,7 +9,7 @@ const subscriptions = require('../services/subscriptionService');
 const invoices = require('../services/invoiceService');
 const studentCount = require('../services/studentCount');
 const mailTemplates = require('../../../mail/templates');
-const mailer = require('../services/mailer');
+const notifications = require('../services/notificationService');
 const { rupees } = require('../domain/money');
 const { SYSTEM_ACTOR } = require('../services/auditService');
 
@@ -70,24 +70,7 @@ async function issueRenewals(now) {
   return issued;
 }
 
-/** Each reminder is recorded before it is sent; the unique key makes it once-only. */
-async function remind({ accountId, kind, subjectId, dueOn, to, message }) {
-  if (!to) return 'skipped';
-  const db = getDb();
-  const [row] = await db.insert(s.notifications)
-    .values({ accountId, kind, subjectId, dueOn, recipient: to, status: 'sent' })
-    .onConflictDoNothing()
-    .returning();
-  if (!row) return 'duplicate';
-  try {
-    const status = await mailer.sendMail({ to, ...message });
-    if (status !== 'sent') await db.update(s.notifications).set({ status }).where(eq(s.notifications.id, row.id));
-    return status;
-  } catch (error) {
-    await db.update(s.notifications).set({ status: 'failed', error: String(error.message).slice(0, 500) }).where(eq(s.notifications.id, row.id));
-    return 'failed';
-  }
-}
+const remind = notifications.sendOnce;
 
 function invoiceMessage(account, inv, variant) {
   return mailTemplates.invoiceEmail({

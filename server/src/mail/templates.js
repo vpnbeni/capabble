@@ -139,6 +139,30 @@ const invoiceEmail = ({ variant, name, invoiceNumber, amountDue, dueDate, url })
   });
 };
 
+/** A payment was recorded (online or offline). The receipt PDF, and the invoice once paid, are attached. */
+const paymentReceived = ({ name, amount, receiptNumber, invoiceNumber, paidOn, method, balanceDue, url }) => renderEmail({
+  subject: `Payment received: ${amount} for ${invoiceNumber}`,
+  preheader: `Thank you. We've received ${amount} for invoice ${invoiceNumber}.`,
+  context: name,
+  heading: 'Payment received',
+  intro: [['Thank you. We’ve received ', { strong: amount }, ' for your Capabble subscription.']],
+  details: [
+    ['Receipt', receiptNumber],
+    ['Invoice', invoiceNumber],
+    ['Amount', amount],
+    ['Paid on', paidOn],
+    ['Method', method],
+    ...(balanceDue ? [['Still due', balanceDue]] : [])
+  ],
+  outro: [
+    balanceDue
+      ? 'The receipt is attached. The rest of the invoice is still due.'
+      : 'The receipt and the paid invoice are attached. Keep them for your accounts.'
+  ],
+  button: { label: 'View billing', url },
+  footnote: `You’re getting this because this is the billing email for ${name} on Capabble.`
+});
+
 const accessEmail = ({ variant, name, date, url }) => {
   const copy = {
     trial_ending: {
@@ -188,5 +212,6 @@ module.exports = {
   newSchoolAlert,
   appointmentUpdate,
   invoiceEmail,
+  paymentReceived,
   accessEmail
 };

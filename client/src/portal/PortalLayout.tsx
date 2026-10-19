@@ -3,10 +3,11 @@ import { classLabel } from '@/utils/classLabel'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useDispatch } from 'react-redux'
 import type { LucideIcon } from 'lucide-react'
-import { Bell, Bus, CalendarCheck, CalendarClock, CalendarDays, GraduationCap, Home, IndianRupee, KeyRound, LogOut, Menu as MenuIcon, UserRound } from 'lucide-react'
+import { Bell, Bus, CalendarCheck, CalendarClock, CalendarDays, GraduationCap, Home, IndianRupee, KeyRound, LogOut, Menu as MenuIcon, Monitor, Moon, Sun, UserRound } from 'lucide-react'
 import { Avatar, Menu, Select, type MenuItem } from '@/components/ui'
 import { logout } from '@/redux/slices/authSlice'
 import type { AppDispatch } from '@/redux/store'
+import { useTheme } from '@/utils/theme'
 import { usePortal } from './PortalContext'
 import type { PortalSection } from './portalService'
 import './portal.css'
@@ -37,6 +38,7 @@ const PortalLayout: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>()
   const navigate = useNavigate()
   const { home, child, setChildId, isParent, has } = usePortal()
+  const { preference, setPreference } = useTheme()
 
   const entries = NAV.filter((entry) => !entry.section || has(entry.section))
   const bottom = entries.slice(0, BOTTOM_SLOTS)
@@ -49,6 +51,10 @@ const PortalLayout: React.FC = () => {
 
   const accountItems: MenuItem[] = [
     { label: 'Change password', icon: KeyRound, onSelect: () => navigate('/portal/account') },
+    { divider: true },
+    { label: 'System theme', icon: Monitor, hint: preference === 'system' ? 'On' : undefined, onSelect: () => setPreference('system') },
+    { label: 'Light theme', icon: Sun, hint: preference === 'light' ? 'On' : undefined, onSelect: () => setPreference('light') },
+    { label: 'Dark theme', icon: Moon, hint: preference === 'dark' ? 'On' : undefined, onSelect: () => setPreference('dark') },
     { divider: true },
     { label: 'Sign out', icon: LogOut, onSelect: signOut },
   ]

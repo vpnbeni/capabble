@@ -1,5 +1,6 @@
 // Tax invoice, payment receipt and credit note PDFs, rendered from stored (immutable) records.
 const path = require('path');
+const { Writable } = require('stream');
 const PDFDocument = require('pdfkit');
 const { STATE_NAMES } = require('../domain/gst');
 const config = require('../config');
@@ -266,4 +267,28 @@ function renderCreditNote(res, { note, invoice }) {
   });
 }
 
-module.exports = { renderInvoice, renderReceipt, renderCreditNote, inWords, inr };
+/** The same PDF as a Buffer, for an email attachment. */
+function toBuffer(render, input) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    const sink = new Writable({
+      write(chunk, _encoding, done) {
+        chunks.push(chunk);
+        done();
+      }
+    });
+    sink.setHeader = () => {};
+    sink.on('finish', () => resolve(Buffer.concat(chunks)));
+    sink.on('error', reject);
+    try {
+      render(sink, input);
+    } catch (error) {
+      reject(error);
+    }
+  });
+}
+
+const invoicePdfBuffer = (invoice) => toBuffer(renderInvoice, invoice);
+const receiptPdfBuffer = ({ payment, invoice }) => toBuffer(renderReceipt, { payment, invoice });
+
+module.exports = { renderInvoice, renderReceipt, renderCreditNote, invoicePdfBuffer, receiptPdfBuffer, inWords, inr };

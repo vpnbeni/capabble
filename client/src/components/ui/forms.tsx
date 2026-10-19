@@ -265,6 +265,48 @@ export const Switch: React.FC<{
   )
 }
 
+/** Compact one-of-few choice that applies immediately (e.g. theme). Arrow keys move the choice. */
+export const SegmentedControl: React.FC<{
+  options: Array<{ value: string; label: React.ReactNode; icon?: LucideIcon }>
+  value: string
+  onChange: (value: string) => void
+  label: string
+  fullWidth?: boolean
+  className?: string
+}> = ({ options, value, onChange, label, fullWidth, className }) => {
+  const onKey = (event: React.KeyboardEvent<HTMLButtonElement>, index: number) => {
+    const step = event.key === 'ArrowRight' || event.key === 'ArrowDown' ? 1 : event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? -1 : 0
+    if (!step) return
+    event.preventDefault()
+    const nextIndex = (index + step + options.length) % options.length
+    onChange(options[nextIndex].value)
+    const sibling = event.currentTarget.parentElement?.children[nextIndex] as HTMLElement | undefined
+    sibling?.focus()
+  }
+  return (
+    <div className={cx('cb-segmented', fullWidth && 'is-full', className)} role="radiogroup" aria-label={label}>
+      {options.map((option, index) => {
+        const on = option.value === value
+        return (
+          <button
+            key={option.value}
+            type="button"
+            role="radio"
+            aria-checked={on}
+            tabIndex={on ? 0 : -1}
+            className={cx('cb-segmented__item', on && 'is-active')}
+            onClick={() => onChange(option.value)}
+            onKeyDown={(event) => onKey(event, index)}
+          >
+            {option.icon ? <Icon icon={option.icon} size={14} /> : null}
+            <span>{option.label}</span>
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
 export interface RadioGroupProps {
   label?: React.ReactNode
   options: Array<{ value: string; label: React.ReactNode; description?: React.ReactNode; disabled?: boolean }>

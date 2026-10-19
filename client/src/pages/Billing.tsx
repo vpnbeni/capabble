@@ -52,6 +52,7 @@ import billingService, {
   type BillingSubscription,
   type Quote,
   type Selection,
+  type SettledPayment,
 } from '@/services/billingService'
 import { getCurrentUser } from '@/redux/slices/authSlice'
 import type { AppDispatch } from '@/redux/store'
@@ -103,6 +104,7 @@ const Billing: React.FC = () => {
   const [editingProfile, setEditingProfile] = useState(false)
   const [confirmCancel, setConfirmCancel] = useState(false)
   const [paying, setPaying] = useState(false)
+  const [settled, setSettled] = useState<SettledPayment | null>(null)
   const cancel = useCancelSubscription()
   const resume = useResumeSubscription()
 
@@ -111,13 +113,19 @@ const Billing: React.FC = () => {
     dispatch(getCurrentUser())
   }
 
-  // Back from Razorpay: record the payment straight away, even before its webhook arrives.
+  // Back from Razorpay: record the payment straight away (the webhook may not have arrived),
+  // then confirm it, whichever of the two recorded it.
   useEffect(() => {
     if (params.get('paid') !== '1') return
-    billingService.reconcile()
+    const linkStatus = params.get('razorpay_payment_link_status')
+    if (linkStatus && linkStatus !== 'paid') {
+      toast.error('The payment wasn’t completed and nothing was charged. You can try again.')
+    }
+    billingService.reconcile(params.get('razorpay_payment_link_id'))
       .then((result) => {
-        if (result.recorded.length) toast.success('Payment received. Thank you.')
-        else toast('We will update this page as soon as Razorpay confirms the payment.')
+        if (result.settled) setSettled(result.settled)
+        else if (result.recorded.length) toast.success('Payment received. Thank you.')
+        else if (!linkStatus || linkStatus === 'paid') toast('Your payment is being confirmed. This page updates in a minute.')
       })
       .catch(() => {})
       .finally(() => {
@@ -315,6 +323,45 @@ const Billing: React.FC = () => {
 
       {choosing ? <ChooseModulesSheet sub={sub} liveStudents={data.liveStudents ?? null} onClose={() => setChoosing(false)} onDone={refreshEverything} /> : null}
       {editingProfile && account ? <ProfileSheet account={account} onClose={() => setEditingProfile(false)} /> : null}
+      <Dialog
+        open={Boolean(settled)}
+        onClose={() => setSettled(null)}
+        size="sm"
+        title="Payment received"
+        description={settled && settled.invoice.outstandingPaise > 0
+          ? `Thank you. ${rupeesExact(settled.invoice.outstandingPaise)} of this invoice is still due.`
+          : 'Thank you. Your invoice is paid in full.'}
+        footer={settled ? (
+          <>
+            <Button
+              variant="secondary"
+              icon={Receipt}
+              onClick={() => openPdf('receipts', settled.payment.id, settled.payment.receiptNumber || 'receipt')}
+            >
+              Download receipt
+            </Button>
+            <Button variant="primary" onClick={() => setSettled(null)}>Done</Button>
+          </>
+        ) : null}
+      >
+        {settled ? (
+          <div className="cb-stack">
+            <DetailList
+              columns={1}
+              items={[
+                { label: 'Amount', value: rupeesExact(settled.payment.amountPaise) },
+                { label: 'Receipt', value: settled.payment.receiptNumber || '—' },
+                { label: 'Invoice', value: settled.invoice.number },
+                { label: 'Paid on', value: formatDate(settled.payment.capturedAt || settled.payment.createdAt) },
+              ]}
+            />
+            {account?.billingEmail ? (
+              <p className="cb-muted">A copy of the receipt is emailed to {account.billingEmail}.</p>
+            ) : null}
+          </div>
+        ) : null}
+      </Dialog>
+
       <Dialog
         open={confirmCancel}
         onClose={() => setConfirmCancel(false)}

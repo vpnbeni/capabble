@@ -29,6 +29,8 @@ When the artifact changes, resync this file and bump the version line.
 
 ## Colour (tokens in `styles/capabble/tokens.css`, generated — don't edit)
 
+- Light and dark: the user picks System (default), Light or Dark under Appearance in the account menu (`utils/theme.ts` puts `.dark` on `<html>`). Tokens switch by themselves; any raw Tailwind colour needs its `dark:` pair. Public marketing pages call `useLightOnlyTheme()` and stay light.
+
 - Grounds: page `bg`; cards, tables, sidebar, header `surface`; menus/dialogs `surface-raised`; table headers, tracks, read-only fields `surface-sunken`.
 - Lines: `border` for hairlines; every input/select/secondary button uses `border-control`.
 - Text: `ink` primary, `ink-muted` secondary, `ink-subtle` only for timestamps, placeholders, column headers.
@@ -70,6 +72,7 @@ Lucide (`lucide-react`), passed as components: `icon={Plus}`. 1.75 stroke is app
 - Overlay by size: `Dialog` for a decision or ≤4 fields; `Sheet` for 5–10 fields or a record preview; a page for anything longer.
 - Choice by count: `RadioGroup` 2–5; `Select` ≤15; `Combobox` for long/searchable lists (students, teachers, subjects).
 - On/off: `Switch` applies immediately; `Checkbox` inside a saved form.
+- One of 2–4 short options that applies immediately (theme, view density): `SegmentedControl`. Not for switching views (that's `Tabs`).
 - Dates: `TextField type="date"` (the system's DatePicker/Calendar aren't ported yet).
 - Times from a fixed set of slots: `SlotPicker`. A free-form time: `TextField type="time"`.
 
@@ -105,6 +108,7 @@ Lucide (`lucide-react`), passed as components: `icon={Plus}`. 1.75 stroke is app
 | `Select` | `label, options (string \| {value,label,disabled}), placeholder, size` | Native dropdown |
 | `Combobox` | `options[{value,label,meta,keywords}], value, onChange, selectedLabel, clearable, placeholder` | Searchable picker; no free text |
 | `SlotPicker` | `slots[{start, end, state: 'free' \| 'busy' \| 'caution', reason}], value, onChange, allowCaution, loading, emptyText` + field chrome | Picking a time slot (appointments). Busy slots stay visible and struck through; `caution` (e.g. a teaching period) is dashed and pickable only with `allowCaution`. Not in the artifact yet: added to our kit |
+| `SegmentedControl` | `options[{value,label,icon}], value, onChange, label, fullWidth` | Immediate one-of-few setting (radiogroup); e.g. the Appearance switch in the account menu |
 | `Checkbox` / `Switch` / `RadioGroup` | `checked, onChange(bool)`; RadioGroup `options, value, onChange, variant: 'list' \| 'cards'` | |
 | `Dialog` | `open, onClose, title, description, tone: 'default' \| 'danger', size: sm \| md \| lg, footer` | Confirmations, ≤4 fields |
 | `Sheet` | `open, onClose, title, description, icon, size: sm \| md \| lg \| xl, footer, onSubmit` | Forms; `onSubmit` wraps body+footer in a `<form>`. Bottom sheet on phones |

@@ -8,6 +8,7 @@ import App from './App'
 import { store, persistor } from './redux/store'
 import { setStoreDispatch } from './services/api'
 import { AcademicSessionProvider } from './contexts/AcademicSessionContext'
+import { initTheme } from './utils/theme'
 import './styles/globals.css'
 import './styles/capabble/tokens.css'
 import './styles/capabble/components.css'
@@ -16,6 +17,7 @@ import './styles/capabble/shell.css'
 
 // Set up store dispatch for API interceptors
 setStoreDispatch(store.dispatch)
+initTheme()
 
 const queryClient = new QueryClient({
   defaultOptions: {

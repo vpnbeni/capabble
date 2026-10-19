@@ -136,6 +136,14 @@
 .cb-app .cb-tabs--segmented .cb-tab.is-active { background: var(--surface-raised); box-shadow: var(--shadow-xs); }
 .cb-app .cb-tabs--segmented .cb-tab.is-active::after { display: none; }
 
+/* ---------- SegmentedControl ---------- */
+.cb-app .cb-segmented { display: inline-flex; gap: 2px; padding: 2px; background: var(--surface-sunken); border-radius: var(--radius-md); }
+.cb-app .cb-segmented.is-full { display: flex; width: 100%; }
+.cb-app .cb-segmented__item { flex: 1 1 0; display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 28px; padding: 0 10px; border: 0; border-radius: 6px; background: none; font: 500 13px/18px var(--font-sans); color: var(--ink-muted); cursor: pointer; white-space: nowrap; }
+.cb-app .cb-segmented__item:hover { color: var(--ink); }
+.cb-app .cb-segmented__item.is-active { background: var(--surface-raised); color: var(--ink); font-weight: 600; box-shadow: var(--shadow-xs); }
+.cb-app .cb-segmented__item:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+
 /* ---------- FilterBar ---------- */
 .cb-app .cb-filterbar { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
 .cb-app .cb-filterbar__search { flex: 1 1 220px; max-width: 320px; }

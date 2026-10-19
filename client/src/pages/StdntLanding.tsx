@@ -1,4 +1,5 @@
 import React from 'react'
+import { useLightOnlyTheme } from '@/utils/theme'
 import { Link } from 'react-router-dom'
 import {
   BookOpen,
@@ -217,6 +218,7 @@ const OperationsPreview: React.FC = () => {
 }
 
 const StdntLanding: React.FC = () => {
+  useLightOnlyTheme()
   return (
     <div className="min-h-screen w-full bg-slate-50 text-slate-900">
       <section className="border-b border-slate-200/80 bg-white">

@@ -17,6 +17,7 @@ import {
   SlidersHorizontal,
 } from 'lucide-react'
 import { navIconFor } from './navIcons'
+import ThemeSwitch from '../common/ThemeSwitch'
 import { useCentreDetails } from '../../hooks/useCentreDetails'
 import {
   useSidebarCounts,
@@ -2218,6 +2219,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                     </NavLink>
                   )}
                 </div>
+                <ThemeSwitch className="px-4 pt-2 pb-3 border-t border-secondary-100 dark:border-secondary-800" />
                 <div className="p-1 border-t border-secondary-100 dark:border-secondary-800">
                   <button
                     onClick={handleLogout}

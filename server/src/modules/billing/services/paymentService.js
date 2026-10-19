@@ -7,6 +7,7 @@ const config = require('../config');
 const razorpay = require('../providers/razorpay');
 const accounts = require('./accountService');
 const invoices = require('./invoiceService');
+const notifications = require('./notificationService');
 const subscriptions = require('./subscriptionService');
 const { audit } = require('./auditService');
 const HttpError = require('../utils/httpError');
@@ -64,7 +65,7 @@ async function payNow(tenantSlug, { invoiceId = null, callbackUrl = null } = {})
 }
 
 async function applyCapturedPayment(invoiceId, payment, actor = PROVIDER_ACTOR) {
-  return transaction((tx) => invoices.recordPayment(tx, actor, {
+  const result = await transaction((tx) => invoices.recordPayment(tx, actor, {
     invoiceId,
     amountPaise: Number(payment.amount),
     provider: 'razorpay',
@@ -74,13 +75,16 @@ async function applyCapturedPayment(invoiceId, payment, actor = PROVIDER_ACTOR) 
     reference: payment.acquirer_data?.rrn || payment.acquirer_data?.upi_transaction_id || '',
     capturedAt: payment.created_at ? new Date(Number(payment.created_at) * 1000) : new Date()
   }));
+  // Committed: tell the school (once, whichever of webhook or reconcile got here first).
+  if (!result.duplicate) await notifications.notifyPaymentReceivedSafely(result.payment.id);
+  return result;
 }
 
 /**
  * After the school returns from Razorpay: ask Razorpay whether the link is paid and record
  * the payment if the webhook hasn't arrived yet. Safe to call any number of times.
  */
-async function reconcile(tenantSlug, { invoiceId = null } = {}) {
+async function reconcile(tenantSlug, { invoiceId = null, paymentLinkId = null } = {}) {
   const account = await accounts.requireAccount(tenantSlug);
   const rows = await getDb().select().from(s.invoices)
     .where(and(eq(s.invoices.accountId, account.id), sql`${s.invoices.paymentLinkId} IS NOT NULL`, eq(s.invoices.status, 'open')));
@@ -94,7 +98,30 @@ async function reconcile(tenantSlug, { invoiceId = null } = {}) {
       if (!result.duplicate) recorded.push(result.payment);
     }
   }
-  return { recorded, invoices: await Promise.all(targets.map((r) => invoices.getInvoice(r.id))) };
+  return {
+    recorded,
+    invoices: await Promise.all(targets.map((r) => invoices.getInvoice(r.id))),
+    settled: paymentLinkId ? await settledPayment(account.id, paymentLinkId) : null
+  };
+}
+
+/**
+ * The payment behind the Razorpay link the school just came back from, whether the webhook
+ * or this reconcile recorded it, so the page can confirm it even when the webhook was first.
+ */
+async function settledPayment(accountId, paymentLinkId) {
+  const [row] = await getDb().select().from(s.invoices)
+    .where(and(eq(s.invoices.accountId, accountId), eq(s.invoices.paymentLinkId, paymentLinkId)));
+  if (!row) return null;
+  const invoice = await invoices.getInvoice(row.id);
+  const payment = invoice.payments
+    .filter((p) => p.status === 'captured')
+    .sort((a, b) => new Date(b.capturedAt || b.createdAt) - new Date(a.capturedAt || a.createdAt))[0] || null;
+  if (!payment) return null;
+  return {
+    payment,
+    invoice: { id: invoice.id, number: invoice.number, status: invoice.status, totalPaise: invoice.totalPaise, outstandingPaise: invoice.outstandingPaise }
+  };
 }
 
 /* ------------------------------------------------------------------ webhooks */

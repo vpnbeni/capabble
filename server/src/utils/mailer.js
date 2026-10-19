@@ -93,7 +93,7 @@ const logoAttachments = (html) => (
     : []
 );
 
-const sendMail = async ({ to, subject, text, html, replyTo }) => {
+const sendMail = async ({ to, subject, text, html, replyTo, attachments = [] }) => {
   if (!to || !subject || (!text && !html)) {
     throw new Error('sendMail requires to, subject, and text or html');
   }
@@ -107,7 +107,7 @@ const sendMail = async ({ to, subject, text, html, replyTo }) => {
     subject,
     text,
     html,
-    attachments: logoAttachments(html)
+    attachments: [...logoAttachments(html), ...attachments]
   });
 };
 

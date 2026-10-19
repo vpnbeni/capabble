@@ -12,7 +12,9 @@ const { requireBillingDatabase, ensureActor } = require('./guards');
 
 const payNowBody = Joi.object({
   invoiceId: Joi.string().guid(),
-  callbackUrl: Joi.string().uri({ scheme: ['http', 'https'] }).max(500)
+  callbackUrl: Joi.string().uri({ scheme: ['http', 'https'] }).max(500),
+  // The Razorpay link the school came back from (razorpay_payment_link_id), for reconcile.
+  paymentLinkId: Joi.string().pattern(/^plink_[A-Za-z0-9]+$/).max(64)
 });
 
 const router = express.Router();

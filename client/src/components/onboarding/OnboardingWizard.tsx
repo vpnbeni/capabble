@@ -181,7 +181,7 @@ export function OnboardingWizard() {
 
   if (!statusData?.hasSession) {
     return (
-      <div className="max-w-2xl mx-auto mt-12 p-8 bg-white rounded-lg shadow-lg">
+      <div className="max-w-2xl mx-auto mt-12 p-8 bg-white dark:bg-gray-800 rounded-lg shadow-lg">
         <h1 className="text-3xl font-bold mb-4">Welcome to Cntr</h1>
         <p className="text-gray-600 mb-6">
           Let's get started by importing your examination data. This wizard will guide you through
@@ -200,7 +200,7 @@ export function OnboardingWizard() {
 
   if (isComplete) {
     return (
-      <div className="max-w-2xl mx-auto mt-12 p-8 bg-white rounded-lg shadow-lg text-center">
+      <div className="max-w-2xl mx-auto mt-12 p-8 bg-white dark:bg-gray-800 rounded-lg shadow-lg text-center">
         <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
         <h1 className="text-3xl font-bold mb-4">Onboarding Complete!</h1>
         <p className="text-gray-600 mb-6">
@@ -275,18 +275,18 @@ export function OnboardingWizard() {
       </div>
 
       {/* Current Step Card */}
-      <div className="bg-white rounded-lg shadow-lg p-8">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8">
         <h2 className="text-2xl font-bold mb-2">{currentStepConfig.title}</h2>
         <p className="text-gray-600 mb-6">{currentStepConfig.description}</p>
 
         {/* Background-processing info banner for combined attendance step */}
         {isCombinedStep && (
-          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
             <div className="flex items-start gap-2">
               <Clock className="w-5 h-5 text-blue-600 mt-0.5 shrink-0" />
               <div>
-                <p className="font-semibold text-blue-800">Processed in the background</p>
-                <p className="text-sm text-blue-700 mt-1">
+                <p className="font-semibold text-blue-800 dark:text-blue-300">Processed in the background</p>
+                <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
                   After you submit both PDFs you'll be taken to the dashboard immediately.
                   A progress indicator will appear at the bottom-right while photos are extracted.
                   You can safely close or navigate — the job will continue on the server.
@@ -298,12 +298,12 @@ export function OnboardingWizard() {
 
         {/* Validation Warnings */}
         {currentStepWarnings.length > 0 && (
-          <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+          <div className="mb-6 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
             <div className="flex items-start">
               <AlertCircle className="w-5 h-5 text-yellow-600 mr-2 mt-0.5" />
               <div>
-                <h3 className="font-semibold text-yellow-800 mb-2">Warnings</h3>
-                <ul className="list-disc list-inside text-sm text-yellow-700">
+                <h3 className="font-semibold text-yellow-800 dark:text-yellow-300 mb-2">Warnings</h3>
+                <ul className="list-disc list-inside text-sm text-yellow-700 dark:text-yellow-300">
                   {currentStepWarnings.map((warning) => (
                     <li key={warning}>{warning}</li>
                   ))}
@@ -318,14 +318,14 @@ export function OnboardingWizard() {
           <div className="mb-6 space-y-4">
             {/* Class X PDF */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Class X Attendance Sheet <span className="text-red-500">*</span>
               </label>
               <input
                 type="file"
                 accept=".pdf"
                 onChange={(e) => setSelectedFileX(e.target.files?.[0] ?? null)}
-                className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 dark:file:bg-blue-900/20 file:text-blue-700 dark:file:text-blue-300 hover:file:bg-blue-100 dark:hover:file:bg-blue-900/30"
               />
               {selectedFileX && (
                 <p className="mt-1 text-sm text-gray-600 flex items-center gap-1">
@@ -337,14 +337,14 @@ export function OnboardingWizard() {
 
             {/* Class XII PDF */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Class XII Attendance Sheet <span className="text-red-500">*</span>
               </label>
               <input
                 type="file"
                 accept=".pdf"
                 onChange={(e) => setSelectedFileXII(e.target.files?.[0] ?? null)}
-                className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 dark:file:bg-blue-900/20 file:text-blue-700 dark:file:text-blue-300 hover:file:bg-blue-100 dark:hover:file:bg-blue-900/30"
               />
               {selectedFileXII && (
                 <p className="mt-1 text-sm text-gray-600 flex items-center gap-1">
@@ -356,14 +356,14 @@ export function OnboardingWizard() {
           </div>
         ) : (
           <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Select {currentStepConfig.fileType.toUpperCase()} File
             </label>
             <input
               type="file"
               accept={currentStepConfig.fileType === 'pdf' ? '.pdf' : '.txt'}
               onChange={handleFileSelect}
-              className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+              className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 dark:file:bg-blue-900/20 file:text-blue-700 dark:file:text-blue-300 hover:file:bg-blue-100 dark:hover:file:bg-blue-900/30"
             />
             {selectedFile && (
               <p className="mt-2 text-sm text-gray-600">Selected: {selectedFile.name}</p>
@@ -377,13 +377,13 @@ export function OnboardingWizard() {
             <button
               onClick={handlePrevious}
               disabled={currentStep === 1}
-              className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+              className="px-6 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-900/40 disabled:opacity-50"
             >
               Previous
             </button>
             <button
               onClick={() => navigate('/dashboard')}
-              className="px-6 py-2 text-gray-500 hover:text-gray-700 text-sm underline underline-offset-2"
+              className="px-6 py-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 text-sm underline underline-offset-2"
             >
               Finish later
             </button>
@@ -419,7 +419,7 @@ export function OnboardingWizard() {
         <div className="mt-6 text-center">
           <button
             onClick={() => setIsReportOpen(true)}
-            className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 hover:underline text-sm"
+            className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 dark:hover:text-blue-300 hover:underline text-sm"
           >
             <FileText className="w-4 h-4" />
             View Validation Report

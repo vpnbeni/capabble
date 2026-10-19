@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { useLightOnlyTheme } from '@/utils/theme'
 import { Link } from 'react-router-dom'
 import { Bot, Building2, CheckCircle2, ChevronRight, Sparkles, UserRoundPlus } from 'lucide-react'
 import tenantSignupService from '@/services/tenantSignupService'
@@ -160,6 +161,7 @@ const validateStepValue = (stepId: StepId, value: string, draft: DraftState) => 
 }
 
 const TenantSignupChat: React.FC = () => {
+  useLightOnlyTheme()
   const authCopy = getUniversalAuthCopy()
   const initialState = useMemo<PersistedState>(() => {
     try {

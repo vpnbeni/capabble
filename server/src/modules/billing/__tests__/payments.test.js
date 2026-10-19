@@ -11,6 +11,7 @@ const s = require('../db/schema');
 const razorpay = require('../providers/razorpay');
 const { seedCatalog } = require('../services/seedService');
 const { getEntitlement } = require('../services/entitlementService');
+const mailer = require('../services/mailer');
 
 /** In-memory stand-in for the Razorpay SDK. */
 function fakeRazorpay() {
@@ -71,6 +72,7 @@ const paidLinkEvent = (link, invoice, paymentId, amount) => ({
 });
 
 let invoice;
+const sent = [];
 
 beforeAll(async () => {
   t = await createTestDb();
@@ -78,11 +80,12 @@ beforeAll(async () => {
   rz = fakeRazorpay();
   rz.payments.owner = rz;
   razorpay.setClient(rz);
+  mailer.setTransport({ sendMail: async (m) => { sent.push(m); } });
   await internal('post', '/tenants/onboard', { tenantId: 't1', tenantSlug: 'payer', tenantName: 'Payer School', billingEmail: 'accounts@payer.test' }).expect(201);
   const res = await internal('post', '/tenant/payer/subscription', { modules: ['attnd'], interval: 'month', declaredStudents: 100 }).expect(200);
   invoice = res.body.data.invoice;
 });
-afterAll(async () => { razorpay.setClient(null); await t.close(); });
+afterAll(async () => { razorpay.setClient(null); mailer.setTransport(null); await t.close(); });
 
 describe('pay now', () => {
   test('creates a payment link for the outstanding amount and reuses it', async () => {
@@ -125,6 +128,14 @@ describe('webhooks', () => {
     const [inv] = await t.db.select().from(s.invoices).where(eq(s.invoices.id, invoice.id));
     expect(inv.status).toBe('paid');
     expect((await getEntitlement('payer')).state).toBe('active');
+
+    // One "payment received" email, with the receipt and the paid invoice attached.
+    const received = sent.filter((m) => m.to === 'accounts@payer.test' && /^Payment received/.test(m.subject));
+    expect(received).toHaveLength(1);
+    expect(received[0].text).toMatch(/Receipt: RC\d{4}-\d{6}/);
+    const files = received[0].attachments.map((a) => a.filename);
+    expect(files).toEqual([`${rows[0].receiptNumber}.pdf`, `${inv.number}.pdf`]);
+    expect(received[0].attachments[0].content.subarray(0, 4).toString()).toBe('%PDF');
   });
 
   test('a failed event can be retried and succeeds the second time', async () => {
@@ -181,6 +192,16 @@ describe('reconcile', () => {
     expect(rec.body.data.invoices[0].status).toBe('paid');
     const again = await internal('post', '/tenant/returning/pay-now/reconcile', {}).expect(200);
     expect(again.body.data.recorded).toHaveLength(0);
+  });
+
+  test('confirms the payment for the link the school returned from, even if the webhook recorded it first', async () => {
+    const [paidInvoice] = await t.db.select().from(s.invoices).where(eq(s.invoices.number, invoice.number));
+    const rec = await internal('post', '/tenant/payer/pay-now/reconcile', { paymentLinkId: paidInvoice.paymentLinkId }).expect(200);
+    expect(rec.body.data.recorded).toHaveLength(0);
+    expect(rec.body.data.settled).toMatchObject({
+      payment: { providerPaymentId: 'pay_link_1', status: 'captured' },
+      invoice: { number: invoice.number, status: 'paid', outstandingPaise: 0 }
+    });
   });
 });
 

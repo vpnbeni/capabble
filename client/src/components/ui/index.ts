@@ -8,7 +8,7 @@
  */
 export { Icon, Button, Badge, Progress, Ring, ColumnChart, Avatar } from './primitives'
 export type { Tone, ButtonProps, RingSegment, ColumnChartItem } from './primitives'
-export { TextField, TextArea, Select, Checkbox, Switch, RadioGroup } from './forms'
+export { TextField, TextArea, Select, Checkbox, Switch, SegmentedControl, RadioGroup } from './forms'
 export { Combobox } from './Combobox'
 export { SlotPicker } from './SlotPicker'
 export type { SlotPickerSlot } from './SlotPicker'

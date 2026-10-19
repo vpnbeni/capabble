@@ -11,7 +11,7 @@ type HelpModuleGridProps = {
 const HelpModuleGrid: React.FC<HelpModuleGridProps> = ({ modules, selectedModuleId, onSelectModule }) => {
   if (modules.length === 0) {
     return (
-      <div className="rounded-2xl border border-dashed border-slate-200 bg-white/70 p-8 text-center text-sm text-slate-500">
+      <div className="rounded-2xl border border-dashed border-slate-200 dark:border-gray-700 bg-white/70 dark:bg-gray-800/70 p-8 text-center text-sm text-slate-500">
         No modules match your search. Try a different keyword or clear the search.
       </div>
     )
@@ -31,7 +31,7 @@ const HelpModuleGrid: React.FC<HelpModuleGridProps> = ({ modules, selectedModule
             disabled={disabled}
             onClick={() => !disabled && onSelectModule(mod.id)}
             className={[
-              'help-module-card group relative flex flex-col rounded-2xl border border-slate-200/90 bg-white p-4 text-left',
+              'help-module-card group relative flex flex-col rounded-2xl border border-slate-200/90 bg-white dark:bg-gray-800 p-4 text-left',
               disabled ? 'help-module-card--disabled cursor-not-allowed opacity-60' : 'cursor-pointer',
               isActive ? 'help-module-card--active' : '',
             ].join(' ')}
@@ -52,16 +52,16 @@ const HelpModuleGrid: React.FC<HelpModuleGridProps> = ({ modules, selectedModule
                     {mod.abbreviation}
                   </span>
                   {mod.comingSoon ? (
-                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-500">
+                    <span className="rounded-full bg-slate-100 dark:bg-gray-700/60 px-2 py-0.5 text-[10px] font-medium text-slate-500">
                       Coming soon
                     </span>
                   ) : !mod.enabled ? (
-                    <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700">
+                    <span className="rounded-full bg-amber-50 dark:bg-amber-900/20 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-300">
                       Not activated
                     </span>
                   ) : null}
                 </div>
-                <p className="mt-0.5 text-sm font-semibold text-slate-900">{mod.title}</p>
+                <p className="mt-0.5 text-sm font-semibold text-slate-900 dark:text-gray-100">{mod.title}</p>
               </div>
             </div>
 

@@ -6,6 +6,7 @@ const accounts = require('../services/accountService');
 const catalog = require('../services/catalogService');
 const subscriptions = require('../services/subscriptionService');
 const invoices = require('../services/invoiceService');
+const notifications = require('../services/notificationService');
 const { getEntitlement } = require('../services/entitlementService');
 const sm = require('../domain/stateMachine');
 const HttpError = require('../utils/httpError');
@@ -200,6 +201,7 @@ async function requireInvoiceOfTenant(tenantKey, invoiceId) {
 async function recordOfflinePayment(req, res) {
   await requireInvoiceOfTenant(schoolKey(req), req.params.invoiceId);
   const result = await invoices.recordOfflinePayment(req.actor, req.params.invoiceId, req.body);
+  await notifications.notifyPaymentReceivedSafely(result.payment.id);
   ok(res, result, 201, `Receipt ${result.payment.receiptNumber} recorded`);
 }
 

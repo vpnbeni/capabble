@@ -84,6 +84,16 @@ export interface BillingPayment {
   reference: string
 }
 
+export interface SettledPayment {
+  payment: BillingPayment
+  invoice: { id: string; number: string; status: string; totalPaise: number; outstandingPaise: number }
+}
+
+export interface ReconcileResult {
+  recorded: BillingPayment[]
+  settled: SettledPayment | null
+}
+
 export interface CreditNote {
   id: string
   number: string
@@ -190,8 +200,9 @@ const billingService = {
     const response = await api.post('/billing/me/pay-now', invoiceId ? { invoiceId } : {})
     return response.data.data
   },
-  async reconcile(): Promise<{ recorded: BillingPayment[] }> {
-    const response = await api.post('/billing/me/pay-now/reconcile', {}, quiet)
+  /** After Razorpay: records the payment if the webhook hasn't yet, and returns the one for this link. */
+  async reconcile(paymentLinkId?: string | null): Promise<ReconcileResult> {
+    const response = await api.post('/billing/me/pay-now/reconcile', paymentLinkId ? { paymentLinkId } : {}, quiet)
     return response.data.data
   },
   async updateProfile(payload: Partial<BillingProfile>): Promise<BillingAccount> {
