@@ -22,9 +22,26 @@ const getTenantEntitlement = async (tenantSlug) => {
   return billing.getEntitlement(tenantSlug);
 };
 
-const onboardTenantTrial = async (payload) => (isConfigured() ? billing.onboardTrial(payload) : null);
+// A new trial or grandfathering changes what the school may use: drop the cached
+// entitlement so the very next request sees it. (Required lazily: the middleware requires this file.)
+const forgetEntitlement = (tenantSlug) => {
+  // eslint-disable-next-line global-require
+  require('../middleware/billingEntitlement').invalidateEntitlement(tenantSlug);
+};
 
-const grandfatherTenant = async (payload) => (isConfigured() ? billing.grandfather(payload) : null);
+const onboardTenantTrial = async (payload) => {
+  if (!isConfigured()) return null;
+  const result = await billing.onboardTrial(payload);
+  forgetEntitlement(payload.tenantSlug);
+  return result;
+};
+
+const grandfatherTenant = async (payload) => {
+  if (!isConfigured()) return null;
+  const result = await billing.grandfather(payload);
+  forgetEntitlement(payload.tenantSlug);
+  return result;
+};
 
 module.exports = {
   isConfigured,

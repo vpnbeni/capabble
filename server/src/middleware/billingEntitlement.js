@@ -109,6 +109,40 @@ const invalidateEntitlement = (tenantSlug) => {
   else entitlementCache.clear();
 };
 
+/*
+ * A school with no billing account (signup ran while billing was down, or one created before
+ * billing existed) starts its free trial on its first request, instead of landing read-only.
+ * onboardTrial is idempotent; concurrent requests share one call.
+ */
+const trialStarts = new Map();
+const startTrialIfMissing = async (tenant, entitlement) => {
+  if (entitlement?.reason !== 'billing_account_missing') return entitlement;
+  const { slug } = tenant;
+  if (!trialStarts.has(slug)) {
+    trialStarts.set(slug, billingClient.onboardTenantTrial({
+      tenantId: String(tenant.id || slug),
+      tenantSlug: slug,
+      tenantName: tenant.name || slug,
+      billingEmail: tenant.adminEmail || null
+    })
+      .then(() => console.info(`[billing-entitlement] status=trial_started_on_first_request tenantSlug=${slug}`))
+      .finally(() => trialStarts.delete(slug)));
+  }
+  try {
+    await trialStarts.get(slug);
+  } catch (error) {
+    console.error('[billing-entitlement] trial_start_failed', { tenantSlug: slug, message: error.message });
+    return entitlement;
+  }
+  invalidateEntitlement(slug);
+  return loadEntitlement(slug);
+};
+
+// Writes a read-only school may still make: opening an academic session is how it reads its data.
+const READ_ONLY_ALLOWED_WRITES = [{ method: 'POST', path: /^\/sessions\/?$/ }];
+const isAllowedWhileReadOnly = (method, path) => READ_ONLY_ALLOWED_WRITES
+  .some((rule) => rule.method === method && rule.path.test(path));
+
 const blockRequest = (res, accessMode) => res.status(402).json({
   ...BILLING_ERROR_RESPONSE,
   accessMode
@@ -129,7 +163,7 @@ const billingEntitlementMiddleware = async (req, res, next) => {
   let entitlement;
 
   try {
-    entitlement = await loadEntitlement(tenantSlug);
+    entitlement = await startTrialIfMissing(req.tenant, await loadEntitlement(tenantSlug));
   } catch (error) {
     console.error('[billing-entitlement] failed_to_fetch', {
       tenantSlug,
@@ -187,7 +221,7 @@ const billingEntitlementMiddleware = async (req, res, next) => {
       return next();
     }
 
-    if (isWriteMethod) {
+    if (isWriteMethod && !isAllowedWhileReadOnly(req.method, requestPath)) {
       return blockRequest(res, accessMode);
     }
 

@@ -1,4 +1,5 @@
 import axios, { AxiosInstance, AxiosResponse, InternalAxiosRequestConfig } from 'axios'
+import { createElement } from 'react'
 import toast from 'react-hot-toast'
 import { getTenantHeader, isLocalRuntime, resolveApiBaseUrl } from '@/utils/tenantRuntime'
 import { getAcademicSessionHeader } from '@/contexts/AcademicSessionContext'
@@ -53,6 +54,30 @@ const showApiErrorToast = (message: string) => {
 
   lastApiErrorToast = { message: normalizedMessage, shownAt: now }
   toast.error(normalizedMessage, { id: API_ERROR_TOAST_ID })
+}
+
+const BILLING_TOAST_ID = 'billing-required'
+
+/** A blocked action because of billing: one toast, with a link to the Billing page. */
+const showBillingToast = (message: string) => {
+  toast.error(
+    (t) => createElement(
+      'span',
+      null,
+      `${message} `,
+      createElement(
+        'a',
+        {
+          href: '#/billing',
+          className: 'cb-link',
+          style: { fontWeight: 600, whiteSpace: 'nowrap' },
+          onClick: () => toast.dismiss(t.id),
+        },
+        'Open Billing'
+      )
+    ),
+    { id: BILLING_TOAST_ID, duration: 8000 }
+  )
 }
 
 const isAuthSurfacePath = () => {
@@ -280,8 +305,10 @@ api.interceptors.response.use(
       }
 
       case 402:
-        // Billing restriction
-        showApiErrorToast(data?.message || 'Billing restriction applied. Open Billing to continue.')
+        // Unpaid: say why in plain words and offer the way out.
+        showBillingToast(data?.errorCode === 'module_not_subscribed'
+          ? 'Your school hasn’t subscribed to this module yet.'
+          : 'Your school’s Capabble access is read-only until the subscription is paid.')
         break
 
       case 404: {

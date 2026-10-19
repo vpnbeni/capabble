@@ -103,6 +103,26 @@ describe('billingEntitlementMiddleware', () => {
     expect(res.statusCode).toBe(402);
   });
 
+  it('read-only still lets the school open an academic session', async () => {
+    spy.mockResolvedValue({ state: 'suspended_read_only', accessMode: 'read_only', entitledModules: ['*'] });
+    expect((await run(makeReq('/sessions', 'POST'))).next).toHaveBeenCalled();
+    expect((await run(makeReq('/sessions/2026-2027/carry-forward', 'POST'))).res.statusCode).toBe(402);
+  });
+
+  it('a school with no billing account starts its trial instead of going read-only', async () => {
+    const onboard = jest.spyOn(client, 'onboardTenantTrial').mockResolvedValue({ created: true });
+    spy
+      .mockResolvedValueOnce({ state: 'suspended_read_only', accessMode: 'read_only', reason: 'billing_account_missing', entitledModules: ['core'] })
+      .mockResolvedValueOnce({ state: 'trialing', accessMode: 'full', reason: 'trialing', entitledModules: ['*'] });
+    const req = makeReq('/sessions', 'POST');
+    req.tenant = { ...req.tenant, id: 't1', name: 'Demo School', adminEmail: 'head@demo.in' };
+    const { next } = await run(req);
+    expect(onboard).toHaveBeenCalledWith(expect.objectContaining({ tenantSlug: 'demo', tenantName: 'Demo School', billingEmail: 'head@demo.in' }));
+    expect(next).toHaveBeenCalled();
+    expect(req.billingEntitlement.state).toBe('trialing');
+    onboard.mockRestore();
+  });
+
   it('keeps using the last known entitlement when billing is unreachable', async () => {
     spy.mockResolvedValueOnce({ state: 'active', accessMode: 'full', entitledModules: ['core', 'attnd'] });
     await run(makeReq());
