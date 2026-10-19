@@ -14,6 +14,9 @@ const tenantSignupApi = axios.create({
   },
 })
 
+/** sessionStorage key: the signup form saves the email here for the confirm page (never in the URL). */
+export const SIGNUP_EMAIL_KEY = 'cb-signup-email'
+
 export interface TenantSignupStartPayload {
   udiseCode: string
   name: string

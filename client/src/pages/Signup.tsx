@@ -1,8 +1,8 @@
 import React, { useMemo, useRef, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { ArrowRight, Building2, LayoutGrid, Lock, Mail, School } from 'lucide-react'
-import toast from 'react-hot-toast'
-import tenantSignupService from '@/services/tenantSignupService'
+import tenantSignupService, { SIGNUP_EMAIL_KEY } from '@/services/tenantSignupService'
+import { buildTenantAppRedirectUrl } from '@/utils/tenantRuntime'
 import AuthLayout, { StepsCard } from '@/components/auth/capabble/AuthLayout'
 import { Button, Callout, Checkbox, StrengthMeter, TextField } from '@/components/auth/capabble/controls'
 import { getPasswordStrength, MISMATCH_ERROR, PASSWORD_ERROR, PASSWORD_RULE } from '@/components/auth/capabble/password'
@@ -24,7 +24,6 @@ const FIELD_ORDER: Field[] = ['udiseCode', 'name', 'email', 'password', 'confirm
 const GENERAL_ERROR = "We couldn't create the account. Check your connection and try again."
 
 const Signup: React.FC = () => {
-  const navigate = useNavigate()
   const [udiseCode, setUdiseCode] = useState('')
   const [nameOfSchool, setNameOfSchool] = useState('')
   const [adminEmail, setAdminEmail] = useState('')
@@ -91,8 +90,14 @@ const Signup: React.FC = () => {
         confirmPassword,
       })
       localStorage.setItem('tenantSlug', result.tenantSlug)
-      toast.success(`Check ${email} for a 6-digit code to confirm your account.`)
-      navigate(`/signup/complete?ticket=${encodeURIComponent(result.ticket)}`)
+      try {
+        sessionStorage.setItem(SIGNUP_EMAIL_KEY, email)
+      } catch {
+        /* storage unavailable: the confirm page says "your email" */
+      }
+      // A full load with ?tenant=<new school> so a leftover ?tenant= from another school
+      // can't make the verify page confirm against the wrong school.
+      window.location.assign(buildTenantAppRedirectUrl(result.tenantSlug, result.ticket))
     } catch (err: unknown) {
       const response =
         err && typeof err === 'object' && 'response' in err
