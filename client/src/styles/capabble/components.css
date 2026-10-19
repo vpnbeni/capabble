@@ -138,7 +138,13 @@
 
 /* ---------- SegmentedControl ---------- */
 .cb-app .cb-segmented { display: inline-flex; gap: 2px; padding: 2px; background: var(--surface-sunken); border-radius: var(--radius-md); }
-.cb-app .cb-segmented.is-full { display: flex; width: 100%; }
+.cb-app .cb-segmented.is-full { display: flex; width: 100%; container-type: inline-size; }
+.cb-app .cb-segmented.is-full .cb-segmented__item { min-width: 0; padding: 0 6px; gap: 4px; }
+/* Narrow menus: icon above a smaller label so every option keeps its full name. */
+@container (max-width: 260px) {
+  .cb-app .cb-segmented.is-full .cb-segmented__item { flex-direction: column; gap: 2px; height: auto; padding: 5px 2px; font-size: 11px; line-height: 14px; }
+}
+.cb-app .cb-segmented__item > span { overflow: hidden; text-overflow: ellipsis; }
 .cb-app .cb-segmented__item { flex: 1 1 0; display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 28px; padding: 0 10px; border: 0; border-radius: 6px; background: none; font: 500 13px/18px var(--font-sans); color: var(--ink-muted); cursor: pointer; white-space: nowrap; }
 .cb-app .cb-segmented__item:hover { color: var(--ink); }
 .cb-app .cb-segmented__item.is-active { background: var(--surface-raised); color: var(--ink); font-weight: 600; box-shadow: var(--shadow-xs); }
