@@ -113,6 +113,7 @@ const tenantContextMiddleware = async (req, res, next) => {
       slug: tenantRecord.slug,
       name: tenantRecord.name,
       adminEmail: tenantRecord.adminEmail,
+      metadata: tenantRecord.metadata || {},
       dbName: tenantRecord.dbName,
       status: tenantRecord.status,
       featureToggles,

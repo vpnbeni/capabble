@@ -103,8 +103,13 @@ const Sidebar: React.FC<SidebarProps> = ({
   const schoolLogoUrl = String(schoolProfile?.logoUrl || '').trim()
 
   const schoolDisplayName = profileSchoolName || centreName || currentUser?.role || 'School'
-  const affiliationDisplay = profileAffiliationNo || '—'
-  const cbseCodeDisplay = profileSchoolCode || schoolCode || '—'
+  const profileUdiseCode = String(schoolProfile?.udiseCode || '').trim()
+  // Every school gives its UDISE+ code at signup; CBSE schools may also add their codes.
+  const udiseLine = `UDISE+ ${profileUdiseCode || '—'}`
+  const cbseLine = [
+    profileAffiliationNo ? `Aff. No. ${profileAffiliationNo}` : '',
+    profileSchoolCode || schoolCode ? `CBSE Code ${profileSchoolCode || schoolCode}` : '',
+  ].filter(Boolean).join(' · ')
 
   // Module switcher state
   const [moduleSwitcherOpen, setModuleSwitcherOpen] = useState(false)
@@ -2032,7 +2037,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                   }`}
                   style={hasLogoBrandMenu && logoBrandTheme ? { color: logoBrandTheme.textMuted } : undefined}
                 >
-                  {affiliationDisplay !== '—' ? `Aff. No. ${affiliationDisplay}` : 'Aff. No. —'}
+                  {udiseLine}
                 </p>
               </div>
             )}
@@ -2098,8 +2103,9 @@ const Sidebar: React.FC<SidebarProps> = ({
                           hasLogoBrandMenu && logoBrandTheme ? { color: logoBrandTheme.textMuted } : undefined
                         }
                       >
-                        {affiliationDisplay !== '—' ? `Aff. No. ${affiliationDisplay}` : 'Aff. No. —'}
+                        {udiseLine}
                       </p>
+                      {cbseLine ? (
                       <p
                         className={`text-xs truncate ${
                           hasLogoBrandMenu ? '' : 'text-secondary-500 dark:text-secondary-400'
@@ -2108,8 +2114,9 @@ const Sidebar: React.FC<SidebarProps> = ({
                           hasLogoBrandMenu && logoBrandTheme ? { color: logoBrandTheme.textMuted } : undefined
                         }
                       >
-                        {cbseCodeDisplay !== '—' ? `CBSE Code ${cbseCodeDisplay}` : 'CBSE Code —'}
+                        {cbseLine}
                       </p>
+                      ) : null}
                     </div>
                   </div>
                 </div>

@@ -205,6 +205,13 @@ const Header: React.FC<HeaderProps> = ({ isSidebarCollapsed, onToggleSidebar }) 
           showBackButton: isDetailRoute,
           backTo: backToPath,
         }
+      case 'account-settings':
+        return {
+          pageTitle: 'Account settings',
+          pageSubtitle: 'Your school’s name, logo and contact details',
+          showBackButton: isDetailRoute,
+          backTo: backToPath,
+        }
       case 'billing':
         return {
           pageTitle: 'Billing',

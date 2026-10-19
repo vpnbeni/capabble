@@ -11,6 +11,7 @@ const ALLOWED_UPDATE_FIELDS = [
   'schoolName',
   'schoolCode',
   'affiliationNo',
+  'udiseCode',
   'tagline',
   'address',
   'contact',
@@ -21,6 +22,8 @@ const buildProfileResponse = (tenant, profile) => ({
   name: profile?.schoolName || tenant?.name || '',
   schoolCode: profile?.schoolCode || tenant?.metadata?.schoolCode || '',
   affiliationNo: profile?.affiliationNo || tenant?.metadata?.affiliationNo || '',
+  // Asked for at signup; the school can correct it in Account Settings.
+  udiseCode: profile?.udiseCode || tenant?.metadata?.udiseCode || '',
   affiliationTill: profile?.affiliationTill
     ? new Date(profile.affiliationTill).toISOString().slice(0, 10)
     : '',
@@ -68,6 +71,13 @@ exports.updateProfile = asyncHandler(async (req, res) => {
     if (req.body[field] !== undefined) {
       updates[field] = String(req.body[field] || '').trim();
     }
+  }
+
+  if (updates.udiseCode && !/^\d{11}$/.test(updates.udiseCode)) {
+    return res.status(HTTP_STATUS.BAD_REQUEST).json({
+      success: false,
+      message: 'UDISE+ code must be 11 digits.'
+    });
   }
 
   if (req.body.affiliationTill !== undefined) {

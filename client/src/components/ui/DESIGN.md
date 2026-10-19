@@ -119,6 +119,7 @@ Toasts: `react-hot-toast` (`toast.success`, `toast.error`); the `Toaster` is in 
 
 `.cb-stats` (4-col stat row) · `.cb-grid-8-4` · `.cb-grid-6-6` · `.cb-grid-3` · `.cb-stack` (vertical gap 24) ·
 `.cb-form-section` + `.cb-form-section__title` · `.cb-form-grid` (2-col; `--3`; child `.is-wide` spans) ·
+`.cb-logo-field` › `.cb-logo-preview` (img, never cropped) + `.cb-logo-field__body` (label, hint, Button): logo uploads; not in the artifact yet ·
 `.cb-check-grid` · `.cb-progress-list` (`--grid`) · `.cb-card-actions` · `.cb-table-state` (+ `.cb-spinner`, loading) ·
 text: `.cb-muted` `.cb-subtle` `.cb-strong` `.cb-subhead` `.cb-section-title` `.cb-link` `.cb-visually-hidden`.
 

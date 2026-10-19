@@ -1,260 +1,256 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
+import { Image as ImageIcon, Upload } from 'lucide-react'
+import toast from 'react-hot-toast'
 import { getStoredUser } from '@/utils/authStorage'
 import schoolProfileService, { type SchoolProfile } from '@/services/schoolProfileService'
 import { schoolProfileKeys } from '@/hooks/useSchoolProfile'
-import toast from 'react-hot-toast'
+import { Button, Card, DetailList, Icon, Page, TextField } from '@/components/ui'
+
+type FormData = {
+  name: string
+  udiseCode: string
+  schoolCode: string
+  affiliationNo: string
+  affiliationTill: string
+  tagline: string
+  address: string
+  contact: string
+  email: string
+}
+type Errors = Partial<Record<keyof FormData, string>>
+
+const toForm = (data: Partial<SchoolProfile>): FormData => ({
+  name: data.name || '',
+  udiseCode: data.udiseCode || '',
+  schoolCode: data.schoolCode || '',
+  affiliationNo: data.affiliationNo || '',
+  affiliationTill: data.affiliationTill || '',
+  tagline: data.tagline || '',
+  address: data.address || '',
+  contact: data.contact || '',
+  email: data.email || '',
+})
+
+const apiMessage = (error: unknown, fallback: string) => {
+  const data = (error as { response?: { data?: { message?: string } } })?.response?.data
+  return data?.message || fallback
+}
+
+const validate = (form: FormData): Errors => {
+  const errors: Errors = {}
+  if (!form.name.trim()) errors.name = 'Enter your school’s name'
+  if (form.udiseCode && !/^\d{11}$/.test(form.udiseCode)) errors.udiseCode = 'UDISE+ code must be 11 digits'
+  if (form.email.trim() && !/^\S+@\S+\.\S+$/.test(form.email.trim())) {
+    errors.email = 'Enter an email address like office@yourschool.in'
+  }
+  return errors
+}
 
 const AccountSettings: React.FC = () => {
   const queryClient = useQueryClient()
-  const user = getStoredUser<{ email?: string }>()
+  const user = getStoredUser<{ email?: string; name?: string }>()
+  const fileInput = useRef<HTMLInputElement>(null)
+
   const [profile, setProfile] = useState<SchoolProfile | null>(null)
+  const [form, setForm] = useState<FormData>(toForm({}))
+  const [errors, setErrors] = useState<Errors>({})
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [uploadingLogo, setUploadingLogo] = useState(false)
-  const [formData, setFormData] = useState({
-    name: '',
-    schoolCode: '',
-    affiliationNo: '',
-    affiliationTill: '',
-    tagline: '',
-    address: '',
-    contact: '',
-    email: '',
-  })
 
   useEffect(() => {
     let cancelled = false
-
-    const loadProfile = async () => {
-      setLoading(true)
-      try {
-        const data = await schoolProfileService.getProfile()
+    schoolProfileService
+      .getProfile()
+      .then((data) => {
         if (cancelled) return
         setProfile(data)
-        setFormData({
-          name: data.name || '',
-          schoolCode: data.schoolCode || '',
-          affiliationNo: data.affiliationNo || '',
-          affiliationTill: data.affiliationTill || '',
-          tagline: data.tagline || '',
-          address: data.address || '',
-          contact: data.contact || '',
-          email: data.email || '',
-        })
-      } catch (error: any) {
-        if (cancelled) return
-        toast.error(String(error?.response?.data?.message || error?.message || 'Failed to load school profile.'))
-      } finally {
+        setForm(toForm(data))
+      })
+      .catch((error) => {
+        if (!cancelled) setLoadError(apiMessage(error, 'We couldn’t load your school profile. Refresh the page to try again.'))
+      })
+      .finally(() => {
         if (!cancelled) setLoading(false)
-      }
+      })
+    return () => {
+      cancelled = true
     }
-
-    void loadProfile()
-    return () => { cancelled = true }
   }, [])
 
-  const logoPreview = useMemo(() => profile?.logoUrl || '', [profile?.logoUrl])
-
-  const handleFieldChange = (
-    field: 'name' | 'schoolCode' | 'affiliationNo' | 'affiliationTill' | 'tagline' | 'address' | 'contact' | 'email',
-    value: string
-  ) => {
-    setFormData((prev) => ({ ...prev, [field]: value }))
+  const set = (field: keyof FormData) => (event: React.ChangeEvent<HTMLInputElement>) => {
+    const value = field === 'udiseCode' ? event.target.value.replace(/\D/g, '').slice(0, 11) : event.target.value
+    setForm((prev) => ({ ...prev, [field]: value }))
+    if (errors[field]) setErrors((prev) => ({ ...prev, [field]: undefined }))
   }
 
-  const handleSaveProfile = async () => {
+  const handleSave = async (event: React.FormEvent) => {
+    event.preventDefault()
+    if (saving) return
+    const next = validate(form)
+    setErrors(next)
+    const first = Object.keys(next)[0]
+    if (first) {
+      document.getElementById(`school-${first}`)?.focus()
+      return
+    }
     setSaving(true)
     try {
-      const updated = await schoolProfileService.updateProfile(formData)
+      const updated = await schoolProfileService.updateProfile(form)
       setProfile(updated)
-      setFormData({
-        name: updated.name || '',
-        schoolCode: updated.schoolCode || '',
-        affiliationNo: updated.affiliationNo || '',
-        affiliationTill: updated.affiliationTill || '',
-        tagline: updated.tagline || '',
-        address: updated.address || '',
-        contact: updated.contact || '',
-        email: updated.email || '',
-      })
-      toast.success('School profile updated.')
+      setForm(toForm(updated))
+      toast.success('School profile saved')
       void queryClient.invalidateQueries({ queryKey: schoolProfileKeys.all })
-    } catch (error: any) {
-      toast.error(String(error?.response?.data?.message || error?.message || 'Failed to update profile.'))
+    } catch (error) {
+      toast.error(apiMessage(error, 'We couldn’t save the profile. Check your connection and try again.'))
     } finally {
       setSaving(false)
     }
   }
 
-  const handleLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLogo = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
+    event.target.value = ''
     if (!file) return
-
     setUploadingLogo(true)
     try {
       const updated = await schoolProfileService.uploadLogo(file)
       setProfile(updated)
-      toast.success('School logo uploaded.')
+      toast.success('Logo updated')
       void queryClient.invalidateQueries({ queryKey: schoolProfileKeys.all })
-    } catch (error: any) {
-      toast.error(String(error?.response?.data?.message || error?.message || 'Failed to upload logo.'))
+    } catch (error) {
+      toast.error(apiMessage(error, 'We couldn’t upload the logo. Use a PNG, JPG or WebP image under 10 MB.'))
     } finally {
       setUploadingLogo(false)
-      event.target.value = ''
     }
   }
 
+  const field = (key: keyof FormData) => ({
+    id: `school-${key}`,
+    value: form[key],
+    onChange: set(key),
+    error: errors[key],
+  })
+
   return (
-    <div className="p-6 space-y-4">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 max-w-5xl">
-        <h1 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white mb-2">Account Settings</h1>
-        <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
-          Address, email, and contact number from this page print on the report card header.
-        </p>
-
-        {loading ? (
-          <div className="text-sm text-gray-500 dark:text-gray-400">Loading school profile...</div>
+    <Page>
+      <div className="cb-stack">
+        {loading || loadError ? (
+          <Card title="School profile">
+            <div className="cb-table-state" role="status">
+              {loading ? (
+                <>
+                  <span className="cb-spinner" aria-hidden="true" />
+                  Loading school profile…
+                </>
+              ) : (
+                loadError
+              )}
+            </div>
+          </Card>
         ) : (
-          <div className="space-y-8">
-            <section className="rounded-lg border border-gray-200 dark:border-gray-700 p-4 md:p-5">
-              <h2 className="text-base md:text-lg font-semibold text-gray-900 dark:text-white mb-4">School Profile</h2>
-
-              <div className="grid grid-cols-1 lg:grid-cols-[220px_1fr] gap-6">
-                <div className="flex flex-col items-center gap-3">
-                  <div className="h-32 w-32 rounded-full border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 overflow-hidden flex items-center justify-center">
-                    {logoPreview ? (
-                      <img src={logoPreview} alt="School logo" className="h-full w-full object-cover" />
+          <form onSubmit={handleSave} noValidate>
+            <Card
+              title="School profile"
+              subtitle="Printed on report cards, admit cards and fee receipts."
+              footer={
+                <div className="cb-card-actions">
+                  <Button type="submit" variant="primary" loading={saving}>
+                    Save profile
+                  </Button>
+                </div>
+              }
+            >
+              <div className="cb-stack">
+                <div className="cb-form-section">
+                <div className="cb-logo-field">
+                  <div className="cb-logo-preview">
+                    {profile?.logoUrl ? (
+                      <img src={profile.logoUrl} alt={`${form.name || 'School'} logo`} />
                     ) : (
-                      <span className="text-xs text-gray-500 dark:text-gray-400 px-3 text-center">No logo uploaded</span>
+                      <>
+                        <Icon icon={ImageIcon} size={24} />
+                        No logo
+                      </>
                     )}
                   </div>
-
-                  <label className="inline-flex items-center justify-center px-3 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-sm text-gray-700 dark:text-gray-200 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800">
-                    {uploadingLogo ? 'Uploading...' : 'Upload Logo'}
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={handleLogoUpload}
-                      disabled={uploadingLogo}
-                    />
-                  </label>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">School Name</label>
-                    <input
-                      type="text"
-                      value={formData.name}
-                      onChange={(e) => handleFieldChange('name', e.target.value)}
-                      className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-gray-100"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">School Code</label>
-                    <input
-                      type="text"
-                      value={formData.schoolCode}
-                      onChange={(e) => handleFieldChange('schoolCode', e.target.value)}
-                      className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-gray-100"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">CBSE Affiliation No</label>
-                    <input
-                      type="text"
-                      value={formData.affiliationNo}
-                      onChange={(e) => handleFieldChange('affiliationNo', e.target.value)}
-                      className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-gray-100"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Affiliation till</label>
-                    <input
-                      type="date"
-                      value={formData.affiliationTill}
-                      onChange={(e) => handleFieldChange('affiliationTill', e.target.value)}
-                      className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-gray-100"
-                    />
-                    <p className="mt-1 text-[11px] text-gray-400 dark:text-gray-500">
-                      CBSE affiliation validity end date. Used for renewal reminders.
-                    </p>
-                  </div>
-
-                  <div className="md:col-span-2">
-                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Tagline</label>
-                    <input
-                      type="text"
-                      value={formData.tagline}
-                      onChange={(e) => handleFieldChange('tagline', e.target.value)}
-                      className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-gray-100"
-                    />
-                  </div>
-
-                  <div className="md:col-span-2">
-                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Address</label>
-                    <input
-                      type="text"
-                      value={formData.address}
-                      onChange={(e) => handleFieldChange('address', e.target.value)}
-                      className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-gray-100"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Contact No</label>
-                    <input
-                      type="text"
-                      value={formData.contact}
-                      onChange={(e) => handleFieldChange('contact', e.target.value)}
-                      className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-gray-100"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Email</label>
-                    <input
-                      type="email"
-                      value={formData.email}
-                      onChange={(e) => handleFieldChange('email', e.target.value)}
-                      className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-gray-100"
-                    />
-                  </div>
-
-                  <div className="md:col-span-2 flex justify-end">
-                    <button
+                  <div className="cb-logo-field__body">
+                    <span className="cb-strong">School logo</span>
+                    <span className="cb-muted">Shown in the sidebar and on everything you print.</span>
+                    <span className="cb-subtle">PNG, JPG or WebP, up to 10 MB. A square image works best.</span>
+                    <Button
                       type="button"
-                      onClick={handleSaveProfile}
-                      disabled={saving}
-                      className="inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                      variant="secondary"
+                      size="sm"
+                      icon={Upload}
+                      loading={uploadingLogo}
+                      onClick={() => fileInput.current?.click()}
                     >
-                      {saving ? 'Saving...' : 'Save'}
-                    </button>
+                      {profile?.logoUrl ? 'Change logo' : 'Upload logo'}
+                    </Button>
+                  </div>
+                  <input
+                    ref={fileInput}
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    className="cb-visually-hidden"
+                    tabIndex={-1}
+                    aria-hidden="true"
+                    onChange={handleLogo}
+                  />
+                </div>
+                </div>
+
+                <div className="cb-form-section">
+                  <span className="cb-form-section__title">School</span>
+                  <div className="cb-form-grid">
+                    <TextField label="School name" required autoComplete="organization" className="is-wide" {...field('name')} />
+                    <TextField
+                      label="UDISE+ code"
+                      hint="11 digits, as on UDISE+"
+                      inputMode="numeric"
+                      autoComplete="off"
+                      {...field('udiseCode')}
+                    />
+                    <TextField label="Tagline" hint="Optional. Shown under the name on documents." {...field('tagline')} />
+                  </div>
+                </div>
+
+                <div className="cb-form-section">
+                  <span className="cb-form-section__title">CBSE affiliation</span>
+                  <span className="cb-muted">Only for CBSE schools. Leave blank if it doesn’t apply.</span>
+                  <div className="cb-form-grid cb-form-grid--3">
+                    <TextField label="School code" autoComplete="off" {...field('schoolCode')} />
+                    <TextField label="Affiliation no." autoComplete="off" {...field('affiliationNo')} />
+                    <TextField
+                      label="Affiliation valid till"
+                      type="date"
+                      hint="Used for renewal reminders"
+                      {...field('affiliationTill')}
+                    />
+                  </div>
+                </div>
+
+                <div className="cb-form-section">
+                  <span className="cb-form-section__title">Contact</span>
+                  <div className="cb-form-grid">
+                    <TextField label="Address" autoComplete="street-address" className="is-wide" {...field('address')} />
+                    <TextField label="Phone" type="tel" autoComplete="tel" {...field('contact')} />
+                    <TextField label="Email" type="email" autoComplete="email" {...field('email')} />
                   </div>
                 </div>
               </div>
-            </section>
-
-            <section className="rounded-lg border border-gray-200 dark:border-gray-700 p-4 md:p-5">
-              <h2 className="text-base md:text-lg font-semibold text-gray-900 dark:text-white mb-4">Account</h2>
-              <div className="space-y-4 text-sm text-gray-700 dark:text-gray-200">
-                <div className="flex items-center justify-between">
-                  <span className="font-medium">Email</span>
-                  <span className="px-2 py-1 rounded-md bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700">
-                    {user?.email || '--'}
-                  </span>
-                </div>
-              </div>
-            </section>
-          </div>
+            </Card>
+          </form>
         )}
+
+        <Card title="Your sign-in" subtitle="The email address you sign in with.">
+          <DetailList columns={2} items={[{ label: 'Email', value: user?.email || '—' }]} />
+        </Card>
       </div>
-    </div>
+    </Page>
   )
 }
 
