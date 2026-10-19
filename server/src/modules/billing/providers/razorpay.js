@@ -60,7 +60,7 @@ function refundPayment(paymentId, { amountPaise, receipt, notes }) {
 }
 
 /** Auto-debit: a Razorpay plan for this amount and a subscription the school authorises once. */
-async function createAutoDebit({ account, subscription, amountPaise, interval }) {
+async function createAutoDebit({ account, subscription, amountPaise, interval, startAt = null, expireBy = null }) {
   const rz = getClient();
   const plan = await call('plan', () => rz.plans.create({
     period: interval === 'year' ? 'yearly' : 'monthly',
@@ -72,9 +72,14 @@ async function createAutoDebit({ account, subscription, amountPaise, interval })
     plan_id: plan.id,
     total_count: interval === 'year' ? 10 : 120,
     customer_notify: 1,
+    // Trial: the mandate is authorised now and the first charge waits until the trial ends.
+    ...(startAt ? { start_at: Math.floor(new Date(startAt).getTime() / 1000) } : {}),
+    ...(expireBy ? { expire_by: Math.floor(new Date(expireBy).getTime() / 1000) } : {}),
     notes: { tenant_slug: account.tenantSlug, subscription_id: subscription.id }
   }));
 }
+
+const fetchSubscription = (id) => call('subscription fetch', () => getClient().subscriptions.fetch(id));
 
 const cancelAutoDebit = (id) => call('subscription cancel', () => getClient().subscriptions.cancel(id, false));
 
@@ -96,5 +101,6 @@ module.exports = {
   refundPayment,
   createAutoDebit,
   cancelAutoDebit,
+  fetchSubscription,
   verifySignature
 };

@@ -19,7 +19,7 @@ const { sendMail } = require('../../utils/mailer');
 const mailTemplates = require('../../mail/templates');
 const { syncTenantUserDirectoryEntry } = require('../../tenancy/tenantUserDirectoryService');
 const {
-  onboardTenantTrial,
+  registerTenant,
   getTenantEntitlement,
 } = require('../../services/billingServiceClient');
 const { normalizeTenantFeatureToggles } = require('../../constants/tenantFeatures');
@@ -191,7 +191,8 @@ const onboardTenantBillingBestEffort = async ({
   }
 
   try {
-    await onboardTenantTrial({
+    // Account and plan invite only; the school opts in to its trial itself.
+    await registerTenant({
       tenantId: tenant._id?.toString?.() || tenant._id,
       tenantSlug: tenant.slug,
       tenantName: tenant.name,

@@ -17,25 +17,31 @@ const ALL = ['*'];
  * trialEndsAt, graceEndsAt, computedAt, validUntil.
  * Added: entitledModules (module codes or ['*']), periodEndsAt, studentsBilled,
  * cancelAtPeriodEnd, subscriptionId.
+ * v3: accessMode 'setup_required' (reason 'plan_required') until the school opts in to a
+ * trial or pays; plannedModules (the chosen modules, even while everything is open); autopay.
  */
 function buildEntitlement({ slug, sub, moduleCodes, coreCodes, now }) {
   const validUntil = new Date(now.getTime() + config.entitlementTtlSeconds * 1000);
-  if (!sub) {
+  // No plan yet (or one waiting for its autopay): the school opts in to a trial first.
+  const lapsedCheckout = sub && sub.state === S.CANCELED && sub.trialConsentAt && !sub.trialStartedAt && !sub.currentPeriodEnd;
+  if (!sub || sm.normalizeState(sub.state) === S.INCOMPLETE || lapsedCheckout) {
     return {
       tenantSlug: slug,
-      state: S.SUSPENDED_READ_ONLY,
-      accessMode: ACCESS_MODES.READ_ONLY,
+      state: sub && !lapsedCheckout ? S.INCOMPLETE : null,
+      accessMode: ACCESS_MODES.SETUP_REQUIRED,
       allowedModules: CORE_ALLOWED_MODULES,
       entitledModules: coreCodes,
-      isReadOnly: true,
-      reason: 'billing_account_missing',
+      plannedModules: [],
+      isReadOnly: false,
+      reason: 'plan_required',
       planCode: null,
       trialEndsAt: null,
       graceEndsAt: null,
       periodEndsAt: null,
       studentsBilled: 0,
       cancelAtPeriodEnd: false,
-      subscriptionId: null,
+      autopay: false,
+      subscriptionId: sub && !lapsedCheckout ? sub.id : null,
       computedAt: now,
       validUntil
     };
@@ -49,6 +55,8 @@ function buildEntitlement({ slug, sub, moduleCodes, coreCodes, now }) {
     accessMode,
     allowedModules: ALL,
     entitledModules: everything ? ALL : [...new Set([...coreCodes, ...moduleCodes])].sort(),
+    // What the school chose: what stays on once a trial or complimentary period ends.
+    plannedModules: [...moduleCodes].sort(),
     isReadOnly: accessMode === ACCESS_MODES.READ_ONLY,
     reason: state,
     planCode: sub.bundleCode || (moduleCodes.length ? 'modules' : null),
@@ -57,6 +65,7 @@ function buildEntitlement({ slug, sub, moduleCodes, coreCodes, now }) {
     periodEndsAt: sub.currentPeriodEnd || null,
     studentsBilled: sub.billedStudents || 0,
     cancelAtPeriodEnd: Boolean(sub.cancelAtPeriodEnd),
+    autopay: sub.collectionMode === 'auto_debit',
     subscriptionId: sub.id,
     computedAt: now,
     validUntil

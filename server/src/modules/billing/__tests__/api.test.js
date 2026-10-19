@@ -62,14 +62,14 @@ beforeAll(async () => {
 afterAll(async () => { await t.close(); });
 
 describe('entitlement contract', () => {
-  test('unknown school keeps the v1 read-only fallback shape', async () => {
+  test('an unknown school has no plan yet and must opt in', async () => {
     const res = await api().get('/entitlements/nobody').expect(200);
     expect(res.body.data).toMatchObject({
       tenantSlug: 'nobody',
-      state: 'suspended_read_only',
-      accessMode: 'read_only',
-      isReadOnly: true,
-      reason: 'billing_account_missing',
+      state: null,
+      accessMode: 'setup_required',
+      isReadOnly: false,
+      reason: 'plan_required',
       planCode: null,
       trialEndsAt: null,
       graceEndsAt: null

@@ -40,8 +40,9 @@ async function run() {
   for (const tenant of tenants) {
     try {
       const entitlement = await billing.getTenantEntitlement(tenant.slug);
-      const hasAccount = entitlement.reason !== 'billing_account_missing';
-      if (hasAccount && entitlement.state !== 'canceled') {
+      // No plan yet (no subscription, or one waiting for autopay) counts as nothing to keep.
+      const hasPlan = entitlement.reason !== 'plan_required';
+      if (hasPlan && entitlement.state !== 'canceled') {
         skipped += 1;
         console.log(`  skip  ${tenant.slug} (already ${entitlement.state})`);
         continue;

@@ -27,6 +27,16 @@ const selection = Joi.object({
   reportedStudents: Joi.number().integer().min(0).max(1000000).allow(null)
 });
 
+// Opting in to a trial: the plan, and the school's agreement to the terms it was shown.
+const trialStart = selection.keys({
+  consent: Joi.boolean().valid(true).required().messages({ 'any.only': 'Agree to the trial terms to start your trial' })
+});
+
+const adminTrial = Joi.object({
+  reason: Joi.string().trim().min(3).max(300).required(),
+  days: Joi.number().integer().min(1).max(90)
+});
+
 const profile = Joi.object({
   billingEmail: Joi.string().trim().lowercase().email({ tlds: false }),
   legalName: Joi.string().trim().max(200).allow(''),
@@ -129,6 +139,8 @@ const auditQuery = Joi.object({
 module.exports = {
   tenantIdentity,
   selection,
+  trialStart,
+  adminTrial,
   profile,
   moduleInput,
   priceInput,

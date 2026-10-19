@@ -14,6 +14,10 @@ const HttpError = require('../utils/httpError');
 
 const PROVIDER_ACTOR = Object.freeze({ type: 'provider', id: 'razorpay' });
 
+// trialService requires this file's neighbours; load it when first used.
+// eslint-disable-next-line global-require
+const trials = () => require('./trialService');
+
 const methodOf = (payment) => {
   const m = String(payment?.method || '').toLowerCase();
   return ['upi', 'card', 'netbanking', 'wallet', 'emi'].includes(m) ? m : 'unknown';
@@ -193,7 +197,12 @@ async function onSubscriptionCharged(payload) {
   const amount = Number(payment.amount);
   let invoice = (await invoices.openInvoicesFor(sub.id)).find((inv) => invoices.outstanding(inv) === amount);
   if (!invoice) {
-    await subscriptions.createRenewalInvoice(PROVIDER_ACTOR, sub.id, { now: new Date(sub.currentPeriodEnd || Date.now()) });
+    // First charge after an opt-in trial pays the conversion invoice; later ones a renewal.
+    if (sub.trialConsentAt && !sub.currentPeriodEnd) {
+      await trials().createConversionInvoice(PROVIDER_ACTOR, sub.id);
+    } else {
+      await subscriptions.createRenewalInvoice(PROVIDER_ACTOR, sub.id, { now: new Date(sub.currentPeriodEnd || Date.now()) });
+    }
     invoice = (await invoices.openInvoicesFor(sub.id)).find((inv) => invoices.outstanding(inv) === amount);
   }
   if (!invoice) throw new Error(`Auto-debit charge ${payment.id} of ${amount} paise matches no open invoice`);
@@ -221,6 +230,8 @@ const HANDLERS = {
   'payment.failed': onPaymentFailed,
   'refund.processed': (p) => onRefund(p, 'processed'),
   'refund.failed': (p) => onRefund(p, 'failed'),
+  // A trial's mandate was authorised (the first charge waits for the trial end).
+  'subscription.authenticated': (p) => (p.subscription?.entity ? trials().activate(p.subscription.entity) : 'ignored'),
   'subscription.charged': onSubscriptionCharged,
   'subscription.halted': (p) => onSubscriptionStopped(p, 'halted'),
   'subscription.cancelled': (p) => onSubscriptionStopped(p, 'cancelled')

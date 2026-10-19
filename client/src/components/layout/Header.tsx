@@ -212,6 +212,13 @@ const Header: React.FC<HeaderProps> = ({ isSidebarCollapsed, onToggleSidebar }) 
           showBackButton: isDetailRoute,
           backTo: backToPath,
         }
+      case 'get-started':
+        return {
+          pageTitle: 'Get started',
+          pageSubtitle: 'Choose your plan and start your free trial',
+          showBackButton: false,
+          backTo: null,
+        }
       case 'billing':
         return {
           pageTitle: 'Billing',

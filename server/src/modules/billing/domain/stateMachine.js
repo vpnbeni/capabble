@@ -5,6 +5,9 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 
 const graceDays = () => Number.parseInt(process.env.BILLING_GRACE_DAYS || '7', 10);
 
+// How long a chosen plan waits for its autopay to be authorised before it lapses.
+const INCOMPLETE_TTL_HOURS = 24;
+
 const addDays = (date, days) => new Date(new Date(date).getTime() + days * DAY_MS);
 
 const zone = () => process.env.BILLING_TIMEZONE || 'Asia/Kolkata';
@@ -55,6 +58,8 @@ const normalizeState = (state) => LEGACY_STATE_ALIASES[state] || state;
 
 function accessModeFor(state) {
   switch (normalizeState(state)) {
+  case S.INCOMPLETE:
+    return ACCESS_MODES.SETUP_REQUIRED;
   case S.SUSPENDED_READ_ONLY:
   case S.CANCELED:
     return ACCESS_MODES.READ_ONLY;
@@ -71,6 +76,9 @@ function step(sub, now, unpaidDueAt = null) {
   const state = normalizeState(sub.state);
   const passed = (date) => date && new Date(date) <= now;
 
+  if (state === S.INCOMPLETE && passed(addDays(sub.trialConsentAt || sub.createdAt || now, INCOMPLETE_TTL_HOURS / 24))) {
+    return { state: S.CANCELED, canceledAt: now, reason: 'autopay_not_authorised' };
+  }
   if (state === S.TRIALING && passed(sub.trialEndsAt)) {
     if (sub.cancelAtPeriodEnd) {
       return { state: S.CANCELED, canceledAt: new Date(sub.trialEndsAt), reason: 'trial_ended_canceled' };
@@ -163,6 +171,7 @@ function nextDeadline(sub) {
 }
 
 module.exports = {
+  INCOMPLETE_TTL_HOURS,
   addDays,
   addInterval,
   startOfDay,

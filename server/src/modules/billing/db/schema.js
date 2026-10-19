@@ -26,6 +26,7 @@ const createdAt = () => ts('created_at').notNull().defaultNow();
 const updatedAt = () => ts('updated_at').notNull().defaultNow();
 
 const subscriptionState = billing.enum('subscription_state', [
+  'incomplete',
   'trialing',
   'active',
   'past_due_grace',
@@ -169,6 +170,13 @@ const subscriptions = billing.table('subscriptions', {
   provider: text('provider').notNull().default('razorpay'),
   providerSubscriptionId: text('provider_subscription_id'),
   trialEndsAt: ts('trial_ends_at'),
+  // Opt-in trial: when the school agreed, the exact words it agreed to, and when the trial began.
+  trialConsentAt: ts('trial_consent_at'),
+  trialConsentText: text('trial_consent_text'),
+  trialStartedAt: ts('trial_started_at'),
+  // Autopay mandate: the amount it was authorised for and how (card, upi, emandate).
+  autopayAmountPaise: paise('autopay_amount_paise'),
+  autopayMethod: text('autopay_method'),
   currentPeriodStart: ts('current_period_start'),
   currentPeriodEnd: ts('current_period_end'),
   graceEndsAt: ts('grace_ends_at'),

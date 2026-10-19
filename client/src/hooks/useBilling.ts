@@ -9,6 +9,7 @@ export const billingKeys = {
   creditNotes: () => [...billingKeys.all, 'credit-notes'] as const,
   catalog: () => [...billingKeys.all, 'catalog'] as const,
   preview: (selection: Selection) => [...billingKeys.all, 'preview', selection] as const,
+  trialPreview: (selection: Selection) => [...billingKeys.all, 'trial-preview', selection] as const,
 }
 
 export const useBillingMe = () => useQuery({ queryKey: billingKeys.me(), queryFn: billingService.getMe })
@@ -27,6 +28,15 @@ export const useBillingPreview = (selection: Selection, enabled: boolean) =>
     retry: false,
   })
 
+export const useTrialPreview = (selection: Selection, enabled: boolean) =>
+  useQuery({
+    queryKey: billingKeys.trialPreview(selection),
+    queryFn: () => billingService.trialPreview(selection),
+    enabled,
+    placeholderData: keepPreviousData,
+    retry: false,
+  })
+
 const useInvalidate = () => {
   const queryClient = useQueryClient()
   return () => queryClient.invalidateQueries({ queryKey: billingKeys.all })
@@ -35,6 +45,11 @@ const useInvalidate = () => {
 export const useSubscribe = () => {
   const invalidate = useInvalidate()
   return useMutation({ mutationFn: billingService.subscribe, onSuccess: invalidate })
+}
+
+export const useStartTrial = () => {
+  const invalidate = useInvalidate()
+  return useMutation({ mutationFn: billingService.startTrial, onSuccess: invalidate })
 }
 
 export const useUpdateBillingProfile = () => {

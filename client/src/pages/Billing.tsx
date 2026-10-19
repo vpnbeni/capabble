@@ -1,6 +1,6 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useDispatch } from 'react-redux'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { CreditCard, FileText, Receipt } from 'lucide-react'
@@ -10,7 +10,6 @@ import {
   Button,
   Card,
   CardToolbar,
-  Checkbox,
   DataTable,
   DetailList,
   Dialog,
@@ -19,20 +18,18 @@ import {
   Figure,
   Menu,
   Page,
-  RadioGroup,
   Select,
   Sheet,
   StatCard,
   Tabs,
+  Timeline,
   TextField,
   formatDate,
-  formatINR,
 } from '@/components/ui'
 import type { Tone } from '@/components/ui'
 import { usePermissions } from '@/hooks/usePermissions'
 import {
   billingKeys,
-  useBillingCatalog,
   useBillingCreditNotes,
   useBillingInvoices,
   useBillingMe,
@@ -47,26 +44,22 @@ import billingService, {
   GST_STATES,
   stateName,
   type BillingAccount,
-  type BillingInterval,
   type BillingInvoice,
   type BillingSubscription,
   type Quote,
-  type Selection,
   type SettledPayment,
 } from '@/services/billingService'
 import { getCurrentUser } from '@/redux/slices/authSlice'
 import type { AppDispatch } from '@/redux/store'
+import { PlanFields, rupees, rupeesExact, usePlanSelection } from '@/components/billing/PlanSelection'
 import '@/components/billing/billing.css'
 
-/** Paise → "₹60,445.50" (whole rupees print without paise). */
-const rupees = (paise: number | null | undefined) =>
-  paise == null ? '—' : formatINR(paise / 100, { decimals: paise % 100 ? 2 : 0 })
-const rupeesExact = (paise: number | null | undefined) => (paise == null ? '—' : formatINR(paise / 100, { decimals: 2 }))
 
 /** A period [start, end) ends the day before `end`. */
 const lastDay = (end: string | null | undefined) => (end ? formatDate(new Date(new Date(end).getTime() - 1)) : '—')
 
 const STATE: Record<string, { label: string; tone: Tone }> = {
+  incomplete: { label: 'Setting up autopay', tone: 'info' },
   trialing: { label: 'Free trial', tone: 'info' },
   active: { label: 'Active', tone: 'success' },
   past_due_grace: { label: 'Payment due', tone: 'warning' },
@@ -78,6 +71,28 @@ const STATE: Record<string, { label: string; tone: Tone }> = {
 const METHOD: Record<string, string> = {
   upi: 'UPI', card: 'Card', netbanking: 'Netbanking', wallet: 'Wallet', emi: 'EMI',
   offline_bank: 'Bank transfer', offline_cheque: 'Cheque', offline_cash: 'Cash', unknown: 'Online',
+}
+
+const DAY_MS = 86400000
+
+/** The opt-in trial's dates, and which one the school has reached. */
+const trialTimeline = (sub: BillingSubscription, amountPaise: number | null, autopay: boolean) => {
+  const end = new Date(sub.trialEndsAt || Date.now()).getTime()
+  const reminder = end - 7 * DAY_MS
+  const notice = end - DAY_MS
+  const now = Date.now()
+  const current = now < reminder ? 0 : now < notice ? 1 : now < end ? 2 : 3
+  return {
+    current,
+    steps: [
+      { label: 'Started', date: formatDate(sub.trialStartedAt || sub.trialConsentAt), caption: 'Every module open' },
+      { label: 'Reminder', date: formatDate(new Date(reminder)), caption: 'We email you a week before' },
+      autopay
+        ? { label: 'Notice', date: formatDate(new Date(notice)), caption: 'Pre-debit notice' }
+        : { label: 'Invoice', date: formatDate(new Date(reminder)), caption: 'Your first invoice' },
+      { label: autopay ? 'First charge' : 'Plan starts', date: formatDate(sub.trialEndsAt), caption: amountPaise != null ? `${rupeesExact(amountPaise)} with GST` : undefined },
+    ],
+  }
 }
 
 const isOverdue = (inv: BillingInvoice) => inv.status === 'open' && new Date(inv.dueAt) < new Date()
@@ -152,6 +167,9 @@ const Billing: React.FC = () => {
   const overdue = openInvoices.filter(isOverdue)
   const items = sub?.items || []
   const everything = Boolean(entitlement?.entitledModules?.includes('*'))
+  // A trial the school opted in to (chose a plan and agreed to its terms).
+  const optInTrial = sub?.state === 'trialing' && Boolean(sub.trialConsentAt)
+  const trialAmount = data?.trial?.firstChargePaise ?? null
 
   const payNow = async () => {
     setPaying(true)
@@ -204,8 +222,46 @@ const Billing: React.FC = () => {
           onChoose={() => setChoosing(true)}
           onPay={payNow}
           paying={paying}
-          onResume={() => resume.mutate(undefined, { onSuccess: () => { toast.success('Your subscription will continue.'); refreshEverything() } })}
+          setupRequired={entitlement?.accessMode === 'setup_required'}
+          onResume={() => resume.mutate(undefined, {
+            onSuccess: (result) => {
+              refreshEverything()
+              if (result?.authorizeUrl) {
+                toast.success('Your trial continues. Set up autopay again to keep your plan.')
+                window.location.href = result.authorizeUrl
+                return
+              }
+              // The server's own message confirms it.
+            },
+          })}
         />
+
+        {optInTrial && sub ? (
+          <Card
+            title="Your free trial"
+            subtitle={sub.cancelAtPeriodEnd
+              ? `Cancelled. Every module stays open until ${formatDate(sub.trialEndsAt)}, and nothing will be charged.`
+              : `Every module is open until ${formatDate(sub.trialEndsAt)}. After that your plan keeps ${items.map((i) => i.name).join(', ') || 'the modules you choose'}.`}
+            action={canManage ? (
+              <div className="cb-card-actions">
+                <Button size="sm" variant="secondary" onClick={() => setChoosing(true)}>Change plan</Button>
+                {!sub.cancelAtPeriodEnd ? <Menu items={[{ label: 'Cancel trial', tone: 'danger', onSelect: () => setConfirmCancel(true) }]} /> : null}
+              </div>
+            ) : undefined}
+          >
+            <div className="cb-stack">
+              <Timeline {...trialTimeline(sub, trialAmount, Boolean(entitlement?.autopay))} label="Your trial" />
+              <DetailList
+                columns={3}
+                items={[
+                  { label: entitlement?.autopay ? 'First charge' : 'First invoice', value: trialAmount != null ? `${rupeesExact(trialAmount)} with GST` : null },
+                  { label: 'Paid by', value: entitlement?.autopay ? 'Autopay' : 'Invoice' },
+                  { label: 'You agreed on', value: sub.trialConsentAt ? formatDate(sub.trialConsentAt) : null },
+                ]}
+              />
+            </div>
+          </Card>
+        ) : null}
 
         <div className="cb-stats">
           <StatCard label="Due now" value={rupees(due)} hint={overdue.length ? `${overdue.length} overdue` : openInvoices.length ? `by ${formatDate(openInvoices[0].dueAt)}` : 'Nothing to pay'} />
@@ -225,12 +281,12 @@ const Billing: React.FC = () => {
             action={(
               <div className="cb-card-actions">
                 {stateInfo ? <Badge tone={stateInfo.tone}>{stateInfo.label}</Badge> : null}
-                {canManage ? (
+                {canManage && !optInTrial ? (
                   <Button size="sm" variant="secondary" onClick={() => setChoosing(true)}>
                     {items.length ? 'Change modules' : 'Choose modules'}
                   </Button>
                 ) : null}
-                {canManage && sub && sub.state !== 'canceled' && !sub.cancelAtPeriodEnd && items.length ? (
+                {canManage && !optInTrial && sub && sub.state !== 'canceled' && !sub.cancelAtPeriodEnd && items.length ? (
                   <Menu items={[{ label: 'Cancel subscription', tone: 'danger', onSelect: () => setConfirmCancel(true) }]} />
                 ) : null}
               </div>
@@ -367,23 +423,26 @@ const Billing: React.FC = () => {
         onClose={() => setConfirmCancel(false)}
         tone="danger"
         size="sm"
-        title="Cancel your subscription?"
-        description={`Your modules stay open until ${lastDay(sub?.currentPeriodEnd)}. After that your data stays safe but can only be read.`}
+        title={optInTrial ? 'Cancel your free trial?' : 'Cancel your subscription?'}
+        description={optInTrial
+          ? `Nothing will be charged${entitlement?.autopay ? ' and your autopay is cancelled' : ''}. Every module stays open until ${formatDate(sub?.trialEndsAt)}; after that your data stays safe but can only be read.`
+          : `Your modules stay open until ${lastDay(sub?.currentPeriodEnd)}. After that your data stays safe but can only be read.`}
         footer={(
           <>
-            <Button variant="tertiary" onClick={() => setConfirmCancel(false)}>Keep subscription</Button>
+            <Button variant="tertiary" onClick={() => setConfirmCancel(false)}>{optInTrial ? 'Keep my trial' : 'Keep subscription'}</Button>
             <Button
               variant="danger"
               loading={cancel.isPending}
               onClick={() => cancel.mutate(undefined, {
                 onSuccess: () => {
                   setConfirmCancel(false)
-                  toast.success('Your subscription ends at the end of this period.')
+                  // A trial's confirmation comes from the server's own message.
+                  if (!optInTrial) toast.success('Your subscription ends at the end of this period.')
                   refreshEverything()
                 },
               })}
             >
-              Cancel at period end
+              {optInTrial ? 'Cancel trial' : 'Cancel at period end'}
             </Button>
           </>
         )}
@@ -393,6 +452,7 @@ const Billing: React.FC = () => {
 }
 
 const StateBanner: React.FC<{
+  setupRequired?: boolean
   state: string
   sub: BillingSubscription | null
   due: number
@@ -402,7 +462,23 @@ const StateBanner: React.FC<{
   onChoose: () => void
   onPay: () => void
   onResume: () => void
-}> = ({ state, sub, due, overdueCount, canManage, paying, onChoose, onPay, onResume }) => {
+}> = ({ setupRequired, state, sub, due, overdueCount, canManage, paying, onChoose, onPay, onResume }) => {
+  if (setupRequired) {
+    return (
+      <Banner tone="info" title="Choose your plan to start your free trial">
+        Every module is open during the trial and nothing is charged today.{' '}
+        {canManage ? <Link to="/get-started" className="cb-link">Choose plan</Link> : 'Ask your school administrator to choose it.'}
+      </Banner>
+    )
+  }
+  if (sub?.cancelAtPeriodEnd && state === 'trialing') {
+    return (
+      <Banner tone="warning" title={`Your trial is cancelled. Every module stays open until ${formatDate(sub.trialEndsAt)}`}>
+        Nothing will be charged.{' '}
+        {canManage ? <button type="button" className="cb-link" onClick={onResume}>Keep my plan</button> : null}
+      </Banner>
+    )
+  }
   if (sub?.cancelAtPeriodEnd && state !== 'canceled') {
     return (
       <Banner tone="warning" title={`Your subscription ends on ${lastDay(sub.currentPeriodEnd || sub.trialEndsAt)}`}>
@@ -516,39 +592,13 @@ const ChooseModulesSheet: React.FC<{
   onClose: () => void
   onDone: () => void
 }> = ({ sub, liveStudents, onClose, onDone }) => {
-  const catalog = useBillingCatalog()
   const subscribe = useSubscribe()
-  const [interval, setBillingInterval] = useState<BillingInterval>(sub?.interval || 'year')
-  const [modules, setModules] = useState<string[]>(() => (sub?.items || []).filter((i) => !i.endsAtPeriodEnd).map((i) => i.moduleCode))
-  const [bundleCode, setBundleCode] = useState(sub?.bundleCode || '')
-  const [students, setStudents] = useState(String(sub?.declaredStudents || liveStudents || ''))
-  const [coupon, setCoupon] = useState(sub?.couponCode || '')
-  const bundle = catalog.data?.bundles.find((b) => b.code === bundleCode) || null
-  const chosen = new Set([...modules, ...(bundle?.moduleCodes || [])])
-
-  const selection: Selection = useMemo(() => ({
-    modules,
-    interval,
-    bundleCode: bundleCode || null,
-    couponCode: coupon.trim() || null,
-    ...(/^\d+$/.test(students) ? { declaredStudents: Number(students) } : {}),
-  }), [modules, interval, bundleCode, coupon, students])
-
-  const [debounced, setDebounced] = useState(selection)
-  useEffect(() => {
-    const timer = window.setTimeout(() => setDebounced(selection), 300)
-    return () => window.clearTimeout(timer)
-  }, [selection])
-  const preview = useBillingPreview(debounced, chosen.size > 0)
+  const plan = usePlanSelection(sub, liveStudents)
+  const { chosen, selection } = plan
+  // During an opt-in trial nothing is invoiced now: the plan only decides what stays after it.
+  const optInTrial = sub?.state === 'trialing' && Boolean(sub.trialConsentAt)
+  const preview = useBillingPreview(plan.debounced, chosen.size > 0)
   const quoteError = (preview.error as { response?: { data?: { message?: string } } } | null)?.response?.data?.message
-
-  const priced = (catalog.data?.modules || []).filter((m) => m.prices[interval])
-  const priceText = (code: string) => {
-    const price = catalog.data?.modules.find((m) => m.code === code)?.prices[interval]
-    if (!price) return ''
-    const per = price.perStudentPaise ? `, then ${rupees(price.perStudentPaise)} a student` : ''
-    return `${rupees(price.basePaise)} a ${interval} for up to ${price.includedStudents} students${per}`
-  }
 
   const submit = () => {
     if (!chosen.size || quoteError) return
@@ -556,6 +606,11 @@ const ChooseModulesSheet: React.FC<{
       onSuccess: async (result) => {
         onClose()
         onDone()
+        if (result.authorizeUrl) {
+          toast.success('Your plan is updated. Authorise autopay for the new amount.')
+          window.location.href = result.authorizeUrl
+          return
+        }
         if (result.invoice && result.invoice.status === 'open') {
           toast.success(`Invoice ${result.invoice.number} is ready. Opening payment…`)
           try {
@@ -565,92 +620,43 @@ const ChooseModulesSheet: React.FC<{
             // The invoice stays on the page with a Pay button.
           }
         } else {
-          toast.success('Your modules are updated.')
+          toast.success(optInTrial ? 'Your plan is updated. Every module stays open until your trial ends.' : 'Your modules are updated.')
         }
       },
     })
   }
 
-  const due = preview.data?.dueNow
-  const studentHint = liveStudents != null
-    ? `${liveStudents.toLocaleString('en-IN')} students are active in Students. We bill whichever is higher.`
-    : 'Your total number of students. Each module covers a number of students; extra students are charged per student.'
+  const due = optInTrial ? null : preview.data?.dueNow
+  let description = 'You pay for a full period, starting today.'
+  if (preview.data?.effective === 'mid_period') description = 'New modules start now and are charged for the rest of this period. Modules you remove stay until the period ends.'
+  else if (optInTrial) description = `Every module stays open until your trial ends on ${formatDate(sub?.trialEndsAt)}. Then you keep, and pay for, the modules you choose here.`
+  else if (sub?.state === 'trialing') description = 'Your paid period starts when your trial ends, so you lose nothing by choosing now.'
 
   return (
     <Sheet
       open
       onClose={onClose}
       size="lg"
-      title={sub?.items?.length ? 'Change modules' : 'Choose your modules'}
-      description={preview.data?.effective === 'mid_period'
-        ? 'New modules start now and are charged for the rest of this period. Modules you remove stay until the period ends.'
-        : sub?.state === 'trialing' ? 'Your paid period starts when your trial ends, so you lose nothing by choosing now.' : 'You pay for a full period, starting today.'}
+      title={optInTrial ? 'Change your plan' : sub?.items?.length ? 'Change modules' : 'Choose your modules'}
+      description={description}
       onSubmit={(event) => { event.preventDefault(); submit() }}
       footer={(
         <>
           <Button variant="tertiary" onClick={onClose}>Keep as is</Button>
           <Button variant="primary" type="submit" loading={subscribe.isPending} disabled={!chosen.size || Boolean(quoteError) || preview.isFetching}>
-            {due ? `Continue to pay ${rupeesExact(due.totalPaise)}` : 'Save modules'}
+            {due ? `Continue to pay ${rupeesExact(due.totalPaise)}` : optInTrial ? 'Save plan' : 'Save modules'}
           </Button>
         </>
       )}
     >
-      <div className="cb-form-section">
-        <RadioGroup
-          label="Pay"
-          orientation="horizontal"
-          value={interval}
-          onChange={(value) => setBillingInterval(value as BillingInterval)}
-          options={[{ value: 'year', label: 'Yearly' }, { value: 'month', label: 'Monthly' }]}
-        />
-      </div>
-      <div className="cb-form-section">
-        <h3 className="cb-form-section__title">Modules</h3>
-        {catalog.isLoading ? <p className="cb-muted">Loading prices…</p> : (
-          <div className="cb-check-grid">
-            {priced.map((m) => {
-              const inBundle = Boolean(bundle?.moduleCodes.includes(m.code))
-              return (
-                <Checkbox
-                  key={m.code}
-                  label={m.name}
-                  description={inBundle ? `In ${bundle?.name} · ${priceText(m.code)}` : priceText(m.code)}
-                  checked={chosen.has(m.code)}
-                  disabled={inBundle}
-                  onChange={(on) => setModules((prev) => (on ? [...prev, m.code] : prev.filter((c) => c !== m.code)))}
-                />
-              )
-            })}
-          </div>
-        )}
-      </div>
-      <div className="cb-form-section">
-        <div className="cb-form-grid">
-          {catalog.data?.bundles.length ? (
-            <Select
-              label="Bundle"
-              value={bundleCode}
-              onChange={(event) => setBundleCode(event.target.value)}
-              options={[{ value: '', label: 'No bundle' }, ...catalog.data.bundles.map((b) => ({ value: b.code, label: `${b.name}, ${b.discountBps / 100}% off` }))]}
-            />
-          ) : null}
-          <TextField
-            label="Number of students"
-            inputMode="numeric"
-            value={students}
-            onChange={(event) => setStudents(event.target.value.replace(/\D/g, ''))}
-            hint={studentHint}
-          />
-          <TextField label="Coupon code" value={coupon} onChange={(event) => setCoupon(event.target.value.toUpperCase())} placeholder="Optional" />
-        </div>
-      </div>
+      <PlanFields plan={plan} />
       {quoteError ? <Banner tone="warning" title={quoteError} /> : null}
-      {preview.data && !quoteError ? <QuoteBox quote={preview.data} /> : null}
+      {preview.data && !quoteError ? <QuoteBox quote={preview.data} afterTrial={optInTrial} /> : null}
     </Sheet>
   )
 }
 
-const QuoteBox: React.FC<{ quote: Quote }> = ({ quote }) => {
+const QuoteBox: React.FC<{ quote: Quote; afterTrial?: boolean }> = ({ quote, afterTrial = false }) => {
   const totals = quote.dueNow
   return (
     <div className="cb-form-section bl-quote">
@@ -663,7 +669,7 @@ const QuoteBox: React.FC<{ quote: Quote }> = ({ quote }) => {
             {totals.igstPaise
               ? <div><dt>IGST 18%</dt><dd>{rupeesExact(totals.igstPaise)}</dd></div>
               : <div><dt>CGST 9% + SGST 9%</dt><dd>{rupeesExact(totals.cgstPaise + totals.sgstPaise)}</dd></div>}
-            <div className="is-total"><dt>Due {formatDate(totals.dueAt)}</dt><dd>{rupeesExact(totals.totalPaise)}</dd></div>
+            <div className="is-total"><dt>{afterTrial ? `When your trial ends, ${formatDate(totals.dueAt)}` : `Due ${formatDate(totals.dueAt)}`}</dt><dd>{rupeesExact(totals.totalPaise)}</dd></div>
           </dl>
           {totals.reason === 'change' ? <p className="cb-subtle">For the rest of your current period.</p> : (
             <p className="cb-subtle">Covers {formatDate(totals.periodStart)} to {lastDay(totals.periodEnd)}.</p>

@@ -9,11 +9,11 @@ jest.mock('../../rbac/session', () => ({
 jest.mock('../../rbac/audit', () => ({ recordAuthEvent: jest.fn() }));
 jest.mock('../../rbac/userPayload', () => ({ buildAuthUserPayload: jest.fn().mockResolvedValue({ id: 'u1' }) }));
 jest.mock('../../middleware/billingEntitlement', () => ({ loadEntitlement: jest.fn().mockResolvedValue({}) }));
-jest.mock('../../services/billingServiceClient', () => ({ onboardTenantTrial: jest.fn() }));
+jest.mock('../../services/billingServiceClient', () => ({ registerTenant: jest.fn() }));
 jest.mock('../../tenancy/platformModels', () => ({ getPlatformModels: jest.fn() }));
 
 const User = require('../../models/User');
-const { onboardTenantTrial } = require('../../services/billingServiceClient');
+const { registerTenant } = require('../../services/billingServiceClient');
 const { getPlatformModels } = require('../../tenancy/platformModels');
 const { verifyEmail } = require('../authController');
 
@@ -63,7 +63,7 @@ describe('authController verifyEmail', () => {
     const res = await run(unverifiedUser());
 
     expect(res.status).toHaveBeenCalledWith(200);
-    expect(onboardTenantTrial).toHaveBeenCalledWith({
+    expect(registerTenant).toHaveBeenCalledWith({
       tenantId: 't1',
       tenantSlug: '06150107536',
       tenantName: 'R.E.D. School',
@@ -76,7 +76,7 @@ describe('authController verifyEmail', () => {
 
     await run(unverifiedUser());
 
-    expect(onboardTenantTrial).not.toHaveBeenCalled();
+    expect(registerTenant).not.toHaveBeenCalled();
   });
 
   it('does not start a trial for a user who has signed in before', async () => {
@@ -84,12 +84,12 @@ describe('authController verifyEmail', () => {
 
     await run(unverifiedUser({ lastLogin: new Date('2026-01-01') }));
 
-    expect(onboardTenantTrial).not.toHaveBeenCalled();
+    expect(registerTenant).not.toHaveBeenCalled();
   });
 
   it('still signs in when the billing service fails', async () => {
     mockTenantRecord({ _id: 't1', slug: '06150107536', name: 'R.E.D. School', adminEmail: 'admin@school.in' });
-    onboardTenantTrial.mockRejectedValueOnce(new Error('billing down'));
+    registerTenant.mockRejectedValueOnce(new Error('billing down'));
     jest.spyOn(console, 'error').mockImplementation(() => {});
 
     const res = await run(unverifiedUser());

@@ -59,7 +59,7 @@ const showApiErrorToast = (message: string) => {
 const BILLING_TOAST_ID = 'billing-required'
 
 /** A blocked action because of billing: one toast, with a link to the Billing page. */
-const showBillingToast = (message: string) => {
+const showBillingToast = (message: string, href = '#/billing', linkLabel = 'Open Billing') => {
   toast.error(
     (t) => createElement(
       'span',
@@ -68,12 +68,12 @@ const showBillingToast = (message: string) => {
       createElement(
         'a',
         {
-          href: '#/billing',
+          href,
           className: 'cb-link',
           style: { fontWeight: 600, whiteSpace: 'nowrap' },
           onClick: () => toast.dismiss(t.id),
         },
-        'Open Billing'
+        linkLabel
       )
     ),
     { id: BILLING_TOAST_ID, duration: 8000 }
@@ -306,6 +306,10 @@ api.interceptors.response.use(
 
       case 402:
         // Unpaid: say why in plain words and offer the way out.
+        if (data?.errorCode === 'plan_required') {
+          showBillingToast('Choose your plan and start your free trial first.', '#/get-started', 'Choose plan')
+          break
+        }
         showBillingToast(data?.errorCode === 'module_not_subscribed'
           ? 'Your school hasn’t subscribed to this module yet.'
           : 'Your school’s Capabble access is read-only until the subscription is paid.')

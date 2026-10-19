@@ -1,6 +1,7 @@
 // Shapes returned by /api/admin/billing (server billing module). Money is always integer paise.
 
 export type SubscriptionState =
+  | 'incomplete'
   | 'trialing'
   | 'active'
   | 'past_due_grace'
@@ -59,6 +60,12 @@ export interface BillingSubscription {
   grandfatherEndsAt: string | null
   cancelAtPeriodEnd: boolean
   canceledAt: string | null
+  /** Opt-in trial: when the school agreed, the words it agreed to, and when the trial began. */
+  trialConsentAt?: string | null
+  trialConsentText?: string | null
+  trialStartedAt?: string | null
+  autopayAmountPaise?: number | null
+  autopayMethod?: string | null
   nextDeadline?: string | null
   items?: SubscriptionItem[]
   addons?: SubscriptionAddon[]
@@ -66,7 +73,7 @@ export interface BillingSubscription {
 
 export interface BillingEntitlement {
   state: SubscriptionState
-  accessMode: 'full' | 'core_only' | 'read_only'
+  accessMode: 'full' | 'core_only' | 'read_only' | 'setup_required'
   entitledModules?: string[]
   nextDeadline?: string | null
   trialEndsAt?: string | null

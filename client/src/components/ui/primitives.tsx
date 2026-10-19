@@ -214,6 +214,36 @@ export const Progress: React.FC<{
   )
 }
 
+export interface TimelineStep {
+  label: React.ReactNode
+  date: React.ReactNode
+  caption?: React.ReactNode
+}
+
+/**
+ * Dated steps of one process, left to right (stacked on phones): a trial's start, reminder,
+ * notice and first charge. Steps before `current` are done, `current` is highlighted.
+ * Not for navigation (that's Tabs) or for many events (that's a list).
+ */
+export const Timeline: React.FC<{ steps: TimelineStep[]; current?: number; label?: string; className?: string }> = ({
+  steps, current = 0, label, className,
+}) => (
+  <ol className={cx('cb-timeline', className)} aria-label={label}>
+    {steps.map((step, i) => (
+      <li
+        key={i}
+        className={cx('cb-timeline__step', i < current && 'is-done', i === current && 'is-current')}
+        aria-current={i === current ? 'step' : undefined}
+      >
+        <span className="cb-timeline__bar" aria-hidden="true" />
+        <span className="cb-timeline__label">{step.label}</span>
+        <span className="cb-timeline__date">{step.date}</span>
+        {step.caption ? <span className="cb-timeline__caption">{step.caption}</span> : null}
+      </li>
+    ))}
+  </ol>
+)
+
 /** A person's photo or initials; falls back to initials if the photo fails to load. */
 export const Avatar: React.FC<{
   name: string

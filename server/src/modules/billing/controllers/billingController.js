@@ -5,6 +5,8 @@ const s = require('../db/schema');
 const accounts = require('../services/accountService');
 const catalog = require('../services/catalogService');
 const subscriptions = require('../services/subscriptionService');
+const trials = require('../services/trialService');
+const trialNotices = require('../services/trialNotices');
 const invoices = require('../services/invoiceService');
 const notifications = require('../services/notificationService');
 const { getEntitlement } = require('../services/entitlementService');
@@ -34,8 +36,31 @@ async function tenantSummary(key) {
     subscription,
     entitlement,
     openInvoices: openInvoices.map((inv) => ({ ...inv, outstandingPaise: invoices.outstanding(inv) })),
-    upcomingRenewal: upcoming
+    upcomingRenewal: upcoming,
+    trial: await trialSummary(account, sub, subscription, openInvoices)
   };
+}
+
+/** An opt-in trial's first charge: the mandate amount, the conversion invoice, or today's quote. */
+async function trialSummary(account, sub, described, openInvoices) {
+  if (!sub || sub.state !== 'trialing' || !trials.isOptInTrial(sub)) return null;
+  const conversion = openInvoices.find((inv) => inv.reason === 'subscription_create');
+  let firstChargePaise = sub.autopayAmountPaise ?? conversion?.totalPaise ?? null;
+  if (firstChargePaise == null && described?.items?.length) {
+    try {
+      const quote = await trials.preview(account.tenantSlug, {
+        modules: described.items.map((i) => i.moduleCode),
+        bundleCode: sub.bundleCode,
+        interval: sub.interval,
+        couponCode: sub.couponCode,
+        declaredStudents: sub.billedStudents
+      }, { reportedStudents: sub.billedStudents });
+      firstChargePaise = quote.firstChargePaise;
+    } catch {
+      firstChargePaise = null; // a module lost its price; the admin sees it
+    }
+  }
+  return { firstChargePaise, trialEndsAt: sub.trialEndsAt, consentText: sub.trialConsentText };
 }
 
 async function getTenantBilling(req, res) {
@@ -73,18 +98,80 @@ async function previewSubscription(req, res) {
   ok(res, await subscriptions.preview(schoolKey(req), selection, { reportedStudents }));
 }
 
+async function currentSub(key) {
+  const db = getDb();
+  const account = await accounts.requireAccount(key, db);
+  return subscriptions.findSubscription(db, account.id);
+}
+
 async function subscribe(req, res) {
   const { reportedStudents, ...selection } = req.body;
+  // During an opt-in trial a change is only a new plan; nothing is invoiced until it ends.
+  const sub = await currentSub(schoolKey(req));
+  if (sub && sub.state === 'trialing' && trials.isOptInTrial(sub)) {
+    const { collectionMode, ...plan } = selection;
+    ok(res, await trials.changePlan(req.actor, schoolKey(req), plan, { reportedStudents }), 200, 'Plan updated');
+    return;
+  }
   const result = await subscriptions.changeSubscription(req.actor, schoolKey(req), selection, { reportedStudents });
   ok(res, result, 200, result.invoice ? `Invoice ${result.invoice.number} issued` : 'Plan updated');
 }
 
 async function cancelSubscription(req, res) {
+  const sub = await currentSub(schoolKey(req));
+  if (sub && sub.state === 'trialing' && !req.body.immediately) {
+    ok(res, await trials.cancel(req.actor, schoolKey(req)), 200, 'Trial cancelled. Nothing will be charged');
+    return;
+  }
   ok(res, await subscriptions.cancel(req.actor, schoolKey(req), req.body), 200, req.body.immediately ? 'Subscription canceled' : 'Subscription will end at the end of the period');
 }
 
 async function resumeSubscription(req, res) {
-  ok(res, await subscriptions.resume(req.actor, schoolKey(req)), 200, 'Cancellation withdrawn');
+  const sub = await currentSub(schoolKey(req));
+  const result = sub && sub.state === 'trialing'
+    ? await trials.resume(req.actor, schoolKey(req))
+    : await subscriptions.resume(req.actor, schoolKey(req));
+  ok(res, result, 200, 'Cancellation withdrawn');
+}
+
+/* ------------------------------------------------------------- opt-in trial */
+
+async function previewTrial(req, res) {
+  const { reportedStudents, consent, ...selection } = req.body;
+  ok(res, await trials.preview(schoolKey(req), selection, { reportedStudents }));
+}
+
+async function startTrial(req, res) {
+  const { reportedStudents, consent, collectionMode, ...selection } = req.body;
+  const result = await trials.start(req.actor, schoolKey(req), selection, { reportedStudents });
+  ok(res, result, 201, result.authorizeUrl ? 'Authorise autopay to start your trial' : 'Your free trial has started');
+}
+
+async function reconcileTrial(req, res) {
+  ok(res, await trials.reconcile(schoolKey(req)));
+}
+
+/** Platform admin: email the school an invite to choose its plan and start its trial. */
+async function sendTrialInvite(req, res) {
+  const account = await accounts.requireAccount(schoolKey(req));
+  const status = await trialNotices.trialInvite(account.id, { force: true });
+  if (status === 'skipped') throw new HttpError(409, 'This school has no billing email, or email is not set up on the server');
+  if (status === 'failed') throw new HttpError(502, "The invite couldn't be emailed. Try again in a few minutes");
+  ok(res, { status }, 200, status === 'duplicate' ? 'An invite was already sent today' : 'Trial invite sent');
+}
+
+/** Platform admin: start a trial without autopay (e.g. a school that pays by bank transfer). */
+async function startTrialWithoutAutopay(req, res) {
+  const account = await accounts.requireAccount(schoolKey(req));
+  const result = await subscriptions.onboardTrial(req.actor, {
+    tenantId: account.tenantId,
+    tenantSlug: account.tenantSlug,
+    tenantName: account.tenantName,
+    trialDays: req.body.days,
+    reason: req.body.reason
+  });
+  if (!result.created) throw new HttpError(409, 'This school already has a live subscription');
+  ok(res, result.subscription, 201, 'Trial started');
 }
 
 /* --------------------------------------------------------------------- PDFs */
@@ -273,6 +360,11 @@ module.exports = {
   updateTenantProfile,
   getCatalog,
   previewSubscription,
+  previewTrial,
+  startTrial,
+  reconcileTrial,
+  sendTrialInvite,
+  startTrialWithoutAutopay,
   subscribe,
   cancelSubscription,
   resumeSubscription,

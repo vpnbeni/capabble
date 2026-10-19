@@ -1,5 +1,6 @@
 export interface BillingSnapshot {
-  accessMode: 'full' | 'core_only' | 'read_only'
+  /** setup_required: no plan yet; the school opts in to a trial (or pays) on Get started. */
+  accessMode: 'full' | 'core_only' | 'read_only' | 'setup_required'
   state: string
   planCode: string | null
   trialEndsAt: string | null
@@ -8,6 +9,10 @@ export interface BillingSnapshot {
   cancelAtPeriodEnd?: boolean
   /** Module codes the school pays for, or ['*'] during a trial or complimentary period. */
   entitledModules?: string[]
+  /** Module codes the school chose. During a trial everything is open; these stay on after it. */
+  plannedModules?: string[]
+  /** The first charge after a trial is collected by an authorised autopay mandate. */
+  autopay?: boolean
   isReadOnly: boolean
 }
 

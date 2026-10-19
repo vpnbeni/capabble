@@ -1,4 +1,6 @@
 const SUBSCRIPTION_STATES = {
+  // Plan chosen, autopay not yet authorised. The trial starts once it is.
+  INCOMPLETE: 'incomplete',
   TRIALING: 'trialing',
   ACTIVE: 'active',
   PAST_DUE_GRACE: 'past_due_grace',
@@ -15,7 +17,9 @@ const LEGACY_STATE_ALIASES = {
 const ACCESS_MODES = {
   FULL: 'full',
   CORE_ONLY: 'core_only',
-  READ_ONLY: 'read_only'
+  READ_ONLY: 'read_only',
+  // No plan chosen yet: the school must opt in to a trial (or pay) first.
+  SETUP_REQUIRED: 'setup_required'
 };
 
 const COLLECTION_MODES = {

@@ -19,6 +19,7 @@ const TONES: Record<string, Tone> = {
   pending: 'info',
   running: 'info',
   trialing: 'info',
+  incomplete: 'info',
   grandfathered: 'info',
   open: 'info',
   partial_failure: 'warning',
@@ -35,6 +36,7 @@ const TONES: Record<string, Tone> = {
 // Billing states read as plain words.
 const LABELS: Record<string, string> = {
   trialing: 'Trial',
+  incomplete: 'Setting up autopay',
   past_due_grace: 'Payment due',
   suspended_read_only: 'Read-only',
   grandfathered: 'Complimentary',

@@ -6,8 +6,8 @@
  * sit inside a `.cb-app` element — use <Page> at the root of a screen. Overlays portal
  * into their own `.cb-app` wrapper.
  */
-export { Icon, Button, Badge, Progress, Ring, ColumnChart, Avatar } from './primitives'
-export type { Tone, ButtonProps, RingSegment, ColumnChartItem } from './primitives'
+export { Icon, Button, Badge, Progress, Ring, ColumnChart, Avatar, Timeline } from './primitives'
+export type { Tone, ButtonProps, RingSegment, ColumnChartItem, TimelineStep } from './primitives'
 export { TextField, TextArea, Select, Checkbox, Switch, SegmentedControl, RadioGroup } from './forms'
 export { Combobox } from './Combobox'
 export { SlotPicker } from './SlotPicker'

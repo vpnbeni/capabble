@@ -111,31 +111,24 @@ const invalidateEntitlement = (tenantSlug) => {
 
 /*
  * A school with no billing account (signup ran while billing was down, or one created before
- * billing existed) starts its free trial on its first request, instead of landing read-only.
- * onboardTrial is idempotent; concurrent requests share one call.
+ * billing existed) gets one on its first request, plus an invite to choose its plan. It does
+ * not get a trial: the school opts in to that itself. Concurrent requests share one call.
  */
-const trialStarts = new Map();
-const startTrialIfMissing = async (tenant, entitlement) => {
-  if (entitlement?.reason !== 'billing_account_missing') return entitlement;
+const registrations = new Map();
+const registered = new Set();
+const registerIfMissing = (tenant, entitlement) => {
+  if (entitlement?.reason !== 'plan_required' || entitlement.subscriptionId || registered.has(tenant.slug)) return;
   const { slug } = tenant;
-  if (!trialStarts.has(slug)) {
-    trialStarts.set(slug, billingClient.onboardTenantTrial({
-      tenantId: String(tenant.id || slug),
-      tenantSlug: slug,
-      tenantName: tenant.name || slug,
-      billingEmail: tenant.adminEmail || null
-    })
-      .then(() => console.info(`[billing-entitlement] status=trial_started_on_first_request tenantSlug=${slug}`))
-      .finally(() => trialStarts.delete(slug)));
-  }
-  try {
-    await trialStarts.get(slug);
-  } catch (error) {
-    console.error('[billing-entitlement] trial_start_failed', { tenantSlug: slug, message: error.message });
-    return entitlement;
-  }
-  invalidateEntitlement(slug);
-  return loadEntitlement(slug);
+  if (registrations.has(slug)) return;
+  registrations.set(slug, billingClient.registerTenant({
+    tenantId: String(tenant.id || slug),
+    tenantSlug: slug,
+    tenantName: tenant.name || slug,
+    billingEmail: tenant.adminEmail || null
+  })
+    .then(() => registered.add(slug))
+    .catch((error) => console.error('[billing-entitlement] register_failed', { tenantSlug: slug, message: error.message }))
+    .finally(() => registrations.delete(slug)));
 };
 
 // Writes a read-only school may still make: opening an academic session is how it reads its data.
@@ -163,7 +156,8 @@ const billingEntitlementMiddleware = async (req, res, next) => {
   let entitlement;
 
   try {
-    entitlement = await startTrialIfMissing(req.tenant, await loadEntitlement(tenantSlug));
+    entitlement = await loadEntitlement(tenantSlug);
+    registerIfMissing(req.tenant, entitlement);
   } catch (error) {
     console.error('[billing-entitlement] failed_to_fetch', {
       tenantSlug,
@@ -214,6 +208,21 @@ const billingEntitlementMiddleware = async (req, res, next) => {
     if (!moduleAllowed) {
       return blockRequest(res, accessMode);
     }
+  }
+
+  // No plan chosen yet: the app shows the plan picker. Reads keep the app shell working;
+  // writes wait until the school opts in to its trial (or pays).
+  if (accessMode === 'setup_required') {
+    if (isWriteMethod && !isAllowedWhileReadOnly(req.method, requestPath)) {
+      return res.status(402).json({
+        ...BILLING_ERROR_RESPONSE,
+        errorCode: 'plan_required',
+        message: 'Choose your plan and start your free trial to use Capabble.',
+        billingUrl: '/get-started',
+        accessMode
+      });
+    }
+    return next();
   }
 
   if (accessMode === 'read_only') {

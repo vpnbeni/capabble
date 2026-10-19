@@ -29,6 +29,14 @@ const forgetEntitlement = (tenantSlug) => {
   require('../middleware/billingEntitlement').invalidateEntitlement(tenantSlug);
 };
 
+// A new school: billing account plus an invite to choose its plan. No trial until it opts in.
+const registerTenant = async (payload) => {
+  if (!isConfigured()) return null;
+  const result = await billing.registerSchool(payload);
+  forgetEntitlement(payload.tenantSlug);
+  return result;
+};
+
 const onboardTenantTrial = async (payload) => {
   if (!isConfigured()) return null;
   const result = await billing.onboardTrial(payload);
@@ -46,6 +54,7 @@ const grandfatherTenant = async (payload) => {
 module.exports = {
   isConfigured,
   getTenantEntitlement,
+  registerTenant,
   onboardTenantTrial,
   grandfatherTenant
 };

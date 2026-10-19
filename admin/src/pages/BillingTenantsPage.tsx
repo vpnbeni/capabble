@@ -5,6 +5,7 @@ import type {
   AuditEntry,
   BillingInterval,
   BillingInvoice,
+  BillingSubscription,
   BillingTenantDetails,
   BillingTenantListItem,
   Quote,
@@ -23,12 +24,38 @@ const MODULE_NAMES = new Map(MODULE_REGISTRY.map((m) => [m.id as string, m.title
 const moduleName = (code: string) => (code === 'core' ? 'Core' : MODULE_NAMES.get(code) || code)
 
 const STATE_WORDS: Record<string, string> = {
+  incomplete: 'Opted in',
   trialing: 'Trial ends',
   active: 'Renews',
   past_due_grace: 'Read-only from',
   grandfathered: 'Complimentary until',
   suspended_read_only: 'Read-only since',
   canceled: 'Cancelled',
+}
+
+const MANDATE_WORDS: Record<string, string> = {
+  card: 'card', upi: 'UPI AutoPay', emandate: 'bank mandate', nach: 'bank mandate',
+}
+
+/** No live plan: never opted in, or an autopay checkout that lapsed. The school sees the plan picker. */
+const hasNoPlan = (sub: BillingSubscription | null) => !sub
+  || (sub.state === 'canceled' && Boolean(sub.trialConsentAt) && !sub.trialStartedAt && !sub.currentPeriodEnd)
+
+function PlanStatus({ sub, state, size }: { sub: BillingSubscription | null; state?: string; size?: 'sm' | 'md' }) {
+  if (hasNoPlan(sub) || !state) return <StatusBadge status="none" size={size} label="Plan not chosen" />
+  return <StatusBadge status={state} size={size} />
+}
+
+const collectionWords = (sub: BillingSubscription | null) => {
+  if (!sub) return null
+  if (sub.collectionMode === 'auto_debit') {
+    const method = sub.autopayMethod ? MANDATE_WORDS[sub.autopayMethod] || sub.autopayMethod : 'autopay'
+    return `Autopay by ${method}${sub.autopayAmountPaise ? `, ${formatINR(sub.autopayAmountPaise)}` : ''}`
+  }
+  if (sub.state === 'incomplete') return 'Waiting for the school to authorise autopay'
+  if (sub.collectionMode === 'manual_link') return 'Pay-now link'
+  if (sub.collectionMode === 'hybrid_auto_manual') return 'Auto-debit, link as fallback'
+  return sub.collectionMode
 }
 
 const isOverdue = (invoice: BillingInvoice) => invoice.status === 'open' && new Date(invoice.dueAt) < new Date()
@@ -49,6 +76,12 @@ const ACTION_WORDS: Record<string, string> = {
   'account.updated': 'School details updated',
   'account.profile_updated': 'Billing profile changed',
   'subscription.trial_started': 'Trial started',
+  'subscription.trial_checkout_started': 'Plan chosen, waiting for autopay',
+  'subscription.autodebit_created': 'Autopay link created',
+  'subscription.autodebit_authorised': 'Autopay authorised',
+  'subscription.autodebit_cancelled': 'Autopay cancelled',
+  'subscription.autodebit_halted': 'Autopay stopped by the bank',
+  'subscription.autodebit_amount_mismatch': 'Autopay amount differs from the invoice',
   'subscription.grandfathered': 'Complimentary access granted',
   'subscription.changed': 'Modules or terms changed',
   'subscription.state_changed': 'Status changed',
@@ -149,14 +182,14 @@ function TenantList({ onOpen }: { onOpen: (id: string) => void }) {
             {
               header: 'Next date',
               accessor: (row) => {
-                if (!row.entitlement) return '—'
+                if (!row.entitlement || hasNoPlan(row.subscription)) return '—'
                 const date = row.entitlement.nextDeadline
                 return date ? `${STATE_WORDS[row.entitlement.state] || ''} ${formatDate(date)}`.trim() : '—'
               },
             },
             {
               header: 'Status',
-              accessor: (row) => (row.entitlement ? <StatusBadge status={row.entitlement.state} size="sm" /> : <StatusBadge status="none" size="sm" label="No plan" />),
+              accessor: (row) => <PlanStatus sub={row.subscription} state={row.entitlement?.state} size="sm" />,
             },
           ]}
         />
@@ -176,7 +209,7 @@ function TenantList({ onOpen }: { onOpen: (id: string) => void }) {
 
 /* ---------------------------------------------------------------- detail */
 
-type DialogKind = null | 'plan' | 'extend' | 'students' | 'cancel'
+type DialogKind = null | 'plan' | 'extend' | 'students' | 'cancel' | 'trial'
 type InvoiceAction = null | { kind: 'pay' | 'credit' | 'void'; invoice: BillingInvoice }
 
 function TenantDetail({ tenantKey, onBack }: { tenantKey: string; onBack: () => void }) {
@@ -232,6 +265,17 @@ function TenantDetail({ tenantKey, onBack }: { tenantKey: string; onBack: () => 
   const overdue = details.openInvoices.filter(isOverdue)
   const deadline = entitlement?.state ? STATE_WORDS[entitlement.state] : ''
   const deadlineDate = sub?.nextDeadline || null
+  const noPlan = hasNoPlan(sub)
+  const live = sub && !noPlan && sub.state !== 'canceled'
+
+  const sendInvite = async () => {
+    try {
+      const res = await billingApi.sendTrialInvite(account.id)
+      done(res.message || 'Trial invite sent')
+    } catch (err) {
+      setError(errorMessage(err, "Couldn't send the invite."))
+    }
+  }
 
   return (
     <div className="grid" style={{ gap: 24 }}>
@@ -242,11 +286,17 @@ function TenantDetail({ tenantKey, onBack }: { tenantKey: string; onBack: () => 
           <p className="page-subtitle">{account.legalName && account.legalName !== account.tenantName ? `${account.legalName} · ` : ''}{account.tenantSlug}</p>
         </div>
         <div className="bl-actions">
-          {sub && sub.state !== 'canceled' ? (
+          {live ? (
             <button type="button" className="ghost" onClick={() => setDialog('cancel')}>Cancel subscription</button>
           ) : null}
-          {sub && sub.state !== 'canceled' ? (
+          {live && sub.state !== 'incomplete' ? (
             <button type="button" className="secondary" onClick={() => setDialog('extend')}>Grant extension</button>
+          ) : null}
+          {noPlan || sub?.state === 'incomplete' ? (
+            <>
+              <button type="button" className="secondary" onClick={sendInvite} disabled={!account.billingEmail}>Send trial invite</button>
+              {noPlan ? <button type="button" className="secondary" onClick={() => setDialog('trial')}>Start trial without autopay</button> : null}
+            </>
           ) : null}
           <button type="button" className="primary" onClick={() => setDialog('plan')}>Change modules</button>
         </div>
@@ -266,7 +316,7 @@ function TenantDetail({ tenantKey, onBack }: { tenantKey: string; onBack: () => 
       <section className="card">
         <div className="bl-card-head">
           <h2 className="card-title">Subscription</h2>
-          {entitlement ? <StatusBadge status={entitlement.state} /> : <StatusBadge status="none" label="No plan" />}
+          <PlanStatus sub={sub} state={entitlement?.state || undefined} />
         </div>
         <div className="cb-metrics bl-metrics">
           <MetricTile label={deadline || 'Next date'} value={deadlineDate ? formatDate(deadlineDate) : '—'} />
@@ -283,10 +333,11 @@ function TenantDetail({ tenantKey, onBack }: { tenantKey: string; onBack: () => 
           items={[
             { label: 'Billing', value: sub ? (sub.interval === 'year' ? 'Yearly' : 'Monthly') : null },
             { label: 'Current period', value: sub?.currentPeriodStart ? `${formatDate(sub.currentPeriodStart)} – ${formatPeriodEnd(sub.currentPeriodEnd)}` : null },
-            { label: 'Access', value: entitlement?.accessMode === 'read_only' ? 'Read-only' : 'Full' },
+            { label: 'Access', value: entitlement?.accessMode === 'read_only' ? 'Read-only' : entitlement?.accessMode === 'setup_required' ? 'Plan picker until the school opts in' : 'Full' },
             { label: 'Bundle', value: sub?.bundleCode },
             { label: 'Coupon', value: sub?.couponCode },
-            { label: 'Collection', value: sub?.collectionMode === 'manual_link' ? 'Pay-now link' : sub?.collectionMode === 'hybrid_auto_manual' ? 'Auto-debit, link as fallback' : sub?.collectionMode },
+            { label: 'Collection', value: collectionWords(sub) },
+            { label: 'Opted in', value: sub?.trialConsentAt ? formatDate(sub.trialConsentAt) : null },
             { label: 'Billing email', value: account.billingEmail },
             { label: 'GSTIN', value: account.gstin || 'Unregistered' },
             { label: 'Place of supply', value: account.stateCode },
@@ -414,6 +465,7 @@ function TenantDetail({ tenantKey, onBack }: { tenantKey: string; onBack: () => 
         <ChangePlanSheet details={details} onClose={() => setDialog(null)} onDone={done} />
       ) : null}
       <ExtendDialog open={dialog === 'extend'} tenantId={account.id} onClose={() => setDialog(null)} onDone={done} />
+      <AdminTrialDialog open={dialog === 'trial'} tenantId={account.id} onClose={() => setDialog(null)} onDone={done} />
       <CancelDialog open={dialog === 'cancel'} tenantId={account.id} onClose={() => setDialog(null)} onDone={done} />
       {invoiceAction?.kind === 'pay' ? <PaymentDialog tenantId={account.id} invoice={invoiceAction.invoice} onClose={() => setInvoiceAction(null)} onDone={done} /> : null}
       {invoiceAction?.kind === 'credit' ? <CreditNoteDialog tenantId={account.id} invoice={invoiceAction.invoice} onClose={() => setInvoiceAction(null)} onDone={done} /> : null}
@@ -633,6 +685,46 @@ function ExtendDialog({ open, tenantId, onClose, onDone }: { open: boolean; tena
     >
       {error ? <Banner tone="danger" title={error} /> : null}
       <TextField label="Days" inputMode="numeric" value={days} onChange={(v) => setDays(v.replace(/\D/g, ''))} error={days && !valid ? 'Enter 1 to 365 days' : undefined} />
+    </Dialog>
+  )
+}
+
+function AdminTrialDialog({ open, tenantId, onClose, onDone }: { open: boolean; tenantId: string; onClose: () => void; onDone: DoneFn }) {
+  const [reason, setReason] = useState('')
+  const [days, setDays] = useState('14')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const validDays = /^\d+$/.test(days) && Number(days) >= 1 && Number(days) <= 90
+  const valid = reason.trim().length >= 3 && validDays
+  const save = async () => {
+    setSaving(true)
+    setError('')
+    try {
+      const res = await billingApi.startTrial(tenantId, { reason: reason.trim(), days: Number(days) })
+      onDone(res.message || 'Trial started')
+    } catch (err) {
+      setError(errorMessage(err, "Couldn't start the trial."))
+    } finally {
+      setSaving(false)
+    }
+  }
+  return (
+    <Dialog
+      isOpen={open}
+      onClose={onClose}
+      size="sm"
+      title="Start a trial without autopay"
+      description="For a school that pays by bank transfer or cheque. Every module opens now; the school chooses its modules on Billing and gets an invoice. Schools normally opt in themselves."
+      footer={(
+        <>
+          <button type="button" className="ghost" onClick={onClose}>Keep as is</button>
+          <button type="button" className="primary" disabled={!valid || saving} onClick={save}>{saving ? 'Starting…' : `Start ${validDays ? days : '…'}-day trial`}</button>
+        </>
+      )}
+    >
+      {error ? <Banner tone="danger" title={error} /> : null}
+      <TextField label="Days" inputMode="numeric" value={days} onChange={(v) => setDays(v.replace(/\D/g, ''))} error={days && !validDays ? 'Enter 1 to 90 days' : undefined} />
+      <TextField label="Reason" value={reason} onChange={setReason} hint="Kept in the audit log, e.g. “Pays by NEFT; agreed on call with the principal”." />
     </Dialog>
   )
 }

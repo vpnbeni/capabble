@@ -11,6 +11,22 @@ const INVOICE = {
   name: SCHOOL, invoiceNumber: 'CB2627-000014', amountDue: '₹29,500.00', dueDate: '2 Nov 2026', url: PAY
 };
 
+const MODULES = [
+  { name: 'Student Management', blurb: 'Admissions, profiles and class lists' },
+  { name: 'Attendance Management', blurb: 'Daily attendance for every class' },
+  { name: 'Timetable Management', blurb: 'Clash-free timetables and substitutions' },
+  { name: 'Internal Exams', blurb: 'Marks entry and report cards' },
+  { name: 'Capital & Finance', blurb: 'Fees, receipts and expenses' },
+  { name: 'Library Management', blurb: 'Issue and return books' },
+  { name: 'School Transport', blurb: 'Routes, stops and riders' },
+  { name: 'Appointments', blurb: 'Parent and visitor meetings' }
+];
+const PLANNED = ['Student Management', 'Attendance Management', 'Internal Exams'];
+const OTHERS = MODULES.map((m) => m.name).filter((n) => !PLANNED.includes(n));
+const TRIAL = {
+  name: SCHOOL, url: PAY, trialEndsOn: '2 Nov 2026', amount: '₹53,100.00'
+};
+
 const samples = {
   'signup-code': () => templates.signupCode({ schoolName: SCHOOL, code: '482913', minutes: 10 }),
   'password-reset-code': () => templates.passwordResetCode({ code: '305817', minutes: 10 }),
@@ -59,6 +75,34 @@ const samples = {
     variant: 'grandfather_ending', name: SCHOOL, date: '31 Mar 2027', url: PAY
   }),
   'grace-ending': () => templates.accessEmail({ variant: 'grace_ending', name: SCHOOL, date: '9 Nov 2026', url: PAY }),
+  'trial-invite': () => templates.trialInvite({
+    name: SCHOOL, url: `${APP}/#/get-started`, trialDays: 14, allModules: MODULES
+  }),
+  'trial-started': () => templates.trialStarted({
+    ...TRIAL, interval: 'year', planned: PLANNED, allModules: MODULES, reminderOn: '26 Oct 2026', noticeOn: '1 Nov 2026', autopay: true
+  }),
+  'trial-midpoint': () => templates.trialMidpoint({
+    name: SCHOOL, url: PAY, daysLeft: 7, others: OTHERS
+  }),
+  'trial-ending-7': () => templates.trialEnding({
+    ...TRIAL, daysLeft: 7, planned: PLANNED, others: OTHERS, autopay: true
+  }),
+  'trial-ending-3': () => templates.trialEnding({
+    ...TRIAL, daysLeft: 3, planned: PLANNED, others: OTHERS, autopay: false
+  }),
+  'legacy-trial-choose-plan': () => templates.legacyTrialChoosePlan({
+    name: SCHOOL, url: PAY, daysLeft: 14, trialEndsOn: TRIAL.trialEndsOn, allModules: MODULES
+  }),
+  'pre-debit-notice': () => templates.preDebitNotice({
+    name: SCHOOL, url: PAY, amount: TRIAL.amount, chargeOn: TRIAL.trialEndsOn, method: 'UPI AutoPay'
+  }),
+  'trial-converted': () => templates.trialConverted({
+    name: SCHOOL, url: PAY, planned: PLANNED, others: OTHERS
+  }),
+  'trial-charge-failed': () => templates.trialChargeFailed({
+    name: SCHOOL, url: PAY, amount: TRIAL.amount, graceEndsOn: '9 Nov 2026'
+  }),
+  'trial-canceled': () => templates.trialCanceled({ name: SCHOOL, url: PAY, trialEndsOn: TRIAL.trialEndsOn }),
   suspended: () => templates.accessEmail({ variant: 'suspended', name: SCHOOL, date: '9 Nov 2026', url: PAY })
 };
 

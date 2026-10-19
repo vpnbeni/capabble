@@ -172,6 +172,13 @@ const Sidebar: React.FC<SidebarProps> = ({
   }, [accessibleModules, selectedModule])
 
   const activeModuleDef = MODULE_REGISTRY.find(m => m.id === activeModule)!
+
+  // During an opt-in trial every module is open; mark the ones that close when it ends.
+  const billingSnapshot = currentUser?.billing
+  const plannedModules = billingSnapshot?.state === 'trialing' && billingSnapshot.plannedModules?.length
+    ? new Set(billingSnapshot.plannedModules)
+    : null
+  const isTrialOnly = (moduleId: string) => Boolean(plannedModules && !plannedModules.has(moduleId))
   const hasMultipleModules = accessibleModules.size > 1
 
   // Refresh counts when location changes (user navigates)
@@ -1896,6 +1903,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                 <span className="cb-sidenav__modulelabel cb-shellnav__modulename truncate">
                   <strong>{activeModuleDef.abbreviation}</strong> <span>{activeModuleDef.title}</span>
                 </span>
+                {isTrialOnly(activeModuleDef.id) ? <span className="cb-menu__hint" title="Open during your trial; not in your plan">Trial</span> : null}
                 {hasMultipleModules ? <ChevronsUpDown size={16} strokeWidth={1.75} aria-hidden /> : null}
               </>
             ) : null}
@@ -1930,6 +1938,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                     <span className="cb-menu__label cb-shellnav__modulename truncate">
                       <strong>{mod.abbreviation}</strong> <span>{mod.title}</span>
                     </span>
+                    {isTrialOnly(mod.id) ? <span className="cb-menu__hint" title="Open during your trial; not in your plan">Trial</span> : null}
                     {isActive ? <Check size={16} strokeWidth={1.75} className="cb-icon" aria-hidden /> : null}
                   </button>
                 )

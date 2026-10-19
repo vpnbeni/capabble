@@ -21,6 +21,8 @@ router.post('/tenants/:tenantId/grant-extension', validate(v.extension), asyncHa
 router.post('/tenants/:tenantId/students', validate(v.students), asyncHandler(c.setTenantStudents));
 router.post('/tenants/:tenantId/cancel', validate(v.cancel), asyncHandler(c.cancelTenant));
 router.post('/tenants/:tenantId/profile', validate(v.profile), asyncHandler(c.updateTenantProfileAdmin));
+router.post('/tenants/:tenantId/trial-invite', asyncHandler(c.sendTrialInvite));
+router.post('/tenants/:tenantId/trial', validate(v.adminTrial), asyncHandler(c.startTrialWithoutAutopay));
 router.post('/tenants/:tenantId/autodebit', asyncHandler(pay.setupAutoDebit));
 router.post('/tenants/:tenantId/invoices/:invoiceId/payments/offline', validate(v.offlinePayment), asyncHandler(c.recordOfflinePayment));
 router.post('/tenants/:tenantId/invoices/:invoiceId/void', validate(v.voidInput), asyncHandler(c.voidInvoice));

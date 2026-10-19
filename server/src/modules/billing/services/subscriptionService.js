@@ -79,7 +79,11 @@ async function refreshState(tx, sub, actor, now = new Date()) {
   return after;
 }
 
-/** Start a trial with full access to every module. Repeated calls never restart a trial. */
+/**
+ * Start a trial with full access to every module, without a plan or consent. Only a platform
+ * admin does this now (a school that pays by bank transfer); schools opt in via trialService.
+ * Repeated calls never restart a trial.
+ */
 async function onboardTrial(actor, input, now = new Date()) {
   return transaction(async (tx) => {
     const account = await accounts.ensureAccount(tx, actor, input);
@@ -93,7 +97,7 @@ async function onboardTrial(actor, input, now = new Date()) {
       trialEndsAt: sm.addDays(now, trialDays),
       declaredStudents: input.declaredStudents || 0
     }).returning();
-    await audit(tx, { actor, entityType: 'subscription', entityId: subscription.id, accountId: account.id, action: 'subscription.trial_started', after: subscription });
+    await audit(tx, { actor, entityType: 'subscription', entityId: subscription.id, accountId: account.id, action: 'subscription.trial_started', after: { ...subscription, ...(input.reason ? { reason: input.reason } : {}) } });
     return { account, subscription, created: true };
   });
 }
@@ -476,7 +480,9 @@ async function cancel(actor, key, { immediately = false, now = new Date() } = {}
       ? { state: S.CANCELED, canceledAt: now, cancelAtPeriodEnd: false }
       : { cancelAtPeriodEnd: true };
     const after = await updateSubscription(tx, sub, changes);
-    await invoices.voidUnpaidInvoices(tx, actor, sub.id, immediately ? ['subscription_create', 'change', 'renewal'] : ['renewal'], 'Subscription canceled');
+    // A trial has no paid period: cancelling it voids the invoice that would start one.
+    const reasons = immediately || sub.state === S.TRIALING ? ['subscription_create', 'change', 'renewal'] : ['renewal'];
+    await invoices.voidUnpaidInvoices(tx, actor, sub.id, reasons, 'Subscription canceled');
     await audit(tx, { actor, entityType: 'subscription', entityId: sub.id, accountId: account.id, action: immediately ? 'subscription.canceled' : 'subscription.cancel_scheduled', before: sub, after });
     return after;
   });
@@ -582,5 +588,13 @@ module.exports = {
   setDeclaredStudents,
   describeSubscription,
   estimateRenewal,
-  periodLabel
+  periodLabel,
+  dateLabel,
+  // Used by the opt-in trial (trialService).
+  planChange,
+  presentQuote,
+  quote,
+  replaceItems,
+  replaceAddons,
+  updateSubscription
 };

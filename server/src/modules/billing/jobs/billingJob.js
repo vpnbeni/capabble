@@ -8,6 +8,8 @@ const config = require('../config');
 const subscriptions = require('../services/subscriptionService');
 const invoices = require('../services/invoiceService');
 const studentCount = require('../services/studentCount');
+const trials = require('../services/trialService');
+const trialNotices = require('../services/trialNotices');
 const mailTemplates = require('../../../mail/templates');
 const notifications = require('../services/notificationService');
 const { rupees } = require('../domain/money');
@@ -93,12 +95,17 @@ async function sendReminders(now) {
     .innerJoin(s.accounts, eq(s.accounts.id, s.invoices.accountId))
     .where(eq(s.invoices.status, 'open'));
 
+  // Autopay collects these itself; the trial emails and the pre-debit notice tell the school.
+  const autopaySubs = new Set((await db.select({ id: s.subscriptions.id }).from(s.subscriptions)
+    .where(eq(s.subscriptions.collectionMode, 'auto_debit'))).map((r) => r.id));
+
   for (const { inv, account } of open) {
     if (invoices.outstanding(inv) === 0) continue;
+    const autopay = autopaySubs.has(inv.subscriptionId);
     const to = account.billingEmail;
     const dueAt = new Date(inv.dueAt);
     const issuedRecently = now - new Date(inv.issuedAt) < 2 * DAY_MS;
-    if (issuedRecently) {
+    if (issuedRecently && !autopay) {
       tally('invoice_issued', await remind({
         accountId: account.id,
         kind: 'invoice_issued',
@@ -109,7 +116,7 @@ async function sendReminders(now) {
       }));
     }
     const daysToDue = (dueAt - now) / DAY_MS;
-    if (daysToDue > 0 && daysToDue <= 3) {
+    if (daysToDue > 0 && daysToDue <= 3 && !autopay) {
       tally('due_soon', await remind({
         accountId: account.id,
         kind: 'due_soon',
@@ -142,7 +149,8 @@ async function sendReminders(now) {
     const to = account.billingEmail;
     const name = account.legalName || account.tenantName;
     const soon = (date, days) => date && new Date(date) > now && new Date(date) - now <= days * DAY_MS;
-    if (sub.state === 'trialing' && soon(sub.trialEndsAt, 3)) {
+    // Opt-in trials get their own reminders (trialNotices); this one is for older trials.
+    if (sub.state === 'trialing' && !sub.trialConsentAt && soon(sub.trialEndsAt, 3)) {
       tally('trial_ending', await remind({
         accountId: account.id,
         kind: 'trial_ending',
@@ -200,7 +208,9 @@ async function runOnce(now = new Date()) {
   try {
     result.stateChanges = await advanceStates(now);
     result.renewalsIssued = await issueRenewals(now);
+    result.trialInvoicesIssued = await trials.issueConversionInvoices(SYSTEM_ACTOR, now);
     result.reminders = await sendReminders(now);
+    result.trialReminders = await trialNotices.sendTrialReminders(now);
     // Renewals or payments may have moved states again.
     result.stateChanges += await advanceStates(now);
     return result;

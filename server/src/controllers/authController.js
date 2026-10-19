@@ -18,7 +18,7 @@ const { ensureUserIndexes } = require('../rbac/userIndexes');
 const { generateResponse } = require('../utils/helpers');
 const { SUCCESS_MESSAGES, HTTP_STATUS } = require('../utils/constants');
 const { loadEntitlement } = require('../middleware/billingEntitlement');
-const { onboardTenantTrial } = require('../services/billingServiceClient');
+const { registerTenant } = require('../services/billingServiceClient');
 const { getPlatformModels } = require('../tenancy/platformModels');
 const { sendMail } = require('../utils/mailer');
 const mailTemplates = require('../mail/templates');
@@ -106,8 +106,11 @@ const buildBillingSnapshot = async (tenantSlug) => {
       periodEndsAt: entitlement.periodEndsAt || null,
       cancelAtPeriodEnd: Boolean(entitlement.cancelAtPeriodEnd),
       entitledModules: entitlement.entitledModules || ['*'],
+      // What the school chose: everything is open in a trial, these stay on after it.
+      plannedModules: entitlement.plannedModules || [],
+      autopay: Boolean(entitlement.autopay),
       isReadOnly: Boolean(entitlement.isReadOnly),
-      state: entitlement.state || 'active',
+      state: entitlement.state || (entitlement.accessMode === 'setup_required' ? 'none' : 'active'),
     };
   } catch (error) {
     console.error('[auth] billing snapshot fetch failed', {
@@ -602,19 +605,20 @@ const resetPassword = asyncHandler(async (req, res) => {
   );
 });
 
-const startSignupTrialBestEffort = async (tenant, user) => {
+// The school gets a billing account and an invite to choose its plan; its trial starts when it opts in.
+const registerSignupBillingBestEffort = async (tenant, user) => {
   try {
     const { Tenant } = getPlatformModels();
     const record = await Tenant.findOne({ slug: tenant.slug }).select('slug name adminEmail').lean();
     if (!record || String(record.adminEmail || '').toLowerCase() !== user.email) return;
-    await onboardTenantTrial({
+    await registerTenant({
       tenantId: String(record._id),
       tenantSlug: record.slug,
       tenantName: record.name,
       billingEmail: record.adminEmail,
     });
   } catch (error) {
-    console.error(`[auth:verify-email] status=trial_onboard_failed tenantSlug=${tenant.slug} message=${error.message}`);
+    console.error(`[auth:verify-email] status=billing_register_failed tenantSlug=${tenant.slug} message=${error.message}`);
   }
 };
 
@@ -689,7 +693,7 @@ const verifyEmail = asyncHandler(async (req, res) => {
   user.lockUntil = null;
   await issueSession({ req, res, user, tenantSlug: req.tenant.slug, rememberMe: req.body.rememberMe !== false });
   await recordAuthEvent(req, { event: 'login_success', actor: user, target: user, details: { via: 'email_verification' } });
-  if (firstSignIn) await startSignupTrialBestEffort(req.tenant, user);
+  if (firstSignIn) await registerSignupBillingBestEffort(req.tenant, user);
 
   return sendAuthUser(req, res, user);
 });

@@ -109,18 +109,24 @@ describe('billingEntitlementMiddleware', () => {
     expect((await run(makeReq('/sessions/2026-2027/carry-forward', 'POST'))).res.statusCode).toBe(402);
   });
 
-  it('a school with no billing account starts its trial instead of going read-only', async () => {
-    const onboard = jest.spyOn(client, 'onboardTenantTrial').mockResolvedValue({ created: true });
-    spy
-      .mockResolvedValueOnce({ state: 'suspended_read_only', accessMode: 'read_only', reason: 'billing_account_missing', entitledModules: ['core'] })
-      .mockResolvedValueOnce({ state: 'trialing', accessMode: 'full', reason: 'trialing', entitledModules: ['*'] });
-    const req = makeReq('/sessions', 'POST');
+  it('a school with no plan gets a billing account and an invite, never a silent trial', async () => {
+    const register = jest.spyOn(client, 'registerTenant').mockResolvedValue({ id: 'acc' });
+    spy.mockResolvedValue({ state: null, accessMode: 'setup_required', reason: 'plan_required', subscriptionId: null, entitledModules: ['core'] });
+    const req = makeReq('/attnd/records', 'GET');
     req.tenant = { ...req.tenant, id: 't1', name: 'Demo School', adminEmail: 'head@demo.in' };
     const { next } = await run(req);
-    expect(onboard).toHaveBeenCalledWith(expect.objectContaining({ tenantSlug: 'demo', tenantName: 'Demo School', billingEmail: 'head@demo.in' }));
+    expect(register).toHaveBeenCalledWith(expect.objectContaining({ tenantSlug: 'demo', tenantName: 'Demo School', billingEmail: 'head@demo.in' }));
     expect(next).toHaveBeenCalled();
-    expect(req.billingEntitlement.state).toBe('trialing');
-    onboard.mockRestore();
+    expect(req.billingEntitlement.accessMode).toBe('setup_required');
+    register.mockRestore();
+  });
+
+  it('without a plan, writes wait for the school to opt in', async () => {
+    spy.mockResolvedValue({ state: null, accessMode: 'setup_required', reason: 'plan_required', subscriptionId: 'sub', entitledModules: ['core'] });
+    const { res } = await run(makeReq('/attnd/records', 'POST'));
+    expect(res.statusCode).toBe(402);
+    expect(res.body.errorCode).toBe('plan_required');
+    expect((await run(makeReq('/billing/me/trial/start', 'POST'))).next).toHaveBeenCalled();
   });
 
   it('keeps using the last known entitlement when billing is unreachable', async () => {

@@ -38,7 +38,7 @@ const toBilling = asyncHandler(async (req, res, next) => {
   };
   if (WRITE_METHODS.includes(req.method)) {
     const path = req.path || '';
-    if (path.startsWith('/subscription')) {
+    if (path.startsWith('/subscription') || path === '/trial/preview' || path === '/trial/start') {
       req.body = { ...(req.body || {}), reportedStudents: await activeStudentCount(req) };
     } else if (path === '/pay-now') {
       req.body = { ...(req.body || {}), callbackUrl: callbackUrl(req) };

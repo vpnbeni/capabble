@@ -25,6 +25,8 @@ export const billingApi = {
   changePlan: (id: string, selection: Selection) => data<unknown>(platformApi.post(`${tenant(id)}/change-plan`, selection)),
   grantExtension: (id: string, days: number) => data<unknown>(platformApi.post(`${tenant(id)}/grant-extension`, { days })),
   setStudents: (id: string, declaredStudents: number) => data<unknown>(platformApi.post(`${tenant(id)}/students`, { declaredStudents })),
+  sendTrialInvite: (id: string) => data<{ status: string }>(platformApi.post(`${tenant(id)}/trial-invite`)),
+  startTrial: (id: string, body: { reason: string; days?: number }) => data<unknown>(platformApi.post(`${tenant(id)}/trial`, body)),
   cancel: (id: string, immediately: boolean) => data<unknown>(platformApi.post(`${tenant(id)}/cancel`, { immediately })),
   recordOfflinePayment: (id: string, invoiceId: string, body: { amountPaise: number; method: string; reference: string; receivedAt?: string }) =>
     data<unknown>(platformApi.post(`${tenant(id)}/invoices/${invoiceId}/payments/offline`, body)),

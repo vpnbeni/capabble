@@ -44,6 +44,13 @@ export interface BillingSubscription {
   cancelAtPeriodEnd: boolean
   nextDeadline: string | null
   items: SubscriptionItem[]
+  collectionMode?: string
+  /** Opt-in trial: when the school agreed and the words it agreed to. */
+  trialConsentAt?: string | null
+  trialConsentText?: string | null
+  trialStartedAt?: string | null
+  autopayAmountPaise?: number | null
+  autopayMethod?: string | null
 }
 
 export interface Totals {
@@ -147,6 +154,25 @@ export interface Quote {
   perPeriod: Totals | null
 }
 
+/** What a trial with a selection costs when it ends, and the dates the school sees before agreeing. */
+export interface TrialPreview {
+  trialDays: number
+  autopay: boolean
+  firstChargePaise: number
+  startsAt: string
+  reminderOn: string
+  noticeOn: string
+  trialEndsAt: string
+  consentText: string
+  quote: Quote
+}
+
+export interface TrialStartResult extends TrialPreview {
+  state: string
+  /** Set when autopay must be authorised before the trial starts (or again after a plan change). */
+  authorizeUrl?: string
+}
+
 export interface BillingMeResponse {
   account?: BillingAccount
   subscription?: BillingSubscription | null
@@ -154,6 +180,8 @@ export interface BillingMeResponse {
   openInvoices?: BillingInvoice[]
   upcomingRenewal?: (Totals & { periodStart: string; periodEnd: string; dueAt: string }) | null
   liveStudents?: number | null
+  /** An opt-in trial: what is charged (or invoiced) when it ends. */
+  trial?: { firstChargePaise: number | null; trialEndsAt: string; consentText: string | null } | null
 }
 
 export type BillingProfile = Pick<BillingAccount, 'billingEmail' | 'legalName' | 'gstin' | 'addressLine1' | 'addressLine2' | 'city' | 'postalCode' | 'stateCode'>
@@ -186,15 +214,31 @@ const billingService = {
     const response = await api.post('/billing/me/subscription/preview', selection, quiet)
     return response.data.data
   },
-  async subscribe(selection: Selection): Promise<{ invoice: BillingInvoice | null }> {
+  /** During an opt-in trial this only changes the plan (and may need autopay authorised again). */
+  async subscribe(selection: Selection): Promise<{ invoice?: BillingInvoice | null; authorizeUrl?: string }> {
     const response = await api.post('/billing/me/subscription', selection)
+    return response.data.data
+  },
+  async trialPreview(selection: Selection): Promise<TrialPreview> {
+    const response = await api.post('/billing/me/trial/preview', selection, quiet)
+    return response.data.data
+  },
+  async startTrial(selection: Selection): Promise<TrialStartResult> {
+    const response = await api.post('/billing/me/trial/start', { ...selection, consent: true })
+    return response.data.data
+  },
+  /** Back from authorising autopay: ask whether it went through. */
+  async reconcileTrial(): Promise<{ state: string | null; autopay: boolean; trialEndsAt: string | null }> {
+    const response = await api.post('/billing/me/trial/reconcile', {}, quiet)
     return response.data.data
   },
   async cancel(): Promise<void> {
     await api.post('/billing/me/cancel', { immediately: false })
   },
-  async resume(): Promise<void> {
-    await api.post('/billing/me/resume', {})
+  /** Withdraw a cancellation. A trial's autopay was cancelled with it, so it may need authorising again. */
+  async resume(): Promise<{ authorizeUrl?: string } | undefined> {
+    const response = await api.post('/billing/me/resume', {})
+    return response.data?.data
   },
   async payNow(invoiceId?: string): Promise<{ paymentLink: { id: string; url: string } }> {
     const response = await api.post('/billing/me/pay-now', invoiceId ? { invoiceId } : {})

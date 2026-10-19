@@ -20,7 +20,10 @@ const C = {
   accent: '#2458AA',
   warningSoft: '#FFFBEB',
   warningBorder: '#FDE68A',
-  warningInk: '#B45309'
+  warningInk: '#B45309',
+  accentSoft: '#EEF3FB',
+  accentBorder: '#C9D8F0',
+  successInk: '#15803D'
 };
 
 // Single quotes inside: these go into style="…" attributes.
@@ -84,6 +87,69 @@ const noticeBlock = (paragraph) => `
     </tr>
   </table>`;
 
+/*
+ * Timeline strip: up to four steps (e.g. Today → Reminder → Notice → First charge). The
+ * current step is filled with the accent. Stacks to one column on narrow screens.
+ */
+const timelineBlock = (steps) => `
+  <table role="presentation" class="cb-stack" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:4px 0 20px;border-collapse:separate;border-spacing:0;">
+    <tr>
+      ${steps.map((step, i) => {
+    const on = Boolean(step.current);
+    return `
+      <td valign="top" width="${Math.floor(100 / steps.length)}%" style="padding:${i ? '0 0 0 6px' : '0'};">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:separate;">
+          <tr><td style="height:4px;line-height:4px;font-size:0;border-radius:2px;background:${on ? C.accent : C.border};">&nbsp;</td></tr>
+          <tr>
+            <td style="padding:10px 2px 0;font-family:${FONT};">
+              <div style="font-size:12px;line-height:16px;font-weight:600;color:${on ? C.accent : C.subtle};text-transform:uppercase;letter-spacing:0.4px;">${escapeHtml(step.label)}</div>
+              <div style="font-size:15px;line-height:22px;font-weight:700;color:${C.ink};">${escapeHtml(step.date)}</div>
+              ${step.caption ? `<div style="font-size:13px;line-height:19px;color:${C.muted};">${escapeHtml(step.caption)}</div>` : ''}
+            </td>
+          </tr>
+        </table>
+      </td>`;
+  }).join('')}
+    </tr>
+  </table>`;
+
+const tagStyle = (tag, planned) => (planned
+  ? `background:${C.accent};color:#FFFFFF;`
+  : `background:${C.accentSoft};color:${C.accent};border:1px solid ${C.accentBorder};`);
+
+/*
+ * Module grid: two columns of { name, blurb, tag }. A tag marked `planned` is filled; the rest
+ * are outlined, so "In your plan" stands out from "Open in your trial".
+ */
+const moduleGridBlock = ({ title, items }) => {
+  const rows = [];
+  for (let i = 0; i < items.length; i += 2) rows.push(items.slice(i, i + 2));
+  const cell = (item) => (item ? `
+        <td valign="top" width="50%" style="padding:6px;">
+          <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border:1px solid ${C.border};border-radius:10px;border-collapse:separate;">
+            <tr>
+              <td style="padding:12px 14px;font-family:${FONT};">
+                <div style="font-size:15px;line-height:20px;font-weight:600;color:${C.ink};">${escapeHtml(item.name)}</div>
+                ${item.blurb ? `<div style="margin-top:2px;font-size:13px;line-height:19px;color:${C.muted};">${escapeHtml(item.blurb)}</div>` : ''}
+                ${item.tag ? `<div style="margin-top:8px;"><span style="display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;line-height:16px;font-weight:600;${tagStyle(item.tag, item.planned)}">${escapeHtml(item.tag)}</span></div>` : ''}
+              </td>
+            </tr>
+          </table>
+        </td>` : '<td width="50%" style="padding:6px;"></td>');
+  return `
+  ${title ? `<p style="margin:8px 0 6px;font-family:${FONT};font-size:13px;line-height:18px;font-weight:600;color:${C.subtle};text-transform:uppercase;letter-spacing:0.4px;">${escapeHtml(title)}</p>` : ''}
+  <table role="presentation" class="cb-stack" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:0 -6px 16px;border-collapse:separate;">
+    ${rows.map((pair) => `<tr>${cell(pair[0])}${cell(pair[1])}</tr>`).join('')}
+  </table>`;
+};
+
+// Short labelled lists, e.g. "These stay on" / "These close on 2 Nov".
+const listsBlock = (lists) => lists.filter((list) => list.items && list.items.length).map((list) => `
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:0 0 14px;">
+    <tr><td style="font-family:${FONT};font-size:14px;line-height:20px;font-weight:600;color:${list.tone === 'muted' ? C.subtle : C.successInk};padding-bottom:4px;">${escapeHtml(list.title)}</td></tr>
+    <tr><td style="font-family:${FONT};font-size:15px;line-height:24px;color:${C.ink};">${list.items.map(escapeHtml).join(' · ')}</td></tr>
+  </table>`).join('');
+
 const footerLine = () => (process.env.MAIL_REPLY_TO
   ? 'Questions? Reply to this email and we’ll help.'
   : 'This mailbox isn’t monitored, so please don’t reply to this email.');
@@ -101,10 +167,15 @@ const footerLine = () => (process.env.MAIL_REPLY_TO
  * @param {*}      [content.notice]      One highlighted paragraph (warnings).
  * @param {Array}  [content.outro]       Paragraphs after the main block.
  * @param {string} [content.footnote]    Why the reader got this email.
+ * @param {Array}  [content.timeline]    [{ label, date, caption, current }] — up to 4 steps.
+ * @param {object} [content.moduleGrid]  { title, items: [{ name, blurb, tag, planned }] }
+ * @param {Array}  [content.lists]       [{ title, items: [string], tone: 'muted'? }]
+ * @param {object} [content.link]        A quieter second action: { label, url }.
  */
 const renderEmail = (content) => {
   const {
-    subject, preheader, context, heading, intro = [], code, button, details, notice, outro = [], footnote
+    subject, preheader, context, heading, intro = [], code, button, details, notice, outro = [], footnote,
+    timeline, moduleGrid, lists, link
   } = content;
   const site = process.env.MAIL_SITE_URL || 'https://capabble.cloud';
   const siteLabel = site.replace(/^https?:\/\//, '').replace(/\/$/, '');
@@ -116,6 +187,7 @@ const renderEmail = (content) => {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light">
 <meta name="supported-color-schemes" content="light">
+<style>@media only screen and (max-width:480px){.cb-stack,.cb-stack tbody,.cb-stack tr,.cb-stack td{display:block!important;width:100%!important;box-sizing:border-box;}.cb-stack td{padding:0 0 12px!important;}}</style>
 <title>${escapeHtml(subject)}</title>
 </head>
 <body style="margin:0;padding:0;background:${C.bg};-webkit-text-size-adjust:100%;">
@@ -140,9 +212,13 @@ const renderEmail = (content) => {
             <h1 style="margin:0 0 16px;font-family:${FONT};font-size:22px;line-height:30px;font-weight:700;color:${C.ink};">${escapeHtml(heading)}</h1>
             ${intro.map((para) => p(paragraphHtml(para))).join('')}
             ${code ? codeBlock(code) : ''}
+            ${timeline && timeline.length ? timelineBlock(timeline) : ''}
+            ${lists && lists.length ? listsBlock(lists) : ''}
             ${details && details.length ? detailsBlock(details) : ''}
             ${notice ? noticeBlock(notice) : ''}
             ${button ? buttonBlock(button) : ''}
+            ${link ? p(`<a href="${escapeHtml(link.url)}" style="color:${C.accent};font-weight:600;text-decoration:none;">${escapeHtml(link.label)} →</a>`) : ''}
+            ${moduleGrid && moduleGrid.items && moduleGrid.items.length ? moduleGridBlock(moduleGrid) : ''}
             ${outro.map((para) => p(paragraphHtml(para))).join('')}
           </td>
         </tr>
@@ -166,9 +242,17 @@ const renderEmail = (content) => {
     '',
     ...intro.map(paragraphText).flatMap((line) => [line, '']),
     ...(code ? [code, ''] : []),
+    ...(timeline && timeline.length ? [...timeline.map((step) => `${step.label}: ${step.date}${step.caption ? ` — ${step.caption}` : ''}`), ''] : []),
+    ...(lists && lists.length ? lists.filter((l) => l.items && l.items.length).flatMap((l) => [`${l.title}: ${l.items.join(', ')}`, '']) : []),
     ...(details && details.length ? [...details.map(([label, value]) => `${label}: ${value}`), ''] : []),
     ...(notice ? [paragraphText(notice), ''] : []),
     ...(button ? [`${button.label}: ${button.url}`, ''] : []),
+    ...(link ? [`${link.label}: ${link.url}`, ''] : []),
+    ...(moduleGrid && moduleGrid.items && moduleGrid.items.length ? [
+      ...(moduleGrid.title ? [moduleGrid.title] : []),
+      ...moduleGrid.items.map((item) => `- ${item.name}${item.tag ? ` (${item.tag})` : ''}${item.blurb ? `: ${item.blurb}` : ''}`),
+      ''
+    ] : []),
     ...outro.map(paragraphText).flatMap((line) => [line, '']),
     '—',
     ...(footnote ? [footnote] : []),
