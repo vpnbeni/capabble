@@ -18,7 +18,10 @@ const { ensureUserIndexes } = require('../rbac/userIndexes');
 const { generateResponse } = require('../utils/helpers');
 const { SUCCESS_MESSAGES, HTTP_STATUS } = require('../utils/constants');
 const { loadEntitlement } = require('../middleware/billingEntitlement');
+const { onboardTenantTrial } = require('../services/billingServiceClient');
+const { getPlatformModels } = require('../tenancy/platformModels');
 const { sendMail } = require('../utils/mailer');
+const mailTemplates = require('../mail/templates');
 
 const PASSWORD_RESET_ERROR_CODES = {
   USER_NOT_FOUND: 'user_not_found',
@@ -75,60 +78,17 @@ const getOtpExpiryMinutes = (otpExpiresAt) => {
 };
 
 const sendPasswordResetOtpEmail = async ({ email, otp, otpExpiresAt }) => {
-  const expiresInMinutes = getOtpExpiryMinutes(otpExpiresAt);
-  const expiryLine = expiresInMinutes && expiresInMinutes > 0
-    ? `This code expires in ${expiresInMinutes} minute${expiresInMinutes === 1 ? '' : 's'}.`
-    : 'Use this code as soon as possible.';
-
-  const subject = 'Cntr Password Reset Verification Code';
-  const text = [
-    `Your Cntr password reset verification code is ${otp}.`,
-    expiryLine,
-    'If you did not request this reset, you can safely ignore this email.',
-  ].join('\n');
-
-  const html = [
-    '<div style="font-family:Arial,sans-serif;line-height:1.6;color:#0f172a;">',
-    '<h2 style="margin:0 0 12px;">Cntr Password Reset</h2>',
-    '<p style="margin:0 0 12px;">Use the OTP below to reset your password:</p>',
-    `<p style="margin:0 0 12px;font-size:28px;letter-spacing:6px;font-weight:700;">${otp}</p>`,
-    `<p style="margin:0 0 12px;">${expiryLine}</p>`,
-    '<p style="margin:0;">If you did not request this reset, you can safely ignore this email.</p>',
-    '</div>',
-  ].join('');
-
   await sendMail({
     to: email,
-    subject,
-    text,
-    html,
+    ...mailTemplates.passwordResetCode({ code: otp, minutes: getOtpExpiryMinutes(otpExpiresAt) }),
   });
 };
 
 const sendEmailVerificationOtpEmail = async ({ email, otp, otpExpiresAt }) => {
-  const expiresInMinutes = getOtpExpiryMinutes(otpExpiresAt);
-  const expiryLine = expiresInMinutes && expiresInMinutes > 0
-    ? `This code expires in ${expiresInMinutes} minute${expiresInMinutes === 1 ? '' : 's'}.`
-    : 'Use this code as soon as possible.';
-
-  const subject = 'Cntr Email Verification Code';
-  const text = [
-    `Your Cntr email verification code is ${otp}.`,
-    expiryLine,
-    'If you did not request this, you can safely ignore this email.',
-  ].join('\n');
-
-  const html = [
-    '<div style="font-family:Arial,sans-serif;line-height:1.6;color:#0f172a;">',
-    '<h2 style="margin:0 0 12px;">Cntr Email Verification</h2>',
-    '<p style="margin:0 0 12px;">Use the code below to verify your email address:</p>',
-    `<p style="margin:0 0 12px;font-size:28px;letter-spacing:6px;font-weight:700;">${otp}</p>`,
-    `<p style="margin:0 0 12px;">${expiryLine}</p>`,
-    '<p style="margin:0;">If you did not request this, you can safely ignore this email.</p>',
-    '</div>',
-  ].join('');
-
-  await sendMail({ to: email, subject, text, html });
+  await sendMail({
+    to: email,
+    ...mailTemplates.emailVerificationCode({ code: otp, minutes: getOtpExpiryMinutes(otpExpiresAt) }),
+  });
 };
 
 const buildBillingSnapshot = async (tenantSlug) => {
@@ -642,6 +602,22 @@ const resetPassword = asyncHandler(async (req, res) => {
   );
 });
 
+const startSignupTrialBestEffort = async (tenant, user) => {
+  try {
+    const { Tenant } = getPlatformModels();
+    const record = await Tenant.findOne({ slug: tenant.slug }).select('slug name adminEmail').lean();
+    if (!record || String(record.adminEmail || '').toLowerCase() !== user.email) return;
+    await onboardTenantTrial({
+      tenantId: String(record._id),
+      tenantSlug: record.slug,
+      tenantName: record.name,
+      billingEmail: record.adminEmail,
+    });
+  } catch (error) {
+    console.error(`[auth:verify-email] status=trial_onboard_failed tenantSlug=${tenant.slug} message=${error.message}`);
+  }
+};
+
 // @desc    Verify email with OTP (sent during login for unverified accounts)
 // @route   POST /api/auth/verify-email
 // @access  Public
@@ -699,6 +675,10 @@ const verifyEmail = asyncHandler(async (req, res) => {
     });
   }
 
+  // A school whose sign-up stopped before the email step finishes it here: its first
+  // sign-in as the signup admin starts the trial the signup would have started.
+  const firstSignIn = !user.lastLogin;
+
   // Mark email verified and clear OTP state
   user.isEmailVerified = true;
   user.emailVerificationOtpHash = null;
@@ -709,6 +689,7 @@ const verifyEmail = asyncHandler(async (req, res) => {
   user.lockUntil = null;
   await issueSession({ req, res, user, tenantSlug: req.tenant.slug, rememberMe: req.body.rememberMe !== false });
   await recordAuthEvent(req, { event: 'login_success', actor: user, target: user, details: { via: 'email_verification' } });
+  if (firstSignIn) await startSignupTrialBestEffort(req.tenant, user);
 
   return sendAuthUser(req, res, user);
 });

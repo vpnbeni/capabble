@@ -16,6 +16,7 @@ const {
 // Import app
 const app = require('./app');
 const billing = require('./modules/billing');
+const { isMailConfigured, verifyMailer } = require('./utils/mailer');
 const { countActiveStudents } = require('./services/billingStudentCount');
 
 // Billing reads the live student count from the school databases the server owns.
@@ -64,6 +65,15 @@ const initializeServer = async () => {
       billing.startScheduler();
     } else {
       console.warn('⚠️  Billing is off (set BILLING_DATABASE_URL to enable).'.yellow);
+    }
+
+    if (isMailConfigured()) {
+      // Log in to the mail server once so a wrong password shows up at startup, not at the first signup.
+      verifyMailer()
+        .then(({ host, from }) => console.log(`✅ Email ready: ${from} via ${host}`.green.bold))
+        .catch((error) => console.warn('⚠️  Email server login failed; emails will not send:'.yellow, error.message));
+    } else {
+      console.warn('⚠️  Email is off (set SMTP_HOST, SMTP_USER, SMTP_PASS and SMTP_FROM to enable).'.yellow);
     }
 
     // TODO: Re-enable calendar initialization after debugging

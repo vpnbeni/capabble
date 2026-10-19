@@ -193,7 +193,7 @@ The system uses a **database-per-tenant** isolation strategy:
 - **Validation**: Joi schemas in `/server/src/validations/`
 - **File Processing**: Parsers in `/server/src/utils/` for CBSE PDFs, Form66, Excel files
 - **PDF Generation**: Puppeteer (v24)
-- **Email**: Nodemailer (`/server/src/utils/mailer.js`) for OTP and notifications
+- **Email**: every email is sent from `no-reply@capabble.cloud` (Hostinger SMTP) by `/server/src/utils/mailer.js`. Build new emails as templates in `/server/src/mail/templates.js` (shared branded layout, logo attached inline, HTML + text) and add a sample to `samples.js`; never write inline HTML in a controller. `npm run mail:preview` / `mail:test` in `/server`
 
 ### API Endpoints
 
@@ -274,7 +274,7 @@ See `.env.example` (root and `/server`) for required variables:
 - `PUBLIC_SIGNUP_TICKET_TTL_MINUTES`, `PUBLIC_SIGNUP_EMAIL_OTP_TTL_MINUTES`, `PUBLIC_SIGNUP_EMAIL_OTP_MAX_ATTEMPTS`
 - Rate limit settings for signup start, exchange, and OTP resend
 
-**Email:** `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`
+**Email:** `SMTP_HOST` (smtp.hostinger.com), `SMTP_PORT` (465), `SMTP_SECURE` (true), `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` (`Capabble <no-reply@capabble.cloud>`), optional `MAIL_REPLY_TO`, `MAIL_SITE_URL`
 
 **Cloudinary:** `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`
 

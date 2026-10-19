@@ -105,9 +105,9 @@ const Signup: React.FC = () => {
           : undefined
       const code = response?.data?.errorCode
       if (code === 'slug_taken') {
-        showErrors({ udiseCode: 'This UDISE+ code already has an account. Sign in instead.' })
+        showErrors({ udiseCode: 'This UDISE+ code already has an account. Sign in instead. If you never confirmed your email, signing in sends a new code.' })
       } else if (code === 'admin_email_taken') {
-        showErrors({ email: 'This email address already has an account. Sign in instead.' })
+        showErrors({ email: 'This email address already has an account. Sign in instead. If you never confirmed it, signing in sends a new code.' })
       } else if (response?.status && response.status < 500 && response.data?.message) {
         setGeneralError(response.data.message)
       } else {

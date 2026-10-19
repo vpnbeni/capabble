@@ -11,13 +11,13 @@ function setTransport(fake) {
 const isNotConfigured = (error) => /configuration is incomplete/i.test(String(error?.message || ''));
 
 /** Returns 'sent', or 'skipped' when mail isn't set up. Throws on a send failure. */
-async function sendMail({ to, subject, text }) {
+async function sendMail({ to, subject, text, html }) {
   if (transport) {
-    await transport.sendMail({ to, subject, text });
+    await transport.sendMail({ to, subject, text, html });
     return 'sent';
   }
   try {
-    await serverMailer.sendMail({ to, subject, text });
+    await serverMailer.sendMail({ to, subject, text, html });
     return 'sent';
   } catch (error) {
     if (isNotConfigured(error)) return 'skipped';

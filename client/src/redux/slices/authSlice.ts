@@ -42,7 +42,13 @@ const clearSessionKeys = () => {
   localStorage.removeItem(ACADEMIC_SESSION_STORAGE_KEY);
 };
 
-export const login = createAsyncThunk<AuthResponse, LoginCredentials>(
+export interface LoginRejection {
+  message: string;
+  /** Server error code, e.g. `email_not_verified` (the server has just emailed a code). */
+  errorCode?: string;
+}
+
+export const login = createAsyncThunk<AuthResponse, LoginCredentials, { rejectValue: LoginRejection }>(
   "auth/login",
   async (credentials, { rejectWithValue }) => {
     try {
@@ -51,7 +57,10 @@ export const login = createAsyncThunk<AuthResponse, LoginCredentials>(
       return response;
     } catch (error: any) {
       const data = error.response?.data;
-      return rejectWithValue(data?.message || data?.error || "Sign-in failed. Please try again.");
+      return rejectWithValue({
+        message: data?.message || data?.error || "Sign-in failed. Please try again.",
+        errorCode: data?.errorCode,
+      });
     }
   }
 );
@@ -159,7 +168,10 @@ const authSlice = createSlice({
       })
       .addCase(login.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload as string;
+        // The email-verification step shows its own message, so it isn't a sign-in error.
+        state.error = action.payload?.errorCode === 'email_not_verified'
+          ? null
+          : action.payload?.message || action.error.message || null;
         state.isAuthenticated = false;
       });
 

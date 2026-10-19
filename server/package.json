@@ -21,6 +21,8 @@
     "migrate:placeholder-emails": "node scripts/migrations/migrate-placeholder-emails.js",
     "migrate:oasis-id": "node scripts/migrations/migrate-teacher-oasis-id.js",
     "billing:grandfather": "node scripts/tenants/grandfather-billing.js",
+    "mail:preview": "node scripts/mail/preview.js",
+    "mail:test": "node scripts/mail/test-send.js",
     "test": "jest --watchAll --verbose",
     "test:cloudinary": "node scripts/tests/test-cloudinary.js",
     "lint": "eslint src --ext .js",

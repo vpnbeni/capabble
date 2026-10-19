@@ -10,6 +10,7 @@
 const { getTenantConnectionAndModels } = require('../../tenancy/tenantConnectionManager');
 const EVENTS = require('../../events/eventNames');
 const { sendMail } = require('../../utils/mailer');
+const { appointmentUpdate } = require('../../mail/templates');
 const { schoolNow } = require('./lifecycle');
 
 const HOST_GONE = 'The person you were meeting is no longer available.';
@@ -59,7 +60,7 @@ const trySend = async (to, message, schoolName) => {
   if (!to || !message) return;
   const [subject, body] = message;
   try {
-    await sendMail({ to, subject: schoolName ? `${subject} · ${schoolName}` : subject, text: `${body}\n\n${schoolName || ''}`.trim() });
+    await sendMail({ to, ...appointmentUpdate({ schoolName, subject, body }) });
   } catch (err) {
     // SMTP not configured or unreachable: appointments must keep working without mail.
     console.warn(`[appnt] email not sent: ${err.message}`);

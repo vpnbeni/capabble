@@ -4,6 +4,7 @@
 const crypto = require('crypto');
 const { hashValue } = require('./session');
 const { sendMail } = require('../utils/mailer');
+const mailTemplates = require('../mail/templates');
 
 const INVITE_TTL_HOURS = Number.parseInt(process.env.INVITE_TTL_HOURS || '', 10) || 72;
 
@@ -57,37 +58,22 @@ const buildInviteUrl = (req, token) => {
   return `${resolveClientOrigin(req)}/#/accept-invite?school=${school}&token=${encodeURIComponent(token)}`;
 };
 
-const escapeHtml = (value) => String(value || '').replace(/[&<>"']/g, (char) => ({
-  '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', '\'': '&#39;'
-}[char]));
-
 const sendInviteEmail = async ({ req, user, inviteUrl }) => {
   if (!user.email) return false;
   const schoolName = req.tenant?.name || 'your school';
-  const greeting = user.name ? `Hello ${user.name},` : 'Hello,';
   const loginHint = user.username ? `Your login ID is ${user.username}@${req.tenant?.slug}.` : `Sign in with ${user.email}.`;
 
   await sendMail({
     to: user.email,
-    subject: `Set up your ${schoolName} login`,
-    text: [
-      greeting,
-      `${schoolName} has created a login for you. Open this link to choose your password:`,
+    ...mailTemplates.loginInvite({
+      schoolName,
+      name: user.name,
       inviteUrl,
       loginHint,
-      `The link works once and expires in ${INVITE_TTL_HOURS} hours.`
-    ].join('\n\n'),
-    html: [
-      '<div style="font-family:Arial,sans-serif;line-height:1.6;color:#0f172a;">',
-      `<p>${escapeHtml(greeting)}</p>`,
-      `<p>${escapeHtml(schoolName)} has created a login for you. Choose your password to get started:</p>`,
-      `<p><a href="${escapeHtml(inviteUrl)}" style="display:inline-block;padding:10px 16px;background:#0f172a;color:#fff;`
-        + 'border-radius:6px;text-decoration:none;">Set my password</a></p>',
-      `<p>${escapeHtml(loginHint)}</p>`,
-      `<p style="color:#475569;">The link works once and expires in ${INVITE_TTL_HOURS} hours.</p>`,
-      '</div>'
-    ].join('')
+      hours: INVITE_TTL_HOURS
+    })
   });
+
   return true;
 };
 

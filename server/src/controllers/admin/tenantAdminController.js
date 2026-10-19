@@ -16,6 +16,7 @@ const { issueSession } = require('../../rbac/session');
 const { buildAuthUserPayload } = require('../../rbac/userPayload');
 const { ADMINISTRATOR_ROLE } = require('../../rbac/catalog');
 const { sendMail } = require('../../utils/mailer');
+const mailTemplates = require('../../mail/templates');
 const { syncTenantUserDirectoryEntry } = require('../../tenancy/tenantUserDirectoryService');
 const {
   onboardTenantTrial,
@@ -56,13 +57,6 @@ const getOtpExpiryMinutes = (otpExpiresAt) => {
   return Math.max(1, Math.ceil(ms / (60 * 1000)));
 };
 
-const escapeHtml = (value) => String(value || '')
-  .replace(/&/g, '&amp;')
-  .replace(/</g, '&lt;')
-  .replace(/>/g, '&gt;')
-  .replace(/"/g, '&quot;')
-  .replace(/'/g, '&#39;');
-
 const sendSignupOtpEmail = async ({
   recipientEmail,
   tenantName,
@@ -70,35 +64,13 @@ const sendSignupOtpEmail = async ({
   otpCode,
   otpExpiresAt
 }) => {
-  const expiresInMinutes = getOtpExpiryMinutes(otpExpiresAt);
-  const safeTenantName = tenantName || tenantSlug || 'your tenant';
-  const escapedTenantName = escapeHtml(safeTenantName);
-
-  const subject = 'Cntr Signup Verification Code';
-  const text = [
-    `Your Cntr verification code is ${otpCode}.`,
-    `This code expires in ${expiresInMinutes} minute(s).`,
-    `Tenant: ${safeTenantName} (${tenantSlug})`,
-    'If you did not request this signup, please ignore this email.'
-  ].join('\n');
-
-  const html = [
-    '<div style="font-family:Arial,sans-serif;line-height:1.6;color:#0f172a;">',
-    '<h2 style="margin:0 0 12px;">Cntr Email Verification</h2>',
-    '<p style="margin:0 0 12px;">'
-      + `Use the OTP below to complete tenant onboarding for <strong>${escapedTenantName}</strong>.`
-      + '</p>',
-    `<p style="margin:0 0 12px;font-size:28px;letter-spacing:6px;font-weight:700;">${otpCode}</p>`,
-    `<p style="margin:0 0 12px;">This code expires in <strong>${expiresInMinutes} minute(s)</strong>.</p>`,
-    '<p style="margin:0;color:#475569;">If you did not request this signup, you can ignore this email.</p>',
-    '</div>'
-  ].join('');
-
   await sendMail({
     to: recipientEmail,
-    subject,
-    text,
-    html
+    ...mailTemplates.signupCode({
+      schoolName: tenantName || tenantSlug,
+      code: otpCode,
+      minutes: getOtpExpiryMinutes(otpExpiresAt)
+    })
   });
 };
 
@@ -111,37 +83,16 @@ const sendAdminNewTenantNotification = async ({ tenantName, tenantSlug, adminEma
 
   if (recipients.length === 0) return;
 
-  const safeName = escapeHtml(tenantName);
-  const safeSlug = escapeHtml(tenantSlug);
-  const safeEmail = escapeHtml(adminEmail);
-  const safeSource = source === 'admin' ? 'Admin Portal' : 'Public Signup';
-  const timestamp = new Date().toUTCString();
-
-  const subject = `[Cntr] New Tenant Registered: ${tenantSlug}`;
-  const text = [
-    'A new tenant has registered on Cntr.',
-    '',
-    `Name:    ${tenantName}`,
-    `Slug:    ${tenantSlug}`,
-    `Email:   ${adminEmail}`,
-    `Source:  ${safeSource}`,
-    `Time:    ${timestamp}`,
-  ].join('\n');
-
-  const html = [
-    '<div style="font-family:Arial,sans-serif;line-height:1.6;color:#0f172a;">',
-    '<h2 style="margin:0 0 12px;">New Tenant Registered on Cntr</h2>',
-    '<table style="border-collapse:collapse;">',
-    `<tr><td style="padding:4px 12px 4px 0;color:#475569;">Name</td><td><strong>${safeName}</strong></td></tr>`,
-    `<tr><td style="padding:4px 12px 4px 0;color:#475569;">Slug</td><td><code>${safeSlug}</code></td></tr>`,
-    `<tr><td style="padding:4px 12px 4px 0;color:#475569;">Admin Email</td><td>${safeEmail}</td></tr>`,
-    `<tr><td style="padding:4px 12px 4px 0;color:#475569;">Source</td><td>${safeSource}</td></tr>`,
-    `<tr><td style="padding:4px 12px 4px 0;color:#475569;">Time</td><td>${timestamp}</td></tr>`,
-    '</table>',
-    '</div>',
-  ].join('');
-
-  await sendMail({ to: recipients.join(', '), subject, text, html });
+  await sendMail({
+    to: recipients.join(', '),
+    ...mailTemplates.newSchoolAlert({
+      tenantName,
+      tenantSlug,
+      adminEmail,
+      source: source === 'admin' ? 'Platform admin' : 'Public signup',
+      time: new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' }) + ' IST'
+    })
+  });
 };
 
 const enqueueAdminNewTenantNotification = ({ tenantName, tenantSlug, adminEmail, source }) => {

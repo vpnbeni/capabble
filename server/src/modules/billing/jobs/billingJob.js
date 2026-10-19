@@ -8,6 +8,7 @@ const config = require('../config');
 const subscriptions = require('../services/subscriptionService');
 const invoices = require('../services/invoiceService');
 const studentCount = require('../services/studentCount');
+const mailTemplates = require('../../../mail/templates');
 const mailer = require('../services/mailer');
 const { rupees } = require('../domain/money');
 const { SYSTEM_ACTOR } = require('../services/auditService');
@@ -70,7 +71,7 @@ async function issueRenewals(now) {
 }
 
 /** Each reminder is recorded before it is sent; the unique key makes it once-only. */
-async function remind({ accountId, kind, subjectId, dueOn, to, subject, text }) {
+async function remind({ accountId, kind, subjectId, dueOn, to, message }) {
   if (!to) return 'skipped';
   const db = getDb();
   const [row] = await db.insert(s.notifications)
@@ -79,7 +80,7 @@ async function remind({ accountId, kind, subjectId, dueOn, to, subject, text }) 
     .returning();
   if (!row) return 'duplicate';
   try {
-    const status = await mailer.sendMail({ to, subject, text });
+    const status = await mailer.sendMail({ to, ...message });
     if (status !== 'sent') await db.update(s.notifications).set({ status }).where(eq(s.notifications.id, row.id));
     return status;
   } catch (error) {
@@ -88,21 +89,15 @@ async function remind({ accountId, kind, subjectId, dueOn, to, subject, text }) 
   }
 }
 
-function invoiceText(account, inv, lead) {
-  const due = invoices.outstanding(inv);
-  return [
-    `Dear ${account.legalName || account.tenantName},`,
-    '',
-    lead,
-    '',
-    `Invoice: ${inv.number}`,
-    `Amount due: ${rupees(due)}`,
-    `Due date: ${dateLabel(inv.dueAt)}`,
-    '',
-    `Pay online (UPI, card or netbanking) or download the invoice: ${appUrl()}`,
-    '',
-    'Capabble billing'
-  ].join('\n');
+function invoiceMessage(account, inv, variant) {
+  return mailTemplates.invoiceEmail({
+    variant,
+    name: account.legalName || account.tenantName,
+    invoiceNumber: inv.number,
+    amountDue: rupees(invoices.outstanding(inv)),
+    dueDate: dateLabel(inv.dueAt),
+    url: appUrl()
+  });
 }
 
 async function sendReminders(now) {
@@ -127,8 +122,7 @@ async function sendReminders(now) {
         subjectId: inv.id,
         dueOn: isoDay(inv.issuedAt),
         to,
-        subject: `Capabble invoice ${inv.number}`,
-        text: invoiceText(account, inv, 'A new invoice has been issued for your Capabble subscription.')
+        message: invoiceMessage(account, inv, 'issued')
       }));
     }
     const daysToDue = (dueAt - now) / DAY_MS;
@@ -139,8 +133,7 @@ async function sendReminders(now) {
         subjectId: inv.id,
         dueOn: isoDay(dueAt),
         to,
-        subject: `Payment due on ${dateLabel(dueAt)}: ${inv.number}`,
-        text: invoiceText(account, inv, 'This is a reminder that your Capabble invoice is due soon.')
+        message: invoiceMessage(account, inv, 'due_soon')
       }));
     }
     if (daysToDue <= 0) {
@@ -152,8 +145,7 @@ async function sendReminders(now) {
         subjectId: inv.id,
         dueOn: isoDay(new Date(dueAt.getTime() + weeksOverdue * 7 * DAY_MS)),
         to,
-        subject: `Overdue: Capabble invoice ${inv.number}`,
-        text: invoiceText(account, inv, 'Your Capabble invoice is overdue. Please pay it to keep full access.')
+        message: invoiceMessage(account, inv, 'overdue')
       }));
     }
   }
@@ -174,8 +166,9 @@ async function sendReminders(now) {
         subjectId: sub.id,
         dueOn: isoDay(sub.trialEndsAt),
         to,
-        subject: 'Your Capabble trial ends soon',
-        text: `Dear ${name},\n\nYour free trial ends on ${dateLabel(sub.trialEndsAt)}. Choose the modules you want to keep and pay to continue without interruption: ${appUrl()}\n\nCapabble billing`
+        message: mailTemplates.accessEmail({
+          variant: 'trial_ending', name, date: dateLabel(sub.trialEndsAt), url: appUrl()
+        })
       }));
     }
     if (sub.state === 'grandfathered' && soon(sub.grandfatherEndsAt, 7)) {
@@ -185,8 +178,9 @@ async function sendReminders(now) {
         subjectId: sub.id,
         dueOn: isoDay(sub.grandfatherEndsAt),
         to,
-        subject: 'Choose your Capabble plan',
-        text: `Dear ${name},\n\nYour complimentary access ends on ${dateLabel(sub.grandfatherEndsAt)}. Choose the modules you want to keep: ${appUrl()}\n\nCapabble billing`
+        message: mailTemplates.accessEmail({
+          variant: 'grandfather_ending', name, date: dateLabel(sub.grandfatherEndsAt), url: appUrl()
+        })
       }));
     }
     if (sub.state === 'past_due_grace' && soon(sub.graceEndsAt, 1)) {
@@ -196,8 +190,9 @@ async function sendReminders(now) {
         subjectId: sub.id,
         dueOn: isoDay(sub.graceEndsAt),
         to,
-        subject: 'Capabble access becomes read-only tomorrow',
-        text: `Dear ${name},\n\nYour payment is overdue. On ${dateLabel(sub.graceEndsAt)} your school's Capabble access becomes read-only until the invoice is paid: ${appUrl()}\n\nCapabble billing`
+        message: mailTemplates.accessEmail({
+          variant: 'grace_ending', name, date: dateLabel(sub.graceEndsAt), url: appUrl()
+        })
       }));
     }
     if (sub.state === 'suspended_read_only' && sub.graceEndsAt) {
@@ -207,8 +202,9 @@ async function sendReminders(now) {
         subjectId: sub.id,
         dueOn: isoDay(sub.graceEndsAt),
         to,
-        subject: 'Capabble access is now read-only',
-        text: `Dear ${name},\n\nYour school's Capabble access is read-only because a payment is overdue. Your data is safe. Pay to restore full access: ${appUrl()}\n\nCapabble billing`
+        message: mailTemplates.accessEmail({
+          variant: 'suspended', name, date: dateLabel(sub.graceEndsAt), url: appUrl()
+        })
       }));
     }
   }

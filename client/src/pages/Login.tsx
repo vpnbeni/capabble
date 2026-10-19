@@ -135,10 +135,11 @@ const Login: React.FC = () => {
       const result = await dispatch(login({ email: identifier, password })).unwrap()
       await goToLanding(result.data.user)
     } catch (loginError: any) {
-      const errorCode = loginError?.response?.data?.errorCode
+      // dispatch(login).unwrap() rejects with { message, errorCode }; the tenant lookup rejects with an axios error.
+      const errorCode = loginError?.errorCode || loginError?.response?.data?.errorCode
       const message =
         loginError?.response?.data?.message
-        || (loginError as Error)?.message
+        || loginError?.message
         || 'Login failed. Check your credentials and try again.'
 
       if (errorCode === 'email_not_verified') {
