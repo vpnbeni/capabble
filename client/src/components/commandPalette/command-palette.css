@@ -29,8 +29,6 @@
 /* Input row */
 .cb-app .cb-cmdk__inputrow { display: flex; align-items: center; gap: var(--space-3); padding: 0 var(--space-4); height: 52px; border-bottom: 1px solid var(--border); flex: none; }
 .cb-app .cb-cmdk__inputicon { flex: none; color: var(--ink-subtle); }
-.cb-app .cb-cmdk__spin { animation: cb-cmdk-spin .8s linear infinite; }
-@keyframes cb-cmdk-spin { to { transform: rotate(360deg); } }
 .cb-app .cb-cmdk__input { flex: 1; min-width: 0; height: 100%; border: 0; outline: 0; background: transparent; color: var(--ink); font: 400 15px/22px var(--font-sans); padding: 0; }
 .cb-app .cb-cmdk__input::placeholder { color: var(--ink-subtle); }
 /* @tailwindcss/forms paints a blue focus ring on text inputs; the palette's input row is the focus affordance. */

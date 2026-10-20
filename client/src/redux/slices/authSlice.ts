@@ -68,12 +68,10 @@ export const login = createAsyncThunk<AuthResponse, LoginCredentials, { rejectVa
 export const logout = createAsyncThunk(
   "auth/logout",
   async () => {
-    try {
-      await authService.logout();
-    } finally {
-      clearSessionKeys();
-      localStorage.removeItem('tenantSlug');
-    }
+    // Sign out instantly; the server revokes the cookies in the background.
+    clearSessionKeys();
+    localStorage.removeItem('tenantSlug');
+    authService.logout().catch(() => {});
     return null;
   }
 );

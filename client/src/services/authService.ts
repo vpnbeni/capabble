@@ -53,14 +53,11 @@ class AuthService {
     return response.data
   }
 
-  // Sign out this device (always clears local state, even if the call fails).
+  // Sign out this device. Local state is cleared first so the caller never waits on the network.
   async logout(): Promise<ApiResponse> {
-    try {
-      const response = await api.post('/auth/logout', {}, { _silent: true } as any)
-      return response.data
-    } finally {
-      clearAuthData()
-    }
+    clearAuthData()
+    const response = await api.post('/auth/logout', {}, { _silent: true, timeout: 10000 } as any)
+    return response.data
   }
 
   async getCurrentUser(): Promise<ApiResponse<User>> {

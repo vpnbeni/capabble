@@ -9,6 +9,7 @@ import {
 } from '@/hooks/useOnboarding';
 import { CheckCircle, AlertCircle, Clock, FileText, XCircle, Upload } from 'lucide-react';
 import Dialog from '@/components/common/Dialog/Dialog';
+import Loader from '@/components/common/Loader';
 import toast from 'react-hot-toast';
 
 // localStorage key for persisting the queued job ID across navigation
@@ -173,9 +174,7 @@ export function OnboardingWizard() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600" />
-      </div>
+      <Loader size="lg" fullScreen />
     );
   }
 

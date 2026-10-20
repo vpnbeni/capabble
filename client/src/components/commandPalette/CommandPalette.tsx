@@ -14,7 +14,6 @@ import {
   FileText,
   GraduationCap,
   History,
-  Loader2,
   Package,
   Receipt,
   School,
@@ -379,7 +378,7 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose, storageK
         <div ref={trapRef} className="cb-cmdk" role="dialog" aria-modal="true" aria-label="Search">
           <div className="cb-cmdk__inputrow">
             {remotePending ? (
-              <Loader2 size={18} strokeWidth={1.75} className="cb-cmdk__inputicon cb-cmdk__spin" aria-hidden />
+              <span className="cb-spinner cb-cmdk__inputicon" style={{ width: 18, height: 18 }} aria-hidden />
             ) : (
               <Search size={18} strokeWidth={1.75} className="cb-cmdk__inputicon" aria-hidden />
             )}

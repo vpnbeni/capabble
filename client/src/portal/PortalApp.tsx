@@ -28,7 +28,7 @@ const PortalApp: React.FC = () => {
   const { data: home, isLoading, isError } = usePortalHome()
 
   if (isLoading) {
-    return <div className="min-h-screen flex items-center justify-center"><Loader size="lg" /></div>
+    return <Loader size="lg" fullScreen />
   }
   if (isError || !home) {
     return (

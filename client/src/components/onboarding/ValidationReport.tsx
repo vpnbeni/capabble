@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useValidationReport } from '@/hooks/useOnboarding';
+import Loader from '@/components/common/Loader';
 import { AlertCircle, CheckCircle, XCircle } from 'lucide-react';
 
 export function ValidationReport() {
@@ -7,9 +8,7 @@ export function ValidationReport() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-      </div>
+      <Loader size="lg" fullScreen />
     );
   }
 

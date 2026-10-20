@@ -212,7 +212,7 @@ const Login: React.FC = () => {
   const busy = loading || resolvingTenant
 
   if (loading) {
-    return <Loader />
+    return <Loader size="lg" fullScreen />
   }
 
   return (

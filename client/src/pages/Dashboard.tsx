@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowRight, CalendarX, Check, ChevronLeft, ChevronRight, Loader2, X } from 'lucide-react'
+import { ArrowRight, CalendarX, Check, ChevronLeft, ChevronRight, X } from 'lucide-react'
 import toast from 'react-hot-toast'
 import type { ExamTimelineItem } from '@/components/dashboard'
 import { CardLoading } from '@/components/exmcl/ExmclUi'
@@ -88,13 +88,13 @@ const AttendanceProgressWidget: React.FC<AttendanceProgressWidgetProps> = ({ job
   const isFinished = state === 'completed' || state === 'failed'
   const stageLabel = STAGE_LABELS[stage] ?? 'Processing…'
   const tone = state === 'failed' ? 'danger' : state === 'completed' ? 'success' : 'info'
-  const glyph = state === 'failed' ? X : state === 'completed' ? Check : Loader2
+  const glyph = state === 'failed' ? X : state === 'completed' ? Check : null
 
   return (
     <div className="cb-toaster">
       <div className={cx('cb-toast', `cb-toast--${tone}`)} role="status" aria-live="polite">
         <span className="cb-toast__icon">
-          <Icon icon={glyph} size={14} />
+          {glyph ? <Icon icon={glyph} size={14} /> : <span className="cb-spinner" aria-hidden="true" />}
         </span>
         <div className="cb-toast__text">
           <p className="cb-toast__title">Processing attendance</p>

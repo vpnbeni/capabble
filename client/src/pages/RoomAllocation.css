@@ -52,21 +52,8 @@
   vertical-align: -2px;
 }
 
-.ra-spin {
-  animation: ra-spin 1s linear infinite;
-}
-
 .ra-text-left {
   text-align: left;
-}
-
-@keyframes ra-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
 }
 
 /* ───────── Allocation mode toggle switch ───────── */

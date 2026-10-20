@@ -626,15 +626,12 @@
   color: var(--accent-strong-hover);
 }
 .cb-auth .cb-spinner {
+  display: inline-block;
+  flex: none;
   width: 16px;
   height: 16px;
-  border: 2px solid currentColor;
-  border-right-color: transparent;
-  border-radius: 9999px;
-  animation: cb-spin 0.7s linear infinite;
-}
-@keyframes cb-spin {
-  to { transform: rotate(360deg); }
+  background: url('../../../assets/capabble-mark.svg') center / contain no-repeat;
+  animation: cb-logo-pulse 1.3s ease-in-out infinite;
 }
 
 /* ---------- Strength meter ---------- */
@@ -753,8 +750,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .cb-auth-photo img,
-  .cb-auth .cb-progress,
-  .cb-auth .cb-spinner {
+  .cb-auth .cb-progress {
     animation: none;
   }
   .cb-auth .cb-progress-fill {
