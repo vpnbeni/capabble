@@ -38,6 +38,14 @@
 .cb-app .cb-spinner { display: inline-block; flex: none; vertical-align: middle; width: 14px; height: 14px; background: url('../../assets/capabble-mark.svg') center / contain no-repeat; animation: cb-logo-pulse 1.3s ease-in-out infinite; }
 @keyframes cb-logo-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .3; } }
 
+/* Skeleton: a light band sweeping across a sunken block while content loads. */
+.cb-app .cb-skeleton { display: block; flex: none; max-width: 100%; border-radius: var(--radius-sm); background: linear-gradient(90deg, var(--surface-sunken) 0%, var(--surface-hover) 50%, var(--surface-sunken) 100%) 0 0 / 200% 100%; animation: cb-shimmer 1.3s ease-in-out infinite; }
+.cb-app .cb-skeleton--round { border-radius: var(--radius-full); }
+.cb-app .cb-skeleton-stack { display: flex; flex-direction: column; gap: var(--space-3); }
+.cb-app .cb-skeleton-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); }
+@keyframes cb-shimmer { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+@media (prefers-reduced-motion: reduce) { .cb-app .cb-skeleton { animation: none; } }
+
 /* ---------- Field / Input / Select ---------- */
 .cb-app .cb-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .cb-app .cb-field__label { font: 500 13px/18px var(--font-sans); color: var(--ink); }
@@ -54,6 +62,18 @@
 .cb-app .cb-input__affix { color: var(--ink-muted); font-size: 13px; }
 .cb-app .cb-input.is-disabled { background: var(--surface-sunken); color: var(--ink-disabled); border-color: var(--border); }
 .cb-app .cb-field.is-invalid .cb-input { border-color: var(--danger-ink); }
+/* FileField: one file to upload, with drop zone */
+.cb-app .cb-file { display: flex; align-items: center; gap: var(--space-3); min-height: 64px; padding: var(--space-3) var(--space-4); background: var(--surface); border: 1px dashed var(--border-control); border-radius: var(--radius-md); }
+.cb-app .cb-file.has-file { border-style: solid; }
+.cb-app .cb-file.is-dragging { border-color: var(--accent); background: var(--accent-soft); }
+.cb-app .cb-file.is-disabled { background: var(--surface-sunken); color: var(--ink-disabled); }
+.cb-app .cb-field.is-invalid .cb-file { border-color: var(--danger-ink); }
+.cb-app .cb-file__icon { flex-shrink: 0; color: var(--ink-subtle); }
+.cb-app .cb-file.has-file .cb-file__icon { color: var(--accent); }
+.cb-app .cb-file__body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.cb-app .cb-file__name { font-size: 14px; font-weight: 500; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cb-app .cb-file__meta { font-size: 12px; line-height: 16px; color: var(--ink-muted); }
+.cb-app .cb-file__placeholder { font-size: 13px; color: var(--ink-muted); }
 .cb-app .cb-select { padding-right: 0; }
 .cb-app .cb-select select { appearance: none; -webkit-appearance: none; padding-right: 36px; cursor: pointer; }
 .cb-app .cb-select__chev { position: absolute; right: 10px; pointer-events: none; color: var(--ink-muted); }

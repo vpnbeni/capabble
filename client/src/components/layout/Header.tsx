@@ -212,6 +212,15 @@ const Header: React.FC<HeaderProps> = ({ isSidebarCollapsed, onToggleSidebar }) 
           showBackButton: isDetailRoute,
           backTo: backToPath,
         }
+      case 'onboarding':
+        return {
+          pageTitle: segments[1] === 'validation' ? 'Import check' : 'Exam centre setup',
+          pageSubtitle: segments[1] === 'validation'
+            ? 'How your imported files compare with each other'
+            : 'Import the candidate lists, Form 66 and attendance sheets',
+          showBackButton: segments[1] === 'validation',
+          backTo: segments[1] === 'validation' ? '/onboarding' : null,
+        }
       case 'get-started':
         return {
           pageTitle: 'Get started',

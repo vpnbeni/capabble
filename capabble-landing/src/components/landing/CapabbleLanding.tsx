@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import "./landing.css";
 import { Avatar, Badge, Button, Icon, Progress, StatCard, type IconName } from "./primitives";
+import { legalFacts } from "@/content/legalFacts";
 import {
   devPlan,
   erpBars,
@@ -456,7 +457,7 @@ export function CapabbleLanding({ loginUrl, signupUrl }: Props) {
             <Button variant="secondary" href={signupUrl} title="Register your school on School OS">
               Register school
             </Button>
-            <Button variant="primary" iconRight="arrow-right" href="#contact" className="cb-nav-demo">
+            <Button variant="primary" iconRight="arrow-right" href="/request-demo" className="cb-nav-demo">
               Request a demo
             </Button>
           </div>
@@ -728,7 +729,7 @@ export function CapabbleLanding({ loginUrl, signupUrl }: Props) {
               organisations around them.
             </p>
             <div className="cb-rise cb-d6" style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-              <Button variant="primary" size="lg" iconRight="arrow-right" href="#contact">
+              <Button variant="primary" size="lg" iconRight="arrow-right" href="/request-demo">
                 Request a demo
               </Button>
               <Button variant="secondary" size="lg" href="#solutions">
@@ -1591,7 +1592,7 @@ export function CapabbleLanding({ loginUrl, signupUrl }: Props) {
           </div>
           <div data-reveal="up" style={{ transitionDelay: ".6s", display: "flex", flexDirection: "column", gap: 16 }}>
             <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-              <Button variant="primary" size="lg" iconRight="arrow-right" href="mailto:info@capabble.ai?subject=Demo%20request">
+              <Button variant="primary" size="lg" iconRight="arrow-right" href="/request-demo">
                 Request a demo
               </Button>
               <Button variant="secondary" size="lg" icon="phone" href="tel:+911262400000">
@@ -1650,17 +1651,27 @@ export function CapabbleLanding({ loginUrl, signupUrl }: Props) {
             </nav>
             <div data-reveal="up" style={{ transitionDelay: ".7s", display: "flex", flexDirection: "column", gap: 12, fontSize: 14, lineHeight: "20px", color: "var(--ink-muted)" }}>
               <span style={{ fontSize: 13, lineHeight: "18px", fontWeight: 600, letterSpacing: "0.08em", color: "var(--ink)" }}>CONTACT</span>
-              <span style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-                <span style={{ flex: "0 0 auto", color: "var(--ink-subtle)" }}>
-                  <Icon name="map-pin" size={18} />
+              {(
+                [
+                  ["Office", legalFacts.officeAddress],
+                  ["Registered office", legalFacts.registeredAddress],
+                ] as const
+              ).map(([label, address]) => (
+                <span key={label} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+                  <span style={{ flex: "0 0 auto", color: "var(--ink-subtle)" }}>
+                    <Icon name="map-pin" size={18} />
+                  </span>
+                  <span style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                    <span style={{ fontSize: 12, lineHeight: "16px", fontWeight: 600, color: "var(--ink)" }}>{label}</span>
+                    <span>{address}</span>
+                  </span>
                 </span>
-                <span>115 D, First Floor, Block A, Sector 34, Rohtak, Haryana 124001</span>
-              </span>
+              ))}
               <span style={{ display: "flex", gap: 10, alignItems: "center" }}>
                 <span style={{ flex: "0 0 auto", color: "var(--ink-subtle)" }}>
                   <Icon name="mail" size={18} />
                 </span>
-                <a href="mailto:info@capabble.ai">info@capabble.ai</a>
+                <a href={`mailto:${legalFacts.infoEmail}`}>{legalFacts.infoEmail}</a>
               </span>
               <span style={{ display: "flex", gap: 10, alignItems: "center" }}>
                 <span style={{ flex: "0 0 auto", color: "var(--ink-subtle)" }}>

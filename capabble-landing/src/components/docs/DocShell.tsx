@@ -4,7 +4,7 @@ import { inter } from "@/lib/fonts";
 import { AccountNav } from "./AccountNav";
 import "./docs.css";
 
-type Page = "help" | "privacy" | "terms" | "pricing";
+type Page = "help" | "privacy" | "terms" | "pricing" | "demo";
 
 const FOOTER_LINKS: { page: Page; href: string; label: string }[] = [
   { page: "pricing", href: "/pricing", label: "Pricing" },
@@ -13,7 +13,9 @@ const FOOTER_LINKS: { page: Page; href: string; label: string }[] = [
   { page: "help", href: "/help", label: "Help" },
 ];
 
-/** Shared header and footer for the Pricing, Help, Privacy and Terms pages. */
+const HOME_LABELS: Record<Page, string> = { help: "Help", pricing: "Pricing", demo: "Request a demo", privacy: "Legal", terms: "Legal" };
+
+/** Shared header and footer for the Pricing, Request a demo, Help, Privacy and Terms pages. */
 export function DocShell({ page, children }: { page: Page; children: ReactNode }) {
   return (
     <div className={`cb-doc ${inter.variable}`} data-page={page}>
@@ -26,7 +28,7 @@ export function DocShell({ page, children }: { page: Page; children: ReactNode }
               Capa<span>bb</span>le
             </span>
             <span className="cb-doc-home-divider" aria-hidden="true" />
-            <span className="cb-doc-home-label">{page === "help" ? "Help" : page === "pricing" ? "Pricing" : "Legal"}</span>
+            <span className="cb-doc-home-label">{HOME_LABELS[page]}</span>
           </Link>
           <AccountNav />
         </div>

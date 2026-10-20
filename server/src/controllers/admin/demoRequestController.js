@@ -13,11 +13,13 @@ const getClientIp = (req) => {
 
 const escapeRegex = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-const istTime = (date) => `${date.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' })} IST`;
+const istTime = (date) => `${date.toLocaleString('en-IN', {
+  timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short'
+})} IST`;
 
 const adminDemoRequestsUrl = () => {
   const base = (process.env.ADMIN_PORTAL_URL || '').trim().replace(/\/+$/, '');
-  return base ? `${base}/#/demo-requests` : undefined;
+  return base ? `${base}/demo-requests` : undefined;
 };
 
 const notifyRecipients = () => (process.env.DEMO_LEAD_NOTIFY_EMAIL || DEFAULT_NOTIFY_EMAIL)
@@ -85,7 +87,7 @@ const createDemoRequest = asyncHandler(async (req, res) => {
     ...fields,
     modules: Array.from(new Set(fields.modules || [])),
     createdIp: getClientIp(req),
-    createdUserAgent: String(req.headers['user-agent'] || '').slice(0, 400) || null,
+    createdUserAgent: String(req.headers['user-agent'] || '').slice(0, 400) || null
   });
 
   setImmediate(() => {
@@ -106,7 +108,7 @@ const listDemoRequests = asyncHandler(async (req, res) => {
   if (status) query.status = status;
   if (search) {
     const pattern = { $regex: escapeRegex(search), $options: 'i' };
-    query.$or = [{ name: pattern }, { institution: pattern }, { email: pattern }, { phone: pattern }, { city: pattern }];
+    query.$or = ['name', 'institution', 'email', 'phone', 'city'].map((field) => ({ [field]: pattern }));
   }
 
   const skip = (page - 1) * limit;
@@ -115,7 +117,7 @@ const listDemoRequests = asyncHandler(async (req, res) => {
       .select('-createdUserAgent')
       .lean(),
     DemoRequest.countDocuments(query),
-    DemoRequest.aggregate([{ $group: { _id: '$status', count: { $sum: 1 } } }]),
+    DemoRequest.aggregate([{ $group: { _id: '$status', count: { $sum: 1 } } }])
   ]);
 
   res.status(200).json({
@@ -126,8 +128,8 @@ const listDemoRequests = asyncHandler(async (req, res) => {
       page,
       pages: Math.ceil(total / limit) || 1,
       limit,
-      counts: counts.reduce((acc, row) => ({ ...acc, [row._id]: row.count }), {}),
-    },
+      counts: counts.reduce((acc, row) => ({ ...acc, [row._id]: row.count }), {})
+    }
   });
 });
 
@@ -152,5 +154,5 @@ const updateDemoRequest = asyncHandler(async (req, res) => {
 module.exports = {
   createDemoRequest,
   listDemoRequests,
-  updateDemoRequest,
+  updateDemoRequest
 };

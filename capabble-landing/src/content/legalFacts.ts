@@ -10,7 +10,9 @@
  */
 export const legalFacts = {
   legalEntityName: 'Capabble Platforms LLP',
-  registeredAddress: 'H. No. 41, Village Godhri, PO Achhej, Tehsil Beri, District Jhajjar, Haryana 124106, India',
+  registeredAddress: 'HN. 41, Village Godhri, PO Achhej, Tehsil Beri, Distt. Jhajjar, PIN 124106, Haryana, India',
+  officeAddress: 'Unit 115 D, First Floor, Block A, Sector 34, Rohtak, Haryana 124001',
+  infoEmail: 'info@capabble.cloud',
   supportEmail: 'support@capabble.cloud',
   supportPhone: '+91 90532 32597',
   supportHours: 'Mon–Sat, 10:00 am – 7:00 pm IST',

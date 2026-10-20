@@ -42,6 +42,32 @@ const trialSteps = (t: TrialDates) => [
 ]
 
 /**
+ * How the price after the trial adds up: module prices, then the bundle or coupon discount,
+ * then GST. Without it a bundle's total looks wrong next to the module prices.
+ */
+const PriceBreakdown: React.FC<{ trial: TrialPreview; bundleName: string | null }> = ({ trial, bundleName }) => {
+  const totals = trial.quote.dueNow ?? trial.quote.perPeriod
+  const per = trial.quote.interval
+  if (!totals) return null
+  const count = trial.quote.modules.length
+  return (
+    <dl className="bl-totals">
+      <div>
+        <dt>{count} {count === 1 ? 'module' : 'modules'} for {trial.quote.students.toLocaleString('en-IN')} students</dt>
+        <dd>{rupeesExact(totals.subtotalPaise)}</dd>
+      </div>
+      {totals.discountPaise ? (
+        <div><dt>{bundleName ? `${bundleName} discount` : 'Discount'}</dt><dd>−{rupeesExact(totals.discountPaise)}</dd></div>
+      ) : null}
+      {totals.igstPaise
+        ? <div><dt>IGST 18%</dt><dd>{rupeesExact(totals.igstPaise)}</dd></div>
+        : <div><dt>CGST 9% + SGST 9%</dt><dd>{rupeesExact(totals.cgstPaise + totals.sgstPaise)}</dd></div>}
+      <div className="is-total"><dt>Then, a {per} with GST</dt><dd>{rupeesExact(trial.firstChargePaise)}</dd></div>
+    </dl>
+  )
+}
+
+/**
  * Get started: a school with no plan opts in to its free trial. It chooses the modules (or a
  * bundle) it will keep, reviews what it will pay and when, agrees, and sets up autopay when
  * that is required. Every module is open during the trial, whatever it chooses.
@@ -187,7 +213,7 @@ const GetStarted: React.FC = () => {
             <div className="cb-stack">
               {done ? <Timeline steps={trialSteps(done)} current={0} label="Your trial" /> : null}
               <div className="cb-card-actions">
-                <Button variant="primary" onClick={() => navigate('/dashboard')}>Start exploring</Button>
+                <Button variant="primary" onClick={() => navigate('/home')}>Start exploring</Button>
                 <Button variant="secondary" onClick={() => navigate('/billing')}>Review my plan</Button>
               </div>
             </div>
@@ -242,14 +268,16 @@ const GetStarted: React.FC = () => {
                 <Figure value="Free" caption={`for ${trialDays} days, every module`} />
                 {quoteError ? <Banner tone="warning" title={quoteError} /> : null}
                 {trial && !quoteError ? (
-                  <DetailList
-                    columns={1}
-                    items={[
-                      { label: 'Then', value: `${rupeesExact(trial.firstChargePaise)} a ${trial.quote.interval}, with GST` },
-                      { label: 'From', value: formatDate(trial.trialEndsAt) },
-                      { label: 'Modules you keep', value: trial.quote.modules.map((m) => m.name).join(', ') },
-                    ]}
-                  />
+                  <>
+                    <PriceBreakdown trial={trial} bundleName={plan.bundle?.name || null} />
+                    <DetailList
+                      columns={1}
+                      items={[
+                        { label: 'From', value: formatDate(trial.trialEndsAt) },
+                        { label: 'Modules you keep', value: trial.quote.modules.map((m) => m.name).join(', ') },
+                      ]}
+                    />
+                  </>
                 ) : <p className="cb-muted">Choose at least one module to see your price.</p>}
                 <Button variant="primary" fullWidth icon={Sparkles} disabled={!trial || Boolean(quoteError) || preview.isFetching} onClick={() => { setAgreed(false); setStep('review') }}>
                   Review and start trial

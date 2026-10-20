@@ -34,7 +34,8 @@
     "billing:db:migrate": "node src/modules/billing/db/migrate.js",
     "billing:db:seed": "node scripts/billing/seed-catalog.js",
     "billing:db:studio": "drizzle-kit studio --config drizzle.billing.config.js",
-    "test:billing": "node --experimental-vm-modules node_modules/jest/bin/jest.js"
+    "test:billing": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "tenant:purge": "node scripts/tenants/purge-tenant.js"
   },
   "keywords": [
     "express",

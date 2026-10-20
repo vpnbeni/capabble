@@ -20,6 +20,7 @@ import {
   Page,
   Select,
   Sheet,
+  Skeleton,
   StatCard,
   Tabs,
   Timeline,
@@ -184,7 +185,7 @@ const Billing: React.FC = () => {
   if (me.isLoading) {
     return (
       <Page>
-        <Card><p className="cb-muted">Loading billing…</p></Card>
+        <BillingSkeleton />
       </Page>
     )
   }
@@ -527,6 +528,57 @@ const StateBanner: React.FC<{
   }
   return null
 }
+
+/** Placeholder in the shape of the billing page (stats, plan + payment, documents) while it loads. */
+const BillingSkeleton: React.FC = () => (
+  <div className="cb-stack" role="status" aria-label="Loading billing">
+    <div className="cb-stats">
+      {[0, 1, 2, 3].map((i) => (
+        <StatCard
+          key={i}
+          label={<Skeleton width={80} height={12} />}
+          value={<Skeleton width={110} height={24} />}
+          hint={<Skeleton width={130} height={10} />}
+        />
+      ))}
+    </div>
+
+    <div className="cb-grid-8-4">
+      <Card title={<Skeleton width={100} height={16} />} subtitle={<Skeleton width={220} height={12} />}>
+        <div className="cb-skeleton-stack">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="cb-skeleton-row">
+              <div className="cb-skeleton-stack">
+                <Skeleton width={160} height={14} />
+                <Skeleton width={100} height={10} />
+              </div>
+              <Skeleton width={72} height={20} round />
+            </div>
+          ))}
+        </div>
+      </Card>
+      <Card title={<Skeleton width={80} height={16} />}>
+        <div className="cb-skeleton-stack">
+          <Skeleton width={140} height={28} />
+          <Skeleton width={90} height={12} />
+          <Skeleton height={36} />
+        </div>
+      </Card>
+    </div>
+
+    <Card title={<Skeleton width={170} height={16} />}>
+      <div className="cb-skeleton-stack">
+        {[0, 1, 2, 3].map((i) => (
+          <div key={i} className="cb-skeleton-row">
+            <Skeleton width="30%" height={14} />
+            <Skeleton width="20%" height={14} />
+            <Skeleton width={72} height={20} round />
+          </div>
+        ))}
+      </div>
+    </Card>
+  </div>
+)
 
 const InvoicesTable: React.FC = () => {
   const { data = [], isLoading } = useBillingInvoices()

@@ -323,36 +323,6 @@ function App() {
             }
           />
 
-          {/* Onboarding (authenticated, has session, but needs onboarding) */}
-          <Route
-            path="/onboarding"
-            element={
-              !isAuthenticated ? (
-                <Navigate to="/" replace />
-              ) : isPortalUser ? (
-                <Navigate to="/portal" replace />
-              ) : !hasSession ? (
-                <Navigate to="/select-session" replace />
-              ) : (
-                <OnboardingPage />
-              )
-            }
-          />
-          <Route
-            path="/onboarding/validation"
-            element={
-              !isAuthenticated ? (
-                <Navigate to="/" replace />
-              ) : isPortalUser ? (
-                <Navigate to="/portal" replace />
-              ) : !hasSession ? (
-                <Navigate to="/select-session" replace />
-              ) : (
-                <ValidationReportPage />
-              )
-            }
-          />
-
           {/* Protected Routes */}
           <Route path="/" element={<ProtectedRoute />}>
             <Route
@@ -368,6 +338,8 @@ function App() {
               }
             >
               <Route path="dashboard" element={<Dashboard />} />
+              <Route path="onboarding" element={<OnboardingPage />} />
+              <Route path="onboarding/validation" element={<ValidationReportPage />} />
               <Route path="home" element={<Home />} />
               <Route path="school-hub" element={<Navigate to="/home" replace />} />
               <Route path="staff" element={<Staff />} />

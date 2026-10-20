@@ -21,16 +21,16 @@ const demoRequestSchema = new mongoose.Schema({
   status: {
     type: String,
     enum: DEMO_REQUEST_STATUSES,
-    default: 'new',
+    default: 'new'
   },
   notes: { type: String, trim: true, default: '' },
   statusUpdatedAt: { type: Date, default: null },
   statusUpdatedBy: { type: String, default: null },
   source: { type: String, trim: true, default: 'website' },
   createdIp: { type: String, default: null },
-  createdUserAgent: { type: String, default: null },
+  createdUserAgent: { type: String, default: null }
 }, {
-  timestamps: true,
+  timestamps: true
 });
 
 demoRequestSchema.index({ status: 1, createdAt: -1 });
@@ -50,5 +50,5 @@ module.exports = {
   demoRequestSchema,
   getDemoRequestModel,
   DEMO_REQUEST_STATUSES,
-  MODEL_NAME,
+  MODEL_NAME
 };

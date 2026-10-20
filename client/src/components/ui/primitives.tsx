@@ -63,6 +63,19 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
   )
 })
 
+/**
+ * Shimmering placeholder for content that is still loading. Size it to the text or block it
+ * stands in for; stack several to sketch the shape of the real screen.
+ */
+export const Skeleton: React.FC<{
+  width?: number | string
+  height?: number | string
+  round?: boolean
+  className?: string
+}> = ({ width = '100%', height = 12, round, className }) => (
+  <span className={cx('cb-skeleton', round && 'cb-skeleton--round', className)} style={{ width, height }} aria-hidden="true" />
+)
+
 /** A short status label. The word always says what the colour means. */
 export const Badge: React.FC<{
   tone?: Tone | 'accent'

@@ -57,7 +57,7 @@ const samples = {
     preferredTime: 'Weekday afternoons',
     message: 'We are moving off spreadsheets before the new session. Fee collection is our biggest pain.',
     time: '19 Oct 2026, 10:42 am IST',
-    adminUrl: 'https://admin.capabble.cloud/#/demo-requests'
+    adminUrl: 'https://admin.capabble.cloud/demo-requests'
   }),
   'demo-request-received': () => templates.demoRequestReceived({ name: 'Anita Sharma', institution: SCHOOL }),
   'appointment-confirmed': () => templates.appointmentUpdate({

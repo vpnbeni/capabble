@@ -11,6 +11,7 @@ import { FeaturesPage } from './pages/FeaturesPage'
 import { SchoolDirectoryPage } from './pages/SchoolDirectoryPage'
 import { RemunerationPage } from './pages/RemunerationPage'
 import { PackingDispatchPage } from './pages/PackingDispatchPage'
+import { DemoRequestsPage } from './pages/DemoRequestsPage'
 import { platformAuthApi } from './services/platformApi'
 import type { PlatformAdmin } from './types/platform'
 import LoginScreen from './components/LoginScreen'
@@ -28,6 +29,7 @@ import {
   IndianRupee,
   LogOut,
   MenuIcon,
+  MessageSquare,
   Package,
   RefreshCw,
   School,
@@ -173,6 +175,12 @@ function App() {
         ],
       },
       {
+        label: 'Sales',
+        items: [
+          { label: 'Demo requests', icon: MessageSquare, path: '/demo-requests', matcher: (path: string) => path === '/demo-requests' },
+        ],
+      },
+      {
         label: 'Exam master data',
         collapsible: true,
         items: [
@@ -240,6 +248,10 @@ function App() {
 
     if (currentPath === '/billing/catalog') {
       return <BillingCatalogPage />
+    }
+
+    if (currentPath === '/demo-requests') {
+      return <DemoRequestsPage />
     }
 
     if (currentPath === '/school-directory') {

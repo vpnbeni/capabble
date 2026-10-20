@@ -146,6 +146,8 @@ const MODULE_PATH_ROOTS: Array<[prefix: string, module: string]> = [
   ['/cpitl', 'cpitl'],
   ['/trnst', 'trnst'],
   ['/exmcl', 'exmcl'],
+  // Exam centre setup (importing candidates, Form 66, attendance sheets)
+  ['/onboarding', 'cntr'],
 ]
 
 export const getModuleForPath = (pathname: string): string | null => {

@@ -23,6 +23,11 @@ const TONES: Record<string, Tone> = {
   grandfathered: 'info',
   open: 'info',
   partial_failure: 'warning',
+  // Demo requests: new needs a look, contacted and scheduled are in progress.
+  new: 'warning',
+  contacted: 'info',
+  scheduled: 'info',
+  closed: 'neutral',
   past_due_grace: 'warning',
   overdue: 'danger',
   suspended: 'danger',

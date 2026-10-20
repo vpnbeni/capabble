@@ -1,0 +1,450 @@
+/* Request a demo page. Sits inside .cb-doc (DocShell), so it uses the doc tokens. */
+
+.cb-doc[data-page="demo"] {
+  background: var(--bg);
+  --danger-ink: #B42318;
+  --danger-soft: #FEF3F2;
+  --success-ink: #047857;
+  --success-soft: #ECFDF5;
+}
+.dark .cb-doc[data-page="demo"] {
+  --danger-ink: #FDA29B;
+  --danger-soft: #3A1512;
+  --success-ink: #6EE7B7;
+  --success-soft: #0B2E24;
+}
+
+.cb-demo {
+  padding: clamp(32px, 6vw, 64px) 0 72px;
+}
+.cb-demo-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 40px;
+  align-items: start;
+}
+@media (min-width: 1000px) {
+  .cb-demo-grid {
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+    gap: 56px;
+  }
+  .cb-demo-aside {
+    position: sticky;
+    top: 24px;
+  }
+}
+
+/* ---------- Left column ---------- */
+
+.cb-demo-aside {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.cb-demo-eyebrow {
+  margin: 0;
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent-strong);
+}
+.cb-demo-intro {
+  margin: 0;
+  max-width: 520px;
+  font-size: 17px;
+  line-height: 26px;
+  color: var(--ink-muted);
+}
+.cb-demo-photo {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 3 / 2;
+  object-fit: cover;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+}
+@media (max-width: 640px) {
+  /* The phone photo (request-demo-mobile.jpg) is portrait. */
+  picture .cb-demo-photo { aspect-ratio: 4 / 5; }
+}
+.cb-demo-photo-ph {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent-strong);
+  background:
+    radial-gradient(circle at 30% 20%, var(--accent-soft), transparent 60%),
+    repeating-linear-gradient(135deg, var(--border) 0 1px, transparent 1px 22px),
+    var(--surface);
+}
+.cb-demo-steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.cb-demo-steps li {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+.cb-demo-steps li > span:last-child {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 15px;
+  line-height: 22px;
+  color: var(--ink-muted);
+}
+.cb-demo-steps strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+.cb-demo-step-n {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 9999px;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  font-size: 14px;
+  font-weight: 700;
+}
+.cb-demo-contact {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+.cb-demo-contact p {
+  margin: 0 0 4px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.cb-demo-meta {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 4px 0;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--ink-muted);
+}
+.cb-demo-meta svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+
+/* ---------- Form card ---------- */
+
+.cb-demo-card {
+  padding: clamp(20px, 3.5vw, 36px);
+}
+.cb-demo-h2 {
+  margin: 0;
+  font-size: 24px;
+  line-height: 30px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+.cb-demo-sub {
+  margin: 6px 0 0;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--ink-muted);
+}
+.cb-demo-alert {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin-top: 20px;
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--danger-soft);
+  color: var(--danger-ink);
+  font-size: 14px;
+  line-height: 20px;
+}
+.cb-demo-alert svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+.cb-demo-alert a {
+  color: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+}
+.cb-demo fieldset {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+.cb-demo .cb-demo-group {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+.cb-demo-fields,
+.cb-demo-module-group:first-of-type {
+  clear: both;
+}
+.cb-demo-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+@media (max-width: 560px) {
+  .cb-demo-fields { grid-template-columns: minmax(0, 1fr); }
+}
+/* Floated so the legend sits inside the group, below its top border. */
+.cb-demo-legend {
+  float: left;
+  width: 100%;
+  margin-bottom: 14px;
+  padding: 0;
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+.cb-demo-legend span {
+  margin-left: 8px;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--ink-muted);
+}
+.cb-demo-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.cb-demo-field[data-wide] {
+  grid-column: 1 / -1;
+}
+form > .cb-demo-field {
+  margin-top: 24px;
+}
+.cb-demo-field label {
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.cb-demo-field label span {
+  color: var(--danger-ink);
+}
+.cb-demo-field input,
+.cb-demo-field select,
+.cb-demo-field textarea {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 15px;
+  line-height: 22px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.cb-demo-field textarea {
+  resize: vertical;
+  min-height: 104px;
+}
+.cb-demo-field input::placeholder,
+.cb-demo-field textarea::placeholder {
+  color: var(--ink-muted);
+  opacity: 0.8;
+}
+.cb-demo-field input:focus,
+.cb-demo-field select:focus,
+.cb-demo-field textarea:focus {
+  outline: none;
+  border-color: var(--focus-ring);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.cb-demo-field[data-invalid] input {
+  border-color: var(--danger-ink);
+}
+.cb-demo-error {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--danger-ink);
+}
+
+/* Modules */
+.cb-demo-modules .cb-demo-module-group + .cb-demo-module-group {
+  margin-top: 14px;
+}
+.cb-demo-module-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.cb-demo-module-title {
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink-muted);
+}
+.cb-demo-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.cb-demo-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: 9999px;
+  background: var(--surface);
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 500;
+  color: var(--ink);
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.cb-demo-chip:hover {
+  background: var(--surface-hover);
+}
+.cb-demo-chip[data-on] {
+  border-color: var(--accent-strong);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  font-weight: 600;
+}
+.cb-demo-chip input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+.cb-demo-chip:has(input:focus-visible) {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* Honeypot: off screen, not display:none, so simple bots still see and fill it. */
+.cb-demo-hp {
+  position: absolute;
+  left: -10000px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+.cb-demo-submit {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 20px;
+  margin-top: 28px;
+}
+.cb-demo-submit p {
+  flex: 1 1 220px;
+  margin: 0;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink-muted);
+}
+
+.cb-doc .cb-demo-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 0 22px;
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+.cb-doc .cb-demo-btn:hover {
+  background: var(--surface-hover);
+  color: var(--ink);
+}
+.cb-doc .cb-demo-btn[data-primary] {
+  border-color: var(--accent-strong);
+  background: var(--accent-strong);
+  color: #fff;
+}
+.cb-doc .cb-demo-btn[data-primary]:hover {
+  border-color: var(--accent-strong-hover);
+  background: var(--accent-strong-hover);
+}
+.dark .cb-doc .cb-demo-btn[data-primary] {
+  color: #051736;
+}
+.cb-doc .cb-demo-btn:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+.cb-doc .cb-demo-btn:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+@media (max-width: 560px) {
+  .cb-demo-submit .cb-demo-btn { width: 100%; }
+}
+
+/* Success */
+.cb-demo-done {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 8px 0;
+}
+.cb-demo-done-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 9999px;
+  background: var(--success-soft);
+  color: var(--success-ink);
+}
+.cb-demo-done h2 {
+  margin: 0;
+  font-size: 24px;
+  line-height: 30px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+.cb-demo-done p {
+  margin: 0 0 8px;
+  max-width: 480px;
+  font-size: 15px;
+  line-height: 24px;
+  color: var(--ink-muted);
+}

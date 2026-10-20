@@ -1,5 +1,5 @@
-import React, { forwardRef, useEffect, useId, useRef } from 'react'
-import { AlertCircle, ChevronDown, type LucideIcon } from 'lucide-react'
+import React, { forwardRef, useEffect, useId, useRef, useState } from 'react'
+import { AlertCircle, ChevronDown, FileText, Upload, type LucideIcon } from 'lucide-react'
 import { cx } from './format'
 import { Icon } from './primitives'
 
@@ -369,5 +369,100 @@ export const RadioGroup: React.FC<RadioGroupProps> = ({
       </div>
       {hint ? <div className="cb-field__hint">{hint}</div> : null}
     </fieldset>
+  )
+}
+
+const formatFileSize = (bytes: number) => {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+export interface FileFieldProps extends FieldChrome {
+  file: File | null
+  onChange: (file: File | null) => void
+  /** Same as the input's accept, e.g. ".pdf" */
+  accept?: string
+  /** What to pick, shown when nothing is chosen: "Choose the Class 10 candidate list (PDF)" */
+  placeholder?: string
+  disabled?: boolean
+  id?: string
+}
+
+/**
+ * One file to upload: a drop zone that shows the chosen file's name and size, with a button
+ * to choose or replace it. Every field has a visible label.
+ */
+export const FileField: React.FC<FileFieldProps> = ({
+  label,
+  hint,
+  error,
+  required,
+  className,
+  file,
+  onChange,
+  accept,
+  placeholder = 'Drop a file here or choose one',
+  disabled,
+  id,
+}) => {
+  const autoId = useId()
+  const fieldId = id || autoId
+  const inputRef = useRef<HTMLInputElement>(null)
+  const [dragging, setDragging] = useState(false)
+
+  const pick = (list: FileList | null) => {
+    const next = list?.[0]
+    if (next) onChange(next)
+  }
+
+  return (
+    <Field id={fieldId} label={label} hint={hint} error={error} required={required} className={className}>
+      <div
+        className={cx('cb-file', file && 'has-file', dragging && 'is-dragging', disabled && 'is-disabled')}
+        onDragOver={(event) => { if (disabled) return; event.preventDefault(); setDragging(true) }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={(event) => {
+          event.preventDefault()
+          setDragging(false)
+          if (!disabled) pick(event.dataTransfer.files)
+        }}
+      >
+        <Icon icon={file ? FileText : Upload} size={20} className="cb-file__icon" />
+        <div className="cb-file__body">
+          {file ? (
+            <>
+              <span className="cb-file__name">{file.name}</span>
+              <span className="cb-file__meta">{formatFileSize(file.size)}</span>
+            </>
+          ) : (
+            <span className="cb-file__placeholder">{placeholder}</span>
+          )}
+        </div>
+        <button
+          type="button"
+          className="cb-btn cb-btn--secondary cb-btn--sm"
+          disabled={disabled}
+          onClick={() => inputRef.current?.click()}
+        >
+          {file ? 'Replace' : 'Choose file'}
+        </button>
+        <input
+          ref={inputRef}
+          id={fieldId}
+          type="file"
+          accept={accept}
+          disabled={disabled}
+          required={required}
+          className="cb-visually-hidden"
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error || hint ? `${fieldId}-hint` : undefined}
+          onChange={(event) => {
+            pick(event.target.files)
+            event.target.value = ''
+          }}
+        />
+      </div>
+    </Field>
   )
 }
