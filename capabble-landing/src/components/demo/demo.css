@@ -195,8 +195,7 @@
   padding-top: 20px;
   border-top: 1px solid var(--border);
 }
-.cb-demo-fields,
-.cb-demo-module-group:first-of-type {
+.cb-demo-fields {
   clear: both;
 }
 .cb-demo-fields {
@@ -343,6 +342,19 @@ form > .cb-demo-field {
   height: 1px;
 }
 .cb-demo-chip:has(input:focus-visible) {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.cb-demo-all {
+  clear: both;
+  margin-bottom: 16px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--accent-strong);
+}
+.cb-demo-all:focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }

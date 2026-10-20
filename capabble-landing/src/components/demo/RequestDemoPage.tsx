@@ -78,6 +78,9 @@ export function RequestDemoPage({ modules, photo, contact }: Props) {
   const toggleModule = (name: string) =>
     setPicked((list) => (list.includes(name) ? list.filter((n) => n !== name) : [...list, name]));
 
+  const allModules = modules.flatMap((g) => g.names);
+  const allPicked = picked.length === allModules.length;
+
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (status === "sending") return;
@@ -249,6 +252,15 @@ export function RequestDemoPage({ modules, photo, contact }: Props) {
                 <legend className="cb-demo-legend">
                   Modules you want to see <span>Optional. Pick any.</span>
                 </legend>
+                <button
+                  type="button"
+                  className="cb-demo-chip cb-demo-all"
+                  data-on={allPicked ? "" : undefined}
+                  aria-pressed={allPicked}
+                  onClick={() => setPicked(allPicked ? [] : allModules)}
+                >
+                  {allPicked ? "Clear all" : `Select all ${allModules.length} modules`}
+                </button>
                 {modules.map((g) => (
                   <div key={g.title} className="cb-demo-module-group">
                     <span className="cb-demo-module-title">{g.title}</span>
