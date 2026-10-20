@@ -22,6 +22,7 @@
     "migrate:oasis-id": "node scripts/migrations/migrate-teacher-oasis-id.js",
     "billing:grandfather": "node scripts/tenants/grandfather-billing.js",
     "billing:invite-legacy-trials": "node scripts/billing/invite-legacy-trials.js",
+    "billing:launch-pricing": "node scripts/billing/set-launch-pricing.js",
     "mail:preview": "node scripts/mail/preview.js",
     "mail:test": "node scripts/mail/test-send.js",
     "test": "jest --watchAll --verbose",

@@ -45,6 +45,21 @@ const samples = {
     source: 'Public signup',
     time: '19 Oct 2026, 10:42 am IST'
   }),
+  'demo-request-alert': () => templates.demoRequestAlert({
+    name: 'Anita Sharma',
+    institution: SCHOOL,
+    role: 'Principal',
+    email: 'principal@redrose.edu.in',
+    phone: '+91 98123 45678',
+    location: 'Rohtak, Haryana',
+    studentCount: '500–1,000',
+    modules: ['Student Management', 'Capital & Finance', 'Timetable Management'],
+    preferredTime: 'Weekday afternoons',
+    message: 'We are moving off spreadsheets before the new session. Fee collection is our biggest pain.',
+    time: '19 Oct 2026, 10:42 am IST',
+    adminUrl: 'https://admin.capabble.cloud/#/demo-requests'
+  }),
+  'demo-request-received': () => templates.demoRequestReceived({ name: 'Anita Sharma', institution: SCHOOL }),
   'appointment-confirmed': () => templates.appointmentUpdate({
     schoolName: SCHOOL,
     subject: 'Meeting confirmed: APT-0142',

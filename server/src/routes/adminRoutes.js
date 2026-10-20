@@ -37,8 +37,12 @@ const {
   masterRemunerationUpdateSchema,
   masterPackingDispatchUpdateSchema,
   schoolDirectoryTypeSettingsSchema,
-  schoolDirectoryManualTypeSchema
+  schoolDirectoryManualTypeSchema,
+  publicDemoRequestSchema,
+  demoRequestQuerySchema,
+  demoRequestUpdateSchema
 } = require('../validations/adminValidation');
+const demoRequestController = require('../controllers/admin/demoRequestController');
 const masterSubjectsController = require('../controllers/admin/masterSubjectsController');
 const masterDatesheetController = require('../controllers/admin/masterDatesheetController');
 const masterGuidelinesController = require('../controllers/admin/masterGuidelinesController');
@@ -113,6 +117,18 @@ const publicTenantResolveLimiter = rateLimit({
   }
 });
 
+const publicDemoRequestLimiter = rateLimit({
+  windowMs: parsePositiveInt(process.env.PUBLIC_DEMO_REQUEST_RATE_LIMIT_WINDOW_MS, 60 * 60 * 1000),
+  max: parsePositiveInt(process.env.PUBLIC_DEMO_REQUEST_RATE_LIMIT_MAX, 5),
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    message: 'Too many demo requests from this network. Please try again later or email info@capabble.cloud.',
+    errorCode: 'rate_limit_exceeded'
+  }
+});
+
 router.post('/auth/login', validateJoi(platformLoginSchema), loginPlatformAdmin);
 router.post(
   '/public/auth/resolve-tenant',
@@ -145,6 +161,13 @@ router.post(
   exchangePublicTenantSignup
 );
 
+router.post(
+  '/public/demo-requests',
+  publicDemoRequestLimiter,
+  validateJoi(publicDemoRequestSchema),
+  demoRequestController.createDemoRequest
+);
+
 router.use(auth.protectPlatform);
 
 router.get('/auth/me', getPlatformMe);
@@ -166,6 +189,15 @@ router.delete(
   validateParams(tenantIdParamSchema),
   validateJoi(deleteTenantSchema),
   deleteTenant
+);
+
+// Demo requests (leads from capabble.cloud/request-demo)
+router.get('/demo-requests', validateQuery(demoRequestQuerySchema), demoRequestController.listDemoRequests);
+router.patch(
+  '/demo-requests/:id',
+  validateParams(tenantIdParamSchema),
+  validateJoi(demoRequestUpdateSchema),
+  demoRequestController.updateDemoRequest
 );
 
 // Tenant feature toggle routes

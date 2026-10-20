@@ -132,6 +132,39 @@ const schoolDirectoryManualTypeSchema = Joi.object({
   type: Joi.string().valid('Govt.', 'Private').required(),
 });
 
+const DEMO_REQUEST_STATUS_VALUES = ['new', 'contacted', 'scheduled', 'closed'];
+const demoText = (max) => Joi.string().trim().max(max).allow('').default('');
+
+// Public "Request a demo" form. `website` is a honeypot: people never see it, bots fill it in.
+const publicDemoRequestSchema = Joi.object({
+  name: Joi.string().trim().min(2).max(120).required(),
+  institution: Joi.string().trim().min(2).max(200).required(),
+  role: demoText(80),
+  email: Joi.string().trim().email().max(200).required(),
+  phone: Joi.string().trim().pattern(/^[+()\-\s0-9]{7,20}$/).required().messages({
+    'string.pattern.base': 'Enter a valid phone number',
+  }),
+  city: demoText(80),
+  state: demoText(80),
+  studentCount: demoText(40),
+  modules: Joi.array().items(Joi.string().trim().min(1).max(80)).max(30).default([]),
+  preferredTime: demoText(120),
+  message: demoText(2000),
+  website: Joi.string().allow('').max(500).default(''),
+});
+
+const demoRequestQuerySchema = Joi.object({
+  status: Joi.string().valid(...DEMO_REQUEST_STATUS_VALUES).optional(),
+  search: Joi.string().trim().max(120).allow('').optional(),
+  page: Joi.number().integer().min(1).default(1),
+  limit: Joi.number().integer().min(1).max(100).default(25),
+});
+
+const demoRequestUpdateSchema = Joi.object({
+  status: Joi.string().valid(...DEMO_REQUEST_STATUS_VALUES).optional(),
+  notes: Joi.string().trim().max(4000).allow('').optional(),
+}).min(1);
+
 module.exports = {
   platformLoginSchema,
   createTenantSchema,
@@ -149,4 +182,7 @@ module.exports = {
   masterPackingDispatchUpdateSchema,
   schoolDirectoryTypeSettingsSchema,
   schoolDirectoryManualTypeSchema,
+  publicDemoRequestSchema,
+  demoRequestQuerySchema,
+  demoRequestUpdateSchema,
 };

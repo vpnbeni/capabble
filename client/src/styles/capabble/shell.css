@@ -115,10 +115,43 @@
 .cb-app .cb-menu__item.is-current .cb-shellnav__modulename strong { color: var(--accent-soft-ink); }
 .cb-app .cb-shellnav__modules { right: auto; min-width: max(100%, 300px); }
 
-/* School card and account menu at the bottom keep their original look. */
+/* School card and account menu at the bottom: system tokens, softer corners than the kit menu. */
 .cb-app.cb-shellnav { display: flex; flex-direction: column; border-right: 1px solid var(--border); }
 .cb-app.cb-shellnav .cb-sidenav { flex: 1 1 auto; min-height: 0; height: auto; border-right: 0; }
 .cb-app .cb-shellnav__legacyfoot { position: relative; flex: none; font-size: 16px; line-height: 24px; }
+.cb-app .cb-shellnav__schoolfoot { padding: var(--space-3); border-top: 1px solid var(--border); background: var(--surface); }
+.cb-app .cb-shellnav__schoolfoot.is-collapsed { display: flex; justify-content: center; padding: var(--space-3) var(--space-2); }
+.cb-app .cb-shellnav__schoolbtn { display: flex; align-items: center; gap: 10px; width: 100%; padding: var(--space-2); border: 1px solid transparent; border-radius: 12px; background: none; color: var(--ink); cursor: pointer; text-align: left; transition: background-color .15s, border-color .15s; }
+.cb-app .cb-shellnav__schoolbtn:hover, .cb-app .cb-shellnav__schoolbtn.is-open { background: var(--surface-hover); border-color: var(--border); }
+.cb-app .cb-shellnav__schoolbtn.is-brand:hover { filter: brightness(1.03); }
+.cb-app .cb-shellnav__schoolbtn:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.cb-app .cb-shellnav__schoolfoot.is-collapsed .cb-shellnav__schoolbtn { justify-content: center; width: auto; padding: 0; }
+.cb-app .cb-shellnav__schoolchev { flex: none; color: var(--ink-subtle); }
+.cb-app .cb-shellnav__schooltext { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.cb-app .cb-shellnav__schoolname { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 600 14px/20px var(--font-sans); color: var(--ink); }
+.cb-app .cb-shellnav__schoolcode { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 400 12px/16px var(--font-sans); color: var(--ink-subtle); font-variant-numeric: tabular-nums; }
+
+/* School logo, or the first letter on the Capabble accent. */
+.cb-app .cb-shellnav__schoollogo { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 40px; height: 40px; overflow: hidden; border-radius: 12px; background: var(--surface); border: 1px solid var(--border); }
+.cb-app .cb-shellnav__schoollogo img { width: 100%; height: 100%; object-fit: contain; padding: 2px; }
+.cb-app .cb-shellnav__schoollogo.is-on-brand { border-color: transparent; background: var(--surface-raised); }
+.cb-app .cb-shellnav__schoollogo.is-initial { background: var(--accent-strong); border-color: transparent; color: var(--on-accent); font: 600 16px/1 var(--font-sans); }
+
+.cb-app .cb-shellnav__schoolmenu { position: absolute; left: 0; right: 0; bottom: calc(100% + var(--space-2)); z-index: 60; min-width: 256px; background: var(--surface-raised); border: 1px solid var(--border); border-radius: 16px; box-shadow: var(--shadow-overlay); overflow: hidden; transform-origin: bottom left; }
+.cb-app .cb-shellnav__schoolmenu.is-flyout { left: calc(100% + var(--space-4)); right: auto; bottom: 0; width: 272px; }
+.cb-app .cb-shellnav__schoolhead { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-4); border-bottom: 1px solid var(--border); }
+.cb-app .cb-shellnav__schoolitems { display: flex; flex-direction: column; gap: 2px; padding: var(--space-2); }
+.cb-app .cb-shellnav__schoolsection { border-top: 1px solid var(--border); }
+.cb-app .cb-shellnav__schoolmenu > .cb-shellnav__schoolsection:not(.cb-shellnav__schoolitems) { padding: var(--space-3) var(--space-4) var(--space-4); }
+.cb-app .cb-shellnav__schoolitem { display: flex; align-items: center; gap: 10px; width: 100%; height: 36px; padding: 0 10px; border: 0; border-radius: 10px; background: none; color: var(--ink); font: 400 14px/20px var(--font-sans); text-align: left; text-decoration: none; cursor: pointer; white-space: nowrap; }
+.cb-app .cb-shellnav__schoolitem svg { flex: none; color: var(--ink-muted); }
+.cb-app .cb-shellnav__schoolitem:hover { background: var(--surface-hover); }
+.cb-app .cb-shellnav__schoolitem:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--focus-ring); }
+.cb-app .cb-shellnav__schoolitem.is-current { background: var(--accent-soft); color: var(--accent-soft-ink); font-weight: 500; }
+.cb-app .cb-shellnav__schoolitem.is-current svg { color: var(--accent-soft-ink); }
+.cb-app .cb-shellnav__schoolitem.is-danger, .cb-app .cb-shellnav__schoolitem.is-danger svg { color: var(--danger-ink); }
+.cb-app .cb-shellnav__schoolitem.is-danger:hover { background: var(--danger-soft); }
+.cb-app .cb-shellnav__schoolpill { margin-left: auto; padding: 0 var(--space-2); border-radius: var(--radius-sm); background: var(--accent-soft); color: var(--accent-soft-ink); font: 500 12px/20px var(--font-sans); font-variant-numeric: tabular-nums; }
 
 /* School OS (Home) link above the module switcher. */
 .cb-app .cb-shellnav__homewrap { display: flex; align-items: center; gap: var(--space-1); padding-bottom: var(--space-3); border-bottom: 1px solid var(--border); }

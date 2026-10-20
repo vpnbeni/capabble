@@ -88,6 +88,45 @@ const newSchoolAlert = ({ tenantName, tenantSlug, adminEmail, source, time }) =>
   footnote: 'You’re getting this because your address is in ADMIN_EMAILS on the Capabble server.'
 });
 
+/** Tells the Capabble team someone asked for a demo on capabble.cloud (DEMO_LEAD_NOTIFY_EMAIL). */
+const demoRequestAlert = ({
+  name, institution, role, email, phone, location, studentCount, modules, preferredTime, message, time, adminUrl
+}) => renderEmail({
+  subject: `Demo request: ${institution}`,
+  preheader: `${name} from ${institution} asked for a demo.`,
+  context: 'Capabble team',
+  heading: 'New demo request',
+  intro: [[{ strong: name }, ' from ', { strong: institution }, ' asked for a demo on capabble.cloud. Reply to this email to write to them.']],
+  details: [
+    ['Name', name],
+    ['Institution', institution],
+    ['Role', role || '—'],
+    ['Email', email],
+    ['Phone', phone],
+    ['City / state', location || '—'],
+    ['Students', studentCount || '—'],
+    ['Modules', modules && modules.length ? modules.join(', ') : '—'],
+    ['Preferred time', preferredTime || '—'],
+    ['Received', time]
+  ],
+  outro: message ? [[{ strong: 'Message: ' }, message]] : [],
+  button: adminUrl ? { label: 'Open demo requests', url: adminUrl } : undefined,
+  footnote: 'You’re getting this because your address is in DEMO_LEAD_NOTIFY_EMAIL on the Capabble server.'
+});
+
+/** Confirms to the person who asked for a demo that we have their request. */
+const demoRequestReceived = ({ name, institution }) => renderEmail({
+  subject: 'We have your Capabble demo request',
+  preheader: 'Someone from our team will call or email you within one working day.',
+  heading: name ? `Thanks, ${name}` : 'Thanks for your interest',
+  intro: [
+    ['We have your request for a Capabble demo', institution ? [' for ', { strong: institution }] : [], '.'].flat(),
+    'Someone from our team will call or email you within one working day to fix a time that suits you.'
+  ],
+  outro: ['If you want to add anything before then, reply to this email.'],
+  footnote: 'You’re getting this because this email was used to request a demo on capabble.cloud. If it wasn’t you, ignore this email.'
+});
+
 /* ---------- Appointments ---------- */
 
 /** Meeting updates for visitors and hosts. */
@@ -437,6 +476,8 @@ module.exports = {
   emailVerificationCode,
   loginInvite,
   newSchoolAlert,
+  demoRequestAlert,
+  demoRequestReceived,
   appointmentUpdate,
   invoiceEmail,
   paymentReceived,

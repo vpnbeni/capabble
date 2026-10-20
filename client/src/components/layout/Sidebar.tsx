@@ -10,11 +10,18 @@ import { usePermissions } from '@/hooks/usePermissions'
 import { deskTitle } from '@/utils/deskTitle'
 import { MODULE_REGISTRY, type ModuleId } from '../../constants/moduleRegistry'
 import {
+  CalendarRange,
   Check,
   ChevronRight,
   ChevronsUpDown,
+  CreditCard,
+  LifeBuoy,
+  LogOut,
   PartyPopper,
+  Settings,
   SlidersHorizontal,
+  UserRound,
+  UsersRound,
 } from 'lucide-react'
 import { navIconFor } from './navIcons'
 import ThemeSwitch from '../common/ThemeSwitch'
@@ -129,33 +136,17 @@ const Sidebar: React.FC<SidebarProps> = ({
   const logoBrandTheme = useLogoBrandTheme(schoolLogoUrl)
   const hasLogoBrandMenu = Boolean(logoBrandTheme && schoolLogoUrl)
   const footerFallbackInitial = (schoolDisplayName || currentUser?.email || 'A').charAt(0).toUpperCase()
-  const renderSchoolLogoAvatar = (
-    sizeClass = 'w-10 h-10',
-    roundedClass = 'rounded-xl',
-    onBrandBackground = false
-  ) => {
-    if (schoolLogoUrl) {
-      return (
-        <div
-          className={`${sizeClass} flex-shrink-0 overflow-hidden ${roundedClass} ${
-            onBrandBackground
-              ? 'bg-white/95 shadow-sm ring-1 ring-white/70'
-              : 'bg-white shadow-md ring-1 ring-black/5'
-          }`}
-        >
-          <img src={schoolLogoUrl} alt="School logo" className="h-full w-full object-contain p-0.5" />
-        </div>
-      )
-    }
-
-    return (
-      <div
-        className={`${sizeClass} flex-shrink-0 ${roundedClass} flex items-center justify-center shadow-md transition-all bg-gradient-to-br from-primary-500 to-indigo-600 shadow-primary-500/10 ring-2 ring-white dark:ring-secondary-800 group-hover:ring-primary-100 dark:group-hover:ring-primary-900/30`}
-      >
-        <span className="text-sm font-bold text-white">{footerFallbackInitial}</span>
-      </div>
+  // School logo when uploaded, otherwise the first letter on the Capabble accent.
+  const renderSchoolLogoAvatar = (onBrandBackground = false) =>
+    schoolLogoUrl ? (
+      <span className={`cb-shellnav__schoollogo${onBrandBackground ? ' is-on-brand' : ''}`}>
+        <img src={schoolLogoUrl} alt="School logo" />
+      </span>
+    ) : (
+      <span className="cb-shellnav__schoollogo is-initial" aria-hidden>
+        {footerFallbackInitial}
+      </span>
     )
-  }
 
 
   const accessibleModules = useMemo(
@@ -1873,7 +1864,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             {renderIcon(homeTitle, '/home', null)}
             {!isCollapsed ? <span className="cb-navitem__label truncate">{homeTitle}</span> : null}
           </NavLink>
-          {location.pathname === '/home' ? (
+          {location.pathname === '/home' && !isCollapsed ? (
             <button
               type="button"
               className="cb-shellnav__customize"
@@ -2002,19 +1993,17 @@ const Sidebar: React.FC<SidebarProps> = ({
       </nav>
 
       <div ref={accountMenuRef} className="cb-shellnav__legacyfoot">
-      {/* Account at bottom - fixed */}
-      <div className={`flex-shrink-0 backdrop-blur-sm border-t border-secondary-100 dark:border-secondary-800 bg-white/50 dark:bg-secondary-900/50 ${
-        isCollapsed ? 'px-2 py-3 flex justify-center' : 'p-[0.8rem]'
-      }`}>
+      {/* School account at the bottom */}
+      <div className={`cb-shellnav__schoolfoot${isCollapsed ? ' is-collapsed' : ''}`}>
         <div className="relative w-full">
           <button
+            type="button"
             onClick={() => setAccountDropdownOpen(!accountDropdownOpen)}
-            className={`w-full flex items-center rounded-xl transition-all duration-200 group outline-none ${
-              isCollapsed
-                ? 'justify-center p-0'
-                : hasLogoBrandMenu
-                  ? 'p-2 ring-1 hover:brightness-[1.03]'
-                  : 'p-2 hover:bg-white dark:hover:bg-secondary-800 hover:shadow-sm ring-1 ring-transparent hover:ring-secondary-200 dark:hover:ring-secondary-700'
+            aria-haspopup="menu"
+            aria-expanded={accountDropdownOpen}
+            aria-label={isCollapsed ? `${schoolDisplayName} account menu` : undefined}
+            className={`cb-shellnav__schoolbtn${hasLogoBrandMenu && !isCollapsed ? ' is-brand' : ''}${
+              accountDropdownOpen ? ' is-open' : ''
             }`}
             style={
               hasLogoBrandMenu && !isCollapsed && logoBrandTheme
@@ -2026,45 +2015,31 @@ const Sidebar: React.FC<SidebarProps> = ({
                 : undefined
             }
           >
-            {renderSchoolLogoAvatar('w-10 h-10', 'rounded-xl', hasLogoBrandMenu && !isCollapsed)}
+            {renderSchoolLogoAvatar(hasLogoBrandMenu && !isCollapsed)}
             {!isCollapsed && (
-              <div className="flex-1 min-w-0 text-left ml-2.5">
-                <p
-                  className={`text-sm font-semibold truncate transition-colors ${
-                    hasLogoBrandMenu
-                      ? ''
-                      : 'text-secondary-900 dark:text-white group-hover:text-primary-600 dark:group-hover:text-primary-400'
-                  }`}
+              <span className="cb-shellnav__schooltext">
+                <span
+                  className="cb-shellnav__schoolname"
                   style={hasLogoBrandMenu && logoBrandTheme ? { color: logoBrandTheme.textPrimary } : undefined}
                 >
                   {schoolDisplayName}
-                </p>
-                <p
-                  className={`text-xs truncate ${
-                    hasLogoBrandMenu
-                      ? ''
-                      : 'text-secondary-500 dark:text-secondary-400'
-                  }`}
+                </span>
+                <span
+                  className="cb-shellnav__schoolcode"
                   style={hasLogoBrandMenu && logoBrandTheme ? { color: logoBrandTheme.textMuted } : undefined}
                 >
                   {udiseLine}
-                </p>
-              </div>
+                </span>
+              </span>
             )}
             {!isCollapsed && (
-              <svg
-                className={`w-4 h-4 transition-transform duration-200 ${accountDropdownOpen ? 'rotate-180' : ''} ${
-                  hasLogoBrandMenu
-                    ? ''
-                    : 'text-secondary-400 group-hover:text-secondary-600 dark:text-secondary-500 dark:group-hover:text-secondary-300'
-                }`}
+              <ChevronsUpDown
+                size={16}
+                strokeWidth={1.75}
+                aria-hidden
+                className="cb-shellnav__schoolchev"
                 style={hasLogoBrandMenu && logoBrandTheme ? { color: logoBrandTheme.textMuted } : undefined}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
+              />
             )}
           </button>
 
@@ -2078,165 +2053,86 @@ const Sidebar: React.FC<SidebarProps> = ({
                 aria-hidden="true"
               />
               <div
-                className={`absolute bottom-full left-0 mb-3 w-64 bg-white dark:bg-secondary-900 rounded-2xl border border-secondary-200 dark:border-secondary-700 z-[60] animate-fade-in-up origin-bottom-left ${isCollapsed ? 'left-full ml-4 bottom-0' : ''}`}
+                role="menu"
+                aria-label="Account"
+                className={`cb-shellnav__schoolmenu animate-fade-in-up${isCollapsed ? ' is-flyout' : ''}`}
               >
-                <div
-                  className={`p-4 border-b border-secondary-100 dark:border-secondary-800 rounded-t-2xl ${
-                    hasLogoBrandMenu ? '' : 'bg-secondary-50/50 dark:bg-secondary-800/50'
-                  }`}
-                  style={
-                    hasLogoBrandMenu && logoBrandTheme
-                      ? {
-                          background: `linear-gradient(135deg, ${logoBrandTheme.light} 0%, ${logoBrandTheme.primary} 100%)`,
-                        }
-                      : undefined
-                  }
-                >
-                  <div className="flex items-center space-x-3">
-                    {renderSchoolLogoAvatar('w-10 h-10', 'rounded-lg', hasLogoBrandMenu)}
-                    <div className="min-w-0 flex-1">
-                      <p
-                        className={`text-sm font-semibold truncate ${
-                          hasLogoBrandMenu ? '' : 'text-secondary-900 dark:text-white'
-                        }`}
-                        style={
-                          hasLogoBrandMenu && logoBrandTheme ? { color: logoBrandTheme.textPrimary } : undefined
-                        }
-                      >
-                        {schoolDisplayName}
-                      </p>
-                      <p
-                        className={`text-xs truncate ${
-                          hasLogoBrandMenu ? '' : 'text-secondary-500 dark:text-secondary-400'
-                        }`}
-                        style={
-                          hasLogoBrandMenu && logoBrandTheme ? { color: logoBrandTheme.textMuted } : undefined
-                        }
-                      >
-                        {udiseLine}
-                      </p>
-                      {cbseLine ? (
-                      <p
-                        className={`text-xs truncate ${
-                          hasLogoBrandMenu ? '' : 'text-secondary-500 dark:text-secondary-400'
-                        }`}
-                        style={
-                          hasLogoBrandMenu && logoBrandTheme ? { color: logoBrandTheme.textMuted } : undefined
-                        }
-                      >
-                        {cbseLine}
-                      </p>
-                      ) : null}
-                    </div>
+                <div className="cb-shellnav__schoolhead">
+                  {renderSchoolLogoAvatar()}
+                  <div className="cb-shellnav__schooltext">
+                    <p className="cb-shellnav__schoolname">{schoolDisplayName}</p>
+                    <p className="cb-shellnav__schoolcode">{udiseLine}</p>
+                    {cbseLine ? <p className="cb-shellnav__schoolcode">{cbseLine}</p> : null}
                   </div>
                 </div>
-                <div className="py-2 px-1">
+                <div className="cb-shellnav__schoolitems">
                   {canAccessAccountSettings && (
                     <NavLink
                       to="/account-settings"
-                      className={({ isActive }) =>
-                        `flex items-center px-3 py-2.5 text-sm font-medium rounded-xl transition-colors ${
-                          isActive
-                            ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300'
-                            : 'text-secondary-700 dark:text-secondary-300 hover:bg-secondary-50 dark:hover:bg-secondary-800 hover:text-primary-600 dark:hover:text-primary-400'
-                        }`
-                      }
+                      role="menuitem"
+                      className={({ isActive }) => `cb-shellnav__schoolitem${isActive ? ' is-current' : ''}`}
                     >
-                      <svg className="w-4 h-4 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                      </svg>
-                      Account Settings
+                      <UserRound size={16} strokeWidth={1.75} aria-hidden />
+                      Account settings
                     </NavLink>
                   )}
                   {canManageUsers && (
                     <NavLink
                       to="/settings/users"
-                      className={({ isActive }) =>
-                        `flex items-center px-3 py-2.5 text-sm font-medium rounded-xl transition-colors ${
-                          isActive
-                            ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300'
-                            : 'text-secondary-700 dark:text-secondary-300 hover:bg-secondary-50 dark:hover:bg-secondary-800 hover:text-primary-600 dark:hover:text-primary-400'
-                        }`
-                      }
+                      role="menuitem"
+                      className={({ isActive }) => `cb-shellnav__schoolitem${isActive ? ' is-current' : ''}`}
                     >
-                      <svg className="w-4 h-4 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-                      </svg>
+                      <UsersRound size={16} strokeWidth={1.75} aria-hidden />
                       Users and access
                     </NavLink>
                   )}
                   {canAccessBilling && (
                     <NavLink
                       to="/billing"
-                      className={({ isActive }) =>
-                        `flex items-center px-3 py-2.5 text-sm font-medium rounded-xl transition-colors ${
-                          isActive
-                            ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300'
-                            : 'text-secondary-700 dark:text-secondary-300 hover:bg-secondary-50 dark:hover:bg-secondary-800 hover:text-primary-600 dark:hover:text-primary-400'
-                        }`
-                      }
+                      role="menuitem"
+                      className={({ isActive }) => `cb-shellnav__schoolitem${isActive ? ' is-current' : ''}`}
                     >
-                      <svg className="w-4 h-4 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a5 5 0 00-10 0v2m-2 0h14a1 1 0 011 1v9a1 1 0 01-1 1H5a1 1 0 01-1-1v-9a1 1 0 011-1z" />
-                      </svg>
+                      <CreditCard size={16} strokeWidth={1.75} aria-hidden />
                       Billing
                     </NavLink>
                   )}
-                  <a
-                    href="#"
-                    className="flex items-center px-3 py-2.5 text-sm font-medium text-secondary-700 dark:text-secondary-300 hover:bg-secondary-50 dark:hover:bg-secondary-800 hover:text-primary-600 dark:hover:text-primary-400 rounded-xl transition-colors"
-                  >
-                    <svg className="w-4 h-4 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
+                  <a href="#" role="menuitem" className="cb-shellnav__schoolitem">
+                    <Settings size={16} strokeWidth={1.75} aria-hidden />
                     Preferences
                   </a>
                   <button
                     type="button"
+                    role="menuitem"
                     onClick={() => {
                       setAccountDropdownOpen(false)
                       handleSwitchSession()
                     }}
-                    className="w-full flex items-center px-3 py-2.5 text-sm font-medium text-secondary-700 dark:text-secondary-300 hover:bg-secondary-50 dark:hover:bg-secondary-800 hover:text-primary-600 dark:hover:text-primary-400 rounded-xl transition-colors"
+                    className="cb-shellnav__schoolitem"
                   >
-                    <svg className="w-4 h-4 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                    <span className="truncate">Switch Session</span>
-                    {currentSession && (
-                      <span className="ml-auto text-[10px] font-semibold px-2 py-0.5 rounded-full bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300">
-                        {currentSession}
-                      </span>
-                    )}
+                    <CalendarRange size={16} strokeWidth={1.75} aria-hidden />
+                    <span className="truncate">Switch session</span>
+                    {currentSession && <span className="cb-shellnav__schoolpill">{currentSession}</span>}
                   </button>
                   {canAccessHelpSupport && (
                     <NavLink
                       to="/help-support"
-                      className={({ isActive }) =>
-                        `flex items-center px-3 py-2.5 text-sm font-medium rounded-xl transition-colors ${
-                          isActive
-                            ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300'
-                            : 'text-secondary-700 dark:text-secondary-300 hover:bg-secondary-50 dark:hover:bg-secondary-800 hover:text-primary-600 dark:hover:text-primary-400'
-                        }`
-                      }
+                      role="menuitem"
+                      className={({ isActive }) => `cb-shellnav__schoolitem${isActive ? ' is-current' : ''}`}
                     >
-                      <svg className="w-4 h-4 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      Help & Support
+                      <LifeBuoy size={16} strokeWidth={1.75} aria-hidden />
+                      Help and support
                     </NavLink>
                   )}
                 </div>
-                <ThemeSwitch className="px-3 pt-2 pb-3 border-t border-secondary-100 dark:border-secondary-800" />
-                <div className="p-1 border-t border-secondary-100 dark:border-secondary-800">
+                <ThemeSwitch className="cb-shellnav__schoolsection" />
+                <div className="cb-shellnav__schoolitems cb-shellnav__schoolsection">
                   <button
+                    type="button"
+                    role="menuitem"
                     onClick={handleLogout}
-                    className="flex items-center w-full px-3 py-2.5 text-sm font-medium text-error-600 dark:text-error-400 hover:bg-error-50 dark:hover:bg-error-900/20 rounded-xl transition-colors"
+                    className="cb-shellnav__schoolitem is-danger"
                   >
-                    <svg className="w-4 h-4 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                    </svg>
+                    <LogOut size={16} strokeWidth={1.75} aria-hidden />
                     Sign out
                   </button>
                 </div>

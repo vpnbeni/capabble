@@ -435,6 +435,9 @@ export function CapabbleLanding({ loginUrl, signupUrl }: Props) {
             <a className="cb-link" href="#platform" onMouseEnter={closeMenu}>
               For schools
             </a>
+            <a className="cb-link" href="/pricing" onMouseEnter={closeMenu}>
+              Pricing
+            </a>
             <a className="cb-link" href="#contact" onMouseEnter={closeMenu}>
               Contact
             </a>
@@ -1640,6 +1643,7 @@ export function CapabbleLanding({ loginUrl, signupUrl }: Props) {
               <a href={loginUrl}>Log in</a>
               <a href={signupUrl}>Register your school</a>
               <a href="#platform">For schools</a>
+              <a href="/pricing">Pricing</a>
               <a href="#how">How we work</a>
               <a href="#stories">Client stories</a>
               <a href="/help">Help centre</a>
