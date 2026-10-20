@@ -424,8 +424,13 @@ body:has(.cb-app) .cursor-glow {
   color: var(--ink);
 }
 
+/* Desktop: logo, links and account actions share one row; drop the section links that don't fit */
+@media (min-width: 900px) {
+  .cb-nav-extra { display: none !important; }
+}
 @media (max-width: 1239px) {
   .cb-nav-demo { display: none !important; }
+  .cb-nav-links { gap: 20px !important; }
 }
 
 /* Narrow screens: keep logo + account actions on one row, nav scrolls sideways below */

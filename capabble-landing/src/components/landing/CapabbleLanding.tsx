@@ -430,10 +430,10 @@ export function CapabbleLanding({ loginUrl, signupUrl }: Props) {
                 <Icon name="chevron-down" size={16} />
               </span>
             </button>
-            <a className="cb-link" href="#how" onMouseEnter={closeMenu}>
+            <a className="cb-link cb-nav-extra" href="#how" onMouseEnter={closeMenu}>
               How we work
             </a>
-            <a className="cb-link" href="#platform" onMouseEnter={closeMenu}>
+            <a className="cb-link cb-nav-extra" href="#platform" onMouseEnter={closeMenu}>
               For schools
             </a>
             <a className="cb-link" href="/pricing" onMouseEnter={closeMenu}>
