@@ -12,7 +12,9 @@
   .scene { position: absolute; inset: 0; display: none; }
   .h { margin: 0; font-weight: 800; font-size: 80px; line-height: 1.04; letter-spacing: -0.04em; color: var(--ink); }
   .h .w { display: inline-block; }
-  .h .a { color: var(--accent-strong); }
+  .h .a, .bb { color: var(--accent-strong); }
+  .bug { position: absolute; left: 96px; bottom: 56px; display: flex; align-items: center; gap: 12px; font: 800 26px/1 var(--font-sans); letter-spacing: -0.03em; color: var(--ink); }
+  .bug img { width: 38px; height: 38px; }
   .sub { margin: 0; font-size: 30px; line-height: 42px; color: var(--ink-muted); font-weight: 500; letter-spacing: -0.01em; }
   .ui { zoom: 1.4; }
   .when { display: inline-flex; align-self: flex-start; align-items: center; height: 48px; padding: 0 20px; border-radius: 999px; background: var(--accent-soft); color: var(--accent-soft-ink); font: 600 24px/1 var(--font-sans); font-variant-numeric: tabular-nums; }
@@ -82,7 +84,7 @@
 
   <!-- 2 Promise -->
   <section class="scene" data-s="3" data-e="5.5">
-    <div class="top" style="top:110px"><h2 class="h" data-words data-t="3.05">Capabble runs all of it, <span class="a">in one place.</span></h2></div>
+    <div class="top" style="top:110px"><h2 class="h" data-words data-t="3.05"><span class="w">Capa<span class="bb">bb</span>le</span> runs all of it, <span class="a">in one place.</span></h2></div>
     <div class="tiles" id="tiles"></div>
   </section>
 
@@ -228,7 +230,7 @@
   <!-- 12 Outro -->
   <section class="scene" data-s="28.5" data-e="32.1" data-last>
     <div style="position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:34px;">
-      <div id="biglogo" style="display:flex; align-items:center; gap:36px;"><img src="logo.svg" style="width:168px; height:168px;"><span style="font:800 128px/1 var(--font-sans); letter-spacing:0.02em; color:var(--ink);">CAPA<span style="color:var(--accent-strong)">BB</span>LE</span></div>
+      <div id="biglogo" style="display:flex; align-items:center; gap:36px;"><img src="logo.svg" style="width:168px; height:168px;"><span style="font:800 132px/1 var(--font-sans); letter-spacing:-0.03em; color:var(--ink);">Capa<span class="bb">bb</span>le</span></div>
       <div style="position:relative; width:1700px; height:110px;">
         <h2 class="h" id="outA" data-words data-t="28.8" style="position:absolute; inset:0; text-align:center; font-size:92px;">Your whole school. <span class="a">One platform.</span></h2>
         <h2 class="h" id="outB" data-words data-t="30.4" style="position:absolute; inset:0; text-align:center; font-size:92px;">Assurance of <span class="a">capability.</span></h2>
@@ -236,6 +238,8 @@
       <p class="sub" data-rise="29.3" style="font-size:32px; color:var(--ink);">School OS · <span style="color:var(--accent-strong); font-weight:600">school.capabble.cloud</span></p>
     </div>
   </section>
+
+  <div class="bug" id="bug"><img src="logo.svg"><span>Capa<span class="bb">bb</span>le</span></div>
 
   <!-- parent phone, persistent through the day -->
   <div id="phone">
@@ -310,7 +314,7 @@ document.querySelectorAll('[data-words]').forEach(h => {
         else { const s = document.createElement('span'); s.className = 'w'; s.textContent = part; frag.appendChild(s); }
       });
       n.replaceWith(frag);
-    } else if (n.nodeName !== 'BR') walk(n);
+    } else if (n.nodeName !== 'BR' && !n.classList.contains('w')) walk(n);
   });
   walk(h);
 });
@@ -383,6 +387,9 @@ window.render = function (t) {
     $('outA').style.transform = `translateY(${-14 * aOut}px)`;
     $('outB').style.display = t >= 30.3 ? 'block' : 'none';
   }
+
+  // corner logo, scenes 2–11
+  $('bug').style.opacity = p(t, 3.3, 0.5) * (1 - p(t, 28.1, 0.3));
 
   // phone
   const ph = $('phone');
