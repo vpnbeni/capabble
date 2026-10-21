@@ -60,6 +60,8 @@ const PAGE_PERMISSIONS: Array<[prefix: string, permission: string | string[]]> =
   ['/appnt/availability', 'appnt.appointments.host'],
   ['/appnt/reports', 'appnt.appointments.report'],
   ['/appnt/settings', 'appnt.appointments.settings'],
+  ['/trnst/live', 'trnst.trips.read'],
+  ['/trnst/trips', 'trnst.trips.read'],
 ]
 
 const isPagePermitted = (pathname: string, can?: PermissionChecker): boolean => {

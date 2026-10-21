@@ -306,6 +306,7 @@ const Header: React.FC<HeaderProps> = ({ isSidebarCollapsed, onToggleSidebar }) 
           'student-info': { title: 'Overview', subtitle: 'Student strength by class and section, gender split and ages.' },
           'students': { title: 'Students', subtitle: 'Add, import and manage student records for this session.' },
           alumni: { title: 'Alumni', subtitle: 'Students who passed out of Class 12, kept across sessions.' },
+          'id-cards': { title: 'ID cards', subtitle: 'Design and print student ID cards with a QR for the school bus.' },
           'subjects': { title: 'Subjects', subtitle: 'Subjects taught in each class this session.' },
         }
         const info = titleMap[subPage] || { title: 'Students', subtitle: 'Student records for this session.' }
@@ -581,6 +582,10 @@ const Header: React.FC<HeaderProps> = ({ isSidebarCollapsed, onToggleSidebar }) 
           vehicles: { title: 'Vehicles', subtitle: 'Buses and vans, their crew and paper renewals.' },
           routes: { title: 'Routes', subtitle: 'Pickup routes, stops and the vehicle on each.' },
           'self-students': { title: 'Self students', subtitle: 'Students who come to school without school transport.' },
+          live: { title: 'Live buses', subtitle: 'Where each bus on a trip is right now.' },
+          trips: { title: 'Trips', subtitle: 'Each day\'s trips, the route driven and who got on and off.' },
+          assignments: { title: 'Student routes', subtitle: 'The route and stop each student uses.' },
+          crew: { title: 'Bus crew', subtitle: 'Run a trip, share the bus location and mark students.' },
         }
         const info = titleMap[subPage] || { title: 'Transport', subtitle: 'School transport.' }
         return {

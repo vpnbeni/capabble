@@ -1,8 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { useSelector } from 'react-redux'
+import { Navigate } from 'react-router-dom'
 import { Page } from '@/components/ui'
 import { selectUser } from '@/redux/slices/authSlice'
 import { usePermissions } from '@/hooks/usePermissions'
+import { isBusCrewOnly } from '@/utils/deskTitle'
 import { useLocalIndex } from '@/components/commandPalette/useLocalIndex'
 import { resolveTenantSlug } from '@/utils/tenantRuntime'
 import {
@@ -49,6 +51,8 @@ const Home: React.FC = () => {
     saveHomeLayout(storageKey, next)
     setCustomize(null)
   }
+
+  if (isBusCrewOnly(user)) return <Navigate to="/trnst/crew" replace />
 
   return (
     <Page className="home-page">

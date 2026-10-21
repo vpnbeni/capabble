@@ -37,6 +37,15 @@ export const usePortalFees = (id?: string, enabled = true) =>
 export const usePortalTransport = (id?: string, enabled = true) =>
   useQuery({ queryKey: keys.student(id || '', 'transport'), queryFn: () => portalService.transport(id as string), enabled: Boolean(id) && enabled, staleTime: STALE })
 
+/** Live bus position: every 10 s while the bus is on a trip, every minute otherwise. */
+export const usePortalBusLive = (id?: string, enabled = true) =>
+  useQuery({
+    queryKey: keys.student(id || '', 'transport', 'live'),
+    queryFn: () => portalService.busLive(id as string),
+    enabled: Boolean(id) && enabled,
+    refetchInterval: (query) => (query.state.data?.active ? 10_000 : 60_000),
+  })
+
 export const usePortalNotices = (enabled = true) =>
   useQuery({ queryKey: keys.notices(), queryFn: portalService.notices, enabled, staleTime: STALE })
 

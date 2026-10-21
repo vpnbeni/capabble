@@ -42,6 +42,9 @@ const TransportVehicle = require('../models/TransportVehicle');
 const TransportRoute = require('../models/TransportRoute');
 const TransportSelfStudent = require('../models/TransportSelfStudent');
 const {
+  TransportAssignment, TransportTrip, TransportLocationPing, TransportBoarding
+} = require('../models/TransportRecords');
+const {
   AcademicLessonPlan,
   AcademicHomework,
   AcademicAssignment,
@@ -156,6 +159,10 @@ const tenantModelExports = {
   TransportVehicle,
   TransportRoute,
   TransportSelfStudent,
+  TransportAssignment,
+  TransportTrip,
+  TransportLocationPing,
+  TransportBoarding,
   AcademicLessonPlan,
   AcademicHomework,
   AcademicAssignment,

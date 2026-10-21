@@ -24,4 +24,10 @@ module.exports = Object.freeze({
   // ── Appointments module ───────────────────────────────────────────────────
   APPOINTMENT_BOOKED: 'appnt:appointment:booked',
   APPOINTMENT_STATUS_CHANGED: 'appnt:appointment:status_changed',
+
+  // ── Transport module ──────────────────────────────────────────────────────
+  TRANSPORT_TRIP_STARTED: 'trnst:trip:started',
+  TRANSPORT_TRIP_ENDED: 'trnst:trip:ended',
+  TRANSPORT_STUDENT_BOARDED: 'trnst:student:boarded',
+  TRANSPORT_STUDENT_DROPPED: 'trnst:student:dropped',
 });

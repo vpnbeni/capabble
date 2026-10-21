@@ -102,6 +102,10 @@ const MODULE_MODEL_KEYS = Object.freeze({
     'TransportVehicle',
     'TransportRoute',
     'TransportSelfStudent',
+    'TransportAssignment',
+    'TransportTrip',
+    'TransportLocationPing',
+    'TransportBoarding',
     'Student',
   ]),
   acdmc: Object.freeze([

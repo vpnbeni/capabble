@@ -31,6 +31,11 @@ const transportVehicleSchema = new mongoose.Schema({
   },
   driverName: { type: String, trim: true, default: '' },
   driverPhone: { type: String, trim: true, default: '' },
+  conductorId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Teacher',
+    default: null,
+  },
   conductorName: { type: String, trim: true, default: '' },
   conductorPhone: { type: String, trim: true, default: '' },
   insuranceExpiry: { type: Date, default: null },
@@ -47,5 +52,7 @@ const transportVehicleSchema = new mongoose.Schema({
 transportVehicleSchema.index({ busNo: 1 }, { unique: true });
 transportVehicleSchema.index({ registrationNumber: 1 }, { unique: true });
 transportVehicleSchema.index({ status: 1, isActive: 1 });
+transportVehicleSchema.index({ driverId: 1 });
+transportVehicleSchema.index({ conductorId: 1 });
 
 module.exports = createContextModelProxy('TransportVehicle', transportVehicleSchema);

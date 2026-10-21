@@ -16,6 +16,7 @@ const schoolProfileSchema = new mongoose.Schema({
   awardListDesign: { type: mongoose.Schema.Types.Mixed, default: null },
   admitCardDesign: { type: mongoose.Schema.Types.Mixed, default: null },
   reportCardDesign: { type: mongoose.Schema.Types.Mixed, default: null },
+  idCardDesign: { type: mongoose.Schema.Types.Mixed, default: null },
   metadata: {
     studentRollNumberAssignment: {
       mode: { type: String, default: 'alphabetical_by_class_section' },

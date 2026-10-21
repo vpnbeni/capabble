@@ -15,6 +15,9 @@ const { buildClassPDFContext } = require('../services/timetableExportService');
 const { buildCardData } = require('./reportCardController');
 const { receiptPdf } = require('./cpitl/collectionController');
 const { sectionKey } = require('../rbac/scope');
+const {
+  closeStaleTrips, serviceDate, sortedStops, publicStop, staleSeconds
+} = require('../modules/trnst/trips');
 
 const STUDENT_FIELDS = 'name rollNumber class section classRollNo gender dateOfBirth fatherName motherName '
   + 'guardianName guardianPhone guardianEmail email phone house busNo profileImage address admissionDate isActive';
@@ -388,31 +391,58 @@ const getNotice = asyncHandler(async (req, res) => {
   return res.json({ success: true, data: notice });
 });
 
+const transportOpen = (req) => canOpen(req, 'transport') && featureOn(req, 'trnst_transport');
+
+/** The child's bus: from their route assignment, else the old free-text bus number. */
+const resolveStudentTransport = async (models, student) => {
+  const { TransportVehicle, TransportRoute, TransportAssignment } = models;
+  const assignment = TransportAssignment
+    ? await TransportAssignment.findOne({ studentId: student._id, isActive: true }).lean()
+    : null;
+  if (assignment && TransportRoute) {
+    const route = await TransportRoute.findOne({ _id: assignment.routeId, isActive: { $ne: false } })
+      .select('name code vehicleId stops').lean();
+    if (route) {
+      const vehicle = route.vehicleId && TransportVehicle
+        ? await TransportVehicle.findById(route.vehicleId)
+          .select('busNo registrationNumber driverName driverPhone conductorName conductorPhone status').lean()
+        : null;
+      return { assignment, vehicle, routes: [route] };
+    }
+  }
+  if (!student.busNo || !TransportVehicle) return { assignment: null, vehicle: null, routes: [] };
+  const vehicle = await TransportVehicle.findOne({ busNo: student.busNo })
+    .select('busNo registrationNumber driverName driverPhone conductorName conductorPhone status').lean();
+  const routes = vehicle && TransportRoute
+    ? await TransportRoute.find({ vehicleId: vehicle._id, isActive: true }).select('name code vehicleId stops').lean()
+    : [];
+  return { assignment: null, vehicle, routes };
+};
+
 // GET /api/portal/students/:studentId/transport
 const getTransport = asyncHandler(async (req, res) => {
-  if (!canOpen(req, 'transport') || !featureOn(req, 'trnst_transport')) {
-    return unavailable(res, 'Transport is not available.');
-  }
-  const { TransportVehicle, TransportRoute, TransportSelfStudent } = req.models || {};
+  if (!transportOpen(req)) return unavailable(res, 'Transport is not available.');
+  const { TransportSelfStudent } = req.models || {};
   const student = req.portalStudent;
 
   const selfTransport = TransportSelfStudent
     ? await TransportSelfStudent.findOne({ studentId: student._id, isActive: { $ne: false } }).select('commuteMode').lean()
     : null;
   if (selfTransport) return res.json({ success: true, data: { usesSchoolTransport: false, commuteMode: selfTransport.commuteMode } });
-  if (!student.busNo || !TransportVehicle) return res.json({ success: true, data: { usesSchoolTransport: false } });
 
-  const vehicle = await TransportVehicle.findOne({ busNo: student.busNo })
-    .select('busNo registrationNumber driverName driverPhone conductorName conductorPhone status').lean();
-  const routes = vehicle && TransportRoute
-    ? await TransportRoute.find({ vehicleId: vehicle._id, isActive: true }).select('name stops').lean()
-    : [];
+  const { assignment, vehicle, routes } = await resolveStudentTransport(req.models || {}, student);
+  if (!assignment && !student.busNo) return res.json({ success: true, data: { usesSchoolTransport: false } });
 
   return res.json({
     success: true,
     data: {
       usesSchoolTransport: true,
-      busNo: student.busNo,
+      busNo: vehicle?.busNo || student.busNo || '',
+      myStop: assignment ? {
+        id: assignment.stopId ? String(assignment.stopId) : '',
+        name: assignment.stopName || '',
+        shift: assignment.shift
+      } : null,
       vehicle: vehicle ? {
         registrationNumber: vehicle.registrationNumber || '',
         driverName: vehicle.driverName || '',
@@ -422,10 +452,66 @@ const getTransport = asyncHandler(async (req, res) => {
       } : null,
       routes: routes.map((route) => ({
         name: route.name,
-        stops: [...(route.stops || [])]
-          .sort((a, b) => (a.sequence || 0) - (b.sequence || 0))
-          .map(({ name, landmark, pickupTime, dropTime }) => ({ name, landmark, pickupTime, dropTime }))
+        stops: sortedStops(route)
+          .map(({ _id, name, landmark, pickupTime, dropTime }) => ({
+            id: _id ? String(_id) : '', name, landmark, pickupTime, dropTime
+          }))
       }))
+    }
+  });
+});
+
+/** A student who rides only one way should only see trips in that direction. */
+const directionFor = (shift) => (shift === 'both' ? {} : { direction: shift });
+
+// GET /api/portal/students/:studentId/transport/live — where the child's bus is now.
+// The location is shared only while the bus is on a trip on the child's route.
+const getTransportLive = asyncHandler(async (req, res) => {
+  if (!transportOpen(req)) return unavailable(res, 'Transport is not available.');
+  const { TransportTrip, TransportBoarding } = req.models || {};
+  const student = req.portalStudent;
+  const { assignment, vehicle, routes } = await resolveStudentTransport(req.models || {}, student);
+  const route = assignment ? routes[0] : null;
+  if (!route || !TransportTrip) {
+    return res.json({ success: true, data: { active: false, assigned: Boolean(assignment) } });
+  }
+
+  await closeStaleTrips(TransportTrip, { routeId: route._id });
+  const trip = await TransportTrip.findOne({ routeId: route._id, status: 'active', ...directionFor(assignment.shift) })
+    .sort({ startedAt: -1 }).lean();
+  const today = serviceDate();
+  const todaysTrips = trip
+    ? [trip]
+    : await TransportTrip.find({ routeId: route._id, serviceDate: today }).select('_id').lean();
+  const tripIds = todaysTrips.map((row) => row._id);
+  const marks = TransportBoarding && tripIds.length
+    ? await TransportBoarding.find({ tripId: { $in: tripIds }, studentId: student._id })
+      .select('event at tripId').sort({ at: 1 }).lean()
+    : [];
+  const now = new Date();
+
+  return res.json({
+    success: true,
+    data: {
+      active: Boolean(trip),
+      assigned: true,
+      busNo: vehicle?.busNo || '',
+      route: { name: route.name, code: route.code },
+      stops: sortedStops(route).map(publicStop),
+      myStopId: assignment.stopId ? String(assignment.stopId) : '',
+      trip: trip ? {
+        direction: trip.direction,
+        startedAt: trip.startedAt,
+        bus: trip.lastLocation ? {
+          lat: trip.lastLocation.lat,
+          lng: trip.lastLocation.lng,
+          heading: trip.lastLocation.heading,
+          speed: trip.lastLocation.speed,
+          at: trip.lastLocation.at
+        } : null,
+        staleSeconds: staleSeconds(trip, now)
+      } : null,
+      today: marks.map((mark) => ({ event: mark.event, at: mark.at }))
     }
   });
 });
@@ -442,5 +528,6 @@ module.exports = {
   getReceiptPdf,
   listNotices,
   getNotice,
-  getTransport
+  getTransport,
+  getTransportLive
 };

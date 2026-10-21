@@ -221,6 +221,16 @@ const studentSchema = new mongoose.Schema({
     type: String,
     default: null
   },
+  // Random token printed as the ID card QR. Rotating it invalidates the old card.
+  idCardToken: {
+    type: String,
+    default: undefined,
+    select: false
+  },
+  idCardIssuedAt: {
+    type: Date,
+    default: null
+  },
   documents: [{
     type: {
       type: String,
@@ -269,6 +279,10 @@ studentSchema.index({ isActive: 1 });
 studentSchema.index({ name: 'text', rollNumber: 'text', fatherName: 'text' });
 studentSchema.index({ createdAt: -1 });
 studentSchema.index({ admissionDate: -1 });
+studentSchema.index(
+  { idCardToken: 1, academicSession: 1 },
+  { unique: true, partialFilterExpression: { idCardToken: { $type: 'string' } } }
+);
 
 // Compound indexes
 studentSchema.index({ class: 1, section: 1, isActive: 1 });

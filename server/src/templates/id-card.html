@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>{{design.title}}</title>
+  <style>
+    /* CR80 card: 85.6 x 54 mm. "sheet" layout prints on A4 with cut guides;
+       "single" prints one card per page for PVC card printers. */
+    {{#if single}}
+      {{#if portrait}}
+      @page { size: 54mm 85.6mm; margin: 0; }
+      {{else}}
+      @page { size: 85.6mm 54mm; margin: 0; }
+      {{/if}}
+    {{else}}
+      @page { size: A4 portrait; margin: 0; }
+    {{/if}}
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root { --accent: {{design.accentColor}}; }
+
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      color: #111;
+      background: #fff;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    .page {
+      page-break-after: always;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      {{#if single}}
+        {{#if portrait}}width: 54mm; height: 85.6mm;{{else}}width: 85.6mm; height: 54mm;{{/if}}
+      {{else}}
+        width: 210mm; height: 297mm;
+      {{/if}}
+    }
+    .page:last-child { page-break-after: auto; }
+
+    .grid {
+      display: grid;
+      gap: 3mm;
+      grid-template-columns: repeat({{#if single}}1{{else}}{{#if portrait}}3{{else}}2{{/if}}{{/if}}, auto);
+    }
+
+    .card {
+      position: relative;
+      overflow: hidden;
+      background: #fff;
+      {{#if portrait}}width: 54mm; height: 85.6mm;{{else}}width: 85.6mm; height: 54mm;{{/if}}
+      {{#unless single}}outline: 0.2mm dashed #9ca3af;{{/unless}}
+      border-radius: {{#if single}}0{{else}}3mm{{/if}};
+      display: flex;
+      flex-direction: column;
+    }
+    .card.blank { outline: none; }
+
+    .band {
+      background: var(--accent);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 1.5mm;
+      padding: 1.6mm 2mm;
+    }
+    .band img { width: 8mm; height: 8mm; object-fit: contain; background: #fff; border-radius: 1mm; padding: 0.4mm; }
+    .band .school { min-width: 0; }
+    .band .school-name { font-size: 7pt; font-weight: 700; line-height: 1.1; text-transform: uppercase; }
+    .band .school-address { font-size: 4.6pt; line-height: 1.15; opacity: 0.9; margin-top: 0.3mm; }
+
+    .title {
+      text-align: center;
+      font-size: 5.4pt;
+      font-weight: 700;
+      letter-spacing: 0.4mm;
+      color: var(--accent);
+      padding: 0.8mm 1mm 0;
+    }
+
+    .photo {
+      width: 19mm;
+      height: 23mm;
+      border: 0.3mm solid var(--accent);
+      border-radius: 1mm;
+      object-fit: cover;
+      background: #f3f4f6;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12pt;
+      font-weight: 700;
+      color: #6b7280;
+      flex-shrink: 0;
+    }
+
+    .name { font-size: 7.4pt; font-weight: 700; line-height: 1.15; }
+    .meta { font-size: 5.6pt; color: #374151; margin-top: 0.3mm; }
+
+    .rows { width: 100%; border-collapse: collapse; font-size: 5.2pt; line-height: 1.25; }
+    .rows td { vertical-align: top; padding: 0.15mm 0; }
+    .rows td.label { color: #6b7280; white-space: nowrap; padding-right: 1.2mm; width: 1%; }
+    .rows td.value { font-weight: 600; word-break: break-word; }
+
+    .footer {
+      margin-top: auto;
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 1.5mm;
+      padding: 0 2mm 1.6mm;
+    }
+    .qr { width: 13mm; height: 13mm; }
+    .sign { text-align: center; font-size: 4.6pt; color: #374151; }
+    .sign img { display: block; max-width: 16mm; max-height: 6mm; margin: 0 auto 0.3mm; object-fit: contain; }
+    .sign .line { border-top: 0.2mm solid #6b7280; padding-top: 0.3mm; min-width: 14mm; }
+    .validity { font-size: 4.6pt; color: #374151; text-align: right; }
+
+    /* Portrait front */
+    .portrait .body { display: flex; flex-direction: column; align-items: center; padding: 1.2mm 2.2mm 0; text-align: center; gap: 0.8mm; }
+    .portrait .rows { margin-top: 0.6mm; text-align: left; }
+
+    /* Landscape front */
+    .landscape .body { display: flex; gap: 2mm; padding: 1mm 2mm 0; align-items: flex-start; }
+    .landscape .details { flex: 1; min-width: 0; }
+    .landscape .photo { width: 17mm; height: 21mm; }
+    .landscape .side { display: flex; flex-direction: column; align-items: center; gap: 1mm; }
+
+    /* Back */
+    .back .body { padding: 2.5mm; display: flex; flex-direction: column; gap: 1.2mm; font-size: 5.4pt; line-height: 1.3; }
+    .back .heading { font-size: 6pt; font-weight: 700; color: var(--accent); text-transform: uppercase; }
+    .back ul { padding-left: 2.6mm; }
+    .back .contact { margin-top: auto; border-top: 0.2mm solid #e5e7eb; padding-top: 1mm; }
+
+    .canvas-item { position: absolute; overflow: hidden; box-sizing: border-box; }
+    .canvas-item img { width: 100%; height: 100%; object-fit: contain; }
+    .canvas-item-text { width: 100%; height: 100%; white-space: pre; line-height: 1.05; padding: 1px; overflow: hidden; }
+  </style>
+</head>
+<body>
+  {{#each pages}}
+  <div class="page">
+    <div class="grid">
+      {{#each cards}}
+        {{#if blank}}
+        <div class="card blank"></div>
+        {{else if ../isBack}}
+        <div class="card back">
+          <div class="band">
+            <div class="school"><div class="school-name">{{@root.schoolName}}</div></div>
+          </div>
+          <div class="body">
+            <div class="heading">{{name}}</div>
+            {{#if @root.design.fields.address}}{{#if address}}<div><strong>Address:</strong> {{address}}</div>{{/if}}{{/if}}
+            <ul>
+              {{#each @root.backLines}}<li>{{this}}</li>{{/each}}
+            </ul>
+            <div class="contact">
+              {{#if @root.emergencyContact}}<div><strong>School:</strong> {{@root.emergencyContact}}</div>{{/if}}
+              {{#if @root.design.fields.guardianPhone}}{{#if guardianPhone}}<div><strong>Parent:</strong> {{guardianPhone}}</div>{{/if}}{{/if}}
+            </div>
+          </div>
+        </div>
+        {{else}}
+        <div class="card {{#if @root.portrait}}portrait{{else}}landscape{{/if}}">
+          <div class="band">
+            {{#if @root.schoolLogoUrl}}<img src="{{@root.schoolLogoUrl}}" alt="" />{{/if}}
+            <div class="school">
+              <div class="school-name">{{@root.schoolName}}</div>
+              {{#if @root.schoolAddress}}<div class="school-address">{{@root.schoolAddress}}</div>{{/if}}
+            </div>
+          </div>
+          <div class="title">{{@root.design.title}}</div>
+
+          {{#if @root.portrait}}
+          <div class="body">
+            {{#if @root.design.fields.photo}}
+              {{#if photoUrl}}<img class="photo" src="{{photoUrl}}" alt="" />{{else}}<div class="photo">{{initials}}</div>{{/if}}
+            {{/if}}
+            <div>
+              <div class="name">{{name}}</div>
+              {{#if @root.design.fields.classSection}}<div class="meta">Class {{classSection}}{{#if @root.design.fields.rollNo}}{{#if rollNo}} · Roll {{rollNo}}{{/if}}{{/if}}</div>{{/if}}
+            </div>
+            <table class="rows">
+              {{#if @root.design.fields.admissionNo}}<tr><td class="label">Adm. No.</td><td class="value">{{admissionNo}}</td></tr>{{/if}}
+              {{#if @root.design.fields.dob}}{{#if dob}}<tr><td class="label">Date of birth</td><td class="value">{{dob}}</td></tr>{{/if}}{{/if}}
+              {{#if @root.design.fields.bloodGroup}}{{#if bloodGroup}}<tr><td class="label">Blood group</td><td class="value">{{bloodGroup}}</td></tr>{{/if}}{{/if}}
+              {{#if @root.design.fields.fatherName}}{{#if fatherName}}<tr><td class="label">Father</td><td class="value">{{fatherName}}</td></tr>{{/if}}{{/if}}
+              {{#if @root.design.fields.motherName}}{{#if motherName}}<tr><td class="label">Mother</td><td class="value">{{motherName}}</td></tr>{{/if}}{{/if}}
+              {{#if @root.design.fields.guardianPhone}}{{#if guardianPhone}}<tr><td class="label">Phone</td><td class="value">{{guardianPhone}}</td></tr>{{/if}}{{/if}}
+              {{#if @root.design.fields.bus}}{{#if bus}}<tr><td class="label">Transport</td><td class="value">{{bus}}</td></tr>{{/if}}{{/if}}
+            </table>
+          </div>
+          {{else}}
+          <div class="body">
+            {{#if @root.design.fields.photo}}
+            <div class="side">
+              {{#if photoUrl}}<img class="photo" src="{{photoUrl}}" alt="" />{{else}}<div class="photo">{{initials}}</div>{{/if}}
+            </div>
+            {{/if}}
+            <div class="details">
+              <div class="name">{{name}}</div>
+              {{#if @root.design.fields.classSection}}<div class="meta">Class {{classSection}}{{#if @root.design.fields.rollNo}}{{#if rollNo}} · Roll {{rollNo}}{{/if}}{{/if}}</div>{{/if}}
+              <table class="rows">
+                {{#if @root.design.fields.admissionNo}}<tr><td class="label">Adm. No.</td><td class="value">{{admissionNo}}</td></tr>{{/if}}
+              {{#if @root.design.fields.dob}}{{#if dob}}<tr><td class="label">Date of birth</td><td class="value">{{dob}}</td></tr>{{/if}}{{/if}}
+              {{#if @root.design.fields.bloodGroup}}{{#if bloodGroup}}<tr><td class="label">Blood group</td><td class="value">{{bloodGroup}}</td></tr>{{/if}}{{/if}}
+              {{#if @root.design.fields.fatherName}}{{#if fatherName}}<tr><td class="label">Father</td><td class="value">{{fatherName}}</td></tr>{{/if}}{{/if}}
+              {{#if @root.design.fields.motherName}}{{#if motherName}}<tr><td class="label">Mother</td><td class="value">{{motherName}}</td></tr>{{/if}}{{/if}}
+              {{#if @root.design.fields.guardianPhone}}{{#if guardianPhone}}<tr><td class="label">Phone</td><td class="value">{{guardianPhone}}</td></tr>{{/if}}{{/if}}
+              {{#if @root.design.fields.bus}}{{#if bus}}<tr><td class="label">Transport</td><td class="value">{{bus}}</td></tr>{{/if}}{{/if}}
+              </table>
+            </div>
+          </div>
+          {{/if}}
+
+          <div class="footer">
+            {{#if qrDataUrl}}<img class="qr" src="{{qrDataUrl}}" alt="" />{{else}}<span></span>{{/if}}
+            {{#if @root.validity}}<div class="validity">Valid for<br /><strong>{{@root.validity}}</strong></div>{{/if}}
+            {{#if @root.design.signatures.principal}}
+            <div class="sign">
+              {{#if @root.principalSignUrl}}<img src="{{@root.principalSignUrl}}" alt="" />{{/if}}
+              <div class="line">Principal</div>
+            </div>
+            {{/if}}
+          </div>
+
+          {{#each @root.canvasItems}}
+          <div class="canvas-item" style="{{{boxStyle}}}">
+            {{#if isImage}}
+            <img src="{{imageUrl}}" alt="" />
+            {{else if isRect}}
+            <div style="{{{shapeStyle}}}"></div>
+            {{else if isLine}}
+            <div style="{{{shapeStyle}}}"></div>
+            {{else}}
+            <div class="canvas-item-text" style="{{{textStyle}}}">{{text}}</div>
+            {{/if}}
+          </div>
+          {{/each}}
+        </div>
+        {{/if}}
+      {{/each}}
+    </div>
+  </div>
+  {{/each}}
+</body>
+</html>

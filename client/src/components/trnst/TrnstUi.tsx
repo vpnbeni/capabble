@@ -1,6 +1,6 @@
 import React from 'react'
 import { Badge, type Tone } from '@/components/ui'
-import type { RouteShift, TransportRoute, TransportVehicle, VehicleStatus } from '@/services/trnstService'
+import type { RouteShift, TransportRoute, TransportVehicle, TripDirection, VehicleStatus } from '@/services/trnstService'
 import './trnst.css'
 
 export const errorMessage = (error: any, fallback: string) =>
@@ -69,3 +69,40 @@ export const Entity: React.FC<{ primary: React.ReactNode; secondary?: React.Reac
     {secondary ? <span className="tr-entity__secondary">{secondary}</span> : null}
   </div>
 )
+
+export const DIRECTION_LABEL: Record<TripDirection, string> = { pickup: 'Pickup', drop: 'Drop' }
+
+// A bus not heard from for this long is shown as "last seen …".
+export const STALE_AFTER_SECONDS = 120
+
+/** "just now", "40 s ago", "3 min ago", "2 h ago". */
+export const agoLabel = (seconds: number | null | undefined) => {
+  if (seconds === null || seconds === undefined) return 'No location yet'
+  if (seconds < 10) return 'just now'
+  if (seconds < 60) return `${seconds} s ago`
+  if (seconds < 3600) return `${Math.floor(seconds / 60)} min ago`
+  return `${Math.floor(seconds / 3600)} h ago`
+}
+
+export const secondsSince = (iso?: string | null, now = Date.now()) =>
+  iso ? Math.max(0, Math.round((now - new Date(iso).getTime()) / 1000)) : null
+
+/** Badge for a bus on a trip: live, last seen a while ago, or no location yet. */
+export const LiveBadge: React.FC<{ seconds: number | null }> = ({ seconds }) => {
+  if (seconds === null) return <Badge tone="warning">Waiting for location</Badge>
+  if (seconds > STALE_AFTER_SECONDS) return <Badge tone="warning">Last seen {agoLabel(seconds)}</Badge>
+  return <Badge tone="success">Live</Badge>
+}
+
+/** Straight-line metres between two points (haversine). */
+export const distanceMeters = (a: { lat: number; lng: number }, b: { lat: number; lng: number }) => {
+  const rad = Math.PI / 180
+  const dLat = (b.lat - a.lat) * rad
+  const dLng = (b.lng - a.lng) * rad
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * rad) * Math.cos(b.lat * rad) * Math.sin(dLng / 2) ** 2
+  return 2 * 6_371_000 * Math.asin(Math.sqrt(h))
+}
+
+/** "350 m", "1.4 km". */
+export const distanceLabel = (meters: number) =>
+  meters < 1000 ? `${Math.max(10, Math.round(meters / 10) * 10)} m` : `${(meters / 1000).toFixed(meters < 10_000 ? 1 : 0)} km`

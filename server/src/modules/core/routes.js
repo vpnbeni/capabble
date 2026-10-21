@@ -22,6 +22,7 @@ const exportRoutes = require('../../routes/exportRoutes');
 const userRoutes = require('../../routes/userRoutes');
 const roleRoutes = require('../../routes/roleRoutes');
 const portalRoutes = require('../../routes/portalRoutes');
+const idCardRoutes = require('../../routes/idCardRoutes');
 
 const mountRoutes = (router) => {
   router.use('/auth', authRoutes);
@@ -37,6 +38,7 @@ const mountRoutes = (router) => {
   router.use('/dashboard', requireTenantFeature('dashboard'), dashboardRoutes);
   router.use('/billing', requireTenantFeature('billing'), billingRoutes);
   router.use('/export', exportRoutes);
+  router.use('/id-cards', requireTenantFeature('stdnt_id_cards'), idCardRoutes);
 };
 
 module.exports = { mountRoutes };

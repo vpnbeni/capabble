@@ -100,7 +100,7 @@ const corsOptions = {
   },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'x-requested-with', 'x-tenant-slug', 'x-academic-session'],
-  exposedHeaders: ['Content-Disposition', 'Content-Type'],
+  exposedHeaders: ['Content-Disposition', 'Content-Type', 'X-Cards-Issued'],
   credentials: true,
   optionsSuccessStatus: 200
 };

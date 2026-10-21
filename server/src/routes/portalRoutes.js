@@ -47,6 +47,7 @@ router.get('/students/:studentId/results', ctrl.getResults);
 router.get('/students/:studentId/fees', ctrl.getFees);
 router.get('/students/:studentId/fees/receipts/:paymentId', ctrl.getReceiptPdf);
 router.get('/students/:studentId/transport', ctrl.getTransport);
+router.get('/students/:studentId/transport/live', ctrl.getTransportLive);
 router.get('/students/:studentId/appointment-hosts', appnt.listHosts);
 router.get('/students/:studentId/appointment-hosts/:hostId/slots', appnt.hostSlots);
 router.post('/students/:studentId/appointments', appointmentWriteLimiter, validateRequest, appnt.request);

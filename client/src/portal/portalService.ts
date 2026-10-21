@@ -123,7 +123,35 @@ export interface PortalTransport {
     conductorName: string
     conductorPhone: string
   } | null
-  routes?: Array<{ name: string; stops: Array<{ name: string; landmark?: string; pickupTime?: string; dropTime?: string }> }>
+  myStop?: { id: string; name: string; shift: 'pickup' | 'drop' | 'both' } | null
+  routes?: Array<{ name: string; stops: Array<{ id?: string; name: string; landmark?: string; pickupTime?: string; dropTime?: string }> }>
+}
+
+export interface PortalBusStop {
+  id: string
+  name: string
+  landmark?: string
+  pickupTime?: string
+  dropTime?: string
+  lat: number | null
+  lng: number | null
+}
+
+/** Where the child's bus is. `trip` is set only while the bus is on a trip on the child's route. */
+export interface PortalBusLive {
+  active: boolean
+  assigned: boolean
+  busNo?: string
+  route?: { name: string; code: string }
+  stops?: PortalBusStop[]
+  myStopId?: string
+  trip?: {
+    direction: 'pickup' | 'drop'
+    startedAt: string
+    bus: { lat: number; lng: number; heading: number | null; speed: number | null; at: string } | null
+    staleSeconds: number | null
+  } | null
+  today?: Array<{ event: 'boarded' | 'dropped' | 'absent'; at: string }>
 }
 
 export type PortalAppointmentStatus = 'requested' | 'confirmed' | 'checked_in' | 'completed' | 'declined' | 'cancelled' | 'no_show'
@@ -189,6 +217,7 @@ const portalService = {
   results: async (id: string): Promise<PortalResult[]> => (await get(`${student(id)}/results`)).data.data,
   fees: async (id: string): Promise<PortalFees | null> => (await get(`${student(id)}/fees`)).data.data,
   transport: async (id: string): Promise<PortalTransport> => (await get(`${student(id)}/transport`)).data.data,
+  busLive: async (id: string): Promise<PortalBusLive> => (await get(`${student(id)}/transport/live`)).data.data,
   notices: async (): Promise<PortalNotice[]> => (await get('/portal/notices')).data.data,
   notice: async (id: string): Promise<PortalNotice> => (await get(`/portal/notices/${encodeURIComponent(id)}`)).data.data,
   appointments: async (): Promise<PortalAppointments> => (await get('/portal/appointments')).data.data,
