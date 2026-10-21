@@ -67,6 +67,9 @@
   .fi .ft { margin-top: 6px; font: 600 19px/24px var(--font-sans); color: var(--ink); letter-spacing: -0.01em; }
   .fi .fd { margin-top: 2px; font: 400 15px/20px var(--font-sans); color: var(--ink-muted); }
 
+  .bgph { position: absolute; inset: 0; display: none; overflow: hidden; }
+  .bgph img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .bgph .veil { position: absolute; inset: 0; background: var(--bg); }
   #link { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; pointer-events: none; display: none; }
   #cursor { position: absolute; width: 44px; height: 44px; left: 0; top: 0; z-index: 50; display: none; }
   .ring { position: absolute; width: 60px; height: 60px; margin: -30px 0 0 -30px; border-radius: 50%; border: 3px solid var(--accent); z-index: 49; display: none; }
@@ -76,6 +79,10 @@
 </head>
 <body class="cb-app">
 <div id="stage">
+  <div class="bgph" data-a="0" data-b="3" data-veil="0.78" data-pos="center 30%"><img src="../../brand-assets/photos/school-assembly.webp"><div class="veil"></div></div>
+  <div class="bgph" data-a="5.5" data-b="8" data-veil="0.84" data-pos="center 40%"><img src="../../brand-assets/photos/school-bus-stop.webp"><div class="veil"></div></div>
+  <div class="bgph" data-a="8" data-b="10.5" data-veil="0.84" data-pos="center 35%"><img src="../../brand-assets/photos/teacher-attendance.webp"><div class="veil"></div></div>
+  <div class="bgph" data-a="28.5" data-b="32.1" data-veil="0.74" data-pos="center 40%"><img src="../../brand-assets/photos/parent-child-phone.webp"><div class="veil"></div></div>
 
   <!-- 1 Hook -->
   <section class="scene" data-s="0" data-e="3">
@@ -396,6 +403,20 @@ window.render = function (t) {
     $('outA').style.transform = `translateY(${-14 * aOut}px)`;
     $('outB').style.display = t >= 30.3 ? 'block' : 'none';
   }
+
+  // photo backdrops: fade in, slow push-in, fade out with their scene
+  document.querySelectorAll('.bgph').forEach(bg => {
+    const a = +bg.dataset.a, b = +bg.dataset.b;
+    const vis = t >= a - 0.01 && t < b;
+    bg.style.display = vis ? 'block' : 'none';
+    if (!vis) return;
+    const fin = a === 0 ? 1 : eo(p(t, a - 0.01, 0.4)), fout = b > 32 ? 0 : eo(p(t, b - 0.3, 0.3));
+    bg.style.opacity = fin * (1 - fout);
+    const img = bg.querySelector('img');
+    img.style.objectPosition = bg.dataset.pos;
+    img.style.transform = `scale(${1.02 + 0.05 * p(t, a, b - a)})`;
+    bg.querySelector('.veil').style.opacity = bg.dataset.veil;
+  });
 
   // corner logo, scenes 2–11
   $('bug').style.opacity = p(t, 3.3, 0.5) * (1 - p(t, 28.1, 0.3));
