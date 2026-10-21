@@ -78,7 +78,7 @@ describe('authController password reset OTP', () => {
     expect(user.passwordResetOtpExpiresAt).toBeInstanceOf(Date);
     expect(sendMail).toHaveBeenCalledWith(expect.objectContaining({
       to: 'admin@example.com',
-      subject: expect.stringContaining('Password Reset'),
+      subject: expect.stringMatching(/password reset/i),
     }));
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res.json).toHaveBeenCalledWith(expect.objectContaining({

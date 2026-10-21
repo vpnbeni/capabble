@@ -12,6 +12,13 @@ export interface Tenant {
   dbName: string
   adminEmail: string
   status: 'active' | 'suspended'
+  /** Set when the school asked to close its workspace (pending while canceledAt is empty). */
+  closure?: {
+    requestedAt?: string | null
+    exportUntil?: string | null
+    deleteAfter?: string | null
+    canceledAt?: string | null
+  } | null
   createdAt: string
   updatedAt?: string
 }
@@ -272,70 +279,3 @@ export interface UploadResult<TData = unknown> {
   errors?: Array<{ row?: number; message: string }>
 }
 
-export interface BillingEntitlementSnapshot {
-  accessMode: 'full' | 'core_only' | 'read_only'
-  state: string
-  planCode: string | null
-  trialEndsAt: string | null
-  graceEndsAt: string | null
-  isReadOnly: boolean
-}
-
-export interface BillingAccount {
-  _id: string
-  tenantId: string
-  tenantSlug: string
-  tenantName: string
-  billingEmail: string
-  legalName: string
-  gstin?: string
-  placeOfSupply?: string
-  hsnSacDefault?: string
-  createdAt: string
-  updatedAt: string
-}
-
-export interface BillingSubscription {
-  _id: string
-  tenantSlug: string
-  planCode: string
-  state: string
-  trialEndAt?: string | null
-  graceEndsAt?: string | null
-  cycleStartAt?: string | null
-  cycleEndAt?: string | null
-  grandfatherEndsAt?: string | null
-  collectionMode?: string
-}
-
-export interface BillingInvoice {
-  _id: string
-  invoiceNo: string
-  status: string
-  totalMinor: number
-  currency: string
-  dueAt: string
-  paidAt?: string | null
-  createdAt: string
-}
-
-export interface BillingTenantListItem {
-  account: BillingAccount
-  subscription: BillingSubscription | null
-  entitlement: BillingEntitlementSnapshot
-}
-
-export interface BillingTenantListResponse {
-  items: BillingTenantListItem[]
-  total: number
-  page: number
-  pages: number
-  limit: number
-}
-
-export interface BillingTenantDetails {
-  account: BillingAccount
-  subscription: BillingSubscription | null
-  invoices: BillingInvoice[]
-  entitlement: BillingEntitlementSnapshot
-}

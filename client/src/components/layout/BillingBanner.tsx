@@ -1,49 +1,62 @@
 import React from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { useSelector } from 'react-redux'
 import { selectUser } from '@/redux/slices/authSlice'
+import { Banner, formatDate } from '@/components/ui'
+import type { Tone } from '@/components/ui'
+import '@/components/billing/billing.css'
 
+/** One line above every page when billing needs the school's attention. The billing page has its own. */
 const BillingBanner: React.FC = () => {
   const user = useSelector(selectUser)
+  const location = useLocation()
   const billing = user?.billing
 
-  if (!billing) {
+  if (!billing || location.pathname.startsWith('/billing') || location.pathname.startsWith('/get-started')) {
     return null
   }
 
-  if (billing.accessMode === 'full' && billing.state !== 'past_due_grace' && billing.state !== 'grandfathered') {
-    return null
-  }
+  let tone: Tone = 'warning'
+  let title = ''
+  let link = { to: '/billing', label: 'Open billing' }
 
-  let text = ''
-  let tone = 'bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-300'
+  const daysLeft = (date: string | null | undefined) => (date ? Math.ceil((new Date(date).getTime() - Date.now()) / 86400000) : null)
 
-  if (billing.accessMode === 'core_only') {
-    text = 'Your trial currently includes core modules only. Upgrade to unlock all modules.'
+  if (billing.accessMode === 'setup_required') {
+    tone = 'info'
+    title = 'Choose your plan to start your free trial. Every module is open during it.'
+    link = { to: '/get-started', label: 'Choose plan' }
   } else if (billing.accessMode === 'read_only') {
-    text = 'Your workspace is in read-only mode due to billing status. Complete payment to restore full access.'
-    tone = 'bg-red-50 border-red-200 text-red-800 dark:bg-red-900/20 dark:border-red-800 dark:text-red-300'
+    tone = 'danger'
+    title = 'Your school can only read data until the subscription is paid.'
+  } else if (billing.accessMode === 'core_only') {
+    title = 'Only core pages are open. Choose modules to unlock the rest.'
   } else if (billing.state === 'past_due_grace') {
-    text = 'Payment is pending. You are in grace period. Complete payment to avoid read-only mode.'
+    title = `Payment is overdue. Access becomes read-only on ${formatDate(billing.graceEndsAt)}.`
+  } else if (billing.state === 'trialing') {
+    // The whole trial: say plainly that everything is open, and for how long.
+    const left = daysLeft(billing.trialEndsAt)
+    if (left == null) return null
+    tone = 'info'
+    const when = left <= 1 ? 'Last day' : `${left} days left`
+    title = billing.plannedModules?.length
+      ? `Free trial · every module open · ${when}. Your plan keeps ${billing.plannedModules.length} module${billing.plannedModules.length === 1 ? '' : 's'} after ${formatDate(billing.trialEndsAt)}.`
+      : `Free trial · every module open · ${when}. Choose the modules you want to keep.`
+    link = { to: '/billing', label: billing.plannedModules?.length ? 'Manage plan' : 'Choose modules' }
   } else if (billing.state === 'grandfathered') {
-    text = 'Your workspace is in grandfathered access period. Billing setup is required before expiry.'
+    tone = 'info'
+    title = 'Choose your modules before your complimentary access ends.'
   }
 
-  if (!text) {
+  if (!title) {
     return null
   }
 
   return (
-    <div className={`mx-4 mt-3 mb-1 rounded-lg border px-4 py-3 text-sm ${tone}`}>
-      <div className="flex items-center justify-between gap-4">
-        <p>{text}</p>
-        <Link
-          to="/billing"
-          className="inline-flex whitespace-nowrap rounded-md bg-white/70 dark:bg-black/30 px-3 py-1.5 text-xs font-semibold hover:opacity-90"
-        >
-          Open Billing
-        </Link>
-      </div>
+    <div className="cb-app bl-shell-banner">
+      <Banner tone={tone} title={title}>
+        <Link to={link.to} className="cb-link">{link.label}</Link>
+      </Banner>
     </div>
   )
 }

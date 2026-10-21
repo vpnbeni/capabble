@@ -1,4 +1,6 @@
 const mongoose = require('mongoose');
+const eventBus = require('../events/eventBus');
+const EVENTS = require('../events/eventNames');
 const {
   ASSET_STATUSES,
   ASSET_CONDITIONS,
@@ -1209,6 +1211,11 @@ const createAllocation = async (req, res) => {
       reason: req.body.reason || 'Allocated',
       referenceType: 'AssetAllocation',
       referenceId: allocation._id,
+    });
+    eventBus.emitFromRequest(req, EVENTS.ASSET_ALLOCATED, {
+      allocationId: String(allocation._id),
+      assetId: String(asset._id),
+      teacherId: req.body.newCustodianTeacherId ? String(req.body.newCustodianTeacherId) : null,
     });
 
     return res.status(201).json({ success: true, data: allocation, message: 'Asset allocated.' });

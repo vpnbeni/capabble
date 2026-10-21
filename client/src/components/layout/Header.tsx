@@ -8,9 +8,10 @@ import { useCentreDetails } from '@/hooks/useCentreDetails'
 import { useOnboardingStatus } from '@/hooks/useOnboarding'
 import { useSchoolProfile } from '@/hooks/useSchoolProfile'
 import { AttndModeSwitch } from '@/components/attnd/AttndModeSwitch'
-import { Bell, CalendarDays, PanelLeft, Search } from 'lucide-react'
-import { Badge, Button } from '@/components/ui'
+import { CalendarDays, PanelLeft, Search } from 'lucide-react'
+import { Button } from '@/components/ui'
 import { isMacPlatform, useCommandPalette } from '@/components/commandPalette/CommandPaletteProvider'
+import NotificationBell from '@/components/notifications/NotificationBell'
 
 /** "2026-2027" → "2026–27", as schools write it. */
 const formatSessionLabel = (session: string) => {
@@ -25,7 +26,6 @@ type HeaderProps = {
 }
 
 const Header: React.FC<HeaderProps> = ({ isSidebarCollapsed, onToggleSidebar }) => {
-  const [notificationsOpen, setNotificationsOpen] = useState(false)
   const { openPalette } = useCommandPalette()
   const shortcutLabel = useMemo(() => (isMacPlatform() ? '⌘K' : 'Ctrl K'), [])
   const location = useLocation()
@@ -205,10 +205,40 @@ const Header: React.FC<HeaderProps> = ({ isSidebarCollapsed, onToggleSidebar }) 
           showBackButton: isDetailRoute,
           backTo: backToPath,
         }
+      case 'notifications':
+        return {
+          pageTitle: 'Notifications',
+          pageSubtitle: 'Updates about your work, your access and your school.',
+          showBackButton: false,
+          backTo: null,
+        }
+      case 'account-settings':
+        return {
+          pageTitle: 'Account settings',
+          pageSubtitle: 'Your school’s name, logo and contact details',
+          showBackButton: isDetailRoute,
+          backTo: backToPath,
+        }
+      case 'onboarding':
+        return {
+          pageTitle: segments[1] === 'validation' ? 'Import check' : 'Exam centre setup',
+          pageSubtitle: segments[1] === 'validation'
+            ? 'How your imported files compare with each other'
+            : 'Import the candidate lists, Form 66 and attendance sheets',
+          showBackButton: segments[1] === 'validation',
+          backTo: segments[1] === 'validation' ? '/onboarding' : null,
+        }
+      case 'get-started':
+        return {
+          pageTitle: 'Get started',
+          pageSubtitle: 'Choose your plan and start your free trial',
+          showBackButton: false,
+          backTo: null,
+        }
       case 'billing':
         return {
           pageTitle: 'Billing',
-          pageSubtitle: 'Manage subscription, invoices, and billing profile',
+          pageSubtitle: 'Your plan, invoices and billing profile',
           showBackButton: isDetailRoute,
           backTo: backToPath,
         }
@@ -283,6 +313,7 @@ const Header: React.FC<HeaderProps> = ({ isSidebarCollapsed, onToggleSidebar }) 
           'student-info': { title: 'Overview', subtitle: 'Student strength by class and section, gender split and ages.' },
           'students': { title: 'Students', subtitle: 'Add, import and manage student records for this session.' },
           alumni: { title: 'Alumni', subtitle: 'Students who passed out of Class 12, kept across sessions.' },
+          'id-cards': { title: 'ID cards', subtitle: 'Design and print student ID cards with a QR for the school bus.' },
           'subjects': { title: 'Subjects', subtitle: 'Subjects taught in each class this session.' },
         }
         const info = titleMap[subPage] || { title: 'Students', subtitle: 'Student records for this session.' }
@@ -558,6 +589,10 @@ const Header: React.FC<HeaderProps> = ({ isSidebarCollapsed, onToggleSidebar }) 
           vehicles: { title: 'Vehicles', subtitle: 'Buses and vans, their crew and paper renewals.' },
           routes: { title: 'Routes', subtitle: 'Pickup routes, stops and the vehicle on each.' },
           'self-students': { title: 'Self students', subtitle: 'Students who come to school without school transport.' },
+          live: { title: 'Live buses', subtitle: 'Where each bus on a trip is right now.' },
+          trips: { title: 'Trips', subtitle: 'Each day\'s trips, the route driven and who got on and off.' },
+          assignments: { title: 'Student routes', subtitle: 'The route and stop each student uses.' },
+          crew: { title: 'Bus crew', subtitle: 'Run a trip, share the bus location and mark students.' },
         }
         const info = titleMap[subPage] || { title: 'Transport', subtitle: 'School transport.' }
         return {
@@ -647,11 +682,6 @@ const Header: React.FC<HeaderProps> = ({ isSidebarCollapsed, onToggleSidebar }) 
     setSearchParams(nextParams, { replace: true })
   }
 
-  const notifications = [
-    { id: 1, message: 'New exam scheduled for Grade 12', time: '2 hours ago', type: 'info' },
-    { id: 2, message: 'Room allocation updated', time: '4 hours ago', type: 'warning' },
-    { id: 3, message: 'Teacher John Smith registered', time: '6 hours ago', type: 'success' },
-  ]
 
   const dashboardDateLabel = useMemo(() => {
     const now = new Date()
@@ -888,60 +918,10 @@ const Header: React.FC<HeaderProps> = ({ isSidebarCollapsed, onToggleSidebar }) 
               <Button variant="tertiary" icon={Search} onClick={openPalette} aria-label="Search" title="Search" />
             </div>
 
-            {/* Notifications */}
-            <div className="relative">
-              <Button
-                variant="tertiary"
-                icon={Bell}
-                onClick={() => setNotificationsOpen(!notificationsOpen)}
-                aria-label="Notifications, 3 new"
-                aria-expanded={notificationsOpen}
-                title="Notifications"
-                className={`cb-shellhead__bell${notificationsOpen ? ' is-open' : ''}`}
-              />
-              <span className="cb-shellhead__belldot" aria-hidden="true" />
-
-              {/* Notifications Dropdown */}
-              {notificationsOpen && (
-                <div className="cb-menu__panel cb-menu__panel--end cb-shellhead__notifications" role="dialog" aria-label="Notifications">
-                  <div className="cb-shellhead__notifhead">
-                    <span className="cb-card__title">Notifications</span>
-                    <Badge tone="accent" dot={false}>3 new</Badge>
-                  </div>
-                  <ul className="cb-shellhead__notiflist">
-                    {notifications.map((notification) => (
-                      <li key={notification.id}>
-                        <span
-                          className={`cb-shellhead__notifdot is-${notification.type === 'info' ? 'info' : notification.type === 'warning' ? 'warning' : 'success'}`}
-                          aria-hidden="true"
-                        />
-                        <span>
-                          <span className="cb-shellhead__notiftext">{notification.message}</span>
-                          <span className="cb-shellhead__notiftime">{notification.time}</span>
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                  <div className="cb-shellhead__notiffoot">
-                    <Button variant="tertiary" size="sm" fullWidth>
-                      View all notifications
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </div>
+            <NotificationBell audience="staff" viewAllPath="/notifications" />
           </div>
         </div>
       </div>
-
-      {/* Click outside to close notifications */}
-      {notificationsOpen && (
-        <div
-          className="fixed inset-0 z-30"
-          onClick={() => setNotificationsOpen(false)}
-          aria-hidden="true"
-        />
-      )}
     </header>
   )
 }

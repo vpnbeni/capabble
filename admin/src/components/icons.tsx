@@ -69,6 +69,9 @@ export const School = make(<>
   <path d="M14 22v-4a2 2 0 1 0-4 0v4" /><path d="m18 10 4 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-8l4-2" />
   <path d="M18 5v17" /><path d="m4 6 8-4 8 4" /><path d="M6 5v17" /><circle cx="12" cy="9" r="2" />
 </>)
+export const MessageSquare = make(<>
+  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+</>)
 export const LogOut = make(<>
   <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" x2="9" y1="12" y2="12" />
 </>)
@@ -85,6 +88,7 @@ export const Upload = make(<>
 </>)
 export const ChevronLeft = make(<path d="m15 18-6-6 6-6" />)
 export const ChevronRight = make(<path d="m9 18 6-6-6-6" />)
+export const ChevronDown = make(<path d="m6 9 6 6 6-6" />)
 export const Eye = make(<>
   <path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0" />
   <circle cx="12" cy="12" r="3" />

@@ -101,3 +101,39 @@
     transform: translateY(0);
   }
 }
+
+/* Dark theme */
+.dark .help-centre-page {
+  --hc-surface: #111827;
+  background:
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(124, 58, 237, 0.14), transparent),
+    radial-gradient(ellipse 60% 40% at 100% 0%, rgba(59, 130, 246, 0.1), transparent),
+    var(--hc-surface);
+}
+
+.dark .help-centre-hero {
+  background: linear-gradient(135deg, #1e1b3a 0%, #1a2040 45%, #0f2433 100%);
+  border-color: rgba(167, 139, 250, 0.2);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.dark .help-sidebar-card {
+  background: rgba(31, 41, 55, 0.92);
+  border-color: rgba(55, 65, 81, 0.9);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+}
+
+.dark .help-contact-row:hover,
+.dark .help-chip:hover {
+  background: rgba(167, 139, 250, 0.12);
+  color: #c4b5fd;
+}
+
+.dark .help-getting-started {
+  background: linear-gradient(145deg, #1e1b3a 0%, #172036 55%, #0f2a30 100%);
+  border-color: rgba(167, 139, 250, 0.2);
+}
+
+.dark .help-module-card:hover:not(.help-module-card--disabled) {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}

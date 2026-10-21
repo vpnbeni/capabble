@@ -10,12 +10,14 @@ const coreListeners = require('../modules/core/listeners');
 const cntrListeners = require('../modules/cntr/listeners');
 const timetableListeners = require('../modules/timetable/listeners');
 const appntListeners = require('../modules/appnt/listeners');
+const notificationListeners = require('../notifications/listeners');
 
 const registerAllListeners = () => {
   coreListeners.register(eventBus);
   cntrListeners.register(eventBus);
   timetableListeners.register(eventBus);
   appntListeners.register(eventBus);
+  notificationListeners.register(eventBus);
 
   console.log('[event-bus] All listeners registered');
 };

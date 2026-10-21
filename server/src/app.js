@@ -23,6 +23,7 @@ const { tenantContextMiddleware } = require('./tenancy/tenantContextMiddleware')
 // Import module registry — each module registers its own routes
 const { mountAll } = require('./modules');
 const platformModule = require('./modules/platform');
+const billing = require('./modules/billing');
 
 // Create Express app
 const app = express();
@@ -99,7 +100,7 @@ const corsOptions = {
   },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'x-requested-with', 'x-tenant-slug', 'x-academic-session'],
-  exposedHeaders: ['Content-Disposition', 'Content-Type'],
+  exposedHeaders: ['Content-Disposition', 'Content-Type', 'X-Cards-Issued'],
   credentials: true,
   optionsSuccessStatus: 200
 };
@@ -135,6 +136,9 @@ if (rateLimitEnabled) {
   });
   app.use(limiter);
 }
+
+// Razorpay webhooks are signed over the raw body, so they mount before the parsers and sanitizers.
+app.use('/api/webhooks', billing.webhookRouter);
 
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));

@@ -118,7 +118,7 @@ const SupportForm: React.FC<SupportFormProps> = ({
 
   if (moduleOptions.length === 0) {
     return (
-      <div className="rounded-xl border border-gray-200 bg-white p-4 text-sm text-gray-500 shadow-sm">
+      <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 text-sm text-gray-500 shadow-sm">
         No modules are enabled for this tenant. Contact your administrator to activate modules before reporting issues.
       </div>
     )
@@ -130,12 +130,12 @@ const SupportForm: React.FC<SupportFormProps> = ({
       className={
         embedded
           ? 'space-y-4'
-          : 'space-y-4 rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5'
+          : 'space-y-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 shadow-sm sm:p-5'
       }
     >
       {!embedded ? (
         <div>
-          <h2 className="text-sm font-semibold text-gray-900">Report an Issue</h2>
+          <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Report an Issue</h2>
           <p className="mt-1 text-xs text-gray-500">
             Choose the module and page where you faced the problem, then describe what happened.
           </p>
@@ -154,7 +154,7 @@ const SupportForm: React.FC<SupportFormProps> = ({
               setPageId(nextPages[0]?.id || '')
             }}
             title="Module"
-            className="w-full rounded-lg border border-gray-300 bg-white px-2.5 py-2 text-xs focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2.5 py-2 text-xs focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
           >
             {moduleOptions.map((mod) => (
               <option key={mod.id} value={mod.id}>
@@ -171,7 +171,7 @@ const SupportForm: React.FC<SupportFormProps> = ({
             value={pageId}
             onChange={(e) => setPageId(e.target.value)}
             title="Page or area"
-            className="w-full rounded-lg border border-gray-300 bg-white px-2.5 py-2 text-xs focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2.5 py-2 text-xs focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
           >
             {pageOptions.map((page) => (
               <option key={page.id} value={page.id}>
@@ -192,7 +192,7 @@ const SupportForm: React.FC<SupportFormProps> = ({
             value={affiliationNo || '—'}
             readOnly
             title="Affiliation number"
-            className="w-full rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-2 text-xs text-gray-700"
+            className="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 px-2.5 py-2 text-xs text-gray-700 dark:text-gray-300"
           />
         </div>
 
@@ -203,7 +203,7 @@ const SupportForm: React.FC<SupportFormProps> = ({
             value={schoolCode || '—'}
             readOnly
             title="CBSE code"
-            className="w-full rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-2 text-xs text-gray-700"
+            className="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 px-2.5 py-2 text-xs text-gray-700 dark:text-gray-300"
           />
         </div>
 
@@ -214,7 +214,7 @@ const SupportForm: React.FC<SupportFormProps> = ({
             value={issueDate}
             onChange={(e) => setIssueDate(e.target.value)}
             title="Issue date"
-            className="w-full rounded-lg border border-gray-300 bg-white px-2.5 py-2 text-xs focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2.5 py-2 text-xs focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
           />
         </div>
 
@@ -236,7 +236,7 @@ const SupportForm: React.FC<SupportFormProps> = ({
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           rows={4}
-          className="w-full resize-y rounded-lg border border-gray-300 px-2.5 py-2 text-xs focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+          className="w-full resize-y rounded-lg border border-gray-300 dark:border-gray-600 px-2.5 py-2 text-xs focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
           placeholder="What were you trying to do? What happened instead? Include steps and any error messages."
         />
         {errors.description ? <p className="mt-1 text-[11px] text-red-500">{errors.description}</p> : null}

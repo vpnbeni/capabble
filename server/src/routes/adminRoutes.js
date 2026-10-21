@@ -37,8 +37,12 @@ const {
   masterRemunerationUpdateSchema,
   masterPackingDispatchUpdateSchema,
   schoolDirectoryTypeSettingsSchema,
-  schoolDirectoryManualTypeSchema
+  schoolDirectoryManualTypeSchema,
+  publicDemoRequestSchema,
+  demoRequestQuerySchema,
+  demoRequestUpdateSchema
 } = require('../validations/adminValidation');
+const demoRequestController = require('../controllers/admin/demoRequestController');
 const masterSubjectsController = require('../controllers/admin/masterSubjectsController');
 const masterDatesheetController = require('../controllers/admin/masterDatesheetController');
 const masterGuidelinesController = require('../controllers/admin/masterGuidelinesController');
@@ -50,6 +54,7 @@ const schoolDirectoryTypeSettingsController = require('../controllers/admin/scho
 const rolloutController = require('../controllers/admin/rolloutController');
 const masterTeacherTemplateController = require('../controllers/admin/masterTeacherTemplateController');
 const billingAdminController = require('../controllers/admin/billingAdminController');
+const billing = require('../modules/billing');
 const tenantFeaturesController = require('../controllers/admin/tenantFeaturesController');
 
 const router = express.Router();
@@ -112,6 +117,18 @@ const publicTenantResolveLimiter = rateLimit({
   }
 });
 
+const publicDemoRequestLimiter = rateLimit({
+  windowMs: parsePositiveInt(process.env.PUBLIC_DEMO_REQUEST_RATE_LIMIT_WINDOW_MS, 60 * 60 * 1000),
+  max: parsePositiveInt(process.env.PUBLIC_DEMO_REQUEST_RATE_LIMIT_MAX, 5),
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    message: 'Too many demo requests from this network. Please try again later or email info@capabble.cloud.',
+    errorCode: 'rate_limit_exceeded'
+  }
+});
+
 router.post('/auth/login', validateJoi(platformLoginSchema), loginPlatformAdmin);
 router.post(
   '/public/auth/resolve-tenant',
@@ -144,6 +161,13 @@ router.post(
   exchangePublicTenantSignup
 );
 
+router.post(
+  '/public/demo-requests',
+  publicDemoRequestLimiter,
+  validateJoi(publicDemoRequestSchema),
+  demoRequestController.createDemoRequest
+);
+
 router.use(auth.protectPlatform);
 
 router.get('/auth/me', getPlatformMe);
@@ -165,6 +189,15 @@ router.delete(
   validateParams(tenantIdParamSchema),
   validateJoi(deleteTenantSchema),
   deleteTenant
+);
+
+// Demo requests (leads from capabble.cloud/request-demo)
+router.get('/demo-requests', validateQuery(demoRequestQuerySchema), demoRequestController.listDemoRequests);
+router.patch(
+  '/demo-requests/:id',
+  validateParams(tenantIdParamSchema),
+  validateJoi(demoRequestUpdateSchema),
+  demoRequestController.updateDemoRequest
 );
 
 // Tenant feature toggle routes
@@ -251,13 +284,7 @@ router.post('/rollouts/:id/retry', rolloutController.retryRollout);
 router.get('/master-teacher-template', masterTeacherTemplateController.getTemplate);
 router.put('/master-teacher-template', masterTeacherTemplateController.updateTemplate);
 
-// Billing admin routes
-router.get('/billing/tenants', billingAdminController.listTenants);
-router.get('/billing/tenants/:tenantId', billingAdminController.getTenantById);
-router.post('/billing/tenants/:tenantId/change-plan', billingAdminController.changePlan);
-router.post('/billing/tenants/:tenantId/grant-extension', billingAdminController.grantExtension);
-router.post('/billing/plans', billingAdminController.createPlan);
-router.post('/billing/coupons', billingAdminController.createCoupon);
-router.post('/billing/addons', billingAdminController.createAddon);
+// Billing (validated, stored and audited by the billing module)
+router.use('/billing', billingAdminController.toBilling, billing.adminRouter);
 
 module.exports = router;

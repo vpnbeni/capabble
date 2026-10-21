@@ -1,0 +1,28 @@
+// TLS for the billing database. Neon's certificates are publicly trusted, so nothing is
+// needed there. Providers with their own CA (e.g. Aiven) need BILLING_DATABASE_CA_CERT: a
+// path to the CA file or the PEM text itself.
+const fs = require('fs');
+const path = require('path');
+
+// A relative BILLING_DATABASE_CA_CERT path is read from the server/ folder.
+const SERVER_ROOT = path.join(__dirname, '..', '..', '..', '..');
+const readCa = (value) => fs.readFileSync(path.isAbsolute(value) ? value : path.join(SERVER_ROOT, value), 'utf8');
+
+function connectionOptions(connectionString) {
+  const ca = process.env.BILLING_DATABASE_CA_CERT;
+  const skipVerify = String(process.env.BILLING_DATABASE_SSL_SKIP_VERIFY || 'false') === 'true';
+  if (!ca && !skipVerify) return { connectionString };
+
+  if (skipVerify && process.env.NODE_ENV === 'production') {
+    throw new Error('BILLING_DATABASE_SSL_SKIP_VERIFY is not allowed in production; set BILLING_DATABASE_CA_CERT');
+  }
+  // An explicit ssl object wins only when sslmode is not also in the URL.
+  const url = new URL(connectionString);
+  url.searchParams.delete('sslmode');
+  const ssl = ca
+    ? { ca: ca.includes('BEGIN CERTIFICATE') ? ca : readCa(ca), rejectUnauthorized: true }
+    : { rejectUnauthorized: false };
+  return { connectionString: url.toString(), ssl };
+}
+
+module.exports = { connectionOptions };

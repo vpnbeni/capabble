@@ -5,6 +5,7 @@ const schoolProfileSchema = new mongoose.Schema({
   schoolName: { type: String, default: '', trim: true },
   schoolCode: { type: String, default: '', trim: true },
   affiliationNo: { type: String, default: '', trim: true },
+  udiseCode: { type: String, default: '', trim: true },
   affiliationTill: { type: Date, default: null },
   logoUrl: { type: String, default: '' },
   logoPublicId: { type: String, default: '' },
@@ -15,6 +16,7 @@ const schoolProfileSchema = new mongoose.Schema({
   awardListDesign: { type: mongoose.Schema.Types.Mixed, default: null },
   admitCardDesign: { type: mongoose.Schema.Types.Mixed, default: null },
   reportCardDesign: { type: mongoose.Schema.Types.Mixed, default: null },
+  idCardDesign: { type: mongoose.Schema.Types.Mixed, default: null },
   metadata: {
     studentRollNumberAssignment: {
       mode: { type: String, default: 'alphabetical_by_class_section' },

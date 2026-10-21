@@ -154,7 +154,8 @@ What the workflow does:
 3. Uploads tarball to EC2 over SSH.
 4. Extracts into `EC2_APP_DIR`.
 5. Runs `npm ci --omit=dev`.
-6. Restarts app using PM2 (`ecosystem.config.js`).
+6. Runs `npm run billing:db:migrate` (billing's Postgres; skip if `BILLING_DATABASE_URL` is not set).
+7. Restarts app using PM2 (`ecosystem.config.js`).
 
 ## 5. PM2 bootstrap (first time only)
 
@@ -163,6 +164,7 @@ On EC2 once:
 ```bash
 cd /var/www/capabble/server
 npm ci --omit=dev
+npm run billing:db:migrate
 pm2 start ecosystem.config.js --only capabble-server --update-env
 pm2 save
 pm2 startup

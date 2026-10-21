@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
-import { MapPinned, Pencil, Plus, Trash2, X } from 'lucide-react'
+import { MapPin, MapPinned, Pencil, Plus, Trash2, X } from 'lucide-react'
 import trnstService, { type RouteShift, type TransportRoute, type TransportStop, type TransportVehicle } from '@/services/trnstService'
 import {
   Button,
@@ -18,6 +18,7 @@ import {
   type DataTableColumn,
 } from '@/components/ui'
 import { Entity, SHIFT_LABEL, errorMessage, routeVehicle, vehicleName } from '@/components/trnst/TrnstUi'
+import StopPlacePicker from '@/components/trnst/StopPlacePicker'
 
 const emptyStop = (): TransportStop => ({ name: '', landmark: '', pickupTime: '', dropTime: '' })
 
@@ -62,6 +63,8 @@ const TrnstRoutes: React.FC = () => {
   const [saving, setSaving] = useState(false)
   const [removing, setRemoving] = useState<TransportRoute | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [pinning, setPinning] = useState<number | null>(null)
+  const [pinValue, setPinValue] = useState<{ lat: number; lng: number } | null>(null)
 
   const loadData = async () => {
     try {
@@ -98,6 +101,21 @@ const TrnstRoutes: React.FC = () => {
     setForm((prev) => ({ ...prev, stops: prev.stops.map((stop, i) => (i === index ? { ...stop, ...patch } : stop)) }))
   const removeStop = (index: number) =>
     setForm((prev) => ({ ...prev, stops: prev.stops.length > 1 ? prev.stops.filter((_, i) => i !== index) : [emptyStop()] }))
+
+  const openPin = (index: number) => {
+    const stop = form.stops[index]
+    setPinValue(typeof stop.lat === 'number' && typeof stop.lng === 'number' ? { lat: stop.lat, lng: stop.lng } : null)
+    setPinning(index)
+  }
+
+  const savePin = () => {
+    if (pinning === null) return
+    updateStop(pinning, { lat: pinValue?.lat ?? null, lng: pinValue?.lng ?? null })
+    setPinning(null)
+  }
+
+  const pinnedCount = form.stops.filter((stop) => stop.name.trim() && typeof stop.lat === 'number').length
+  const namedCount = form.stops.filter((stop) => stop.name.trim()).length
 
   const openAdd = () => {
     setEditing(null)
@@ -347,7 +365,9 @@ const TrnstRoutes: React.FC = () => {
         <div className="tr-section">
           <div className="tr-section__head">
             <span className="tr-section__title">Stops</span>
-            <span className="tr-section__hint">In pickup order. Empty rows are skipped.</span>
+            <span className="tr-section__hint">
+              In pickup order. Empty rows are skipped. {pinnedCount} of {namedCount} on the map.
+            </span>
           </div>
           <ol className="tr-stops">
             {form.stops.map((stop, index) => (
@@ -378,6 +398,15 @@ const TrnstRoutes: React.FC = () => {
                   onChange={(e) => updateStop(index, { dropTime: e.target.value })}
                 />
                 <Button
+                  className="tr-stop__pin"
+                  variant={typeof stop.lat === 'number' ? 'secondary' : 'tertiary'}
+                  size="sm"
+                  icon={MapPin}
+                  aria-label={`${typeof stop.lat === 'number' ? 'Move' : 'Set'} stop ${index + 1} on the map`}
+                  title={typeof stop.lat === 'number' ? 'On the map. Click to move it.' : 'Set on the map'}
+                  onClick={() => openPin(index)}
+                />
+                <Button
                   className="tr-stop__remove"
                   variant="tertiary"
                   size="sm"
@@ -395,6 +424,42 @@ const TrnstRoutes: React.FC = () => {
           </div>
         </div>
       </Sheet>
+
+      <Dialog
+        open={pinning !== null}
+        onClose={() => setPinning(null)}
+        size="lg"
+        title={`Set ${form.stops[pinning ?? 0]?.name.trim() || `stop ${(pinning ?? 0) + 1}`} on the map`}
+        description="Paste the spot from Google Maps, search a place, or click the map where the bus stops. Parents see this point on the bus map."
+        footer={
+          <>
+            {pinValue ? (
+              <Button variant="tertiary" onClick={() => setPinValue(null)}>
+                Clear point
+              </Button>
+            ) : null}
+            <Button onClick={() => setPinning(null)}>Cancel</Button>
+            <Button variant="primary" onClick={savePin}>
+              Save point
+            </Button>
+          </>
+        }
+      >
+        {pinning !== null ? (
+          <StopPlacePicker
+            initialQuery={form.stops[pinning]?.name.trim() || ''}
+            stops={form.stops.map((stop, index) => ({
+              id: String(index),
+              name: stop.name || `Stop ${index + 1}`,
+              // The stop being placed is drawn by the pick marker instead.
+              lat: index === pinning ? null : stop.lat ?? null,
+              lng: index === pinning ? null : stop.lng ?? null,
+            }))}
+            value={pinValue}
+            onChange={setPinValue}
+          />
+        ) : null}
+      </Dialog>
 
       <Dialog
         open={Boolean(removing)}

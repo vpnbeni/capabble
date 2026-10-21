@@ -1,5 +1,7 @@
 import axios, { AxiosInstance, AxiosResponse, InternalAxiosRequestConfig } from 'axios'
+import { createElement } from 'react'
 import toast from 'react-hot-toast'
+import { Info } from 'lucide-react'
 import { getTenantHeader, isLocalRuntime, resolveApiBaseUrl } from '@/utils/tenantRuntime'
 import { getAcademicSessionHeader } from '@/contexts/AcademicSessionContext'
 import { clearAuthData, setStoredUser } from '@/utils/authStorage'
@@ -53,6 +55,37 @@ const showApiErrorToast = (message: string) => {
 
   lastApiErrorToast = { message: normalizedMessage, shownAt: now }
   toast.error(normalizedMessage, { id: API_ERROR_TOAST_ID })
+}
+
+const BILLING_TOAST_ID = 'billing-required'
+
+/**
+ * A blocked action because of billing: one toast, with a link to the next step.
+ * It is a step to take, not a failure, so it uses the info style rather than red.
+ */
+const showBillingToast = (message: string, href = '#/billing', linkLabel = 'Open Billing') => {
+  toast(
+    (t) => createElement(
+      'span',
+      null,
+      `${message} `,
+      createElement(
+        'a',
+        {
+          href,
+          className: 'cb-link',
+          style: { fontWeight: 600, whiteSpace: 'nowrap' },
+          onClick: () => toast.dismiss(t.id),
+        },
+        linkLabel
+      )
+    ),
+    {
+      id: BILLING_TOAST_ID,
+      duration: 8000,
+      icon: createElement(Info, { size: 18, 'aria-hidden': true, style: { color: 'var(--info-solid)', flexShrink: 0 } }),
+    }
+  )
 }
 
 const isAuthSurfacePath = () => {
@@ -279,10 +312,22 @@ api.interceptors.response.use(
         break
       }
 
-      case 402:
-        // Billing restriction
-        showApiErrorToast(data?.message || 'Billing restriction applied. Open Billing to continue.')
+      case 402: {
+        // Unpaid: say why in plain words and offer the way out. Only for something the user
+        // did: a page loading data shows its own state, and a school that hasn't chosen its
+        // plan yet is already sent to Get started by ProtectedRoute.
+        const isBackgroundRead = String(error.config?.method || 'get').toLowerCase() === 'get'
+        if (isBackgroundRead || (error.config as any)?._silent === true) break
+        if (data?.errorCode === 'plan_required' || data?.accessMode === 'setup_required'
+          || error.response?.headers?.['x-billing-access-mode'] === 'setup_required') {
+          showBillingToast('Choose your plan and start your free trial first.', '#/get-started', 'Choose plan')
+          break
+        }
+        showBillingToast(data?.errorCode === 'module_not_subscribed'
+          ? 'Your school hasn’t subscribed to this module yet.'
+          : 'Your school’s Capabble access is read-only until the subscription is paid.')
         break
+      }
 
       case 404: {
         const isSilent404 = (error.config as any)?._silent === true

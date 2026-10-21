@@ -29,6 +29,8 @@ When the artifact changes, resync this file and bump the version line.
 
 ## Colour (tokens in `styles/capabble/tokens.css`, generated — don't edit)
 
+- Light and dark: the user picks System (default), Light or Dark under Appearance in the account menu (`utils/theme.ts` puts `.dark` on `<html>`). Tokens switch by themselves; any raw Tailwind colour needs its `dark:` pair. Public marketing pages call `useLightOnlyTheme()` and stay light.
+
 - Grounds: page `bg`; cards, tables, sidebar, header `surface`; menus/dialogs `surface-raised`; table headers, tracks, read-only fields `surface-sunken`.
 - Lines: `border` for hairlines; every input/select/secondary button uses `border-control`.
 - Text: `ink` primary, `ink-muted` secondary, `ink-subtle` only for timestamps, placeholders, column headers.
@@ -59,6 +61,7 @@ When the artifact changes, resync this file and bump the version line.
 
 - Money `formatINR(n)` → ₹1,25,000; stats `formatINR(n, { compact: true })` → ₹18.4 L.
 - Dates `formatDate(d)` → 7 Oct 2026; `{ year: false }` inside the current year. Times `formatTime('14:30')` → 2:30 pm.
+- Feeds and activity `formatRelative(d)` → Just now, 5 min ago, 3 hours ago, Yesterday, then 7 Oct (not in the artifact yet: added to our kit).
 - Missing values `orDash(v)` → "—". Also: `cx`, `initials`.
 
 ## Icons
@@ -70,6 +73,7 @@ Lucide (`lucide-react`), passed as components: `icon={Plus}`. 1.75 stroke is app
 - Overlay by size: `Dialog` for a decision or ≤4 fields; `Sheet` for 5–10 fields or a record preview; a page for anything longer.
 - Choice by count: `RadioGroup` 2–5; `Select` ≤15; `Combobox` for long/searchable lists (students, teachers, subjects).
 - On/off: `Switch` applies immediately; `Checkbox` inside a saved form.
+- One of 2–4 short options that applies immediately (theme, view density): `SegmentedControl`. Not for switching views (that's `Tabs`).
 - Dates: `TextField type="date"` (the system's DatePicker/Calendar aren't ported yet).
 - Times from a fixed set of slots: `SlotPicker`. A free-form time: `TextField type="time"`.
 
@@ -97,17 +101,22 @@ Lucide (`lucide-react`), passed as components: `icon={Plus}`. 1.75 stroke is app
 | `Button` | `variant: primary \| secondary \| tertiary \| danger, size: sm \| md \| lg, icon, iconRight, loading, fullWidth` | One primary per view. Card actions are `sm`/`tertiary` |
 | `Badge` | `tone, dot (default true), size: 'sm' \| 'lg'` | Status, 1–3 words |
 | `Ring` | `segments[{value,tone}], max, size: 'sm' \| 'lg', label, children` | Donut for a part-of-whole (present / absent / half day). Centre content in children; keep centre numbers ≤ 28px (lg) or 13px (sm). Never the only carrier of the number: legend or label beside it |
-| `ColumnChart` | `items[{label,value,caption,tone}], max, target{value,label}, unit, label` | Same measure across categories (attendance % per class). Fixed 0–max scale, value above each column, optional dashed target. Accent by default; warning/danger only for columns below target |
+| `ColumnChart` | `items[{label,value,caption,tone,detail,detailLabel}], max, target{value,label}, unit, label` | Same measure across categories (attendance % per class). Fixed 0–max scale, value above each column, optional dashed target. Accent by default; warning/danger only for columns below target. `detail` puts a `HoverCard` on that column (e.g. who is absent) |
+| `Timeline` | `steps[{label,date,caption}], current, label` | Dated steps of one process, e.g. a trial: Today → Reminder → Notice → First charge. Steps before `current` read as done, `current` is accent. Stacks on phones. Not for navigation or long event lists. Not in the artifact yet: added to our kit |
 | `Progress` | `value, max, label, valueLabel, showValue, tone, size: 'sm'` | Per-class figures: label + valueLabel ("12 of 30 topics"); stack in `.cb-progress-list` |
+| `Skeleton` | `width, height, round, className` | Shimmering placeholder while a screen or card loads. Sketch the real layout with it (StatCards with Skeleton values, Card rows in `.cb-skeleton-stack` / `.cb-skeleton-row`), never a lone "Loading…" line. Small inline waits (buttons, table state) use `.cb-spinner` (the pulsing Capabble mark). Not in the artifact yet: added to our kit |
 | `Avatar` | `name, src, size, square` | People; school logo is `square` |
 | `Icon` | `icon, size, label` | Lucide glyph at system stroke |
 | `TextField` / `TextArea` | `label, hint, error, required` + input props; TextField `prefix, suffix, icon, size` | Every field has a visible label |
+| `FileField` | `label, hint, error, required, file, onChange(File \| null), accept, placeholder, disabled` | One file to upload (imports). Dashed drop zone; shows the chosen file's name and size with Replace. Several files = several FileFields, each labelled. Not in the artifact yet: added to our kit |
 | `Select` | `label, options (string \| {value,label,disabled}), placeholder, size` | Native dropdown |
 | `Combobox` | `options[{value,label,meta,keywords}], value, onChange, selectedLabel, clearable, placeholder` | Searchable picker; no free text |
 | `SlotPicker` | `slots[{start, end, state: 'free' \| 'busy' \| 'caution', reason}], value, onChange, allowCaution, loading, emptyText` + field chrome | Picking a time slot (appointments). Busy slots stay visible and struck through; `caution` (e.g. a teaching period) is dashed and pickable only with `allowCaution`. Not in the artifact yet: added to our kit |
+| `SegmentedControl` | `options[{value,label,icon}], value, onChange, label, fullWidth` | Immediate one-of-few setting (radiogroup); e.g. the Appearance switch in the account menu |
 | `Checkbox` / `Switch` / `RadioGroup` | `checked, onChange(bool)`; RadioGroup `options, value, onChange, variant: 'list' \| 'cards'` | |
 | `Dialog` | `open, onClose, title, description, tone: 'default' \| 'danger', size: sm \| md \| lg, footer` | Confirmations, ≤4 fields |
 | `Sheet` | `open, onClose, title, description, icon, size: sm \| md \| lg \| xl, footer, onSubmit` | Forms; `onSubmit` wraps body+footer in a `<form>`. Bottom sheet on phones |
+| `HoverCard` | `content, label, focusable, children` | Light card behind a figure: the short list it counts (absent students) and one link to the page that owns it. Opens on hover, focus and tap (never hover-only); body uses `.cb-hovercard__title`, `__list`/`__row` (a `Link` row), `__more`, `__footer` with a `.cb-link`. Not in the artifact yet: added to our kit |
 | `Menu` | `items[{label, icon, hint, onSelect, tone:'danger', disabled} \| {divider:true}], label, align, trigger` | "…" row/card actions; destructive last and still confirm |
 | `PaperStage`, `Paper`, `PaperCopies`, `FormatToolbar` | `Paper pageSize: 'A4' \| 'legal' \| 'letter'` | Print previews (paper stays white in both themes) |
 | `PdfFrame` | `src, title, toolbar` | Embedded PDF preview |
@@ -118,6 +127,7 @@ Toasts: `react-hot-toast` (`toast.success`, `toast.error`); the `Toaster` is in 
 
 `.cb-stats` (4-col stat row) · `.cb-grid-8-4` · `.cb-grid-6-6` · `.cb-grid-3` · `.cb-stack` (vertical gap 24) ·
 `.cb-form-section` + `.cb-form-section__title` · `.cb-form-grid` (2-col; `--3`; child `.is-wide` spans) ·
+`.cb-logo-field` › `.cb-logo-preview` (img, never cropped) + `.cb-logo-field__body` (label, hint, Button): logo uploads; not in the artifact yet ·
 `.cb-check-grid` · `.cb-progress-list` (`--grid`) · `.cb-card-actions` · `.cb-table-state` (+ `.cb-spinner`, loading) ·
 text: `.cb-muted` `.cb-subtle` `.cb-strong` `.cb-subhead` `.cb-section-title` `.cb-link` `.cb-visually-hidden`.
 

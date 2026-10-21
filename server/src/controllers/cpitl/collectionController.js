@@ -2,6 +2,8 @@ const fs = require('fs');
 const path = require('path');
 const handlebars = require('handlebars');
 const asyncHandler = require('../../middleware/asyncHandler');
+const eventBus = require('../../events/eventBus');
+const EVENTS = require('../../events/eventNames');
 const pdfGenerator = require('../../utils/pdfGenerator');
 const { parseIds, runBulk, sendBulk, labelled } = require('../../modules/cpitl/bulk');
 const {
@@ -212,6 +214,7 @@ const createPayment = asyncHandler(async (req, res) => {
   const account = await loadAccountForStudent(req.models, req.params.studentId);
   if (!account) throw httpError('No fee account found for this student. Assign a fee structure first.', 404);
   const payment = await recordPayment(req.models, account, req.body || {}, req.academicSession, auditUser(req));
+  eventBus.emitFromRequest(req, EVENTS.FEE_PAYMENT_RECORDED, { paymentId: String(payment._id) });
   return res.status(201).json({ success: true, data: payment, message: `Receipt ${payment.receiptNo} generated.` });
 });
 
@@ -247,6 +250,7 @@ const cancelPaymentHandler = asyncHandler(async (req, res) => {
   const payment = await FeePayment.findById(req.params.id);
   if (!payment) throw httpError('Receipt not found.', 404);
   await cancelPayment(req.models, payment, req.body?.reason, auditUser(req));
+  eventBus.emitFromRequest(req, EVENTS.FEE_PAYMENT_CANCELLED, { paymentId: String(payment._id), reason: String(req.body?.reason || '').trim() });
   return ok(res, payment, { message: `Receipt ${payment.receiptNo} cancelled.` });
 });
 
@@ -265,6 +269,7 @@ const bulkCancelPayments = asyncHandler(async (req, res) => {
     } catch (error) {
       throw labelled(error, payment.receiptNo);
     }
+    eventBus.emitFromRequest(req, EVENTS.FEE_PAYMENT_CANCELLED, { paymentId: String(payment._id), reason });
     return payment.receiptNo;
   });
   return sendBulk(res, result);
@@ -278,6 +283,7 @@ const updateChequeStatus = asyncHandler(async (req, res) => {
   if (!['pending', 'cleared', 'bounced'].includes(status)) throw httpError('Invalid cheque status.');
   if (status === 'bounced' && payment.status === 'valid') {
     await cancelPayment(req.models, payment, `Cheque bounced${req.body?.note ? `: ${req.body.note}` : ''}`, auditUser(req));
+    eventBus.emitFromRequest(req, EVENTS.FEE_PAYMENT_CANCELLED, { paymentId: String(payment._id), reason: 'Cheque bounced' });
   }
   payment.cheque.status = status;
   await payment.save();

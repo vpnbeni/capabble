@@ -1,5 +1,7 @@
 const ExcelJS = require('exceljs');
 const asyncHandler = require('../../middleware/asyncHandler');
+const eventBus = require('../../events/eventBus');
+const EVENTS = require('../../events/eventNames');
 const pdfGenerator = require('../../utils/pdfGenerator');
 const { numberToIndianWords } = require('../../utils/numberToIndianWords');
 const { httpError, getModel, auditUser, getSettings } = require('../../modules/cpitl/feeService');
@@ -449,6 +451,7 @@ const finalizeRun = asyncHandler(async (req, res) => {
   run.status = 'finalized';
   run.updatedBy = auditUser(req);
   await run.save();
+  eventBus.emitFromRequest(req, EVENTS.PAYROLL_FINALIZED, { runId: String(run._id) });
   return ok(res, run, { message: 'Payroll finalized. Payslips are ready.' });
 });
 
@@ -465,6 +468,7 @@ const payRun = asyncHandler(async (req, res) => {
   const expense = await upsertForSource(req.models, { kind: 'salary', sourceModel: 'PayrollRun', source: run, sessionLabel: req.academicSession, user: auditUser(req) });
   run.expenseId = expense._id;
   await run.save();
+  eventBus.emitFromRequest(req, EVENTS.PAYROLL_PAID, { runId: String(run._id) });
   return ok(res, run, { message: `Salary for ${monthTitle(run.month)} marked paid.` });
 });
 

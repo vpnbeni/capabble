@@ -1,6 +1,7 @@
 import React, { forwardRef, useState } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import { cx, initials } from './format'
+import { HoverCard } from './hovercard'
 
 export type Tone = 'success' | 'warning' | 'danger' | 'info' | 'neutral'
 
@@ -62,6 +63,19 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
   )
 })
 
+/**
+ * Shimmering placeholder for content that is still loading. Size it to the text or block it
+ * stands in for; stack several to sketch the shape of the real screen.
+ */
+export const Skeleton: React.FC<{
+  width?: number | string
+  height?: number | string
+  round?: boolean
+  className?: string
+}> = ({ width = '100%', height = 12, round, className }) => (
+  <span className={cx('cb-skeleton', round && 'cb-skeleton--round', className)} style={{ width, height }} aria-hidden="true" />
+)
+
 /** A short status label. The word always says what the colour means. */
 export const Badge: React.FC<{
   tone?: Tone | 'accent'
@@ -119,7 +133,15 @@ export const Ring: React.FC<{
   )
 }
 
-export type ColumnChartItem = { label: string; value: number; caption?: string; tone?: 'accent' | 'success' | 'warning' | 'danger' | 'info' }
+export type ColumnChartItem = {
+  label: string
+  value: number
+  caption?: string
+  tone?: 'accent' | 'success' | 'warning' | 'danger' | 'info'
+  /** Card shown on hover / focus / tap of the column (e.g. who is absent), labelled by `detailLabel`. */
+  detail?: React.ReactNode
+  detailLabel?: string
+}
 
 /** Column chart on a fixed 0–`max` scale, one column per item, with an optional dashed target line. */
 export const ColumnChart: React.FC<{
@@ -131,26 +153,39 @@ export const ColumnChart: React.FC<{
   className?: string
 }> = ({ items, max = 100, target, unit = '%', label, className }) => {
   const pos = (value: number) => Math.max(0, Math.min(100, max > 0 ? (value / max) * 100 : 0))
+  const withDetail = (item: ColumnChartItem, node: React.ReactNode, focusable = true) =>
+    item.detail ? (
+      <HoverCard className="cb-columns__hover" label={item.detailLabel || item.label} content={item.detail} focusable={focusable}>{node}</HoverCard>
+    ) : node
+  const interactive = items.some((item) => item.detail)
   return (
-    <div className={cx('cb-columns', className)} role="img" aria-label={label}>
+    <div className={cx('cb-columns', className)} role={interactive ? 'group' : 'img'} aria-label={label}>
       <div className="cb-columns__plot">
         {target ? (
           <div className="cb-columns__target" style={{ '--pos': pos(target.value) } as React.CSSProperties} title={target.label} />
         ) : null}
         {items.map((item) => (
           <div key={item.label} className="cb-columns__col">
-            <span className="cb-columns__value is-num">{`${item.value}${unit}`}</span>
-            <span className="cb-columns__track">
-              <i className={`cb-columns__bar cb-columns__bar--${item.tone || 'accent'}`} style={{ '--pos': pos(item.value) } as React.CSSProperties} />
-            </span>
+            {withDetail(item, (
+              <>
+                <span className="cb-columns__value is-num">{`${item.value}${unit}`}</span>
+                <span className="cb-columns__track">
+                  <i className={`cb-columns__bar cb-columns__bar--${item.tone || 'accent'}`} style={{ '--pos': pos(item.value) } as React.CSSProperties} />
+                </span>
+              </>
+            ))}
           </div>
         ))}
       </div>
       <div className="cb-columns__labels">
         {items.map((item) => (
           <div key={item.label} className="cb-columns__col">
-            <span className="cb-columns__name">{item.label}</span>
-            <span className="cb-columns__caption">{item.caption || '\u00a0'}</span>
+            {withDetail(item, (
+              <>
+                <span className="cb-columns__name">{item.label}</span>
+                <span className={cx('cb-columns__caption', item.detail ? 'has-detail' : null)}>{item.caption || '\u00a0'}</span>
+              </>
+            ), false)}
           </div>
         ))}
       </div>
@@ -191,6 +226,36 @@ export const Progress: React.FC<{
     </div>
   )
 }
+
+export interface TimelineStep {
+  label: React.ReactNode
+  date: React.ReactNode
+  caption?: React.ReactNode
+}
+
+/**
+ * Dated steps of one process, left to right (stacked on phones): a trial's start, reminder,
+ * notice and first charge. Steps before `current` are done, `current` is highlighted.
+ * Not for navigation (that's Tabs) or for many events (that's a list).
+ */
+export const Timeline: React.FC<{ steps: TimelineStep[]; current?: number; label?: string; className?: string }> = ({
+  steps, current = 0, label, className,
+}) => (
+  <ol className={cx('cb-timeline', className)} aria-label={label}>
+    {steps.map((step, i) => (
+      <li
+        key={i}
+        className={cx('cb-timeline__step', i < current && 'is-done', i === current && 'is-current')}
+        aria-current={i === current ? 'step' : undefined}
+      >
+        <span className="cb-timeline__bar" aria-hidden="true" />
+        <span className="cb-timeline__label">{step.label}</span>
+        <span className="cb-timeline__date">{step.date}</span>
+        {step.caption ? <span className="cb-timeline__caption">{step.caption}</span> : null}
+      </li>
+    ))}
+  </ol>
+)
 
 /** A person's photo or initials; falls back to initials if the photo fails to load. */
 export const Avatar: React.FC<{

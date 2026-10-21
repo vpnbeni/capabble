@@ -14,6 +14,7 @@ const { getMasterPackingDispatchModel } = require('../models/platform/MasterPack
 const { getMasterSchoolDirectoryModel } = require('../models/platform/MasterSchoolDirectory');
 const { getSchoolDirectoryTypeSettingsModel } = require('../models/platform/SchoolDirectoryTypeSettings');
 const { getTenantFeatureDefaultsModel } = require('../models/platform/TenantFeatureDefaults');
+const { getDemoRequestModel } = require('../models/platform/DemoRequest');
 
 const getPlatformModels = () => {
   const connection = getPlatformConnection();
@@ -35,6 +36,7 @@ const getPlatformModels = () => {
     MasterSchoolDirectory: getMasterSchoolDirectoryModel(connection),
     SchoolDirectoryTypeSettings: getSchoolDirectoryTypeSettingsModel(connection),
     TenantFeatureDefaults: getTenantFeatureDefaultsModel(connection),
+    DemoRequest: getDemoRequestModel(connection),
   };
 };
 

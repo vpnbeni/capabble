@@ -176,7 +176,39 @@ const normalizeTenantFeatureToggles = (source) => {
   return normalized;
 };
 
+const FEATURE_MODULE = Object.freeze(
+  FEATURE_CATALOG.reduce((acc, entry) => {
+    acc[entry.key] = entry.module;
+    return acc;
+  }, {})
+);
+
+/**
+ * Effective toggles = admin toggles AND billing entitlement. Features of a module the
+ * school hasn't paid for are switched off; core features never are. `entitledModules`
+ * of ['*'] (trial, grandfathered) or a missing list leaves the toggles unchanged.
+ * Returns the new toggles and the feature keys billing switched off.
+ */
+const applyBillingEntitlement = (toggles, entitledModules) => {
+  if (!Array.isArray(entitledModules) || entitledModules.includes('*')) {
+    return { toggles, billingDisabled: [] };
+  }
+  const entitled = new Set(['core', ...entitledModules]);
+  const next = { ...toggles };
+  const billingDisabled = [];
+  Object.keys(next).forEach((key) => {
+    const moduleKey = FEATURE_MODULE[key];
+    if (moduleKey && !entitled.has(moduleKey) && next[key] !== false) {
+      next[key] = false;
+      billingDisabled.push(key);
+    }
+  });
+  return { toggles: next, billingDisabled };
+};
+
 module.exports = {
+  FEATURE_MODULE,
+  applyBillingEntitlement,
   TENANT_FEATURE_PAGES,
   TENANT_FEATURE_KEYS,
   TENANT_MODULE_CATALOG,

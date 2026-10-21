@@ -1,0 +1,43 @@
+/* Billing pages (Schools, Prices and plans). Tokens only. */
+
+.cb-app .bl-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); justify-content: flex-end; }
+.cb-app .bl-back { justify-self: start; align-self: flex-start; display: inline-flex; align-items: center; gap: var(--space-1); padding-left: var(--space-2); }
+.cb-app .bl-card-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-bottom: var(--space-4); }
+.cb-app .bl-card-head .card-title { margin: 0; }
+.cb-app .bl-metrics { margin-bottom: var(--space-5); }
+.cb-app .bl-pad { padding: var(--space-5); margin: 0; }
+.cb-app .bl-num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cb-app .bl-row-actions { display: flex; flex-wrap: wrap; gap: var(--space-1); justify-content: flex-end; }
+.cb-app .bl-row-actions button,
+.cb-app td button.ghost { display: inline-flex; align-items: center; gap: var(--space-1); height: 32px; padding: 0 var(--space-3); font-size: 13px; }
+
+.cb-app .admin-list-card .cb-tabs { padding: 0 var(--space-5); border-bottom: 1px solid var(--border); }
+.cb-app .admin-list-card > .bl-card-head { padding: var(--space-5) var(--space-5) 0; }
+
+.cb-app .bl-module-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3) var(--space-4); }
+.cb-app .bl-check-cell { display: flex; align-items: flex-end; padding-bottom: var(--space-2); }
+
+.cb-app .bl-quote { border-top: 1px solid var(--border); padding-top: var(--space-4); }
+.cb-app .bl-quote p { margin: 0 0 var(--space-2); }
+.cb-app .bl-quote__block { background: var(--surface-sunken); border-radius: var(--radius-md); padding: var(--space-4); margin: var(--space-3) 0; }
+.cb-app .bl-totals { margin: var(--space-2) 0 0; display: grid; gap: var(--space-1); }
+.cb-app .bl-totals div { display: flex; justify-content: space-between; gap: var(--space-4); font-size: 13px; color: var(--ink-muted); }
+.cb-app .bl-totals dt, .cb-app .bl-totals dd { margin: 0; }
+.cb-app .bl-totals dd { font-variant-numeric: tabular-nums; color: var(--ink); }
+.cb-app .bl-totals .is-total { border-top: 1px solid var(--border); padding-top: var(--space-2); margin-top: var(--space-1); font-size: 15px; font-weight: 600; color: var(--ink); }
+
+.cb-app .bl-history { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
+.cb-app .bl-history li { display: flex; justify-content: space-between; gap: var(--space-3); font-size: 13px; padding: var(--space-2) 0; border-bottom: 1px solid var(--border); }
+
+@media (max-width: 640px) {
+  .cb-app .bl-module-list { grid-template-columns: minmax(0, 1fr); }
+  .cb-app .bl-actions { justify-content: flex-start; }
+  .cb-app .admin-list-card .cb-tabs { padding: 0 var(--space-4); overflow-x: auto; }
+  .cb-app .admin-list-card > .bl-card-head { padding: var(--space-4) var(--space-4) 0; }
+}
+
+/* List cards have no padding, so the table needs no bleed margin. */
+.cb-app .card.admin-list-card > .admin-table,
+.cb-app .card.admin-list-card > div > .admin-table { margin: 0; }
+.cb-app .admin-list-card > .admin-toolbar + .admin-table,
+.cb-app .admin-list-card > .error-text + .admin-table { border-top: 1px solid var(--border); }

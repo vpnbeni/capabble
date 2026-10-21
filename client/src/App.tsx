@@ -81,7 +81,9 @@ import RemunerationDetails from './pages/RemunerationDetails'
 import DropdownExamples from './pages/DropdownExamples'
 import DialogShowcase from './pages/DialogShowcase'
 import Billing from './pages/Billing'
+import GetStarted from './pages/GetStarted'
 import AccountSettings from './pages/AccountSettings'
+import Notifications from './pages/Notifications'
 import HelpSupport from './pages/HelpSupport'
 import SessionSelector from './pages/SessionSelector'
 import Pricing from './pages/Pricing'
@@ -108,6 +110,11 @@ import TrnstOverview from './pages/TrnstOverview'
 import TrnstVehicles from './pages/TrnstVehicles'
 import TrnstRoutes from './pages/TrnstRoutes'
 import TrnstSelfStudents from './pages/TrnstSelfStudents'
+import TrnstLive from './pages/trnst/TrnstLive'
+import TrnstTrips from './pages/trnst/TrnstTrips'
+import TrnstAssignments from './pages/trnst/TrnstAssignments'
+import TrnstCrew from './pages/trnst/TrnstCrew'
+import StdntIdCards from './pages/stdnt/StdntIdCards'
 import AcdmcOverview from './pages/acdmc/AcdmcOverview'
 import AcdmcLessonPlan from './pages/acdmc/AcdmcLessonPlan'
 import AcdmcHomework from './pages/acdmc/AcdmcHomework'
@@ -181,12 +188,17 @@ const LegacyCandidatesRedirect = () => {
   return <Navigate to={`${nextPath}${location.search}${location.hash}`} replace />
 }
 
+// The school app (school./stageschool.capabble.cloud) opens on sign-in; marketing lives on
+// capabble.cloud. Product sites keep their landing pages, and ?brand= still previews them.
 const PublicLanding = () => {
+  const location = useLocation()
   const variant = getPublicBrandVariant()
+  const brandPreview = new URLSearchParams(location.search).has('brand')
 
   if (variant === 'tmtbl') return <TmtblLanding />
   if (variant === 'stdnt') return <StdntLanding />
-  return <CntrLanding />
+  if (brandPreview) return <CntrLanding />
+  return <Navigate to={`/login${location.search}`} replace />
 }
 
 function App() {
@@ -209,12 +221,7 @@ function App() {
 
   if (checkingSession) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-        <div className="text-center">
-          <Loader size="lg" />
-          <p className="mt-4 text-gray-600 dark:text-gray-400">Loading...</p>
-        </div>
-      </div>
+      <Loader size="lg" fullScreen />
     )
   }
 
@@ -299,7 +306,7 @@ function App() {
             <Route
               path="/portal/*"
               element={
-                <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><Loader size="lg" /></div>}>
+                <Suspense fallback={<Loader size="lg" fullScreen />}>
                   <PortalApp />
                 </Suspense>
               }
@@ -322,36 +329,6 @@ function App() {
             }
           />
 
-          {/* Onboarding (authenticated, has session, but needs onboarding) */}
-          <Route
-            path="/onboarding"
-            element={
-              !isAuthenticated ? (
-                <Navigate to="/" replace />
-              ) : isPortalUser ? (
-                <Navigate to="/portal" replace />
-              ) : !hasSession ? (
-                <Navigate to="/select-session" replace />
-              ) : (
-                <OnboardingPage />
-              )
-            }
-          />
-          <Route
-            path="/onboarding/validation"
-            element={
-              !isAuthenticated ? (
-                <Navigate to="/" replace />
-              ) : isPortalUser ? (
-                <Navigate to="/portal" replace />
-              ) : !hasSession ? (
-                <Navigate to="/select-session" replace />
-              ) : (
-                <ValidationReportPage />
-              )
-            }
-          />
-
           {/* Protected Routes */}
           <Route path="/" element={<ProtectedRoute />}>
             <Route
@@ -367,6 +344,8 @@ function App() {
               }
             >
               <Route path="dashboard" element={<Dashboard />} />
+              <Route path="onboarding" element={<OnboardingPage />} />
+              <Route path="onboarding/validation" element={<ValidationReportPage />} />
               <Route path="home" element={<Home />} />
               <Route path="school-hub" element={<Navigate to="/home" replace />} />
               <Route path="staff" element={<Staff />} />
@@ -396,6 +375,7 @@ function App() {
                 element={<TimetableSubjects showParallelSubjectPairs={false} showCommonPeriod={false} />}
               />
               <Route path="stdnt/alumni" element={<AlmniDirectory />} />
+              <Route path="stdnt/id-cards" element={<StdntIdCards />} />
               <Route path="stdnt" element={<Navigate to="/stdnt/stdntboard" replace />} />
               <Route path="staaf/overview" element={<StaafOverview />} />
               <Route path="staaf/organisation-structure" element={<StaafOrgStructure />} />
@@ -417,6 +397,10 @@ function App() {
               <Route path="trnst/vehicles" element={<TrnstVehicles />} />
               <Route path="trnst/routes" element={<TrnstRoutes />} />
               <Route path="trnst/self-students" element={<TrnstSelfStudents />} />
+              <Route path="trnst/live" element={<TrnstLive />} />
+              <Route path="trnst/trips" element={<TrnstTrips />} />
+              <Route path="trnst/assignments" element={<TrnstAssignments />} />
+              <Route path="trnst/crew" element={<TrnstCrew />} />
               <Route path="trnst" element={<TrnstOverview />} />
               <Route path="acdmc/overview" element={<AcdmcOverview />} />
               <Route path="acdmc/lesson-plan" element={<AcdmcLessonPlan />} />
@@ -571,7 +555,9 @@ function App() {
               <Route path="cbse-circulars" element={<CBSECirculars />} />
               <Route path="cbse-portals" element={<CBSEPortals />} />
               <Route path="billing" element={<Billing />} />
+              <Route path="get-started" element={<GetStarted />} />
               <Route path="account-settings" element={<AccountSettings />} />
+              <Route path="notifications" element={<Notifications />} />
               <Route path="settings/users" element={<UsersAndAccess />} />
               <Route path="settings/users/:id" element={<UserDetail />} />
               <Route path="settings/roles" element={<RolesPage />} />

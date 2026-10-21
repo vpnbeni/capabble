@@ -25,6 +25,7 @@ const provisionTenant = async ({
   adminPassword,
   schoolCode,
   affiliationNo,
+  udiseCode,
   createdBy = null,
   dbName
 }) => {
@@ -76,6 +77,7 @@ const provisionTenant = async ({
       createdBy,
       schoolCode: String(schoolCode || '').trim(),
       affiliationNo: String(affiliationNo || '').trim(),
+      udiseCode: String(udiseCode || '').trim(),
     }
   });
 

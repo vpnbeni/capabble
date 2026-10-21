@@ -168,11 +168,6 @@
     @apply text-gray-950 dark:text-gray-50 border-gray-200 dark:border-gray-700;
   }
 
-  /* Loading spinner */
-  .spinner {
-    @apply animate-spin rounded-full border-2 border-gray-200 border-t-primary-600;
-  }
-
   /* Navigation active states */
   .nav-link {
     @apply flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200;

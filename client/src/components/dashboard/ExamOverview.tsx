@@ -19,7 +19,7 @@ const ExamOverview: React.FC<ExamOverviewProps> = ({
   ]
 
   return (
-    <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
+    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 border border-gray-100 dark:border-gray-700">
       <h2 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Exam Overview</h2>
       <div className="space-y-2">
         {items.map(({ label, value, icon: Icon }) => (

@@ -1,8 +1,8 @@
 import React, { useMemo, useRef, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { ArrowRight, Building2, LayoutGrid, Lock, Mail, School } from 'lucide-react'
-import toast from 'react-hot-toast'
-import tenantSignupService from '@/services/tenantSignupService'
+import tenantSignupService, { SIGNUP_EMAIL_KEY } from '@/services/tenantSignupService'
+import { buildTenantAppRedirectUrl } from '@/utils/tenantRuntime'
 import AuthLayout, { StepsCard } from '@/components/auth/capabble/AuthLayout'
 import { Button, Callout, Checkbox, StrengthMeter, TextField } from '@/components/auth/capabble/controls'
 import { getPasswordStrength, MISMATCH_ERROR, PASSWORD_ERROR, PASSWORD_RULE } from '@/components/auth/capabble/password'
@@ -17,16 +17,14 @@ function toSlug(value: string): string {
     .replace(/^-+|-+$/g, '')
 }
 
-type Field = 'schoolCode' | 'affiliationNo' | 'name' | 'email' | 'password' | 'confirm'
+type Field = 'udiseCode' | 'name' | 'email' | 'password' | 'confirm'
 type Errors = Partial<Record<Field, string>>
-const FIELD_ORDER: Field[] = ['schoolCode', 'affiliationNo', 'name', 'email', 'password', 'confirm']
+const FIELD_ORDER: Field[] = ['udiseCode', 'name', 'email', 'password', 'confirm']
 
 const GENERAL_ERROR = "We couldn't create the account. Check your connection and try again."
 
 const Signup: React.FC = () => {
-  const navigate = useNavigate()
-  const [schoolCode, setSchoolCode] = useState('')
-  const [affiliationNo, setAffiliationNo] = useState('')
+  const [udiseCode, setUdiseCode] = useState('')
   const [nameOfSchool, setNameOfSchool] = useState('')
   const [adminEmail, setAdminEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -37,8 +35,7 @@ const Signup: React.FC = () => {
   const [generalError, setGeneralError] = useState<string | null>(null)
 
   const refs = {
-    schoolCode: useRef<HTMLInputElement>(null),
-    affiliationNo: useRef<HTMLInputElement>(null),
+    udiseCode: useRef<HTMLInputElement>(null),
     name: useRef<HTMLInputElement>(null),
     email: useRef<HTMLInputElement>(null),
     password: useRef<HTMLInputElement>(null),
@@ -46,7 +43,7 @@ const Signup: React.FC = () => {
   }
 
   const strength = useMemo(() => getPasswordStrength(password), [password])
-  const slug = useMemo(() => toSlug(schoolCode.trim() || nameOfSchool.trim()), [schoolCode, nameOfSchool])
+  const slug = useMemo(() => toSlug(udiseCode.trim() || nameOfSchool.trim()), [udiseCode, nameOfSchool])
 
   const clearError = (field: Field) => {
     if (errors[field]) setErrors((prev) => ({ ...prev, [field]: undefined }))
@@ -61,8 +58,7 @@ const Signup: React.FC = () => {
 
   const validate = (): Errors => {
     const next: Errors = {}
-    if (!/^\d{5}$/.test(schoolCode)) next.schoolCode = 'Enter the 5-digit institution code'
-    if (!/^\d{6}$/.test(affiliationNo)) next.affiliationNo = 'Enter the 6-digit affiliation no.'
+    if (!/^\d{11}$/.test(udiseCode)) next.udiseCode = 'Enter the 11-digit UDISE+ code'
     if (!nameOfSchool.trim() || !slug) next.name = 'Enter your institution name'
     if (!/^\S+@\S+\.\S+$/.test(adminEmail.trim())) next.email = 'Enter an email address like name@yourschool.in'
     if (strength < 2) next.password = PASSWORD_ERROR
@@ -86,8 +82,7 @@ const Signup: React.FC = () => {
     setSubmitting(true)
     try {
       const result = await tenantSignupService.startSignup({
-        schoolCode: schoolCode.trim(),
-        affiliationNo: affiliationNo.trim(),
+        udiseCode: udiseCode.trim(),
         name: nameOfSchool.trim(),
         slug,
         adminEmail: email,
@@ -95,8 +90,14 @@ const Signup: React.FC = () => {
         confirmPassword,
       })
       localStorage.setItem('tenantSlug', result.tenantSlug)
-      toast.success(`Check ${email} for a 6-digit code to confirm your account.`)
-      navigate(`/signup/complete?ticket=${encodeURIComponent(result.ticket)}`)
+      try {
+        sessionStorage.setItem(SIGNUP_EMAIL_KEY, email)
+      } catch {
+        /* storage unavailable: the confirm page says "your email" */
+      }
+      // A full load with ?tenant=<new school> so a leftover ?tenant= from another school
+      // can't make the verify page confirm against the wrong school.
+      window.location.assign(buildTenantAppRedirectUrl(result.tenantSlug, result.ticket))
     } catch (err: unknown) {
       const response =
         err && typeof err === 'object' && 'response' in err
@@ -104,9 +105,9 @@ const Signup: React.FC = () => {
           : undefined
       const code = response?.data?.errorCode
       if (code === 'slug_taken') {
-        showErrors({ schoolCode: 'This institution code already has an account. Sign in instead.' })
+        showErrors({ udiseCode: 'This UDISE+ code already has an account. Sign in instead. If you never confirmed your email, signing in sends a new code.' })
       } else if (code === 'admin_email_taken') {
-        showErrors({ email: 'This email address already has an account. Sign in instead.' })
+        showErrors({ email: 'This email address already has an account. Sign in instead. If you never confirmed it, signing in sends a new code.' })
       } else if (response?.status && response.status < 500 && response.data?.message) {
         setGeneralError(response.data.message)
       } else {
@@ -134,7 +135,7 @@ const Signup: React.FC = () => {
         <StepsCard
           title="Three steps to get started"
           items={[
-            { icon: Building2, title: 'Add your institution', detail: 'Code, affiliation no. and name' },
+            { icon: Building2, title: 'Add your institution', detail: 'UDISE+ code and name' },
             { icon: Mail, title: 'Confirm your email', detail: 'We email you a 6-digit code' },
             { icon: LayoutGrid, title: 'Open any module', detail: 'Exams, exam centre, fees and more' },
           ]}
@@ -151,44 +152,30 @@ const Signup: React.FC = () => {
       <form className="cb-auth-form" style={{ marginTop: 0 }} noValidate onSubmit={handleSubmit}>
         <div className="cb-auth-section">
           <p className="cb-auth-section-label">Institution</p>
-          <div className="cb-auth-pair">
-            <TextField
-              ref={refs.schoolCode}
-              id="schoolCode"
-              label="Institution code"
-              hint="5 digits"
-              error={errors.schoolCode}
-              inputMode="numeric"
-              autoComplete="off"
-              value={schoolCode}
-              onChange={(e) => {
-                setSchoolCode(digitsOnly(e.target.value, 5))
-                clearError('schoolCode')
-              }}
-            />
-            <TextField
-              ref={refs.affiliationNo}
-              id="affiliationNo"
-              label="Affiliation no."
-              hint="6 digits"
-              error={errors.affiliationNo}
-              inputMode="numeric"
-              autoComplete="off"
-              value={affiliationNo}
-              onChange={(e) => {
-                setAffiliationNo(digitsOnly(e.target.value, 6))
-                clearError('affiliationNo')
-              }}
-            />
-          </div>
+          <TextField
+            ref={refs.udiseCode}
+            id="udiseCode"
+            label="UDISE+ code"
+            hint="11 digits"
+            error={errors.udiseCode}
+            inputMode="numeric"
+            autoComplete="off"
+            required
+            value={udiseCode}
+            onChange={(e) => {
+              setUdiseCode(digitsOnly(e.target.value, 11))
+              clearError('udiseCode')
+            }}
+          />
           <TextField
             ref={refs.name}
             id="nameOfSchool"
             label="Institution name"
             icon={School}
-            placeholder="As it appears on your affiliation"
+            placeholder="As it appears on UDISE+"
             error={errors.name}
             autoComplete="organization"
+            required
             value={nameOfSchool}
             onChange={(e) => {
               setNameOfSchool(e.target.value)
@@ -209,6 +196,7 @@ const Signup: React.FC = () => {
             hint="You'll sign in with this and we'll email a 6-digit code to it to confirm your account."
             error={errors.email}
             autoComplete="email"
+            required
             value={adminEmail}
             onChange={(e) => {
               setAdminEmail(e.target.value)
@@ -225,6 +213,7 @@ const Signup: React.FC = () => {
               hint={PASSWORD_RULE}
               error={errors.password}
               autoComplete="new-password"
+              required
               value={password}
               onChange={(e) => {
                 setPassword(e.target.value)
@@ -245,6 +234,7 @@ const Signup: React.FC = () => {
             type={passwordType}
             error={errors.confirm}
             autoComplete="new-password"
+            required
             value={confirmPassword}
             onChange={(e) => {
               setConfirmPassword(e.target.value)

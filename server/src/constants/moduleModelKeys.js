@@ -32,6 +32,7 @@ const MODULE_MODEL_KEYS = Object.freeze({
     'SupportTicket',
     'OnboardingSession',
     'SchoolProfile',
+    'Notification',
   ]),
   cntr: Object.freeze([
     'Student',
@@ -102,6 +103,10 @@ const MODULE_MODEL_KEYS = Object.freeze({
     'TransportVehicle',
     'TransportRoute',
     'TransportSelfStudent',
+    'TransportAssignment',
+    'TransportTrip',
+    'TransportLocationPing',
+    'TransportBoarding',
     'Student',
   ]),
   acdmc: Object.freeze([

@@ -8,6 +8,9 @@ import { usePermissions } from '@/hooks/usePermissions'
 import { Button, Card, EmptyState, Page } from '@/components/ui'
 import { Lock } from 'lucide-react'
 
+// Pages a school without a plan can open: choosing it, billing, and who can sign in.
+const SETUP_ALLOWED = ['/get-started', '/billing', '/settings/users', '/settings/roles', '/account-settings']
+
 /** Guards the school (staff) panel. Parents and students are sent to the portal. */
 const ProtectedRoute: React.FC = () => {
   const isAuthenticated = useSelector(selectIsAuthenticated)
@@ -35,6 +38,10 @@ const ProtectedRoute: React.FC = () => {
   }
 
   const accessMode = user?.billing?.accessMode
+  // No plan yet: the school opts in to its trial before anything else.
+  if (accessMode === 'setup_required' && !SETUP_ALLOWED.some((prefix) => location.pathname === prefix || location.pathname.startsWith(`${prefix}/`))) {
+    return <Navigate to="/get-started" replace />
+  }
   if (accessMode === 'core_only' && !isCoreAllowedPath(location.pathname)) {
     return <Navigate to="/billing?reason=core-only" replace />
   }

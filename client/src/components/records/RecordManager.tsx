@@ -77,8 +77,8 @@ export const RecordManager = ({
     <div className="p-6">
       <div className="mx-auto max-w-[1400px]">
         <div className="grid gap-6 xl:grid-cols-[380px_1fr]">
-          <form onSubmit={handleSave} className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
-            <h3 className="text-lg font-semibold text-slate-900">{editingId ? 'Edit record' : 'New record'}</h3>
+          <form onSubmit={handleSave} className="rounded-[28px] border border-slate-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-5 shadow-sm">
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-gray-100">{editingId ? 'Edit record' : 'New record'}</h3>
             <div className="mt-4 max-h-[68vh] space-y-3 overflow-auto pr-1">
               {fields.map((field) => (
                 <label key={field.key} className="block text-sm">
@@ -118,22 +118,22 @@ export const RecordManager = ({
                 {saving ? 'Saving...' : editingId ? 'Update' : 'Save'}
               </button>
               {editingId ? (
-                <button type="button" onClick={() => { setEditingId(''); setForm(empty) }} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600">Cancel</button>
+                <button type="button" onClick={() => { setEditingId(''); setForm(empty) }} className="rounded-xl border border-slate-200 dark:border-gray-700 px-4 py-2 text-sm font-semibold text-slate-600">Cancel</button>
               ) : null}
             </div>
           </form>
-          <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
+          <section className="rounded-[28px] border border-slate-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-5 shadow-sm">
             <div className="mb-4 flex items-center justify-between gap-3">
-              <h3 className="text-lg font-semibold text-slate-900">{visible.length} records</h3>
-              <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search" className="w-[200px] rounded-xl border border-slate-200 px-3 py-2 text-sm" />
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-gray-100">{visible.length} records</h3>
+              <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search" className="w-[200px] rounded-xl border border-slate-200 dark:border-gray-700 px-3 py-2 text-sm" />
             </div>
             {loading ? <p className="text-sm text-slate-500">Loading...</p> : null}
             <div className="space-y-3">
               {visible.map((item) => (
-                <article key={item._id} className="rounded-2xl border border-slate-100 p-4">
+                <article key={item._id} className="rounded-2xl border border-slate-100 dark:border-gray-700 p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <p className="font-semibold text-slate-900">{cardTitle(item)}</p>
+                      <p className="font-semibold text-slate-900 dark:text-gray-100">{cardTitle(item)}</p>
                       <p className="mt-1 whitespace-pre-wrap text-sm text-slate-500">{cardMeta(item)}</p>
                     </div>
                     <div className="flex gap-2">
@@ -157,4 +157,4 @@ export const RecordManager = ({
   )
 }
 
-const inputClass = 'w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none focus:border-indigo-400'
+const inputClass = 'w-full rounded-xl border border-slate-200 dark:border-gray-700 px-3 py-2 text-sm text-slate-900 dark:text-gray-100 outline-none focus:border-indigo-400'

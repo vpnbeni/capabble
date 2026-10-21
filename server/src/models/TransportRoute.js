@@ -7,7 +7,10 @@ const stopSchema = new mongoose.Schema({
   pickupTime: { type: String, trim: true, default: '' },
   dropTime: { type: String, trim: true, default: '' },
   sequence: { type: Number, default: 1 },
-}, { _id: false });
+  // Map position; optional so routes without coordinates keep working.
+  lat: { type: Number, min: -90, max: 90, default: null },
+  lng: { type: Number, min: -180, max: 180, default: null },
+});
 
 const transportRouteSchema = new mongoose.Schema({
   name: {

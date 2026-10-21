@@ -4,6 +4,7 @@ export interface SchoolProfile {
   name: string
   schoolCode: string
   affiliationNo: string
+  udiseCode: string
   affiliationTill: string
   logoUrl: string
   logoPublicId: string
@@ -23,7 +24,7 @@ export interface SchoolProfile {
 
 type SchoolProfileUpdatePayload = Pick<
   SchoolProfile,
-  'name' | 'schoolCode' | 'affiliationNo' | 'affiliationTill' | 'tagline' | 'address' | 'contact' | 'email'
+  'name' | 'schoolCode' | 'affiliationNo' | 'udiseCode' | 'affiliationTill' | 'tagline' | 'address' | 'contact' | 'email'
 >
 
 const getProfile = async (): Promise<SchoolProfile> => {
@@ -36,6 +37,7 @@ const updateProfile = async (payload: SchoolProfileUpdatePayload): Promise<Schoo
     schoolName: payload.name,
     schoolCode: payload.schoolCode,
     affiliationNo: payload.affiliationNo,
+    udiseCode: payload.udiseCode,
     affiliationTill: payload.affiliationTill || '',
     tagline: payload.tagline,
     address: payload.address,

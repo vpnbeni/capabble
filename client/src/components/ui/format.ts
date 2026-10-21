@@ -13,7 +13,8 @@ export const formatINR = (n: number | null | undefined, opts: { compact?: boolea
     if (a >= 1e7) return `₹${(n / 1e7).toFixed(2).replace(/\.?0+$/, '')} Cr`
     if (a >= 1e5) return `₹${(n / 1e5).toFixed(2).replace(/\.?0+$/, '')} L`
   }
-  return `₹${Number(n).toLocaleString('en-IN', { maximumFractionDigits: opts.decimals || 0 })}`
+  const digits = opts.decimals || 0
+  return `₹${Number(n).toLocaleString('en-IN', { minimumFractionDigits: digits, maximumFractionDigits: digits })}`
 }
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
@@ -34,6 +35,22 @@ export const formatTime = (value: string | null | undefined) => {
   if (!Number.isFinite(h) || !Number.isFinite(m)) return value || '—'
   const suffix = h >= 12 ? 'pm' : 'am'
   return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${suffix}`
+}
+
+/** "Just now", "5 min ago", "3 hours ago", "Yesterday", then the date (7 Oct). For feeds and activity. */
+export const formatRelative = (d: Date | string | number | null | undefined, now: Date = new Date()) => {
+  if (d == null || d === '') return '—'
+  const x = d instanceof Date ? d : new Date(d)
+  if (Number.isNaN(x.getTime())) return '—'
+  const minutes = Math.floor((now.getTime() - x.getTime()) / 60000)
+  if (minutes < 1) return 'Just now'
+  if (minutes < 60) return `${minutes} min ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24 && x.getDate() === now.getDate()) return `${hours} hour${hours === 1 ? '' : 's'} ago`
+  const yesterday = new Date(now)
+  yesterday.setDate(now.getDate() - 1)
+  if (x.toDateString() === yesterday.toDateString()) return 'Yesterday'
+  return formatDate(x, { year: x.getFullYear() !== now.getFullYear() })
 }
 
 /** Shows "—" for empty values, as the design system asks. */

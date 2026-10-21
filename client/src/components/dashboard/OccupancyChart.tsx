@@ -18,7 +18,7 @@ const OccupancyChart: React.FC<OccupancyChartProps> = ({ used, remaining }) => {
     : [{ name: 'Empty', value: 1, color: COLORS[1] }]
 
   return (
-    <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100 flex flex-col items-center justify-center">
+    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 border border-gray-100 dark:border-gray-700 flex flex-col items-center justify-center">
       <h2 className="text-sm font-semibold text-gray-900 dark:text-white mb-2 w-full text-left">
         Occupancy
       </h2>

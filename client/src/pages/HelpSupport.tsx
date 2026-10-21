@@ -87,7 +87,7 @@ const HelpSupport: React.FC = () => {
               <section>
                 <div className="mb-4 flex items-end justify-between gap-3">
                   <div>
-                    <h2 className="text-lg font-bold text-slate-900">Browse by School OS Modules</h2>
+                    <h2 className="text-lg font-bold text-slate-900 dark:text-gray-100">Browse by School OS Modules</h2>
                     <p className="mt-1 text-sm text-slate-500">
                       Select a module to see its pages and report issues in context.
                     </p>

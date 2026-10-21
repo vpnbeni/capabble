@@ -19,7 +19,7 @@ const contactItems = [
   {
     id: 'report',
     icon: Ticket,
-    iconBg: 'bg-violet-100 text-violet-600',
+    iconBg: 'bg-violet-100 dark:bg-violet-900/30 text-violet-600',
     title: 'Report an Issue',
     subtitle: 'Raise a support ticket',
     action: 'report' as const,
@@ -27,7 +27,7 @@ const contactItems = [
   {
     id: 'chat',
     icon: MessageCircle,
-    iconBg: 'bg-sky-100 text-sky-600',
+    iconBg: 'bg-sky-100 dark:bg-sky-900/30 text-sky-600',
     title: 'Live Chat',
     subtitle: SUPPORT_CONTACT.chatHours,
     href: `mailto:${SUPPORT_CONTACT.email}?subject=Capabble%20Live%20Chat%20Request`,
@@ -35,7 +35,7 @@ const contactItems = [
   {
     id: 'call',
     icon: Phone,
-    iconBg: 'bg-emerald-100 text-emerald-600',
+    iconBg: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600',
     title: 'Call Support',
     subtitle: SUPPORT_CONTACT.phone,
     href: `tel:${SUPPORT_CONTACT.phone.replace(/\s/g, '')}`,
@@ -43,7 +43,7 @@ const contactItems = [
   {
     id: 'email',
     icon: Mail,
-    iconBg: 'bg-amber-100 text-amber-600',
+    iconBg: 'bg-amber-100 dark:bg-amber-900/30 text-amber-600',
     title: 'Email Support',
     subtitle: SUPPORT_CONTACT.email,
     href: `mailto:${SUPPORT_CONTACT.email}`,
@@ -53,7 +53,7 @@ const contactItems = [
 const HelpContactPanel: React.FC<HelpContactPanelProps> = ({ onReportIssue }) => {
   return (
     <div className="help-sidebar-card rounded-2xl p-4">
-      <h2 className="text-sm font-semibold text-slate-900">Need Immediate Help?</h2>
+      <h2 className="text-sm font-semibold text-slate-900 dark:text-gray-100">Need Immediate Help?</h2>
       <div className="mt-3 space-y-1">
         {contactItems.map((item) => {
           const Icon = item.icon
@@ -63,7 +63,7 @@ const HelpContactPanel: React.FC<HelpContactPanelProps> = ({ onReportIssue }) =>
                 <Icon className="h-4 w-4" strokeWidth={2} />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-slate-800">{item.title}</p>
+                <p className="text-sm font-medium text-slate-800 dark:text-gray-200">{item.title}</p>
                 <p className="truncate text-xs text-slate-500">{item.subtitle}</p>
               </div>
               <ChevronRight className="h-4 w-4 shrink-0 text-slate-300" />
@@ -117,7 +117,7 @@ export const HelpSystemStatus: React.FC<{ status?: string; message?: string; upd
           <Activity className={`h-5 w-5 ${isOperational ? 'help-status-pulse' : ''}`} />
         </div>
         <div>
-          <p className="text-sm font-semibold text-slate-900">System Status</p>
+          <p className="text-sm font-semibold text-slate-900 dark:text-gray-100">System Status</p>
           <p
             className={`mt-0.5 text-xs font-medium ${
               isOperational ? 'text-emerald-600' : isDown ? 'text-red-600' : 'text-amber-600'
@@ -136,17 +136,17 @@ export const HelpGettingStarted: React.FC = () => {
   return (
     <div className="help-getting-started rounded-2xl p-4">
       <div className="flex items-start gap-3">
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/80 ring-1 ring-violet-100">
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/80 dark:bg-gray-800/80 ring-1 ring-violet-100">
           <GraduationCap className="h-6 w-6 text-violet-600" />
         </div>
         <div>
-          <p className="text-sm font-semibold text-slate-900">Getting Started Guide</p>
+          <p className="text-sm font-semibold text-slate-900 dark:text-gray-100">Getting Started Guide</p>
           <p className="mt-1 text-xs leading-relaxed text-slate-600">
             New to Capabble? Set up your school profile, activate modules, and configure your academic session.
           </p>
           <Link
             to="/account-settings"
-            className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-violet-600 hover:text-violet-700"
+            className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-violet-600 hover:text-violet-700 dark:hover:text-violet-300"
           >
             Open Account Settings
             <ChevronRight className="h-3.5 w-3.5" />

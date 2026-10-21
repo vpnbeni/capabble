@@ -1,14 +1,16 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { useLightOnlyTheme } from '@/utils/theme'
 import { Link } from 'react-router-dom'
 import { Bot, Building2, CheckCircle2, ChevronRight, Sparkles, UserRoundPlus } from 'lucide-react'
 import tenantSignupService from '@/services/tenantSignupService'
 import { buildTenantAppRedirectUrl } from '@/utils/tenantRuntime'
 import { getUniversalAuthCopy } from '@/utils/publicBranding'
 
-type StepId = 'name' | 'slug' | 'adminEmail' | 'adminPassword' | 'confirmPassword'
+type StepId = 'name' | 'udiseCode' | 'slug' | 'adminEmail' | 'adminPassword' | 'confirmPassword'
 
 interface DraftState {
   name: string
+  udiseCode: string
   slug: string
   adminEmail: string
   adminPassword: string
@@ -27,7 +29,7 @@ interface PersistedState {
   messages: ChatMessage[]
 }
 
-const CHAT_STORAGE_KEY = 'centre-signup-chat-v2'
+const CHAT_STORAGE_KEY = 'centre-signup-chat-v3'
 const slugRegex = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const strongPasswordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[!@#$%^&*]).{8,128}$/
@@ -42,6 +44,12 @@ const STEPS: Array<{
     id: 'name',
     prompt: 'Please enter institution name.',
     placeholder: 'Example: Sunrise Public School',
+    inputType: 'text',
+  },
+  {
+    id: 'udiseCode',
+    prompt: 'Please enter your 11-digit UDISE+ code.',
+    placeholder: 'Example: 06123456789',
     inputType: 'text',
   },
   {
@@ -72,6 +80,7 @@ const STEPS: Array<{
 
 const emptyDraft: DraftState = {
   name: '',
+  udiseCode: '',
   slug: '',
   adminEmail: '',
   adminPassword: '',
@@ -94,6 +103,7 @@ const buildReviewMessage = (draft: DraftState) => {
   return [
     'Perfect, here is what I captured:',
     `Centre name: ${draft.name}`,
+    `UDISE+ code: ${draft.udiseCode}`,
     `School code: ${draft.slug}`,
     `Admin email: ${draft.adminEmail}`,
     'Reply with edits or tap "Create Centre" to finish.',
@@ -105,6 +115,14 @@ const validateStepValue = (stepId: StepId, value: string, draft: DraftState) => 
     const normalized = value.trim()
     if (normalized.length < 2) {
       return { error: 'Centre name must be at least 2 characters.' }
+    }
+    return { value: normalized }
+  }
+
+  if (stepId === 'udiseCode') {
+    const normalized = value.replace(/\D/g, '')
+    if (!/^\d{11}$/.test(normalized)) {
+      return { error: 'UDISE+ code must be 11 digits.' }
     }
     return { value: normalized }
   }
@@ -143,6 +161,7 @@ const validateStepValue = (stepId: StepId, value: string, draft: DraftState) => 
 }
 
 const TenantSignupChat: React.FC = () => {
+  useLightOnlyTheme()
   const authCopy = getUniversalAuthCopy()
   const initialState = useMemo<PersistedState>(() => {
     try {
@@ -281,6 +300,7 @@ const TenantSignupChat: React.FC = () => {
     try {
       const result = await tenantSignupService.startSignup({
         name: draft.name,
+        udiseCode: draft.udiseCode,
         slug: draft.slug,
         adminEmail: draft.adminEmail,
         adminPassword: draft.adminPassword,

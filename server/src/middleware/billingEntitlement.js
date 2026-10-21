@@ -1,7 +1,12 @@
-const { getTenantEntitlement } = require('../services/billingServiceClient');
+const billingClient = require('../services/billingServiceClient');
+const { applyBillingEntitlement } = require('../constants/tenantFeatures');
 
+// Fresh for 45s. If billing is unreachable (e.g. its database is waking up), the last
+// known entitlement keeps being used for up to 24h instead of failing requests.
 const ENTITLEMENT_CACHE_TTL_MS = 45 * 1000;
+const ENTITLEMENT_STALE_MAX_MS = 24 * 60 * 60 * 1000;
 const entitlementCache = new Map();
+const inflight = new Map();
 
 const BILLING_ERROR_RESPONSE = {
   success: false,
@@ -11,7 +16,8 @@ const BILLING_ERROR_RESPONSE = {
 };
 
 const CORE_ALLOWED_MODULES = new Set(['dashboard', 'candidates', 'subjects', 'datesheets', 'billing', 'auth']);
-const SAFE_ALWAYS_ALLOWED_PREFIXES = ['/auth', '/billing', '/onboarding', '/users', '/roles'];
+const SAFE_ALWAYS_ALLOWED_PREFIXES = ['/auth', '/billing', '/onboarding', '/users', '/roles', '/notifications'];
+const WRITE_METHODS = ['POST', 'PUT', 'PATCH', 'DELETE'];
 
 const parseBooleanEnv = (value, fallback) => {
   if (value === undefined) return fallback;
@@ -70,24 +76,65 @@ const isReadOnlyBlockedPath = (path) => {
   return false;
 };
 
-const getCachedEntitlement = (tenantSlug) => {
+/**
+ * Entitlement for a school, from cache when fresh. Concurrent misses share one request.
+ * On failure a stale value (≤ 24h) is returned with `stale: true`; otherwise it throws.
+ */
+const loadEntitlement = async (tenantSlug, { now = Date.now() } = {}) => {
   const cached = entitlementCache.get(tenantSlug);
-  if (!cached) return null;
+  if (cached && now - cached.fetchedAt < ENTITLEMENT_CACHE_TTL_MS) return cached.value;
 
-  if (cached.expiresAt <= Date.now()) {
-    entitlementCache.delete(tenantSlug);
-    return null;
+  if (!inflight.has(tenantSlug)) {
+    inflight.set(tenantSlug, billingClient.getTenantEntitlement(tenantSlug)
+      .then((value) => {
+        entitlementCache.set(tenantSlug, { value, fetchedAt: Date.now() });
+        return value;
+      })
+      .finally(() => inflight.delete(tenantSlug)));
   }
 
-  return cached.value;
+  try {
+    return await inflight.get(tenantSlug);
+  } catch (error) {
+    if (cached && now - cached.fetchedAt < ENTITLEMENT_STALE_MAX_MS) {
+      console.warn('[billing-entitlement] using last known entitlement', { tenantSlug, message: error.message });
+      return { ...cached.value, stale: true };
+    }
+    throw error;
+  }
 };
 
-const setCachedEntitlement = (tenantSlug, value) => {
-  entitlementCache.set(tenantSlug, {
-    value,
-    expiresAt: Date.now() + ENTITLEMENT_CACHE_TTL_MS
-  });
+const invalidateEntitlement = (tenantSlug) => {
+  if (tenantSlug) entitlementCache.delete(tenantSlug);
+  else entitlementCache.clear();
 };
+
+/*
+ * A school with no billing account (signup ran while billing was down, or one created before
+ * billing existed) gets one on its first request, plus an invite to choose its plan. It does
+ * not get a trial: the school opts in to that itself. Concurrent requests share one call.
+ */
+const registrations = new Map();
+const registered = new Set();
+const registerIfMissing = (tenant, entitlement) => {
+  if (entitlement?.reason !== 'plan_required' || entitlement.subscriptionId || registered.has(tenant.slug)) return;
+  const { slug } = tenant;
+  if (registrations.has(slug)) return;
+  registrations.set(slug, billingClient.registerTenant({
+    tenantId: String(tenant.id || slug),
+    tenantSlug: slug,
+    tenantName: tenant.name || slug,
+    billingEmail: tenant.adminEmail || null
+  })
+    .then(() => registered.add(slug))
+    .catch((error) => console.error('[billing-entitlement] register_failed', { tenantSlug: slug, message: error.message }))
+    .finally(() => registrations.delete(slug)));
+};
+
+// Writes a read-only school may still make: opening an academic session is how it reads its data.
+const READ_ONLY_ALLOWED_WRITES = [{ method: 'POST', path: /^\/sessions\/?$/ }];
+const isAllowedWhileReadOnly = (method, path) => READ_ONLY_ALLOWED_WRITES
+  .some((rule) => rule.method === method && rule.path.test(path));
 
 const blockRequest = (res, accessMode) => res.status(402).json({
   ...BILLING_ERROR_RESPONSE,
@@ -104,42 +151,53 @@ const billingEntitlementMiddleware = async (req, res, next) => {
   }
 
   const requestPath = req.path || '/';
-  if (shouldSkipForPath(requestPath)) {
-    return next();
-  }
-
+  const skipBlocking = shouldSkipForPath(requestPath);
   const tenantSlug = req.tenant.slug;
-  let entitlement = getCachedEntitlement(tenantSlug);
+  let entitlement;
 
-  if (!entitlement) {
-    try {
-      entitlement = await getTenantEntitlement(tenantSlug);
-      setCachedEntitlement(tenantSlug, entitlement);
-    } catch (error) {
-      console.error('[billing-entitlement] failed_to_fetch', {
-        tenantSlug,
-        message: error.message
+  try {
+    entitlement = await loadEntitlement(tenantSlug);
+    registerIfMissing(req.tenant, entitlement);
+  } catch (error) {
+    console.error('[billing-entitlement] failed_to_fetch', {
+      tenantSlug,
+      message: error.message
+    });
+
+    if (skipBlocking) return next();
+    // Nothing known about this school: reads go through, writes wait for billing.
+    if (WRITE_METHODS.includes(req.method)) {
+      return res.status(503).json({
+        success: false,
+        message: 'Billing service temporarily unavailable. Please try again.'
       });
-
-      // Fail-open for read requests to avoid hard downtime; fail-closed for mutating requests.
-      if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
-        return res.status(503).json({
-          success: false,
-          message: 'Billing service temporarily unavailable. Please try again.'
-        });
-      }
-
-      return next();
     }
+
+    return next();
   }
 
   req.billingEntitlement = entitlement;
   res.setHeader('x-billing-access-mode', entitlement.accessMode || 'full');
   res.setHeader('x-billing-state', entitlement.state || 'active');
 
+  // Modules the school hasn't paid for are switched off for everything downstream:
+  // requireTenantFeature (402), the user payload sent to the app, search and portals.
+  if (req.tenant.featureToggles) {
+    const { toggles, billingDisabled } = applyBillingEntitlement(
+      req.tenant.featureToggles,
+      entitlement.entitledModules
+    );
+    req.tenant.featureToggles = toggles;
+    req.tenant.billingDisabledFeatures = billingDisabled;
+  }
+
+  if (skipBlocking) {
+    return next();
+  }
+
   const accessMode = entitlement.accessMode || 'full';
   const moduleName = resolveModuleFromPath(requestPath);
-  const isWriteMethod = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method);
+  const isWriteMethod = WRITE_METHODS.includes(req.method);
 
   if (accessMode === 'core_only') {
     if (!parseBooleanEnv(process.env.BILLING_TRIAL_CORE_ONLY_ENABLED, true)) {
@@ -152,12 +210,27 @@ const billingEntitlementMiddleware = async (req, res, next) => {
     }
   }
 
+  // No plan chosen yet: the app shows the plan picker. Reads keep the app shell working;
+  // writes wait until the school opts in to its trial (or pays).
+  if (accessMode === 'setup_required') {
+    if (isWriteMethod && !isAllowedWhileReadOnly(req.method, requestPath)) {
+      return res.status(402).json({
+        ...BILLING_ERROR_RESPONSE,
+        errorCode: 'plan_required',
+        message: 'Choose your plan and start your free trial to use Capabble.',
+        billingUrl: '/get-started',
+        accessMode
+      });
+    }
+    return next();
+  }
+
   if (accessMode === 'read_only') {
     if (!parseBooleanEnv(process.env.BILLING_READ_ONLY_MODE_ENABLED, true)) {
       return next();
     }
 
-    if (isWriteMethod) {
+    if (isWriteMethod && !isAllowedWhileReadOnly(req.method, requestPath)) {
       return blockRequest(res, accessMode);
     }
 
@@ -171,7 +244,10 @@ const billingEntitlementMiddleware = async (req, res, next) => {
 
 module.exports = {
   billingEntitlementMiddleware,
+  loadEntitlement,
+  invalidateEntitlement,
   resolveModuleFromPath,
   isReadOnlyBlockedPath,
-  shouldSkipForPath
+  shouldSkipForPath,
+  _cache: entitlementCache
 };

@@ -75,7 +75,7 @@ const AcceptInvite: React.FC = () => {
     }
   }
 
-  if (status === 'loading') return <Loader />
+  if (status === 'loading') return <Loader size="lg" fullScreen />
 
   const loginHint = invite?.username
     ? `${invite.username}@${school}`

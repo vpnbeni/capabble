@@ -1,8 +1,6 @@
 import axios from 'axios'
 import type {
   DefaultTenantFeatureConfigResponse,
-  BillingTenantDetails,
-  BillingTenantListResponse,
   DataRollout,
   MasterCBSEDatesheet,
   MasterGuideline,
@@ -40,11 +38,32 @@ const isLocalApiUrl = (value: string): boolean => {
   }
 }
 
+const ADMIN_API_PATH = '/api/admin'
+
+/** `https://api.capabble.cloud` → `https://api.capabble.cloud/api/admin`; a full URL is kept. */
+const withAdminPath = (value: string): string => {
+  const trimmed = value.replace(/\/+$/, '')
+  return trimmed.endsWith(ADMIN_API_PATH) ? trimmed : `${trimmed}${ADMIN_API_PATH}`
+}
+
+/**
+ * Without VITE_PLATFORM_API_URL, the admin site finds its API from its own address:
+ * stageadmin.<domain> → stageapi.<domain>, admin.<domain> → api.<domain>. The admin
+ * site itself (Vercel) serves no API, so a relative /api/admin can't work there.
+ */
+const apiFromAdminHost = (): string | null => {
+  if (typeof window === 'undefined') return null
+  const { protocol, hostname } = window.location
+  const match = hostname.match(/^(stage)?admin\.(.+)$/)
+  if (!match) return null
+  return `${protocol}//${match[1] ? 'stageapi' : 'api'}.${match[2]}${ADMIN_API_PATH}`
+}
+
 const API_BASE_URL = import.meta.env.DEV
-  ? '/api/admin'
-  : ((!import.meta.env.DEV && isLocalApiUrl(configuredApiBaseUrl))
-    ? '/api/admin'
-    : (configuredApiBaseUrl || '/api/admin'))
+  ? ADMIN_API_PATH
+  : (isLocalApiUrl(configuredApiBaseUrl)
+    ? ADMIN_API_PATH
+    : (configuredApiBaseUrl ? withAdminPath(configuredApiBaseUrl) : (apiFromAdminHost() || ADMIN_API_PATH)))
 
 interface ApiResponse<T> {
   success: boolean
@@ -420,66 +439,6 @@ export const rolloutApi = {
   async retry(id: string): Promise<DataRollout> {
     const response = await platformApi.post<ApiResponse<DataRollout>>(`/rollouts/${id}/retry`)
     return response.data.data
-  },
-}
-
-export const billingAdminApi = {
-  async listTenants(search = '', page = 1, limit = 20): Promise<BillingTenantListResponse> {
-    const response = await platformApi.get<ApiResponse<BillingTenantListResponse>>('/billing/tenants', {
-      params: {
-        search: search || undefined,
-        page,
-        limit,
-      },
-    })
-    return response.data.data
-  },
-
-  async getTenantById(tenantId: string): Promise<BillingTenantDetails> {
-    const response = await platformApi.get<ApiResponse<BillingTenantDetails>>(`/billing/tenants/${tenantId}`)
-    return response.data.data
-  },
-
-  async changePlan(tenantId: string, planCode: string): Promise<void> {
-    await platformApi.post(`/billing/tenants/${tenantId}/change-plan`, { planCode })
-  },
-
-  async grantExtension(tenantId: string, days: number): Promise<void> {
-    await platformApi.post(`/billing/tenants/${tenantId}/grant-extension`, { days })
-  },
-
-  async createPlan(payload: {
-    code: string
-    name: string
-    billingCycle: 'monthly' | 'yearly'
-    amountMinor: number
-    description?: string
-    trialDays?: number
-    currency?: string
-    features?: string[]
-  }): Promise<void> {
-    await platformApi.post('/billing/plans', payload)
-  },
-
-  async createCoupon(payload: {
-    code: string
-    discountType: 'percentage' | 'fixed_minor'
-    discountValue: number
-    durationType?: 'one_time' | 'forever' | 'repeating'
-    durationInMonths?: number
-    maxRedemptions?: number
-    expiresAt?: string
-  }): Promise<void> {
-    await platformApi.post('/billing/coupons', payload)
-  },
-
-  async createAddon(payload: {
-    code: string
-    name: string
-    amountMinor: number
-    cycle?: 'monthly' | 'yearly' | 'one_time'
-  }): Promise<void> {
-    await platformApi.post('/billing/addons', payload)
   },
 }
 

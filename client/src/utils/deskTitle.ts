@@ -23,3 +23,12 @@ const rankOf = (key: string) => {
   // Custom roles rank after the built-in main roles.
   return TEMPLATE_RANK.get(key) ?? TEMPLATE_RANK.size
 }
+
+// Bus crew roles: their work is the crew screen, not the school dashboard.
+const BUS_CREW_ROLES = new Set(['driver', 'conductor'])
+
+/** True when every role the user holds is a bus crew role, so Home should open the crew screen. */
+export const isBusCrewOnly = (user: User | null | undefined): boolean => {
+  const roles = user?.roles || []
+  return Boolean(roles.length) && !user?.isAdmin && roles.every((role) => BUS_CREW_ROLES.has(role.key))
+}

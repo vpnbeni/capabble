@@ -1,7 +1,8 @@
 import React, { useMemo, useId } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Loader2 } from 'lucide-react'
+import { X } from 'lucide-react'
+import Loader from '../Loader'
 import { DialogProvider } from './DialogContext'
 import { DialogHeader } from './DialogHeader'
 import { DialogBody } from './DialogBody'
@@ -164,7 +165,7 @@ const Dialog = ({
                           'btn-primary'
               }`}
           >
-            {action.loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+            {action.loading && <Loader size="sm" className="mr-2" />}
             {action.icon && !action.loading && <span className="mr-2">{action.icon}</span>}
             {action.label}
           </button>
@@ -277,7 +278,7 @@ const Dialog = ({
         {loading && (
           <div className="absolute inset-0 bg-white/75 dark:bg-gray-900/75 backdrop-blur-sm flex items-center justify-center z-50">
             <div className="text-center">
-              <Loader2 className="w-8 h-8 animate-spin mx-auto text-primary-600" />
+              <Loader size="md" className="block mx-auto" />
               <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">Loading...</p>
             </div>
           </div>

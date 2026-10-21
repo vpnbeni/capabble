@@ -14,11 +14,16 @@ const {
 } = require('../rbac/session');
 const { buildAuthUserPayload } = require('../rbac/userPayload');
 const { recordAuthEvent } = require('../rbac/audit');
+const eventBus = require('../events/eventBus');
+const EVENTS = require('../events/eventNames');
 const { ensureUserIndexes } = require('../rbac/userIndexes');
 const { generateResponse } = require('../utils/helpers');
 const { SUCCESS_MESSAGES, HTTP_STATUS } = require('../utils/constants');
-const { getTenantEntitlement } = require('../services/billingServiceClient');
+const { loadEntitlement } = require('../middleware/billingEntitlement');
+const { registerTenant } = require('../services/billingServiceClient');
+const { getPlatformModels } = require('../tenancy/platformModels');
 const { sendMail } = require('../utils/mailer');
+const mailTemplates = require('../mail/templates');
 
 const PASSWORD_RESET_ERROR_CODES = {
   USER_NOT_FOUND: 'user_not_found',
@@ -75,60 +80,17 @@ const getOtpExpiryMinutes = (otpExpiresAt) => {
 };
 
 const sendPasswordResetOtpEmail = async ({ email, otp, otpExpiresAt }) => {
-  const expiresInMinutes = getOtpExpiryMinutes(otpExpiresAt);
-  const expiryLine = expiresInMinutes && expiresInMinutes > 0
-    ? `This code expires in ${expiresInMinutes} minute${expiresInMinutes === 1 ? '' : 's'}.`
-    : 'Use this code as soon as possible.';
-
-  const subject = 'Cntr Password Reset Verification Code';
-  const text = [
-    `Your Cntr password reset verification code is ${otp}.`,
-    expiryLine,
-    'If you did not request this reset, you can safely ignore this email.',
-  ].join('\n');
-
-  const html = [
-    '<div style="font-family:Arial,sans-serif;line-height:1.6;color:#0f172a;">',
-    '<h2 style="margin:0 0 12px;">Cntr Password Reset</h2>',
-    '<p style="margin:0 0 12px;">Use the OTP below to reset your password:</p>',
-    `<p style="margin:0 0 12px;font-size:28px;letter-spacing:6px;font-weight:700;">${otp}</p>`,
-    `<p style="margin:0 0 12px;">${expiryLine}</p>`,
-    '<p style="margin:0;">If you did not request this reset, you can safely ignore this email.</p>',
-    '</div>',
-  ].join('');
-
   await sendMail({
     to: email,
-    subject,
-    text,
-    html,
+    ...mailTemplates.passwordResetCode({ code: otp, minutes: getOtpExpiryMinutes(otpExpiresAt) }),
   });
 };
 
 const sendEmailVerificationOtpEmail = async ({ email, otp, otpExpiresAt }) => {
-  const expiresInMinutes = getOtpExpiryMinutes(otpExpiresAt);
-  const expiryLine = expiresInMinutes && expiresInMinutes > 0
-    ? `This code expires in ${expiresInMinutes} minute${expiresInMinutes === 1 ? '' : 's'}.`
-    : 'Use this code as soon as possible.';
-
-  const subject = 'Cntr Email Verification Code';
-  const text = [
-    `Your Cntr email verification code is ${otp}.`,
-    expiryLine,
-    'If you did not request this, you can safely ignore this email.',
-  ].join('\n');
-
-  const html = [
-    '<div style="font-family:Arial,sans-serif;line-height:1.6;color:#0f172a;">',
-    '<h2 style="margin:0 0 12px;">Cntr Email Verification</h2>',
-    '<p style="margin:0 0 12px;">Use the code below to verify your email address:</p>',
-    `<p style="margin:0 0 12px;font-size:28px;letter-spacing:6px;font-weight:700;">${otp}</p>`,
-    `<p style="margin:0 0 12px;">${expiryLine}</p>`,
-    '<p style="margin:0;">If you did not request this, you can safely ignore this email.</p>',
-    '</div>',
-  ].join('');
-
-  await sendMail({ to: email, subject, text, html });
+  await sendMail({
+    to: email,
+    ...mailTemplates.emailVerificationCode({ code: otp, minutes: getOtpExpiryMinutes(otpExpiresAt) }),
+  });
 };
 
 const buildBillingSnapshot = async (tenantSlug) => {
@@ -137,14 +99,20 @@ const buildBillingSnapshot = async (tenantSlug) => {
   }
 
   try {
-    const entitlement = await getTenantEntitlement(tenantSlug);
+    const entitlement = await loadEntitlement(tenantSlug);
     return {
       accessMode: entitlement.accessMode || 'full',
       planCode: entitlement.planCode || null,
       trialEndsAt: entitlement.trialEndsAt || null,
       graceEndsAt: entitlement.graceEndsAt || null,
+      periodEndsAt: entitlement.periodEndsAt || null,
+      cancelAtPeriodEnd: Boolean(entitlement.cancelAtPeriodEnd),
+      entitledModules: entitlement.entitledModules || ['*'],
+      // What the school chose: everything is open in a trial, these stay on after it.
+      plannedModules: entitlement.plannedModules || [],
+      autopay: Boolean(entitlement.autopay),
       isReadOnly: Boolean(entitlement.isReadOnly),
-      state: entitlement.state || 'active',
+      state: entitlement.state || (entitlement.accessMode === 'setup_required' ? 'none' : 'active'),
     };
   } catch (error) {
     console.error('[auth] billing snapshot fetch failed', {
@@ -408,6 +376,7 @@ const changePassword = asyncHandler(async (req, res) => {
   await user.save();
   await issueSession({ req, res, user, tenantSlug: req.tenant.slug, rememberMe: true });
   await recordAuthEvent(req, { event: 'password_changed', actor: user, target: user });
+  eventBus.emitFromRequest(req, EVENTS.USER_ACCOUNT_CHANGED, { userId: String(user._id), change: 'password_changed' });
 
   return sendAuthUser(req, res, user, { message: 'Password changed. Other devices have been signed out.' });
 });
@@ -631,6 +600,7 @@ const resetPassword = asyncHandler(async (req, res) => {
   clearPasswordResetOtpState(user);
   await user.save();
   await recordAuthEvent(req, { event: 'password_reset', actor: user, target: user });
+  eventBus.emitFromRequest(req, EVENTS.USER_ACCOUNT_CHANGED, { userId: String(user._id), change: 'password_changed' });
 
   clearSessionCookies(res);
 
@@ -638,6 +608,23 @@ const resetPassword = asyncHandler(async (req, res) => {
     generateResponse(true, 'Password reset successfully. Please login with your new password.')
   );
 });
+
+// The school gets a billing account and an invite to choose its plan; its trial starts when it opts in.
+const registerSignupBillingBestEffort = async (tenant, user) => {
+  try {
+    const { Tenant } = getPlatformModels();
+    const record = await Tenant.findOne({ slug: tenant.slug }).select('slug name adminEmail').lean();
+    if (!record || String(record.adminEmail || '').toLowerCase() !== user.email) return;
+    await registerTenant({
+      tenantId: String(record._id),
+      tenantSlug: record.slug,
+      tenantName: record.name,
+      billingEmail: record.adminEmail,
+    });
+  } catch (error) {
+    console.error(`[auth:verify-email] status=billing_register_failed tenantSlug=${tenant.slug} message=${error.message}`);
+  }
+};
 
 // @desc    Verify email with OTP (sent during login for unverified accounts)
 // @route   POST /api/auth/verify-email
@@ -696,6 +683,10 @@ const verifyEmail = asyncHandler(async (req, res) => {
     });
   }
 
+  // A school whose sign-up stopped before the email step finishes it here: its first
+  // sign-in as the signup admin starts the trial the signup would have started.
+  const firstSignIn = !user.lastLogin;
+
   // Mark email verified and clear OTP state
   user.isEmailVerified = true;
   user.emailVerificationOtpHash = null;
@@ -706,6 +697,7 @@ const verifyEmail = asyncHandler(async (req, res) => {
   user.lockUntil = null;
   await issueSession({ req, res, user, tenantSlug: req.tenant.slug, rememberMe: req.body.rememberMe !== false });
   await recordAuthEvent(req, { event: 'login_success', actor: user, target: user, details: { via: 'email_verification' } });
+  if (firstSignIn) await registerSignupBillingBestEffort(req.tenant, user);
 
   return sendAuthUser(req, res, user);
 });

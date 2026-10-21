@@ -26,6 +26,8 @@ const FEATURE_PERMISSIONS = permissionCatalog.features as Record<string, string 
 const EXTRA_PATH_PERMISSIONS: Array<[prefix: string, permission: string | string[]]> = [
   ['/settings/users', 'core.users.read'],
   ['/settings/roles', 'core.users.read'],
+  // Everyone can see that the plan isn't set up; only billing managers can choose it.
+  ['/get-started', ['core.billing.read', 'core.dashboard.read']],
 ]
 
 type FeatureCatalogEntry = {
@@ -58,6 +60,8 @@ const PAGE_PERMISSIONS: Array<[prefix: string, permission: string | string[]]> =
   ['/appnt/availability', 'appnt.appointments.host'],
   ['/appnt/reports', 'appnt.appointments.report'],
   ['/appnt/settings', 'appnt.appointments.settings'],
+  ['/trnst/live', 'trnst.trips.read'],
+  ['/trnst/trips', 'trnst.trips.read'],
 ]
 
 const isPagePermitted = (pathname: string, can?: PermissionChecker): boolean => {
@@ -144,6 +148,8 @@ const MODULE_PATH_ROOTS: Array<[prefix: string, module: string]> = [
   ['/cpitl', 'cpitl'],
   ['/trnst', 'trnst'],
   ['/exmcl', 'exmcl'],
+  // Exam centre setup (importing candidates, Form 66, attendance sheets)
+  ['/onboarding', 'cntr'],
 ]
 
 export const getModuleForPath = (pathname: string): string | null => {

@@ -20,11 +20,11 @@ const HelpCentreHero: React.FC<HelpCentreHeroProps> = ({
 
       <div className="relative flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
         <div className="max-w-xl">
-          <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-white/70 px-3 py-1 text-[11px] font-medium text-violet-700 ring-1 ring-violet-100">
+          <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-white/70 dark:bg-gray-800/70 px-3 py-1 text-[11px] font-medium text-violet-700 dark:text-violet-300 ring-1 ring-violet-100">
             <Headphones className="h-3.5 w-3.5" />
             Capabble School OS Help Centre
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Help Centre</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-gray-100 sm:text-3xl">Help Centre</h1>
           <p className="mt-2 text-sm leading-relaxed text-slate-600">
             Search guides, browse modules, report issues, and get support for every part of your school ERP.
           </p>
@@ -38,7 +38,7 @@ const HelpCentreHero: React.FC<HelpCentreHeroProps> = ({
       </div>
 
       <form
-        className="help-centre-search relative mt-6 flex items-center gap-2 rounded-xl border border-violet-100 bg-white p-1.5 shadow-sm"
+        className="help-centre-search relative mt-6 flex items-center gap-2 rounded-xl border border-violet-100 dark:border-violet-800 bg-white dark:bg-gray-800 p-1.5 shadow-sm"
         onSubmit={(e) => {
           e.preventDefault()
           onSearchSubmit()
@@ -50,7 +50,7 @@ const HelpCentreHero: React.FC<HelpCentreHeroProps> = ({
           value={searchQuery}
           onChange={(e) => onSearchChange(e.target.value)}
           placeholder="Search for help articles, e.g. 'attendance', 'report card'"
-          className="min-w-0 flex-1 border-0 bg-transparent px-1 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-0"
+          className="min-w-0 flex-1 border-0 bg-transparent px-1 py-2.5 text-sm text-slate-800 dark:text-gray-200 placeholder:text-slate-400 focus:outline-none focus:ring-0"
         />
         <button
           type="submit"
@@ -67,7 +67,7 @@ const HelpCentreHero: React.FC<HelpCentreHeroProps> = ({
             key={term}
             type="button"
             onClick={() => onSearchChange(term)}
-            className="help-chip rounded-full border border-slate-200 bg-white/80 px-3 py-1 text-xs font-medium text-slate-600"
+            className="help-chip rounded-full border border-slate-200 dark:border-gray-700 bg-white/80 dark:bg-gray-800/80 px-3 py-1 text-xs font-medium text-slate-600"
           >
             {term}
           </button>

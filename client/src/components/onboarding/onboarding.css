@@ -1,0 +1,36 @@
+/* Exam centre setup (onboarding wizard) */
+.cb-app .ob-steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.cb-app .ob-step { display: flex; align-items: flex-start; gap: var(--space-3); padding: var(--space-3) 0; border-top: 1px solid var(--border); }
+.cb-app .ob-step:first-child { border-top: 0; padding-top: 0; }
+.cb-app .ob-step:last-child { padding-bottom: 0; }
+.cb-app .ob-step__mark {
+  flex-shrink: 0; width: 24px; height: 24px; border-radius: var(--radius-full);
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums;
+  background: var(--surface-sunken); color: var(--ink-muted); border: 1px solid var(--border);
+}
+.cb-app .ob-step.is-current .ob-step__mark { background: var(--accent-strong); color: var(--on-accent); border-color: var(--accent-strong); }
+.cb-app .ob-step.is-done .ob-step__mark { background: var(--accent-soft); color: var(--accent-soft-ink); border-color: transparent; }
+.cb-app .ob-step__body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; padding-top: 2px; }
+.cb-app .ob-step__title { font-size: 14px; font-weight: 500; color: var(--ink); }
+.cb-app .ob-step.is-current .ob-step__title { font-weight: 600; }
+.cb-app .ob-step__caption { font-size: 13px; line-height: 18px; color: var(--ink-muted); }
+
+.cb-app .ob-list { margin: 0; padding-left: var(--space-5); display: flex; flex-direction: column; gap: var(--space-1); font-size: 14px; color: var(--ink); }
+.cb-app .ob-aside { gap: var(--space-3); }
+
+.cb-app .ob-actions { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
+.cb-app .ob-actions__left { display: flex; align-items: center; gap: var(--space-2); }
+
+.cb-app .ob-mismatch__list {
+  list-style: none; margin: 0; padding: 0; max-height: 192px; overflow-y: auto;
+  border: 1px solid var(--border); border-radius: var(--radius-md);
+}
+.cb-app .ob-mismatch__list li { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-4); padding: var(--space-2) var(--space-3); font-size: 13px; border-top: 1px solid var(--border); }
+.cb-app .ob-mismatch__list li:first-child { border-top: 0; }
+.cb-app .ob-mismatch__pair { white-space: nowrap; }
+
+@media (max-width: 600px) {
+  .cb-app .ob-actions { flex-direction: column-reverse; align-items: stretch; }
+  .cb-app .ob-actions .cb-btn--primary { width: 100%; }
+}

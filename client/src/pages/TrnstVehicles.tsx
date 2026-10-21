@@ -3,7 +3,7 @@ import toast from 'react-hot-toast'
 import { Bus, Pencil, Plus, Trash2 } from 'lucide-react'
 import teacherService, { type Teacher } from '@/services/teacherService'
 import trnstService, { type TransportVehicle, type VehicleStatus, type VehicleType } from '@/services/trnstService'
-import { isDriver } from '@/utils/staafStaff'
+import { isConductor, isDriver } from '@/utils/staafStaff'
 import {
   Banner,
   Button,
@@ -43,6 +43,7 @@ type VehicleForm = {
   color: string
   capacity: number
   driverId: string
+  conductorId: string
   conductorName: string
   conductorPhone: string
   insuranceExpiry: string
@@ -60,6 +61,7 @@ const emptyVehicle: VehicleForm = {
   color: '',
   capacity: 40,
   driverId: '',
+  conductorId: '',
   conductorName: '',
   conductorPhone: '',
   insuranceExpiry: '',
@@ -77,6 +79,7 @@ const toForm = (vehicle: TransportVehicle): VehicleForm => ({
   color: vehicle.color || '',
   capacity: vehicle.capacity || 40,
   driverId: vehicle.driverId ? String(vehicle.driverId) : '',
+  conductorId: vehicle.conductorId ? String(vehicle.conductorId) : '',
   conductorName: vehicle.conductorName || '',
   conductorPhone: vehicle.conductorPhone || '',
   insuranceExpiry: vehicle.insuranceExpiry ? String(vehicle.insuranceExpiry).slice(0, 10) : '',
@@ -88,6 +91,7 @@ const toForm = (vehicle: TransportVehicle): VehicleForm => ({
 const TrnstVehicles: React.FC = () => {
   const [vehicles, setVehicles] = useState<TransportVehicle[]>([])
   const [drivers, setDrivers] = useState<Teacher[]>([])
+  const [conductors, setConductors] = useState<Teacher[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState<'all' | VehicleStatus>('all')
@@ -111,10 +115,15 @@ const TrnstVehicles: React.FC = () => {
 
   const loadDrivers = async () => {
     try {
-      const response = await teacherService.getAll({ dutyType: 'Driver', isActive: true, limit: 200, sort: 'name' })
-      setDrivers((response.items || []).filter(isDriver))
+      const [driverList, conductorList] = await Promise.all([
+        teacherService.getAll({ dutyType: 'Driver', isActive: true, limit: 200, sort: 'name' }),
+        teacherService.getAll({ dutyType: 'Conductor', isActive: true, limit: 200, sort: 'name' }),
+      ])
+      setDrivers((driverList.items || []).filter(isDriver))
+      setConductors((conductorList.items || []).filter(isConductor))
     } catch {
       setDrivers([])
+      setConductors([])
     }
   }
 
@@ -122,6 +131,14 @@ const TrnstVehicles: React.FC = () => {
     void loadVehicles()
     void loadDrivers()
   }, [])
+
+  const assignedConductorIds = useMemo(() => {
+    const map = new Map<string, string>()
+    vehicles.forEach((vehicle) => {
+      if (vehicle.conductorId && vehicle._id !== editing?._id) map.set(String(vehicle.conductorId), vehicleName(vehicle))
+    })
+    return map
+  }, [vehicles, editing])
 
   // Which bus each driver already drives, so the picker can say so.
   const assignedDriverIds = useMemo(() => {
@@ -182,6 +199,7 @@ const TrnstVehicles: React.FC = () => {
         {
           ...form,
           driverId: form.driverId || null,
+          conductorId: form.conductorId || null,
           insuranceExpiry: form.insuranceExpiry || null,
           fitnessExpiry: form.fitnessExpiry || null,
         },
@@ -424,14 +442,34 @@ const TrnstVehicles: React.FC = () => {
                 return { value: String(driver._id), label: assignedTo ? `${driver.name} (drives ${assignedTo})` : driver.name }
               })}
             />
-            <TextField label="Conductor" value={form.conductorName} onChange={(e) => set({ conductorName: e.target.value })} />
-            <TextField
-              label="Conductor phone"
-              type="tel"
-              inputMode="tel"
-              value={form.conductorPhone}
-              onChange={(e) => set({ conductorPhone: e.target.value })}
+            <Select
+              className="is-wide"
+              label="Conductor"
+              hint={
+                conductors.length
+                  ? 'From STAAF staff with the type Conductor. The driver and conductor can sign in to run trips on this bus.'
+                  : 'No STAAF conductors yet. Type a name below instead.'
+              }
+              value={form.conductorId}
+              onChange={(e) => set({ conductorId: e.target.value })}
+              placeholder="Not from STAAF"
+              options={conductors.map((conductor) => {
+                const assignedTo = assignedConductorIds.get(String(conductor._id))
+                return { value: String(conductor._id), label: assignedTo ? `${conductor.name} (on ${assignedTo})` : conductor.name }
+              })}
             />
+            {!form.conductorId ? (
+              <>
+                <TextField label="Conductor name" value={form.conductorName} onChange={(e) => set({ conductorName: e.target.value })} />
+                <TextField
+                  label="Conductor phone"
+                  type="tel"
+                  inputMode="tel"
+                  value={form.conductorPhone}
+                  onChange={(e) => set({ conductorPhone: e.target.value })}
+                />
+              </>
+            ) : null}
           </div>
         </div>
 

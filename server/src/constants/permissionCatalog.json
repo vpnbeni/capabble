@@ -53,6 +53,7 @@
 
     { "key": "stdnt.students", "module": "stdnt", "label": "Student records", "actions": ["read", "write", "delete"], "scopable": true },
     { "key": "stdnt.alumni", "module": "stdnt", "label": "Alumni directory", "actions": ["read", "write"] },
+    { "key": "stdnt.idcards", "module": "stdnt", "label": "Student ID cards", "actions": ["read", "write"] },
 
     { "key": "staaf.staff", "module": "staaf", "label": "Staff records", "actions": ["read", "write", "delete"] },
 
@@ -73,6 +74,8 @@
     { "key": "actvt.activities", "module": "actvt", "label": "Houses, clubs and events", "actions": ["read", "write", "delete"] },
     { "key": "mdcl.clinic", "module": "mdcl", "label": "Clinic cases and supplies", "actions": ["read", "write", "delete"] },
     { "key": "trnst.transport", "module": "trnst", "label": "Vehicles and routes", "actions": ["read", "write", "delete"] },
+    { "key": "trnst.trips", "module": "trnst", "label": "Bus trips and live tracking", "actions": ["read", "operate"] },
+    { "key": "trnst.boarding", "module": "trnst", "label": "Boarding and drop records", "actions": ["read", "mark"] },
 
     {
       "key": "asets.assets",
@@ -117,6 +120,7 @@
   "routes": [
     { "prefix": "/users", "resource": "core.users", "writeAction": "manage" },
     { "prefix": "/roles", "resource": "core.users", "writeAction": "manage" },
+    { "prefix": "/account", "path": "^/closure", "permission": "core.billing.manage" },
 
     { "prefix": "/sessions", "methods": ["GET"], "staff": true },
     { "prefix": "/sessions", "path": "^/?$", "methods": ["POST"], "staff": true },
@@ -126,6 +130,7 @@
     { "prefix": "/school-profile", "methods": ["GET"], "staff": true },
     { "prefix": "/school-profile", "resource": "core.school" },
     { "prefix": "/support", "staff": true },
+    { "prefix": "/notifications", "staff": true },
     { "prefix": "/search", "staff": true },
     { "prefix": "/dashboard", "staff": true },
     { "prefix": "/billing", "resource": "core.billing", "writeAction": "manage" },
@@ -137,6 +142,7 @@
     { "prefix": "/students", "path": "^/bulk-delete", "permission": "stdnt.students.delete" },
     { "prefix": "/students", "resource": "stdnt.students" },
     { "prefix": "/almni", "resource": "stdnt.alumni" },
+    { "prefix": "/id-cards", "resource": "stdnt.idcards" },
     { "prefix": "/teachers", "resource": "staaf.staff" },
 
     { "prefix": "/attnd", "path": "^/dashboard", "methods": ["GET"], "permission": ["attnd.staff.read", "attnd.students.read"] },
@@ -178,6 +184,8 @@
 
     { "prefix": "/actvt", "resource": "actvt.activities" },
     { "prefix": "/mdcl", "resource": "mdcl.clinic" },
+    { "prefix": "/trnst", "path": "^/crew", "permission": ["trnst.trips.operate", "trnst.boarding.mark"] },
+    { "prefix": "/trnst", "path": "^/(live|trips)", "resource": "trnst.trips" },
     { "prefix": "/trnst", "resource": "trnst.transport" },
     { "prefix": "/asets", "resource": "asets.assets" },
     { "prefix": "/cpitl", "resource": "cpitl.finance" },
@@ -215,6 +223,8 @@
     "attnd_student_attendance": "attnd.students.read",
     "almni_directory": "stdnt.alumni.read",
     "trnst_transport": "trnst.transport.read",
+    "trnst_crew": ["trnst.trips.operate", "trnst.boarding.mark"],
+    "stdnt_id_cards": "stdnt.idcards.read",
     "acdmc_academics": ["acdmc.curriculum.read", "acdmc.classwork.read"],
     "actvt_activities": "actvt.activities.read",
     "mdcl_clinic": "mdcl.clinic.read",
@@ -286,14 +296,14 @@
       "designations": ["principal", "vice principal", "headmaster", "headmistress", "director"],
       "permissions": [
         "core.users.read", "core.school.read", "core.billing.read", "core.subjects.read", "core.dashboard.read",
-        "stdnt.students.read", "stdnt.students.write", "stdnt.alumni.read",
+        "stdnt.students.read", "stdnt.students.write", "stdnt.alumni.read", "stdnt.idcards.read", "stdnt.idcards.write",
         "staaf.staff.read",
         "attnd.staff.read", "attnd.staff.write", "attnd.students.read", "attnd.students.write",
         "timetable.timetable.read", "timetable.timetable.write",
         "acdmc.curriculum.read", "acdmc.curriculum.write", "acdmc.classwork.read", "acdmc.classwork.write",
         "exam.setup.read", "exam.candidates.read", "exam.conduct.read", "exam.duties.read", "exam.results.read", "exam.results.write",
         "actvt.activities.read", "actvt.activities.write",
-        "mdcl.clinic.read", "trnst.transport.read",
+        "mdcl.clinic.read", "trnst.transport.read", "trnst.trips.read", "trnst.boarding.read",
         "asets.assets.view", "asets.assets.report", "libry.catalogue.view", "libry.catalogue.create", "libry.catalogue.edit", "libry.members.view", "libry.members.manage", "libry.circulation.view", "libry.circulation.manage", "libry.circulation.issue", "libry.circulation.return", "libry.circulation.renew", "libry.reservations.view", "libry.reservations.manage", "libry.fines.view", "libry.fines.assess", "libry.fines.waive", "libry.acquisitions.view", "libry.acquisitions.request", "libry.acquisitions.approve", "libry.acquisitions.manage", "libry.acquisitions.receive", "libry.reports.view", "libry.stocktake.view", "libry.stocktake.manage", "libry.audit.view", "libry.digital.view", "libry.digital.manage", "libry.reading.view", "libry.reading.manage", "libry.reading.log", "libry.reading.moderate",
         "cpitl.finance.view",
         "appnt.appointments.view", "appnt.appointments.book", "appnt.appointments.manage", "appnt.appointments.host",
@@ -368,6 +378,7 @@
       "permissions": [
         "core.school.read", "core.subjects.read", "core.subjects.write", "core.subjects.delete", "core.dashboard.read",
         "stdnt.students.read", "stdnt.students.write", "stdnt.students.delete", "stdnt.alumni.read", "stdnt.alumni.write",
+        "stdnt.idcards.read", "stdnt.idcards.write",
         "staaf.staff.read", "staaf.staff.write", "staaf.staff.delete",
         "attnd.staff.read", "attnd.staff.write", "attnd.students.read", "attnd.students.write",
         "timetable.timetable.read", "timetable.timetable.write",
@@ -379,7 +390,7 @@
         "exam.results.read", "exam.results.write",
         "actvt.activities.read", "actvt.activities.write", "actvt.activities.delete",
         "mdcl.clinic.read", "mdcl.clinic.write", "mdcl.clinic.delete",
-        "trnst.transport.read", "trnst.transport.write", "trnst.transport.delete",
+        "trnst.transport.read", "trnst.transport.write", "trnst.transport.delete", "trnst.trips.read", "trnst.boarding.read",
         "asets.assets.view", "asets.assets.create", "asets.assets.edit", "asets.assets.allocate", "asets.assets.transfer",
         "asets.assets.maintain", "asets.assets.audit", "asets.assets.procure", "asets.assets.report",
         "cpitl.finance.view", "cpitl.finance.collect", "cpitl.finance.expense_log",
@@ -404,8 +415,22 @@
       "key": "transport_incharge",
       "name": "Transport in-charge",
       "description": "Vehicles, routes and students on each route.",
-      "designations": ["transport", "driver", "conductor"],
-      "permissions": ["core.dashboard.read", "stdnt.students.read", "staaf.staff.read", "trnst.transport.read", "trnst.transport.write", "trnst.transport.delete"]
+      "designations": ["transport"],
+      "permissions": ["core.dashboard.read", "stdnt.students.read", "staaf.staff.read", "trnst.transport.read", "trnst.transport.write", "trnst.transport.delete", "trnst.trips.read", "trnst.boarding.read"]
+    },
+    {
+      "key": "driver",
+      "name": "Bus driver",
+      "description": "Starts and ends trips on their own bus and shares its location. Can mark students on and off the bus.",
+      "designations": ["driver"],
+      "permissions": ["trnst.trips.operate", "trnst.boarding.mark"]
+    },
+    {
+      "key": "conductor",
+      "name": "Bus conductor",
+      "description": "Scans ID cards or marks students on and off their own bus. Can run the trip when the driver doesn't.",
+      "designations": ["conductor"],
+      "permissions": ["trnst.trips.operate", "trnst.boarding.mark"]
     },
     {
       "key": "nurse",

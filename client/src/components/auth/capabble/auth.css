@@ -351,6 +351,33 @@
 .cb-auth .cb-field-input[data-icon] {
   padding-left: 40px;
 }
+.cb-auth .cb-field-input[data-trailing] {
+  padding-right: 48px;
+}
+.cb-auth .cb-field-trailing {
+  position: absolute;
+  right: 4px;
+  display: inline-flex;
+}
+.cb-auth .cb-field-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  color: var(--ink-muted);
+  background: none;
+  border: 0;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.cb-auth .cb-field-toggle:hover {
+  color: var(--ink);
+}
+.cb-auth .cb-field-toggle:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
 .cb-auth .cb-field-input::placeholder {
   color: var(--ink-disabled);
 }
@@ -626,15 +653,12 @@
   color: var(--accent-strong-hover);
 }
 .cb-auth .cb-spinner {
+  display: inline-block;
+  flex: none;
   width: 16px;
   height: 16px;
-  border: 2px solid currentColor;
-  border-right-color: transparent;
-  border-radius: 9999px;
-  animation: cb-spin 0.7s linear infinite;
-}
-@keyframes cb-spin {
-  to { transform: rotate(360deg); }
+  background: url('../../../assets/capabble-mark.svg') center / contain no-repeat;
+  animation: cb-logo-pulse 1.3s ease-in-out infinite;
 }
 
 /* ---------- Strength meter ---------- */
@@ -753,8 +777,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .cb-auth-photo img,
-  .cb-auth .cb-progress,
-  .cb-auth .cb-spinner {
+  .cb-auth .cb-progress {
     animation: none;
   }
   .cb-auth .cb-progress-fill {

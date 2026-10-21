@@ -1,101 +1,22 @@
-const asyncHandler = require('../../middleware/asyncHandler');
-const {
-  listBillingTenants,
-  getBillingTenantById,
-  changeBillingTenantPlan,
-  grantBillingTenantExtension,
-  createBillingPlan,
-  createBillingCoupon,
-  createBillingAddon
-} = require('../../services/billingServiceClient');
+// Platform admin billing: the admin session is checked by adminRoutes, the billing module
+// (src/modules/billing/routes/adminRoutes.js) validates, stores and audits.
+const { invalidateEntitlement } = require('../../middleware/billingEntitlement');
 
-const listTenants = asyncHandler(async (req, res) => {
-  const response = await listBillingTenants(req.query || {});
+const WRITE_METHODS = ['POST', 'PUT', 'PATCH', 'DELETE'];
 
-  res.status(200).json({
-    success: true,
-    data: response?.data || {
-      items: [],
-      total: 0,
-      page: 1,
-      pages: 1,
-      limit: 20
-    }
-  });
-});
-
-const getTenantById = asyncHandler(async (req, res) => {
-  const response = await getBillingTenantById(req.params.tenantId);
-
-  if (!response?.data) {
-    return res.status(404).json({
-      success: false,
-      message: 'Billing tenant not found'
+/** Records who is acting and drops cached entitlements after a change, so access follows at once. */
+const toBilling = (req, res, next) => {
+  req.actor = {
+    type: 'platform_admin',
+    id: req.platformUser?._id ? String(req.platformUser._id) : '',
+    requestId: req.headers['x-request-id'] || ''
+  };
+  if (WRITE_METHODS.includes(req.method)) {
+    res.on('finish', () => {
+      if (res.statusCode < 400) invalidateEntitlement();
     });
   }
-
-  return res.status(200).json({
-    success: true,
-    data: response.data
-  });
-});
-
-const changePlan = asyncHandler(async (req, res) => {
-  const response = await changeBillingTenantPlan(req.params.tenantId, req.body || {});
-
-  res.status(200).json({
-    success: Boolean(response?.success),
-    message: response?.message || 'Plan updated',
-    data: response?.data || null
-  });
-});
-
-const grantExtension = asyncHandler(async (req, res) => {
-  const response = await grantBillingTenantExtension(req.params.tenantId, req.body || {});
-
-  res.status(200).json({
-    success: Boolean(response?.success),
-    message: response?.message || 'Extension granted',
-    data: response?.data || null
-  });
-});
-
-const createPlan = asyncHandler(async (req, res) => {
-  const response = await createBillingPlan(req.body || {});
-
-  res.status(201).json({
-    success: Boolean(response?.success),
-    message: response?.message || 'Plan saved',
-    data: response?.data || null
-  });
-});
-
-const createCoupon = asyncHandler(async (req, res) => {
-  const response = await createBillingCoupon(req.body || {});
-
-  res.status(201).json({
-    success: Boolean(response?.success),
-    message: response?.message || 'Coupon saved',
-    data: response?.data || null
-  });
-});
-
-const createAddon = asyncHandler(async (req, res) => {
-  const response = await createBillingAddon(req.body || {});
-
-  res.status(201).json({
-    success: Boolean(response?.success),
-    message: response?.message || 'Addon saved',
-    data: response?.data || null
-  });
-});
-
-module.exports = {
-  listTenants,
-  getTenantById,
-  changePlan,
-  grantExtension,
-  createPlan,
-  createCoupon,
-  createAddon
+  next();
 };
+
+module.exports = { toBilling };

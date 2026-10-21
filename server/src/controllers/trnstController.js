@@ -1,3 +1,5 @@
+const mongoose = require('mongoose');
+
 const normalizeString = (value) => String(value || '').trim();
 
 const parseDate = (value) => {
@@ -6,37 +8,50 @@ const parseDate = (value) => {
   return Number.isNaN(date.getTime()) ? null : date;
 };
 
-const resolveDriverFromStaff = async (req, driverId) => {
-  const id = normalizeString(driverId);
-  if (!id) {
-    return { driverId: null, driverName: '', driverPhone: '' };
-  }
-
+/**
+ * Link a vehicle's driver or conductor to a STAAF staff record of that duty type.
+ * `role` is 'driver' or 'conductor'; the result uses `<role>Id`, `<role>Name`, `<role>Phone`.
+ */
+const resolveCrewFromStaff = async (req, role, staffId) => {
+  const empty = { [`${role}Id`]: null };
+  const id = normalizeString(staffId);
   const Teacher = req.models?.Teacher;
-  if (!Teacher) {
-    return { driverId: null, driverName: '', driverPhone: '' };
-  }
+  if (!id || !Teacher) return empty;
 
   const staff = await Teacher.findOne({
     _id: id,
     isActive: { $ne: false },
-    dutyType: { $regex: /^driver$/i },
+    dutyType: { $regex: new RegExp(`^${role}$`, 'i') },
   })
     .select('_id name phone mobileNo')
     .lean();
 
   if (!staff) {
-    return { error: 'Selected driver was not found in STAAF drivers.' };
+    return { error: `Selected ${role} was not found in STAAF ${role}s.` };
   }
 
   return {
-    driverId: staff._id,
-    driverName: normalizeString(staff.name),
-    driverPhone: normalizeString(staff.mobileNo || staff.phone),
+    [`${role}Id`]: staff._id,
+    [`${role}Name`]: normalizeString(staff.name),
+    [`${role}Phone`]: normalizeString(staff.mobileNo || staff.phone),
   };
 };
 
-const vehiclePayload = (body = {}, driverFields = {}) => ({
+const resolveVehicleCrew = async (req) => {
+  const driver = await resolveCrewFromStaff(req, 'driver', req.body?.driverId);
+  if (driver.error) return driver;
+  const conductor = await resolveCrewFromStaff(req, 'conductor', req.body?.conductorId);
+  if (conductor.error) return conductor;
+  return { ...driver, ...conductor };
+};
+
+const toCoordinate = (value, limit) => {
+  if (value === null || value === undefined || value === '') return null;
+  const number = Number(value);
+  return Number.isFinite(number) && Math.abs(number) <= limit ? number : null;
+};
+
+const vehiclePayload = (body = {}, crew = {}) => ({
   busNo: normalizeString(body.busNo),
   registrationNumber: normalizeString(body.registrationNumber).toUpperCase(),
   vehicleType: ['Bus', 'Mini Bus', 'Van', 'Winger', 'Other'].includes(body.vehicleType) ? body.vehicleType : 'Bus',
@@ -44,11 +59,12 @@ const vehiclePayload = (body = {}, driverFields = {}) => ({
   model: normalizeString(body.model),
   color: normalizeString(body.color),
   capacity: Number(body.capacity) > 0 ? Number(body.capacity) : 40,
-  driverId: driverFields.driverId ?? null,
-  driverName: normalizeString(driverFields.driverName ?? body.driverName),
-  driverPhone: normalizeString(driverFields.driverPhone ?? body.driverPhone),
-  conductorName: normalizeString(body.conductorName),
-  conductorPhone: normalizeString(body.conductorPhone),
+  driverId: crew.driverId ?? null,
+  driverName: normalizeString(crew.driverName ?? body.driverName),
+  driverPhone: normalizeString(crew.driverPhone ?? body.driverPhone),
+  conductorId: crew.conductorId ?? null,
+  conductorName: normalizeString(crew.conductorName ?? body.conductorName),
+  conductorPhone: normalizeString(crew.conductorPhone ?? body.conductorPhone),
   insuranceExpiry: parseDate(body.insuranceExpiry),
   fitnessExpiry: parseDate(body.fitnessExpiry),
   status: ['active', 'maintenance', 'inactive'].includes(body.status) ? body.status : 'active',
@@ -67,11 +83,15 @@ const routePayload = (body = {}) => ({
   stops: Array.isArray(body.stops)
     ? body.stops
       .map((stop, index) => ({
+        // Keep the stop's id across edits: student assignments point at it.
+        ...(mongoose.Types.ObjectId.isValid(String(stop._id || '')) ? { _id: stop._id } : {}),
         name: normalizeString(stop.name),
         landmark: normalizeString(stop.landmark),
         pickupTime: normalizeString(stop.pickupTime),
         dropTime: normalizeString(stop.dropTime),
         sequence: Number(stop.sequence) || index + 1,
+        lat: toCoordinate(stop.lat, 90),
+        lng: toCoordinate(stop.lng, 180),
       }))
       .filter((stop) => stop.name)
     : [],
@@ -127,11 +147,11 @@ const listVehicles = async (req, res) => {
 
 const createVehicle = async (req, res) => {
   try {
-    const driver = await resolveDriverFromStaff(req, req.body?.driverId);
-    if (driver.error) {
-      return res.status(400).json({ success: false, message: driver.error });
+    const crew = await resolveVehicleCrew(req);
+    if (crew.error) {
+      return res.status(400).json({ success: false, message: crew.error });
     }
-    const payload = vehiclePayload(req.body, driver);
+    const payload = vehiclePayload(req.body, crew);
     if (!payload.busNo) {
       return res.status(400).json({ success: false, message: 'Bus number is required.' });
     }
@@ -151,11 +171,11 @@ const createVehicle = async (req, res) => {
 
 const updateVehicle = async (req, res) => {
   try {
-    const driver = await resolveDriverFromStaff(req, req.body?.driverId);
-    if (driver.error) {
-      return res.status(400).json({ success: false, message: driver.error });
+    const crew = await resolveVehicleCrew(req);
+    if (crew.error) {
+      return res.status(400).json({ success: false, message: crew.error });
     }
-    const payload = vehiclePayload(req.body, driver);
+    const payload = vehiclePayload(req.body, crew);
     if (!payload.busNo) {
       return res.status(400).json({ success: false, message: 'Bus number is required.' });
     }
@@ -185,12 +205,22 @@ const deleteVehicle = async (req, res) => {
   }
 };
 
+/** Routes saved before stops had ids get them once, so students can be assigned to a stop. */
+const ensureStopIds = async (Route, routes) => {
+  const missing = routes.filter((route) => (route.stops || []).some((stop) => !stop._id));
+  await Promise.all(missing.map(async (route) => {
+    route.stops = route.stops.map((stop) => (stop._id ? stop : { ...stop, _id: new mongoose.Types.ObjectId() }));
+    await Route.updateOne({ _id: route._id }, { $set: { stops: route.stops } });
+  }));
+};
+
 const listRoutes = async (req, res) => {
   try {
     const routes = await req.models.TransportRoute.find({ isActive: { $ne: false } })
       .populate('vehicleId', 'busNo registrationNumber vehicleType driverName capacity')
       .sort({ code: 1 })
       .lean();
+    await ensureStopIds(req.models.TransportRoute, routes);
     return res.json({ success: true, data: routes });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Failed to load routes.', error: error.message });

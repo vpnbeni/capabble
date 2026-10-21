@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react'
-import { ChevronDown, X, Search, Loader2, Check } from 'lucide-react'
+import { ChevronDown, X, Search, Check } from 'lucide-react'
+import Loader from '../Loader'
 import { createPortal } from 'react-dom'
 import { useDropdown } from './useDropdown'
 import { VirtualList } from './VirtualList'
@@ -261,7 +262,7 @@ export const Dropdown: React.FC<DropdownProps> = ({
         {onLoadMore && hasMore && (
           <div ref={loadMoreRef} className="px-3 py-2 text-center">
             {isLoadingMore && (
-              <Loader2 className="w-4 h-4 animate-spin mx-auto text-primary-600" />
+              <Loader size="sm" className="block mx-auto" />
             )}
           </div>
         )}
@@ -314,7 +315,7 @@ export const Dropdown: React.FC<DropdownProps> = ({
       {/* Options list */}
       {loading ? (
         <div className="px-3 py-8 text-center">
-          <Loader2 className="w-6 h-6 animate-spin mx-auto text-primary-600" />
+          <Loader size="md" className="block mx-auto" />
           <p className="mt-2 text-sm text-secondary-500 dark:text-secondary-400">Loading...</p>
         </div>
       ) : virtualized && filteredOptions.length > 0 ? (
@@ -402,7 +403,7 @@ export const Dropdown: React.FC<DropdownProps> = ({
 
             {/* Loading spinner */}
             {loading && (
-              <Loader2 className={`${iconSizeClasses[size]} animate-spin text-secondary-400`} />
+              <span className={`cb-logo-loader ${iconSizeClasses[size]}`} role="status" aria-label="Loading" />
             )}
 
             {/* Dropdown icon */}

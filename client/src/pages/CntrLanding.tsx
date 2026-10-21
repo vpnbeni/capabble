@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { useLightOnlyTheme } from '@/utils/theme'
 import { Link } from 'react-router-dom'
 import { Document, Page, pdfjs } from 'react-pdf'
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
@@ -92,6 +93,7 @@ const modules = [
 ]
 
 const CntrLanding: React.FC = () => {
+  useLightOnlyTheme()
   const [showPreviewDialog, setShowPreviewDialog] = useState(false)
   const [previewPageCount, setPreviewPageCount] = useState(0)
   const [previewRenderError, setPreviewRenderError] = useState<string | null>(null)

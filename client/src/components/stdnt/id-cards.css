@@ -1,0 +1,87 @@
+/* Student ID card preview. Like .cb-paper, the card is a printed object: it stays white with dark ink in both
+   themes, and those colours live only in the --idc-* variables below. Sizes are in mm to match the PDF. */
+.cb-app .idc-previews {
+  --idc-paper: #fff;
+  --idc-ink: #111;
+  --idc-muted: #6b7280;
+  --idc-rule: #9ca3af;
+  --idc-photo-bg: #f3f4f6;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-6);
+  padding: var(--space-6);
+  background: var(--surface-sunken);
+}
+.cb-app .idc-figure { display: flex; flex-direction: column; align-items: center; gap: var(--space-2); margin: 0; }
+
+/* Shown 1.6x so the small print is readable while designing. */
+.cb-app .idc-scale { position: relative; }
+.cb-app .idc-scale--portrait { width: calc(54mm * 1.6); height: calc(85.6mm * 1.6); }
+.cb-app .idc-scale--landscape { width: calc(85.6mm * 1.6); height: calc(54mm * 1.6); }
+.cb-app .idc-scale > .idc-card { position: absolute; left: 0; top: 0; transform: scale(1.6); transform-origin: 0 0; }
+@media (max-width: 640px) {
+  .cb-app .idc-previews { padding: var(--space-4); }
+  .cb-app .idc-scale--portrait { width: calc(54mm * 1.3); height: calc(85.6mm * 1.3); }
+  .cb-app .idc-scale--landscape { width: calc(85.6mm * 1.05); height: calc(54mm * 1.05); }
+  .cb-app .idc-scale--portrait > .idc-card { transform: scale(1.3); }
+  .cb-app .idc-scale--landscape > .idc-card { transform: scale(1.05); }
+}
+
+.cb-app .idc-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--idc-paper);
+  color: var(--idc-ink);
+  border-radius: 3mm;
+  box-shadow: var(--shadow-overlay);
+  font-family: Arial, Helvetica, sans-serif;
+}
+.cb-app .idc-card--portrait { width: 54mm; height: 85.6mm; }
+.cb-app .idc-card--landscape { width: 85.6mm; height: 54mm; }
+
+.cb-app .idc-band { display: flex; align-items: center; gap: 1.5mm; padding: 1.6mm 2mm; background: var(--idc-accent); color: var(--idc-paper); }
+.cb-app .idc-band img { width: 8mm; height: 8mm; object-fit: contain; background: var(--idc-paper); border-radius: 1mm; padding: 0.4mm; }
+.cb-app .idc-school { min-width: 0; }
+.cb-app .idc-school__name { font-size: 7pt; font-weight: 700; line-height: 1.1; text-transform: uppercase; }
+.cb-app .idc-school__address { font-size: 4.6pt; line-height: 1.15; opacity: 0.9; margin-top: 0.3mm; }
+.cb-app .idc-title { text-align: center; font-size: 5.4pt; font-weight: 700; letter-spacing: 0.4mm; color: var(--idc-accent); padding: 0.8mm 1mm 0; }
+
+.cb-app .idc-photo {
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  width: 19mm; height: 23mm; object-fit: cover;
+  border: 0.3mm solid var(--idc-accent); border-radius: 1mm;
+  background: var(--idc-photo-bg); color: var(--idc-muted); font-size: 12pt; font-weight: 700;
+}
+.cb-app .idc-name { font-size: 7.4pt; font-weight: 700; line-height: 1.15; }
+.cb-app .idc-meta { font-size: 5.6pt; margin-top: 0.3mm; }
+.cb-app .idc-rows { width: 100%; border-collapse: collapse; font-size: 5.2pt; line-height: 1.25; }
+.cb-app .idc-rows td { vertical-align: top; padding: 0.15mm 0; }
+.cb-app .idc-label { color: var(--idc-muted); white-space: nowrap; padding-right: 1.2mm !important; width: 1%; }
+.cb-app .idc-value { font-weight: 600; word-break: break-word; }
+
+.cb-app .idc-body--portrait { display: flex; flex-direction: column; align-items: center; gap: 0.8mm; padding: 1.2mm 2.2mm 0; text-align: center; }
+.cb-app .idc-body--portrait .idc-rows { margin-top: 0.6mm; text-align: left; }
+.cb-app .idc-body--landscape { display: flex; gap: 2mm; padding: 1mm 2mm 0; align-items: flex-start; }
+.cb-app .idc-body--landscape .idc-photo { width: 17mm; height: 21mm; }
+.cb-app .idc-details { flex: 1; min-width: 0; }
+
+.cb-app .idc-footer { margin-top: auto; display: flex; align-items: flex-end; justify-content: space-between; gap: 1.5mm; padding: 0 2mm 1.6mm; }
+.cb-app .idc-qr { display: flex; align-items: center; justify-content: center; width: 13mm; height: 13mm; border: 0.2mm dashed var(--idc-rule); color: var(--idc-muted); }
+.cb-app .idc-qr svg { width: 8mm; height: 8mm; }
+.cb-app .idc-validity { font-size: 4.6pt; text-align: right; }
+.cb-app .idc-sign { text-align: center; font-size: 4.6pt; }
+.cb-app .idc-sign img { display: block; max-width: 16mm; max-height: 6mm; margin: 0 auto 0.3mm; object-fit: contain; }
+.cb-app .idc-sign__line { border-top: 0.2mm solid var(--idc-muted); padding-top: 0.3mm; min-width: 14mm; }
+
+.cb-app .idc-back { display: flex; flex-direction: column; gap: 1.2mm; padding: 2.5mm; flex: 1; font-size: 5.4pt; line-height: 1.3; }
+.cb-app .idc-back__heading { font-size: 6pt; font-weight: 700; color: var(--idc-accent); text-transform: uppercase; }
+.cb-app .idc-back ul { margin: 0; padding-left: 2.6mm; }
+.cb-app .idc-back__contact { margin-top: auto; border-top: 0.2mm solid var(--idc-rule); padding-top: 1mm; }
+
+/* Designer side panel */
+.cb-app .idc-colour { display: flex; align-items: center; gap: var(--space-3); }
+.cb-app .idc-colour input[type='color'] { width: 44px; height: 36px; padding: 2px; border: 1px solid var(--border-control); border-radius: var(--radius-sm); background: var(--surface); cursor: pointer; }
+.cb-app .idc-print-note { font-size: 13px; line-height: 18px; color: var(--ink-muted); }

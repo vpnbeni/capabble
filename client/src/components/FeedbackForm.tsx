@@ -52,11 +52,11 @@ const FeedbackForm: React.FC<FeedbackFormProps> = ({ onSubmitted, embedded = fal
   return (
     <form
       onSubmit={handleSubmit}
-      className={embedded ? 'space-y-3' : 'space-y-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm'}
+      className={embedded ? 'space-y-3' : 'space-y-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 shadow-sm'}
     >
       {!embedded ? (
         <>
-          <h2 className="text-sm font-semibold text-gray-900">Feedback</h2>
+          <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Feedback</h2>
           <p className="text-xs text-gray-500">
             Help us improve Capabble by sharing your experience with any module or workflow.
           </p>
@@ -76,7 +76,7 @@ const FeedbackForm: React.FC<FeedbackFormProps> = ({ onSubmitted, embedded = fal
             onChange={(e) => setName(e.target.value)}
             title="Name"
             placeholder="Your name"
-            className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+            className="w-full border border-gray-300 dark:border-gray-600 rounded-md px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
           />
           {errors.name && <p className="mt-1 text-[11px] text-red-500">{errors.name}</p>}
         </div>
@@ -88,7 +88,7 @@ const FeedbackForm: React.FC<FeedbackFormProps> = ({ onSubmitted, embedded = fal
             onChange={(e) => setEmail(e.target.value)}
             title="Email"
             placeholder="you@example.com"
-            className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+            className="w-full border border-gray-300 dark:border-gray-600 rounded-md px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
           />
           {errors.email && <p className="mt-1 text-[11px] text-red-500">{errors.email}</p>}
         </div>
@@ -121,7 +121,7 @@ const FeedbackForm: React.FC<FeedbackFormProps> = ({ onSubmitted, embedded = fal
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           rows={3}
-          className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 resize-y"
+          className="w-full border border-gray-300 dark:border-gray-600 rounded-md px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 resize-y"
           placeholder="Share what is working well and what can be improved."
         />
         {errors.message && <p className="mt-1 text-[11px] text-red-500">{errors.message}</p>}

@@ -22,12 +22,17 @@ const exportRoutes = require('../../routes/exportRoutes');
 const userRoutes = require('../../routes/userRoutes');
 const roleRoutes = require('../../routes/roleRoutes');
 const portalRoutes = require('../../routes/portalRoutes');
+const idCardRoutes = require('../../routes/idCardRoutes');
+const notificationRoutes = require('../../routes/notificationRoutes');
+const accountRoutes = require('../../routes/accountRoutes');
 
 const mountRoutes = (router) => {
   router.use('/auth', authRoutes);
   router.use('/users', userRoutes);
+  router.use('/account', accountRoutes);
   router.use('/roles', roleRoutes);
   router.use('/portal', portalRoutes);
+  router.use('/notifications', notificationRoutes);
   router.use('/teachers', requireTenantFeature('exam_functionaries'), teacherRoutes);
   router.use('/subjects', requireTenantFeature('subjects'), subjectRoutes);
   router.use('/rooms', requireTenantFeature('examrooms'), roomRoutes);
@@ -37,6 +42,7 @@ const mountRoutes = (router) => {
   router.use('/dashboard', requireTenantFeature('dashboard'), dashboardRoutes);
   router.use('/billing', requireTenantFeature('billing'), billingRoutes);
   router.use('/export', exportRoutes);
+  router.use('/id-cards', requireTenantFeature('stdnt_id_cards'), idCardRoutes);
 };
 
 module.exports = { mountRoutes };

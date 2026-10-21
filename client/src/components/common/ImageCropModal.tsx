@@ -491,15 +491,15 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
   // Portalled above kit Sheets/Dialogs (z-100), which it usually opens from.
   return createPortal(
     <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-900/55 p-4" role="dialog" aria-modal="true">
-      <div className="w-full max-w-xl overflow-hidden rounded-[24px] bg-white shadow-2xl">
-        <div className="border-b border-slate-100 px-5 py-4">
+      <div className="w-full max-w-xl overflow-hidden rounded-[24px] bg-white dark:bg-gray-800 shadow-2xl">
+        <div className="border-b border-slate-100 dark:border-gray-700 px-5 py-4">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h3 className="text-lg font-semibold text-slate-900">{title}</h3>
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-gray-100">{title}</h3>
               <p className="mt-1 text-sm text-slate-500">{tip}</p>
             </div>
             {allowFreeCrop ? (
-              <div className="inline-flex shrink-0 rounded-xl border border-slate-200 p-0.5 text-xs font-semibold">
+              <div className="inline-flex shrink-0 rounded-xl border border-slate-200 dark:border-gray-700 p-0.5 text-xs font-semibold">
                 <button
                   type="button"
                   onClick={() => setFreeCrop(false)}
@@ -677,7 +677,7 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
               type="button"
               onClick={onCancel}
               disabled={processing}
-              className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 disabled:opacity-60"
+              className="rounded-xl border border-slate-200 dark:border-gray-700 px-4 py-2 text-sm font-semibold text-slate-600 disabled:opacity-60"
             >
               Cancel
             </button>

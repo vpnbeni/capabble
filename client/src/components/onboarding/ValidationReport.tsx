@@ -1,135 +1,95 @@
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
+import { ClipboardList } from 'lucide-react';
 import { useValidationReport } from '@/hooks/useOnboarding';
-import { AlertCircle, CheckCircle, XCircle } from 'lucide-react';
+import { Badge, Banner, Button, Card, EmptyState, MetricTile, MetricTiles, Page } from '@/components/ui';
+import './onboarding.css';
+
+const STATUS = {
+  valid: { tone: 'success', label: 'Everything matches', body: 'The candidate lists, Form 66 and attendance sheets agree with each other.' },
+  warnings: { tone: 'warning', label: 'Needs review', body: 'Some candidates don’t match between files. Check them before exam day.' },
+  errors: { tone: 'danger', label: 'Has errors', body: 'Some files don’t match. Fix the records below, or import the files again.' },
+} as const;
+
+interface ClassReport {
+  candidateCount: number;
+  candidateCompleteness: { totalIssues: number };
+  form66Validation: { totalMismatches: number; summary: { rollNumberIssues: number; subjectIssues: number; classIssues: number } };
+  attendanceValidation: { totalMismatches: number };
+}
+
+function ClassCard({ title, report }: { title: string; report: ClassReport }) {
+  const issues = report.candidateCompleteness.totalIssues
+    + report.form66Validation.totalMismatches
+    + report.attendanceValidation.totalMismatches;
+  const f66 = report.form66Validation;
+  return (
+    <Card title={title}>
+      <div className="cb-stack">
+        <MetricTiles>
+          <MetricTile label="Candidates" value={report.candidateCount.toLocaleString('en-IN')} />
+          <MetricTile label="Issues" value={issues.toLocaleString('en-IN')} tone={issues ? 'warning' : 'neutral'} />
+        </MetricTiles>
+        {f66.totalMismatches > 0 ? (
+          <Banner tone="warning" title="Form 66 doesn’t match the candidate list">
+            <ul className="ob-list">
+              <li>Roll no. mismatches: {f66.summary.rollNumberIssues}</li>
+              <li>Subject mismatches: {f66.summary.subjectIssues}</li>
+              <li>Class mismatches: {f66.summary.classIssues}</li>
+            </ul>
+          </Banner>
+        ) : null}
+      </div>
+    </Card>
+  );
+}
 
 export function ValidationReport() {
-  const { data, isLoading, refetch } = useValidationReport();
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-      </div>
-    );
-  }
+  const navigate = useNavigate();
+  const { data, isFetching, refetch } = useValidationReport();
+  const back = <Button key="back" variant="tertiary" onClick={() => navigate('/onboarding')}>Back to setup</Button>;
 
   if (!data?.report) {
     return (
-      <div className="max-w-4xl mx-auto mt-12 p-8 bg-white rounded-lg shadow-lg">
-        <h1 className="text-3xl font-bold mb-4">Validation Report</h1>
-        <p className="text-gray-600">No validation report available.</p>
-        <button
-          onClick={() => refetch()}
-          className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-        >
-          Generate Report
-        </button>
-      </div>
+      <Page>
+        <Card>
+          <EmptyState
+            icon={ClipboardList}
+            title="No import check yet"
+            body="Run the check to compare your candidate lists, Form 66 and attendance sheets."
+            action={[
+              <Button key="run" variant="primary" loading={isFetching} onClick={() => refetch()}>Run import check</Button>,
+              back,
+            ]}
+          />
+        </Card>
+      </Page>
     );
   }
 
-  const { report } = data;
-  const { overallStatus, classX, classXII, summary } = report;
+  const { overallStatus, classX, classXII, summary } = data.report;
+  const status = STATUS[overallStatus as keyof typeof STATUS] ?? STATUS.warnings;
 
   return (
-    <div className="max-w-6xl mx-auto mt-8 p-6">
-      <h1 className="text-3xl font-bold mb-8">Validation Report</h1>
-
-      {/* Overall Status */}
-      <div className="mb-8 p-6 bg-white rounded-lg shadow-lg">
-        <div className="flex items-center mb-4">
-          {overallStatus === 'valid' && (
-            <CheckCircle className="w-8 h-8 text-green-500 mr-3" />
-          )}
-          {overallStatus === 'warnings' && (
-            <AlertCircle className="w-8 h-8 text-yellow-500 mr-3" />
-          )}
-          {overallStatus === 'errors' && (
-            <XCircle className="w-8 h-8 text-red-500 mr-3" />
-          )}
-          <div>
-            <h2 className="text-2xl font-bold">
-              {overallStatus === 'valid' && 'All Validations Passed'}
-              {overallStatus === 'warnings' && 'Validation Warnings Found'}
-              {overallStatus === 'errors' && 'Validation Errors Found'}
-            </h2>
-            <p className="text-gray-600">
-              Total Candidates: {summary.totalCandidates} | Total Issues: {summary.totalIssues}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Class X Report */}
-      <div className="mb-8 p-6 bg-white rounded-lg shadow-lg">
-        <h3 className="text-xl font-bold mb-4">Class X</h3>
-        <div className="grid grid-cols-2 gap-4 mb-4">
-          <div>
-            <p className="text-sm text-gray-600">Candidates</p>
-            <p className="text-2xl font-bold">{classX.candidateCount}</p>
-          </div>
-          <div>
-            <p className="text-sm text-gray-600">Issues</p>
-            <p className="text-2xl font-bold">
-              {classX.candidateCompleteness.totalIssues +
-                classX.form66Validation.totalMismatches +
-                classX.attendanceValidation.totalMismatches}
-            </p>
-          </div>
-        </div>
-
-        {/* Form 66 Validation */}
-        {classX.form66Validation.totalMismatches > 0 && (
-          <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-            <h4 className="font-semibold text-yellow-800 mb-2">Form 66 Issues</h4>
-            <ul className="list-disc list-inside text-sm text-yellow-700">
-              <li>Roll Number Mismatches: {classX.form66Validation.summary.rollNumberIssues}</li>
-              <li>Subject Mismatches: {classX.form66Validation.summary.subjectIssues}</li>
-              <li>Class Mismatches: {classX.form66Validation.summary.classIssues}</li>
-            </ul>
-          </div>
-        )}
-      </div>
-
-      {/* Class XII Report */}
-      <div className="mb-8 p-6 bg-white rounded-lg shadow-lg">
-        <h3 className="text-xl font-bold mb-4">Class XII</h3>
-        <div className="grid grid-cols-2 gap-4 mb-4">
-          <div>
-            <p className="text-sm text-gray-600">Candidates</p>
-            <p className="text-2xl font-bold">{classXII.candidateCount}</p>
-          </div>
-          <div>
-            <p className="text-sm text-gray-600">Issues</p>
-            <p className="text-2xl font-bold">
-              {classXII.candidateCompleteness.totalIssues +
-                classXII.form66Validation.totalMismatches +
-                classXII.attendanceValidation.totalMismatches}
-            </p>
-          </div>
-        </div>
-
-        {/* Form 66 Validation */}
-        {classXII.form66Validation.totalMismatches > 0 && (
-          <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-            <h4 className="font-semibold text-yellow-800 mb-2">Form 66 Issues</h4>
-            <ul className="list-disc list-inside text-sm text-yellow-700">
-              <li>Roll Number Mismatches: {classXII.form66Validation.summary.rollNumberIssues}</li>
-              <li>Subject Mismatches: {classXII.form66Validation.summary.subjectIssues}</li>
-              <li>Class Mismatches: {classXII.form66Validation.summary.classIssues}</li>
-            </ul>
-          </div>
-        )}
-      </div>
-
-      <div className="text-center">
-        <Link
-          to="/onboarding"
-          className="text-blue-600 hover:underline"
+    <Page>
+      <div className="cb-stack">
+        <Card
+          title="Import check"
+          subtitle={`${summary.totalCandidates.toLocaleString('en-IN')} candidates, ${summary.totalIssues.toLocaleString('en-IN')} issues`}
+          action={<Badge tone={status.tone}>{status.label}</Badge>}
         >
-          Back to Onboarding
-        </Link>
+          <div className="cb-stack">
+            <p className="cb-muted">{status.body}</p>
+            <div className="cb-card-actions">
+              <Button variant="secondary" loading={isFetching} onClick={() => refetch()}>Run check again</Button>
+              {back}
+            </div>
+          </div>
+        </Card>
+        <div className="cb-grid-6-6">
+          <ClassCard title="Class 10" report={classX} />
+          <ClassCard title="Class 12" report={classXII} />
+        </div>
       </div>
-    </div>
+    </Page>
   );
 }

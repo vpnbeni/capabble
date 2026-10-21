@@ -16,6 +16,7 @@ import PortalTransport from './pages/PortalTransport'
 import PortalAppointments from './pages/PortalAppointments'
 import PortalProfile from './pages/PortalProfile'
 import PortalAccount from './pages/PortalAccount'
+import PortalNotifications from './pages/PortalNotifications'
 import type { PortalSection } from './portalService'
 
 const Guard: React.FC<{ section: PortalSection; children: React.ReactElement }> = ({ section, children }) => {
@@ -28,7 +29,7 @@ const PortalApp: React.FC = () => {
   const { data: home, isLoading, isError } = usePortalHome()
 
   if (isLoading) {
-    return <div className="min-h-screen flex items-center justify-center"><Loader size="lg" /></div>
+    return <Loader size="lg" fullScreen />
   }
   if (isError || !home) {
     return (
@@ -58,6 +59,7 @@ const PortalApp: React.FC = () => {
           <Route path="transport" element={<Guard section="transport"><PortalTransport /></Guard>} />
           <Route path="appointments" element={<Guard section="appointments"><PortalAppointments /></Guard>} />
           <Route path="profile" element={<PortalProfile />} />
+          <Route path="notifications" element={<PortalNotifications />} />
           <Route path="account" element={<PortalAccount />} />
           <Route path="*" element={<Navigate to="/portal" replace />} />
         </Route>

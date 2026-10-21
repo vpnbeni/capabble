@@ -15,6 +15,12 @@ const {
 
 // Import app
 const app = require('./app');
+const billing = require('./modules/billing');
+const { isMailConfigured, verifyMailer } = require('./utils/mailer');
+const { countActiveStudents } = require('./services/billingStudentCount');
+
+// Billing reads the live student count from the school databases the server owns.
+billing.setStudentCounter(countActiveStudents);
 
 // Vercel serverless: export the Express app and run DB init in background (no listen)
 if (process.env.VERCEL) {
@@ -24,6 +30,7 @@ if (process.env.VERCEL) {
       console.log(`✅ Platform database '${getCentralDbName()}' connected (Vercel)`.green.bold);
       await runTenantModelStartupSanityCheck();
       require('./events/registerAllListeners')();
+    require('./notifications/scheduler').start();
     } catch (error) {
       console.error('❌ Server initialization failed (Vercel):'.red.bold, error.message);
     }
@@ -50,6 +57,25 @@ const initializeServer = async () => {
     console.log(`✅ Platform database '${getCentralDbName()}' connected successfully`.green.bold);
     await runTenantModelStartupSanityCheck();
     require('./events/registerAllListeners')();
+
+    if (billing.isConfigured()) {
+      // Wake the billing database (Neon may be suspended) without holding up startup.
+      billing.ping()
+        .then((ms) => console.log(`✅ Billing database reachable (${ms}ms)`.green.bold))
+        .catch((error) => console.warn('⚠️  Billing database not reachable yet; requests will retry:'.yellow, error.code || error.message));
+      billing.startScheduler();
+    } else {
+      console.warn('⚠️  Billing is off (set BILLING_DATABASE_URL to enable).'.yellow);
+    }
+
+    if (isMailConfigured()) {
+      // Log in to the mail server once so a wrong password shows up at startup, not at the first signup.
+      verifyMailer()
+        .then(({ host, from }) => console.log(`✅ Email ready: ${from} via ${host}`.green.bold))
+        .catch((error) => console.warn('⚠️  Email server login failed; emails will not send:'.yellow, error.message));
+    } else {
+      console.warn('⚠️  Email is off (set SMTP_HOST, SMTP_USER, SMTP_PASS and SMTP_FROM to enable).'.yellow);
+    }
 
     // TODO: Re-enable calendar initialization after debugging
     // setTimeout(async () => {
@@ -123,6 +149,7 @@ process.on('unhandledRejection', (err) => {
 // Handle SIGTERM
 process.on('SIGTERM', () => {
   console.log('👋 SIGTERM RECEIVED. Shutting down gracefully');
+  billing.stopScheduler();
   if (isAttendanceQueueReady()) {
     const worker = require('./workers/attendanceWorker');
     worker.close().catch(() => {});
@@ -135,6 +162,7 @@ process.on('SIGTERM', () => {
 // Handle SIGINT (Ctrl+C)
 process.on('SIGINT', () => {
   console.log('\n👋 SIGINT RECEIVED. Shutting down gracefully');
+  billing.stopScheduler();
   if (isAttendanceQueueReady()) {
     const worker = require('./workers/attendanceWorker');
     worker.close().catch(() => {});

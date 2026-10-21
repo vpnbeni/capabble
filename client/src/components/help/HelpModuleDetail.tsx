@@ -28,7 +28,7 @@ const HelpModuleDetail: React.FC<HelpModuleDetailProps> = ({
   const pages = supportModule?.pages.filter((page) => page.label !== 'Other / General') || []
 
   return (
-    <section className="help-detail-enter rounded-2xl border border-slate-200/90 bg-white p-5 shadow-sm sm:p-6">
+    <section className="help-detail-enter rounded-2xl border border-slate-200/90 bg-white dark:bg-gray-800 p-5 shadow-sm sm:p-6">
       <button
         type="button"
         onClick={onBack}
@@ -49,7 +49,7 @@ const HelpModuleDetail: React.FC<HelpModuleDetailProps> = ({
           </div>
           <div>
             <p className="text-xs font-bold uppercase tracking-wide text-violet-600">{module.abbreviation}</p>
-            <h2 className="text-xl font-bold text-slate-900">{module.title}</h2>
+            <h2 className="text-xl font-bold text-slate-900 dark:text-gray-100">{module.title}</h2>
             <p className="mt-1 max-w-2xl text-sm leading-relaxed text-slate-500">{module.description}</p>
           </div>
         </div>
@@ -66,7 +66,7 @@ const HelpModuleDetail: React.FC<HelpModuleDetailProps> = ({
           <button
             type="button"
             onClick={onShareFeedback}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 transition hover:border-violet-200 hover:bg-violet-50 hover:text-violet-700"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-2 text-xs font-semibold text-slate-700 dark:text-gray-300 transition hover:border-violet-200 dark:hover:border-violet-800 hover:bg-violet-50 dark:hover:bg-violet-900/20 hover:text-violet-700 dark:hover:text-violet-300"
           >
             <Star className="h-3.5 w-3.5" />
             Share Feedback
@@ -83,15 +83,15 @@ const HelpModuleDetail: React.FC<HelpModuleDetailProps> = ({
                 <Link
                   key={page.id}
                   to={page.path}
-                  className="group flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50/60 px-4 py-3 text-sm transition hover:border-violet-200 hover:bg-violet-50/50"
+                  className="group flex items-center justify-between rounded-xl border border-slate-200 dark:border-gray-700 bg-slate-50/60 dark:bg-gray-900/40 px-4 py-3 text-sm transition hover:border-violet-200 dark:hover:border-violet-800 hover:bg-violet-50/50 dark:hover:bg-violet-900/20"
                 >
-                  <span className="font-medium text-slate-800 group-hover:text-violet-700">{page.label}</span>
+                  <span className="font-medium text-slate-800 dark:text-gray-200 group-hover:text-violet-700 dark:group-hover:text-violet-300">{page.label}</span>
                   <ChevronRight className="h-4 w-4 text-slate-300 group-hover:text-violet-500" />
                 </Link>
               ) : (
                 <div
                   key={page.id}
-                  className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50/40 px-4 py-3 text-sm text-slate-500"
+                  className="flex items-center justify-between rounded-xl border border-slate-100 dark:border-gray-700 bg-slate-50/40 dark:bg-gray-900/40 px-4 py-3 text-sm text-slate-500"
                 >
                   {page.label}
                 </div>
@@ -100,7 +100,7 @@ const HelpModuleDetail: React.FC<HelpModuleDetailProps> = ({
           </div>
         </div>
       ) : (
-        <div className="mt-6 rounded-xl border border-dashed border-slate-200 bg-slate-50/50 px-4 py-5 text-sm text-slate-500">
+        <div className="mt-6 rounded-xl border border-dashed border-slate-200 dark:border-gray-700 bg-slate-50/50 dark:bg-gray-900/40 px-4 py-5 text-sm text-slate-500">
           No pages are currently active for this module on your account. You can still report a general issue using
           the button above.
         </div>

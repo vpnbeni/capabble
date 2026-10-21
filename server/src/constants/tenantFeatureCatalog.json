@@ -106,6 +106,23 @@
     "fallbackPriority": 32
   },
   {
+    "key": "stdnt_id_cards",
+    "label": "Stdnt - ID Cards",
+    "path": "/stdnt/id-cards",
+    "group": "Student Hub",
+    "module": "stdnt",
+    "prefixes": ["/stdnt/id-cards", "/id-cards"]
+  },
+  {
+    "key": "trnst_crew",
+    "label": "TRNST - Bus Crew Screen",
+    "path": "/trnst/crew",
+    "group": "Transport Hub",
+    "module": "trnst",
+    "prefixes": ["/trnst/crew"],
+    "fallbackPriority": 33.5
+  },
+  {
     "key": "trnst_transport",
     "label": "TRNST - School Transport",
     "path": "/trnst",

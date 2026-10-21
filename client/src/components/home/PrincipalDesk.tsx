@@ -1,5 +1,5 @@
 import React from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import {
   ArrowRight,
@@ -11,8 +11,8 @@ import {
   UserRound,
   Users,
 } from 'lucide-react'
-import { Badge, Button, Card, DataTable, EmptyState, Entity, Icon, Ring, ColumnChart, formatTime, type DataTableColumn } from '@/components/ui'
-import attndService from '@/services/attndService'
+import { Badge, Button, Card, DataTable, EmptyState, Entity, HoverCard, Icon, Ring, ColumnChart, formatTime, type DataTableColumn } from '@/components/ui'
+import attndService, { type AttndAbsentStudent } from '@/services/attndService'
 import appntService, { type Appointment } from '@/services/appntService'
 import { usePermissions } from '@/hooks/usePermissions'
 import { isFeatureEnabledForPath } from '@/constants/featureAccess'
@@ -46,6 +46,46 @@ const DeskMetric: React.FC<{
   </button>
 )
 
+const ABSENT_PREVIEW = 8
+
+/** Hover card body: who is absent, each name to the student's profile, and a link to the register. */
+const AbsentList: React.FC<{
+  title: string
+  students: AttndAbsentStudent[]
+  showClass: boolean
+  profileLinks: boolean
+  footer: { label: string; to: string }
+}> = ({ title, students, showClass, profileLinks, footer }) => (
+  <>
+    <p className="cb-hovercard__title">{title}</p>
+    {students.length ? (
+      <ul className="cb-hovercard__list">
+        {students.slice(0, ABSENT_PREVIEW).map((student) => {
+          const meta = [showClass ? `${student.className} ${student.section}` : `Section ${student.section}`, student.rollNumber ? `Roll ${student.rollNumber}` : '']
+            .filter(Boolean).join(' · ')
+          const body = (
+            <>
+              <span className="cb-hovercard__row-main"><strong>{student.name}</strong><span>{meta}</span></span>
+              {student.halfDay ? <Badge tone="warning">Half day</Badge> : null}
+            </>
+          )
+          return (
+            <li key={student.studentId}>
+              {profileLinks
+                ? <Link className="cb-hovercard__row" to={`/stdnt/students/${student.studentId}`}>{body}</Link>
+                : <div className="cb-hovercard__row">{body}</div>}
+            </li>
+          )
+        })}
+      </ul>
+    ) : <p className="cb-hovercard__more">Names are not available for your role.</p>}
+    {students.length > ABSENT_PREVIEW ? <p className="cb-hovercard__more">and {formatCount(students.length - ABSENT_PREVIEW)} more</p> : null}
+    <div className="cb-hovercard__footer">
+      <Link to={footer.to} className="cb-link">{footer.label} →</Link>
+    </div>
+  </>
+)
+
 export const PrincipalDesk: React.FC<{ actions: QuickAction[]; onEditActions: () => void }> = ({ actions, onEditActions }) => {
   const navigate = useNavigate()
   const date = todayKey()
@@ -56,6 +96,7 @@ export const PrincipalDesk: React.FC<{ actions: QuickAction[]; onEditActions: ()
   })
   const { access } = usePermissions()
   const appointmentsOn = isFeatureEnabledForPath('/appnt/today', access)
+  const profileLinks = isFeatureEnabledForPath('/stdnt/students', access)
   const appointments = useQuery({
     queryKey: ['appnt', 'today', date],
     queryFn: () => appntService.today(date),
@@ -77,8 +118,13 @@ export const PrincipalDesk: React.FC<{ actions: QuickAction[]; onEditActions: ()
     const strength = row.sections.reduce((sum, section) => sum + section.strength, 0)
     const absent = row.sections.reduce((sum, section) => sum + section.todayAbsent, 0)
     const halfDay = row.sections.reduce((sum, section) => sum + section.todayHalfDay, 0)
-    return { className: row.className, strength, absent, rate: strength ? Math.max(0, rate(strength - absent - halfDay * .5, strength)) : 0 }
+    const sections = row.sections.filter((section) => section.todayAbsent || section.todayHalfDay).map((section) => section.section)
+    return { className: row.className, strength, absent, halfDay, sections, rate: strength ? Math.max(0, rate(strength - absent - halfDay * .5, strength)) : 0 }
   }).filter((item) => item.strength > 0)
+  const absentStudents = attendance.data?.studentsAbsentToday || []
+  const month = date.slice(0, 7)
+  const registerPath = (className: string, sections: string[]) =>
+    `/attnd/student-attendance?${new URLSearchParams({ class: className, ...(sections.length === 1 ? { section: sections[0] } : {}), month })}`
   const absentRate = students ? rate(students.todayAbsent, students.strength) : 0
   const halfDayRate = students ? rate(students.todayHalfDay, students.strength) : 0
   // Calendar events are not exposed by the current API. Keep the school-day label local
@@ -152,13 +198,29 @@ export const PrincipalDesk: React.FC<{ actions: QuickAction[]; onEditActions: ()
                   { label: 'Present', count: students.todayPresent, share: attendanceRate, tone: 'success' },
                   { label: 'Half day', count: students.todayHalfDay, share: halfDayRate, tone: 'warning' },
                   { label: 'Absent', count: students.todayAbsent, share: absentRate, tone: 'danger' },
-                ].map((row) => (
-                  <li key={row.label}>
-                    <span className="principal-attendance__name"><span className={`principal-attendance__dot is-${row.tone}`} aria-hidden="true" />{row.label}</span>
-                    <strong className="principal-attendance__count is-num">{formatCount(row.count)}</strong>
-                    <span className="principal-attendance__share is-num">{row.share}% of students</span>
-                  </li>
-                ))}
+                ].map((row) => {
+                  const body = (
+                    <>
+                      <span className="principal-attendance__name"><span className={`principal-attendance__dot is-${row.tone}`} aria-hidden="true" />{row.label}</span>
+                      <strong className="principal-attendance__count is-num">{formatCount(row.count)}</strong>
+                      <span className="principal-attendance__share is-num">{row.share}% of students</span>
+                    </>
+                  )
+                  const listed = row.tone === 'danger' ? absentStudents.filter((s) => !s.halfDay) : row.tone === 'warning' ? absentStudents.filter((s) => s.halfDay) : []
+                  return (
+                    <li key={row.label}>
+                      {row.tone !== 'success' && row.count ? (
+                        <HoverCard
+                          className="principal-attendance__hover"
+                          label={`${row.label} today: ${formatCount(row.count)} students`}
+                          content={<AbsentList title={`${formatCount(row.count)} ${row.label.toLowerCase()} today`} students={listed} showClass profileLinks={profileLinks} footer={{ label: 'View attendance', to: '/attnd/attndboard' }} />}
+                        >
+                          {body}
+                        </HoverCard>
+                      ) : body}
+                    </li>
+                  )
+                })}
               </ul>
             </div>
           ) : <EmptyState compact icon={Users} title="Attendance is not available" body="Mark attendance to see today’s school overview." />}
@@ -173,6 +235,18 @@ export const PrincipalDesk: React.FC<{ actions: QuickAction[]; onEditActions: ()
                   value: item.rate,
                   caption: item.absent ? `${formatCount(item.absent)} absent` : undefined,
                   tone: item.rate >= 95 ? 'accent' : item.rate >= 90 ? 'warning' : 'danger',
+                  ...(item.absent || item.halfDay ? {
+                    detailLabel: `${item.className}: who is absent today`,
+                    detail: (
+                      <AbsentList
+                        title={`${item.className} · ${[item.absent ? `${formatCount(item.absent)} absent` : '', item.halfDay ? `${formatCount(item.halfDay)} half day` : ''].filter(Boolean).join(', ')}`}
+                        students={absentStudents.filter((s) => s.className === item.className)}
+                        showClass={false}
+                        profileLinks={profileLinks}
+                        footer={{ label: `Open ${item.className} register`, to: registerPath(item.className, item.sections) }}
+                      />
+                    ),
+                  } : {}),
                 }))}
               />
             </div>

@@ -34,7 +34,6 @@ CAPABBLE is a **modular school/institution ERP** built on the principle that ins
 ├── client/          # React 18 + TypeScript + Vite  (port 5173)
 ├── server/          # Node.js + Express + MongoDB    (port 5000)
 ├── admin/           # React 18 + TypeScript + Vite  (port 5174)  — platform ops portal
-├── billing-service/ # Standalone Express micro-service for billing entitlements
 ├── capabble-landing/# Next.js 15 — company marketing site (separate repo/deploy)
 └── docs/            # Architecture docs
 ```
@@ -634,7 +633,7 @@ npm run dev:all
 ├── server  → nodemon src/server.js     (port 5000)
 ├── client  → vite dev                 (port 5173, proxies /api → port 5000)
 ├── admin   → vite dev                 (port 5174)
-└── billing → (optional) billing-service (separate port)
+└── billing → Postgres (Neon), billing module only
 ```
 
 Vite's dev proxy (`vite.config.ts`) forwards `/api` to `localhost:5000`.
@@ -667,7 +666,7 @@ The client stores and sends `x-tenant-slug` on every authenticated request (comp
 
 ### Billing Micro-service
 
-`billing-service/` is a separate Express app that the main server calls to check tenant entitlements. It maintains billing state independently. The main server caches entitlement responses for 45 seconds to avoid hammering the billing service on every request.
+Billing lives in `server/src/modules/billing` and keeps its data in its own Postgres database (Neon). The server reads each school's entitlement from it in-process and caches it for 45 seconds; see the module's README.
 
 The main server's `billingEntitlementMiddleware` implements three access modes:
 - `full` — unrestricted
