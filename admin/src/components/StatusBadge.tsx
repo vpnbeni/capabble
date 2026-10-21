@@ -31,6 +31,8 @@ const TONES: Record<string, Tone> = {
   past_due_grace: 'warning',
   overdue: 'danger',
   suspended: 'danger',
+  // A school asked to close its workspace.
+  pending_closure: 'warning',
   suspended_read_only: 'danger',
   failed: 'danger',
   canceled: 'neutral',

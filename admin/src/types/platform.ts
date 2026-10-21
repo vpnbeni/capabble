@@ -12,6 +12,13 @@ export interface Tenant {
   dbName: string
   adminEmail: string
   status: 'active' | 'suspended'
+  /** Set when the school asked to close its workspace (pending while canceledAt is empty). */
+  closure?: {
+    requestedAt?: string | null
+    exportUntil?: string | null
+    deleteAfter?: string | null
+    canceledAt?: string | null
+  } | null
   createdAt: string
   updatedAt?: string
 }

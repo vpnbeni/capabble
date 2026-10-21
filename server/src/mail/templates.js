@@ -70,7 +70,45 @@ const loginInvite = ({ schoolName, name, inviteUrl, loginHint, hours }) => rende
   footnote: `You're getting this because ${schoolName} added you to Capabble.`
 });
 
+/* ---------- Closing a workspace ---------- */
+
+/** Confirms to the administrator that their school asked to close its workspace. */
+const workspaceClosureRequested = ({ schoolName, name, exportUntil, deleteAfter, url }) => renderEmail({
+  subject: `We have your request to close ${schoolName} on Capabble`,
+  preheader: `Your workspace stays open until ${exportUntil} so you can download your data.`,
+  context: schoolName,
+  heading: 'Your workspace will close',
+  intro: [
+    name ? `Hi ${name},` : null,
+    ['You asked to close the Capabble workspace for ', { strong: schoolName }, '. Everyone at your school can keep using it until ', { strong: exportUntil }, ', so you have time to download your data from the Export options on each list.'],
+    ['After that the workspace closes and we delete its data by ', { strong: deleteAfter }, '. Fees already paid are not refunded.']
+  ].filter(Boolean),
+  notice: ['Changed your mind? Open Settings → Account and choose “Cancel closure” before ', { strong: exportUntil }, '.'],
+  button: url ? { label: 'Open account settings', url } : undefined,
+  outro: ['If you didn’t ask for this, cancel the closure and write to support@capabble.cloud.'],
+  footnote: `You’re getting this because you are an administrator of ${schoolName} on Capabble.`
+});
+
 /* ---------- Internal ---------- */
+
+/** Tells Capabble support a school asked to close its workspace. */
+const workspaceClosureAlert = ({ tenantName, tenantSlug, requestedBy, requestedByEmail, exportUntil, deleteAfter, time }) => renderEmail({
+  subject: `Workspace closure requested: ${tenantName}`,
+  preheader: `${tenantName} (${tenantSlug}) asked to close its workspace.`,
+  context: 'Capabble team',
+  heading: 'A school asked to close its workspace',
+  details: [
+    ['School', tenantName],
+    ['Workspace code', tenantSlug],
+    ['Requested by', requestedBy || '—'],
+    ['Their email', requestedByEmail || '—'],
+    ['Requested', time],
+    ['Export until', exportUntil],
+    ['Delete after', deleteAfter]
+  ],
+  outro: ['Nothing has been switched off or deleted. The school can cancel until the export date.'],
+  footnote: 'You’re getting this because this address receives Capabble support requests.'
+});
 
 /** Tells the Capabble team a new school signed up (ADMIN_EMAILS). */
 const newSchoolAlert = ({ tenantName, tenantSlug, adminEmail, source, time }) => renderEmail({
@@ -476,6 +514,8 @@ module.exports = {
   emailVerificationCode,
   loginInvite,
   newSchoolAlert,
+  workspaceClosureRequested,
+  workspaceClosureAlert,
   demoRequestAlert,
   demoRequestReceived,
   appointmentUpdate,

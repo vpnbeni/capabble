@@ -45,6 +45,22 @@ const samples = {
     source: 'Public signup',
     time: '19 Oct 2026, 10:42 am IST'
   }),
+  'workspace-closure-requested': () => templates.workspaceClosureRequested({
+    schoolName: SCHOOL,
+    name: 'Anita Sharma',
+    exportUntil: '20 Nov 2026',
+    deleteAfter: '19 Jan 2027',
+    url: `${APP}/#/account-settings`
+  }),
+  'workspace-closure-alert': () => templates.workspaceClosureAlert({
+    tenantName: SCHOOL,
+    tenantSlug: 'redrose',
+    requestedBy: 'Anita Sharma',
+    requestedByEmail: 'principal@redrose.edu.in',
+    exportUntil: '20 Nov 2026',
+    deleteAfter: '19 Jan 2027',
+    time: '21 Oct 2026, 10:42 am IST'
+  }),
   'demo-request-alert': () => templates.demoRequestAlert({
     name: 'Anita Sharma',
     institution: SCHOOL,

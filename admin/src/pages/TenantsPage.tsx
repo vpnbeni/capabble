@@ -5,6 +5,21 @@ import type { PlatformAdmin, Tenant } from '../types/platform'
 import { StatusBadge } from '../components/StatusBadge'
 import { Building2, ChevronLeft, ChevronRight, Plus } from '../components/icons'
 
+/** "Closure requested · delete after 19 Jan 2027" while a school's closure request is pending. */
+const closureLabel = (tenant: Tenant) => {
+  const closure = tenant.closure
+  if (!closure?.requestedAt || closure.canceledAt) return null
+  const date = closure.deleteAfter
+    ? new Date(closure.deleteAfter).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+    : '—'
+  return `Closure requested · delete after ${date}`
+}
+
+const ClosureNote = ({ tenant }: { tenant: Tenant }) => {
+  const label = closureLabel(tenant)
+  return label ? <div style={{ marginTop: 6 }}><StatusBadge status="pending_closure" label={label} size="sm" /></div> : null
+}
+
 interface TenantDraft {
   name: string
   adminEmail: string
@@ -503,6 +518,7 @@ export function TenantsPage({ navigateTo, currentPath }: TenantsPageProps) {
                   <div className="tenant-email">{tenant.adminEmail}</div>
                   <div>
                     <StatusBadge status={tenant.status} />
+                    <ClosureNote tenant={tenant} />
                   </div>
                   <div className="tenant-open"><ChevronRight size={16} /></div>
                 </div>
@@ -558,6 +574,7 @@ export function TenantsPage({ navigateTo, currentPath }: TenantsPageProps) {
                   <div>
                     <div className="input-label" style={{ marginBottom: 6 }}>Status</div>
                     <StatusBadge status={selectedTenant.status} />
+                    <ClosureNote tenant={selectedTenant} />
                   </div>
                   <div>
                     <div className="input-label" style={{ marginBottom: 6 }}>Created</div>

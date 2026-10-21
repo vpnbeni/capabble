@@ -6,6 +6,8 @@ import { getStoredUser } from '@/utils/authStorage'
 import schoolProfileService, { type SchoolProfile } from '@/services/schoolProfileService'
 import { schoolProfileKeys } from '@/hooks/useSchoolProfile'
 import { Button, Card, DetailList, Icon, Page, TextField } from '@/components/ui'
+import CloseWorkspaceCard from '@/components/account/CloseWorkspaceCard'
+import { usePermissions } from '@/hooks/usePermissions'
 
 type FormData = {
   name: string
@@ -49,6 +51,7 @@ const validate = (form: FormData): Errors => {
 
 const AccountSettings: React.FC = () => {
   const queryClient = useQueryClient()
+  const { isAdmin, isPortal } = usePermissions()
   const user = getStoredUser<{ email?: string; name?: string }>()
   const fileInput = useRef<HTMLInputElement>(null)
 
@@ -249,6 +252,8 @@ const AccountSettings: React.FC = () => {
         <Card title="Your sign-in" subtitle="The email address you sign in with.">
           <DetailList columns={2} items={[{ label: 'Email', value: user?.email || '—' }]} />
         </Card>
+
+        {isAdmin && !isPortal ? <CloseWorkspaceCard /> : null}
       </div>
     </Page>
   )

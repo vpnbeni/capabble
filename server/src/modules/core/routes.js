@@ -24,10 +24,12 @@ const roleRoutes = require('../../routes/roleRoutes');
 const portalRoutes = require('../../routes/portalRoutes');
 const idCardRoutes = require('../../routes/idCardRoutes');
 const notificationRoutes = require('../../routes/notificationRoutes');
+const accountRoutes = require('../../routes/accountRoutes');
 
 const mountRoutes = (router) => {
   router.use('/auth', authRoutes);
   router.use('/users', userRoutes);
+  router.use('/account', accountRoutes);
   router.use('/roles', roleRoutes);
   router.use('/portal', portalRoutes);
   router.use('/notifications', notificationRoutes);
