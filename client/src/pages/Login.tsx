@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { Link, useNavigate } from 'react-router-dom'
-import { ArrowRight, Building2, KeyRound, LayoutGrid, Lock, Mail, RefreshCw } from 'lucide-react'
+import { ArrowRight, Building2, Eye, EyeOff, KeyRound, LayoutGrid, Lock, Mail, RefreshCw } from 'lucide-react'
 import { clearError, login, selectAuth, setSignedInUser } from '../redux/slices/authSlice'
 import authService, { schoolCodeFromLoginId } from '../services/authService'
 import { useAcademicSession } from '../contexts/AcademicSessionContext'
@@ -327,23 +327,33 @@ const Login: React.FC = () => {
               />
             ) : null}
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <TextField
-                id="password"
-                name="password"
-                label="Password"
-                icon={Lock}
-                type={showPassword ? 'text' : 'password'}
-                autoComplete="current-password"
-                error={fieldErrors.password}
-                value={formData.password}
-                onChange={handleInputChange}
-              />
-              <div className="cb-auth-row">
-                <Checkbox label="Show password" checked={showPassword} onChange={setShowPassword} />
-                <Link to="/forgot-password">Forgot password?</Link>
-              </div>
-            </div>
+            <TextField
+              id="password"
+              name="password"
+              label="Password"
+              icon={Lock}
+              type={showPassword ? 'text' : 'password'}
+              autoComplete="current-password"
+              error={fieldErrors.password}
+              value={formData.password}
+              onChange={handleInputChange}
+              labelAside={
+                <Link to="/forgot-password">
+                  Forgot password?
+                </Link>
+              }
+              trailing={
+                <button
+                  type="button"
+                  className="cb-field-toggle"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  aria-pressed={showPassword}
+                  onClick={() => setShowPassword((shown) => !shown)}
+                >
+                  {showPassword ? <EyeOff size={18} strokeWidth={1.75} aria-hidden /> : <Eye size={18} strokeWidth={1.75} aria-hidden />}
+                </button>
+              }
+            />
 
             <Checkbox
               label="Keep me signed in on this device"

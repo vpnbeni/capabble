@@ -351,6 +351,33 @@
 .cb-auth .cb-field-input[data-icon] {
   padding-left: 40px;
 }
+.cb-auth .cb-field-input[data-trailing] {
+  padding-right: 48px;
+}
+.cb-auth .cb-field-trailing {
+  position: absolute;
+  right: 4px;
+  display: inline-flex;
+}
+.cb-auth .cb-field-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  color: var(--ink-muted);
+  background: none;
+  border: 0;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.cb-auth .cb-field-toggle:hover {
+  color: var(--ink);
+}
+.cb-auth .cb-field-toggle:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
 .cb-auth .cb-field-input::placeholder {
   color: var(--ink-disabled);
 }

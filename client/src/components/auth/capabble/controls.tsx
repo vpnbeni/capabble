@@ -14,10 +14,12 @@ interface TextFieldProps extends Omit<React.InputHTMLAttributes<HTMLInputElement
   labelAside?: React.ReactNode
   /** Wide letter-spacing for one-time codes. */
   code?: boolean
+  /** Control inside the right edge of the input, e.g. a show-password toggle. */
+  trailing?: React.ReactNode
 }
 
 export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(
-  ({ label, hint, error, icon: FieldIcon, labelAside, code, id, ...input }, ref) => {
+  ({ label, hint, error, icon: FieldIcon, labelAside, code, trailing, id, ...input }, ref) => {
     const autoId = useId()
     const inputId = id || autoId
     const noteId = `${inputId}-note`
@@ -42,10 +44,12 @@ export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(
             className="cb-field-input"
             data-icon={FieldIcon ? '' : undefined}
             data-code={code ? '' : undefined}
+            data-trailing={trailing ? '' : undefined}
             aria-invalid={error ? true : undefined}
             aria-describedby={note ? noteId : undefined}
             {...input}
           />
+          {trailing ? <span className="cb-field-trailing">{trailing}</span> : null}
         </div>
         {error ? (
           <p className="cb-field-error" id={noteId}>
