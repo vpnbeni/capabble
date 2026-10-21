@@ -1,5 +1,5 @@
 import numpy as np, wave, sys
-SR = 48000; DUR = 30.0; N = int(SR * DUR)
+SR = 48000; DUR = 32.0; N = int(SR * DUR)
 rng = np.random.default_rng(7)
 out = sys.argv[1]
 def mtof(m): return 440.0 * 2 ** ((m - 69) / 12)
@@ -26,8 +26,8 @@ def reverb(x, secs=2.2, mix=0.25):
 
 beat = 0.5
 loop = [[53,57,60,64],[55,59,62,64],[57,60,64,67],[55,59,62,67]]  # Fmaj7 G6 Am7 G
-chords = (loop*4)[:13]
-roots = ([41,43,45,43]*4)[:13]
+chords = (loop*4)[:14]
+roots = ([41,43,45,43]*4)[:14]
 final = [48,55,59,62,64]  # Cmaj9
 
 # --- pad
@@ -45,17 +45,17 @@ def padchord(notes, t0, length, gain):
     add(pad, s*gain/len(notes), t0)
 for i, c in enumerate(chords):
     padchord(c, i*2.0, 2.0, 0.16)
-padchord(final + [67, 71], 26.5, 2.6, 0.22)
+padchord(final + [67, 71], 28.5, 2.6, 0.22)
 
 # --- kick + sidechain
 kick = np.zeros(N); side = np.ones(N)
-kick_times = [1.5] + [t for t in np.arange(2.0, 26.0, beat)] + [26.5]
+kick_times = [1.5] + [t for t in np.arange(2.0, 28.0, beat)] + [28.5]
 for t in kick_times:
     n = int(0.45*SR); tt = np.arange(n)/SR
     f = 48 + 110*np.exp(-tt*28)
     k = np.sin(2*np.pi*np.cumsum(f)/SR) * np.exp(-tt*7.5)
     k += 0.05*lp(rng.standard_normal(n), 2500)*np.exp(-tt*180)
-    add(kick, k*(0.9 if t != 26.5 else 1.0), t)
+    add(kick, k*(0.9 if t != 28.5 else 1.0), t)
     i = int(t*SR); m = int(0.32*SR)
     duck = 1 - 0.55*np.exp(-np.arange(m)/SR*9)
     side[i:i+m] = np.minimum(side[i:i+m], duck[:len(side[i:i+m])])
@@ -65,9 +65,9 @@ pad *= side
 hats = np.zeros(N)
 hn = int(0.06*SR); tt = np.arange(hn)/SR
 base = rng.standard_normal(hn); base = base - lp(base, 7000)
-for t in np.arange(3.25, 26.0, beat):
+for t in np.arange(3.25, 28.0, beat):
     add(hats, base*np.exp(-tt*70)*0.05, t)
-for t in np.arange(5.5 + 0.5, 26.0, 1.0):
+for t in np.arange(5.5 + 0.5, 28.0, 1.0):
     n = int(0.25*SR); t2 = np.arange(n)/SR
     nz = rng.standard_normal(n); nz = lp(nz, 3200) - lp(nz, 900)
     cl = nz*(np.exp(-t2*30) + 0.5*np.exp(-np.maximum(t2-0.012, 0)*40)*(t2 > 0.012))
@@ -75,7 +75,7 @@ for t in np.arange(5.5 + 0.5, 26.0, 1.0):
 
 # --- bass (8ths) from 7.0
 bass = np.zeros(N)
-for bar in range(2, 13):
+for bar in range(2, 14):
     r = roots[bar]
     for k in range(8):
         t = bar*2.0 + k*0.25
@@ -94,7 +94,7 @@ def pluck(m, t, g):
     s = (np.sin(2*np.pi*f*t2) + 0.4*np.sin(4*np.pi*f*t2+0.3) + 0.15*np.sin(6*np.pi*f*t2)) * np.exp(-t2*9)
     add(pl, s*g, t)
 pattern = [0, 1, 2, 3, 2, 1, 2, 3]
-for bar in range(7, 13):
+for bar in range(7, 14):
     c = chords[bar]
     for k in range(8):
         t = bar*2.0 + k*0.25
@@ -104,7 +104,7 @@ for bar in range(7, 13):
 # --- riser into outro
 rs = np.zeros(N); n = int(1.0*SR); t2 = np.arange(n)/SR
 nz = rng.standard_normal(n); nz = lp(nz, 600 + 5000*(t2/1.0)**2)
-add(rs, nz*(t2/1.0)**2*np.minimum(1,(1.0-t2)/0.08)*0.08, 25.5)
+add(rs, nz*(t2/1.0)**2*np.minimum(1,(1.0-t2)/0.08)*0.08, 27.5)
 
 # --- SFX (tuned to C major)
 sfx = np.zeros(N)
@@ -131,12 +131,12 @@ for i in range(4):                                    # everything in between
     blip([76, 79, 83, 86][i], 15.7 + i*0.15, 0.04, dec=30)
 bell(84, 9.0, 0.04); bell(88, 18.45, 0.045)           # badges
 for i in range(0, 32, 4):                             # seats
-    blip([72, 76, 79, 84, 88, 91, 93, 96][i//4], 20.2 + i*0.015, 0.025, dec=35)
-bell(81, 22.0, 0.045)                                 # loss of pay from attendance
-for i, t in enumerate([24.2, 24.45, 24.7, 24.95, 25.2, 25.45]):  # switches
+    blip([72, 76, 79, 84, 88, 91, 93, 96][i//4], 21.2 + i*0.015, 0.025, dec=35)
+bell(81, 24.0, 0.045)                                 # loss of pay from attendance
+for i, t in enumerate([26.2, 26.45, 26.7, 26.95, 27.2, 27.45]):  # switches
     blip([79, 81, 84, 86, 88, 91][i], t, 0.07)
-bell(72, 26.55, 0.06); bell(79, 26.55, 0.05); bell(84, 26.6, 0.05)
-bell(88, 28.4, 0.045); bell(91, 28.5, 0.035)          # second tagline
+bell(72, 28.55, 0.06); bell(79, 28.55, 0.05); bell(84, 28.6, 0.05)
+bell(88, 30.4, 0.045); bell(91, 30.5, 0.035)          # second tagline
 
 music = pad + kick*0.55 + hats + bass + pl + rs
 music = reverb(music, 1.6, 0.18)

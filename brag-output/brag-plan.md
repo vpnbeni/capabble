@@ -12,7 +12,7 @@
 
 **Privacy:** all names, roll nos, bus numbers and amounts are fictional.
 
-## Storyboard (30.0s, 1920×1080, 30fps, 120 BPM)
+## Storyboard (32.0s, 1920×1080, 30fps, 120 BPM)
 | # | Time | Beat | Headline | Screen → link |
 |---|---|---|---|---|
 | 1 | 0.0–3.0 | Hook | Running a school means running everything. | Chips of every job flick in |
