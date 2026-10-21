@@ -17,8 +17,8 @@ export const legalFacts = {
   supportPhone: '+91 90532 32597',
   supportHours: 'Mon–Sat, 10:00 am – 7:00 pm IST',
   legalContactEmail: 'support@capabble.cloud',
-  privacyLastUpdated: '13 October 2026',
-  termsLastUpdated: '13 October 2026',
+  privacyLastUpdated: '21 October 2026',
+  termsLastUpdated: '21 October 2026',
 }
 
 /** Placeholder text in the markdown → the fact that replaces it. */

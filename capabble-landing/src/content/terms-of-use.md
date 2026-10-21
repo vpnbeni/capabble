@@ -55,23 +55,23 @@ You're responsible for having the right to add that data, including any consent 
 
 ## Modules, fees and payment
 
-You can use the modules your institution has turned on. Fees are as set out in your order or on our pricing page: [link or order reference].
+You can use the modules your institution has turned on. Fees are as set out in your order or on our [pricing page](/pricing).
 
-- Payment terms: [e.g. billed per session, due within N days of invoice]
+- Payment terms: billed monthly or yearly in advance, by module and number of students. Invoices are due within 7 days. If an invoice is still unpaid 7 days after it's due, your workspace becomes read-only until it's paid.
 - Prices exclude GST, which is added where it applies.
-- Price changes: we'll give at least [N days] notice before a new session.
+- Price changes: we'll give at least 30 days' notice, and a new price applies from your next billing period.
 
 ## Availability and support
 
-We work to keep Capabble running smoothly. We'll give at least [N hours] notice of planned maintenance, and schedule it outside school hours where we can. [Service level, if offered]
+We work to keep Capabble running smoothly. We'll give at least 24 hours' notice of planned maintenance, and schedule it outside school hours where we can. We don't offer an uptime guarantee or service credits.
 
 Support is available through the [Help centre](#/help) and at [support email].
 
 ## Suspending or closing an account
 
-- You can close your workspace account at any time by [how to close].
+- You can close your workspace account at any time from Settings → Account → Close workspace, or by emailing [support email] from your administrator's email address.
 - We may suspend an account if these terms are seriously broken or fees are unpaid. We'll give notice first, unless there's an urgent security risk.
-- After an account closes, you can export your school's data for [N days]. After that we delete it, as our privacy policy describes.
+- After an account closes, you can export your school's data for 30 days. After that we delete it within a further 60 days, as our privacy policy describes. Fees already paid aren't refunded.
 
 ## Our software and brand
 
@@ -81,7 +81,13 @@ If you send us suggestions, we may use them to improve Capabble without owing yo
 
 ## Limits of our liability
 
-[To be drafted by counsel: warranty disclaimer, exclusions of indirect loss, and a liability cap — for example, the fees paid in the 12 months before a claim.]
+We provide Capabble "as is" and "as available". As far as the law allows, we don't promise that it will be uninterrupted or error-free, or that it will suit a particular purpose. Keep your own copies of records you can't afford to lose.
+
+We're not liable for indirect or consequential loss, such as lost profits, lost data that you could have exported, or loss of reputation.
+
+Our total liability for all claims under these terms is limited to the fees your institution paid us in the 12 months before the claim.
+
+Nothing in these terms limits liability that can't be limited by law, such as for fraud.
 
 ## Governing law
 
@@ -89,6 +95,6 @@ These terms are governed by the laws of India. The courts of Jhajjar, Haryana ha
 
 ## Changes and contact
 
-If we change these terms in a significant way, we'll email workspace account holders at least [N days] before the change takes effect.
+If we change these terms in a significant way, we'll email workspace account holders at least 30 days before the change takes effect.
 
 Questions about these terms: [legal contact email].
