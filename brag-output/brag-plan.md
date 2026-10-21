@@ -1,30 +1,34 @@
-# /brag plan — Capabble School OS
+# /brag plan — Capabble School OS (v2)
 
-**What it is:** School OS by Capabble, a modular school ERP: each module (Timetable, Students, Exam centre, Assets, Finance, Appointments…) works on its own, and modules share one school's data when you turn more on.
-**Who it's for:** CBSE schools — principals, office staff, teachers.
-**What sets it apart:** Start with one module, add the rest with one switch; they integrate automatically (Appointments reads the Timetable, so teaching periods show up as unavailable).
-**Most impressive claim:** Turning on a new module and it already knows the school — the appointment picker marks teaching periods from the timetable.
-**Visual hook:** A single switch flipping on under the line "Start with one module."
-**Real UI shown:** The app's own kit CSS (`client/src/styles/capabble/*.css`, copied verbatim): `cb-switch`, `cb-card`, `cb-tt` timetable grid, `cb-slots` slot picker with teaching-period caution slots, `cb-toast`, `cb-badge`. Logo from `capabble-landing/src/app/icon.svg`. Tagline "Assurance of capability." from the landing hero.
-**Tone:** `polished` with `default` pacing — confident, calm, clean. No jokes; the product is serious.
-**Share caption:** see share-copy.txt.
+**Narrative:** Everything a school runs, one platform. A school day told module by module; each beat shows a real screen and the data moving on to the next place (mostly the parent app). Only integrations that exist in the code are claimed.
 
-**Privacy:** No real people. Teacher names (Ms. Kaur, Mr. Rao…), roll nos and the class are fictional stand-ins. No landing-page testimonials or customer names used.
+**What it is:** School OS by Capabble — interconnected modules for everything a school manages: students, staff, attendance, timetable, academics, exams, board exam centre, finance, transport, library, clinic, assets, activities, appointments, alumni, and the parent app.
+**Who it's for:** School leadership and office teams (CBSE schools first).
+**What sets it apart:** Every module works alone, and once switched on they share one school's data: attendance reaches parents and payroll, fees come from student records, marks become report cards in the parent app.
+**Tone:** polished, warm. **Share caption:** see share-copy.txt.
 
-## Identity
-Inter 400–800, page `#F4F5F6`, cards white with `#E3E6E8` hairlines, accent `#2458AA` / `#3A7AE1`, chart colours for timetable subjects. Headlines 76px, 800, −0.04em tracking, accent word in accent-strong — same as the landing hero.
+**Verified links shown** (server code): attendance → parent portal; transport route → parent portal; timetable → parent portal; fee receipts → parent portal; exam results → report card → parent portal; staff attendance (absent / half day) → payroll loss-of-pay; student records → fee accounts.
+**Not claimed:** library or clinic reaching parents, transport fees linked to routes, homework in the parent app.
 
-## Storyboard (22.0s, 1920×1080, 30fps, 120 BPM — cuts on bar lines)
-| # | Time | Scene | On screen | Sound |
+**Privacy:** all names, roll nos, bus numbers and amounts are fictional.
+
+## Storyboard (30.0s, 1920×1080, 30fps, 120 BPM)
+| # | Time | Beat | Headline | Screen → link |
 |---|---|---|---|---|
-| 1 Hook | 0.0–3.0 | One switch | "Start with **one module.**" rises in; a single Timetable switch card flips on at 1.5s | Soft pad + kick enters; switch click |
-| 2 Reveal | 3.0–7.0 | Modules card | "Add the rest with **one click.**" / "They work alone. Better together." Five more switches flip on, one per beat | Hats join; 5 tuned clicks |
-| 3 Highlight | 7.0–11.0 | Timetable | "Timetable, **without the clashes.**" Class 7-A week grid fills period by period; "No clashes" success badge | Bass joins; soft ticks under fill |
-| 4 Highlight | 11.0–15.5 | Appointments | "Appointments already know **who's teaching.**" Slot picker: teaching periods dashed (from Timetable), cursor picks 11:30 am, toast "Meeting booked" | Pluck melody; chime on toast |
-| 5 Highlight | 15.5–18.5 | Exam centre | "Exam centre, **down to the seat.**" Hall 3 seats fill with roll nos; badge "24 of 24 seated" | Rising energy |
-| 6 Outro | 18.5–22.0 | Logo | Mark + "Assurance of **capability.**" + "School OS by Capabble · school.capabble.cloud" | Final chord rings out, fade |
+| 1 | 0.0–3.0 | Hook | Running a school means running everything. | Chips of every job flick in |
+| 2 | 3.0–5.5 | Promise | Capabble runs all of it, in one place. | 16 module tiles assemble |
+| 3 | 5.5–8.0 | 7:40 am | Every bus, on the way. | Morning routes → parent app: bus on the way |
+| 4 | 8.0–10.5 | 8:00 am | Attendance, marked in class. | Class register → parent app: present today |
+| 5 | 10.5–13.0 | 9:00 am | Periods planned. Homework set. | Teacher's day + homework → parent app: today's timetable |
+| 6 | 13.0–15.5 | 11:00 am | Fee paid. Receipt sent. | Record payment → parent app: receipt |
+| 7 | 15.5–17.5 | All day | And everything in between. | Library, clinic, assets, house points |
+| 8 | 17.5–20.0 | Exam season | Marks become report cards. | Marks entry → parent app: report card |
+| 9 | 20.0–21.2 | Quick cut | Board exams too. | Exam-centre seating plan |
+| 10 | 21.2–23.5 | Month end | Nothing entered twice. | Payroll: loss of pay from attendance |
+| 11 | 23.5–26.5 | Modular | Start with what you need. Switch on the rest. | Module switches |
+| 12 | 26.5–30.0 | Outro | Your whole school. One platform. → Assurance of capability. | Logo, school.capabble.cloud |
 
-Transitions: stagger — old content fades/slides out 0.3s, new content rises in. Never a crossfade of two busy layouts.
+Transitions: old content out, new in (no crossfades). The parent phone stays on screen 5.5–20s and its feed grows with each beat.
 
-## Music cue guidance
-Synthesized in-house (no bundled track): 120 BPM, A minor → C major feel (Am–F–C–G), kick on beats, pad sidechained gently, switch clicks tuned to the key, chime on the booking toast at 13.6s, final C chord at 18.5s.
+## Sound
+Synthesized: 120 BPM, Fmaj7–G6–Am7–G loop, resolving to Cmaj9 on the outro. A soft two-note notification chime each time the parent app receives something (the motif), tuned ticks for chips, tiles, attendance marks and switches.

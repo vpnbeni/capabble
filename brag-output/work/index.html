@@ -10,159 +10,239 @@
   html, body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; }
   #stage { position: relative; width: 1920px; height: 1080px; overflow: hidden; }
   .scene { position: absolute; inset: 0; display: none; }
-  .h { margin: 0; font-weight: 800; font-size: 84px; line-height: 1.04; letter-spacing: -0.04em; color: var(--ink); }
-  .h .w { display: inline-block; will-change: transform; }
+  .h { margin: 0; font-weight: 800; font-size: 80px; line-height: 1.04; letter-spacing: -0.04em; color: var(--ink); }
+  .h .w { display: inline-block; }
   .h .a { color: var(--accent-strong); }
   .sub { margin: 0; font-size: 30px; line-height: 42px; color: var(--ink-muted); font-weight: 500; letter-spacing: -0.01em; }
-  .ui { zoom: 1.6; }
-  .bug { position: absolute; left: 96px; bottom: 64px; display: flex; align-items: center; gap: 14px; font: 600 24px/1 var(--font-sans); color: var(--ink); letter-spacing: -0.01em; }
-  .bug img { width: 40px; height: 40px; }
+  .ui { zoom: 1.4; }
+  .when { display: inline-flex; align-self: flex-start; align-items: center; height: 48px; padding: 0 20px; border-radius: 999px; background: var(--accent-soft); color: var(--accent-soft-ink); font: 600 24px/1 var(--font-sans); font-variant-numeric: tabular-nums; }
+  .top { position: absolute; left: 140px; top: 96px; display: flex; flex-direction: column; gap: 22px; }
+  .area { position: absolute; left: 140px; top: 360px; }
   .left { position: absolute; left: 140px; top: 0; bottom: 0; width: 700px; display: flex; flex-direction: column; justify-content: center; gap: 28px; }
   .right { position: absolute; left: 920px; top: 0; bottom: 0; display: flex; align-items: center; }
-  .row-hl { border-radius: var(--radius-md); }
-  .mods .cb-switch { padding: 10px 12px; margin: 0 -12px; border-radius: 8px; }
-  .mods .cb-switch + .cb-switch { margin-top: 2px; }
-  .seat { width: 76px; height: 50px; border-radius: 6px; border: 1px dashed var(--border-strong); display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 12px; line-height: 16px; color: var(--ink-subtle); position: relative; }
-  .seat .fill { position: absolute; inset: -1px; border-radius: 6px; background: var(--accent-soft); border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent); display: flex; flex-direction: column; align-items: center; justify-content: center; }
-  .seat .roll { font: 600 12px/16px var(--font-sans); color: var(--accent-soft-ink); font-variant-numeric: tabular-nums; }
-  .seat .sno { font-size: 12px; line-height: 16px; color: var(--ink-muted); }
-  .front { height: 30px; border-radius: 6px; background: var(--surface-sunken); display: flex; align-items: center; justify-content: center; font: 500 12px/16px var(--font-sans); color: var(--ink-muted); margin-bottom: 14px; }
-  #cursor { position: absolute; width: 44px; height: 44px; left: 0; top: 0; z-index: 50; display: none; pointer-events: none; }
+
+  /* hook chips */
+  .chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 14px; width: 1400px; }
+  .chip { height: 56px; padding: 0 24px; display: inline-flex; align-items: center; border-radius: 999px; background: var(--surface); border: 1px solid var(--border); font: 500 24px/1 var(--font-sans); color: var(--ink-muted); }
+
+  /* module tiles */
+  .tiles { position: absolute; left: 140px; top: 330px; width: 1640px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
+  .tile { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 24px 28px; height: 130px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; gap: 6px; }
+  .tile b { font: 600 26px/32px var(--font-sans); color: var(--ink); letter-spacing: -0.01em; }
+  .tile span { font-size: 19px; line-height: 26px; color: var(--ink-muted); }
+  .tile.is-key { background: var(--accent-soft); border-color: color-mix(in srgb, var(--accent) 35%, transparent); }
+  .tile.is-key b { color: var(--accent-soft-ink); }
+
+  /* lists inside cards */
+  .rows { display: flex; flex-direction: column; }
+  .r { display: grid; align-items: center; gap: 12px; padding: 10px 20px; border-top: 1px solid var(--border); }
+  .r:first-child { border-top: 0; }
+  .r .t { font-weight: 600; color: var(--ink); }
+  .r .s { font-size: 13px; line-height: 18px; color: var(--ink-muted); }
+  .r .n { font-variant-numeric: tabular-nums; color: var(--ink-muted); font-size: 13px; }
+  .r.is-hl { background: var(--accent-soft); }
+  .thead { display: grid; gap: 12px; padding: 8px 20px; background: var(--surface-sunken); font: 500 12px/16px var(--font-sans); color: var(--ink-subtle); }
+  .opts { display: inline-flex; border: 1px solid var(--border-control); border-radius: 6px; overflow: hidden; }
+  .opts span { padding: 4px 10px; font: 500 12px/16px var(--font-sans); color: var(--ink-muted); border-left: 1px solid var(--border); }
+  .opts span:first-child { border-left: 0; }
+  .opts span.on-success { background: var(--success-soft); color: var(--success-ink); font-weight: 600; }
+  .opts span.on-danger { background: var(--danger-soft); color: var(--danger-ink); font-weight: 600; }
+  .lbl { font: 500 12px/16px var(--font-sans); color: var(--ink-subtle); }
+  .mods .cb-switch { padding: 8px 12px; margin: 0 -12px; border-radius: 8px; }
+
+  /* phone */
+  #phone { position: absolute; left: 1420px; top: 130px; width: 380px; height: 820px; box-sizing: border-box; border-radius: 56px; border: 12px solid #191B1C; background: var(--bg); overflow: hidden; display: none; box-shadow: 0 30px 60px rgba(25,27,28,.16); }
+  #phone .ph-head { background: var(--surface); padding: 46px 22px 16px; border-bottom: 1px solid var(--border); }
+  #phone .ph-app { display: flex; align-items: center; gap: 10px; font: 600 20px/24px var(--font-sans); color: var(--ink); }
+  #phone .ph-app img { width: 30px; height: 30px; }
+  #phone .ph-kid { margin-top: 10px; font: 500 16px/22px var(--font-sans); color: var(--ink-muted); }
+  #phone .feed { position: relative; padding: 14px; }
+  .fi { position: absolute; left: 14px; right: 14px; top: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 14px 16px; box-sizing: border-box; height: 108px; }
+  .fi .fl { display: flex; justify-content: space-between; align-items: center; font: 500 14px/18px var(--font-sans); color: var(--ink-subtle); }
+  .fi .ft { margin-top: 6px; font: 600 19px/24px var(--font-sans); color: var(--ink); letter-spacing: -0.01em; }
+  .fi .fd { margin-top: 2px; font: 400 15px/20px var(--font-sans); color: var(--ink-muted); }
+
+  #link { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; pointer-events: none; display: none; }
+  #cursor { position: absolute; width: 44px; height: 44px; left: 0; top: 0; z-index: 50; display: none; }
   .ring { position: absolute; width: 60px; height: 60px; margin: -30px 0 0 -30px; border-radius: 50%; border: 3px solid var(--accent); z-index: 49; display: none; }
-  .toastwrap { position: absolute; right: 120px; bottom: 96px; width: 600px; }
-  .toastwrap .cb-toast { zoom: 1.45; }
+  .seat { height: 40px; border-radius: 6px; border: 1px dashed var(--border-strong); position: relative; }
+  .seat .fill { position: absolute; inset: -1px; border-radius: 6px; background: var(--accent-soft); border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent); display: flex; align-items: center; justify-content: center; font: 600 11px/14px var(--font-sans); color: var(--accent-soft-ink); font-variant-numeric: tabular-nums; }
 </style>
 </head>
 <body class="cb-app">
 <div id="stage">
 
   <!-- 1 Hook -->
-  <section class="scene" id="s1" data-s="0" data-e="3">
-    <div style="position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:72px;">
-      <h1 class="h" data-words data-t="0.15">Start with <span class="a">one module.</span></h1>
-      <div class="ui" id="s1card">
-        <div class="cb-card" style="width:440px;">
-          <div class="cb-card__body" style="padding:14px 18px;">
-            <div class="cb-switch">
-              <span class="cb-check__text"><span class="cb-check__label" style="font-weight:600">Timetable</span><span class="cb-check__desc">Bell timings, teachers and classes</span></span>
-              <button class="cb-switch__track" data-on="1.55"><span class="cb-switch__thumb"></span></button>
-            </div>
+  <section class="scene" data-s="0" data-e="3">
+    <div style="position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:64px;">
+      <h1 class="h" data-words data-t="0.1" style="text-align:center">Running a school means<br><span class="a">running everything.</span></h1>
+      <div class="chips" id="chips"></div>
+    </div>
+  </section>
+
+  <!-- 2 Promise -->
+  <section class="scene" data-s="3" data-e="5.5">
+    <div class="top" style="top:110px"><h2 class="h" data-words data-t="3.05">Capabble runs all of it, <span class="a">in one place.</span></h2></div>
+    <div class="tiles" id="tiles"></div>
+  </section>
+
+  <!-- 3 Transport -->
+  <section class="scene" data-s="5.5" data-e="8" data-link="6.35,6.9,560">
+    <div class="top"><span class="when" data-rise="5.55">7:40 am</span><h2 class="h" data-words data-t="5.6">Every bus, <span class="a">on the way.</span></h2></div>
+    <div class="area"><div class="ui" data-rise="5.7">
+      <div class="cb-card" style="width:740px">
+        <div class="cb-card__head"><div><div class="cb-card__title">Morning routes</div><div class="cb-card__subtitle">Thu, 22 Oct · live</div></div></div>
+        <div class="cb-card__body" style="padding:12px 0 6px">
+          <div class="rows" style="--g: 1fr 110px 110px">
+            <div class="r" style="grid-template-columns:var(--g)" data-rise="5.85"><div><div class="t">Route 2 · Sector 34</div><div class="s">Bus 4521 · 38 students</div></div><div class="n">7:42 am</div><div><span class="cb-badge cb-badge--success"><span class="cb-badge__dot"></span>Arrived</span></div></div>
+            <div class="r" style="grid-template-columns:var(--g)" data-rise="5.97" data-hl="6.3"><div><div class="t">Route 4 · Model Town</div><div class="s">Bus 4588 · 41 students</div></div><div class="n">7:51 am</div><div><span class="cb-badge cb-badge--info"><span class="cb-badge__dot"></span>On the way</span></div></div>
+            <div class="r" style="grid-template-columns:var(--g)" data-rise="6.09"><div><div class="t">Route 7 · Jind Road</div><div class="s">Bus 4610 · 35 students</div></div><div class="n">7:58 am</div><div><span class="cb-badge cb-badge--warning"><span class="cb-badge__dot"></span>8 min late</span></div></div>
+            <div class="r" style="grid-template-columns:var(--g)" data-rise="6.21"><div><div class="t">Route 9 · Sunaria</div><div class="s">Bus 4702 · 29 students</div></div><div class="n">8:05 am</div><div><span class="cb-badge cb-badge--neutral"><span class="cb-badge__dot"></span>Not started</span></div></div>
           </div>
         </div>
       </div>
-    </div>
+    </div></div>
   </section>
 
-  <!-- 2 Reveal -->
-  <section class="scene" id="s2" data-s="3" data-e="7">
-    <div class="left">
-      <h2 class="h" data-words data-t="3.1">Add the rest with <span class="a">one click.</span></h2>
-      <p class="sub" data-rise="4.4">They work alone. Better together.</p>
-    </div>
-    <div class="right">
-      <div class="ui" data-rise="3.15">
-        <div class="cb-card" style="width:500px;">
-          <div class="cb-card__head"><div><div class="cb-card__title">Modules</div><div class="cb-card__subtitle">Turn on what your school needs</div></div></div>
-          <div class="cb-card__body mods" style="padding:8px 20px 14px;">
-            <div class="cb-switch"><span class="cb-check__text"><span class="cb-check__label">Timetable</span><span class="cb-check__desc">Bell timings, teachers and classes</span></span><button class="cb-switch__track" data-on="0"><span class="cb-switch__thumb"></span></button></div>
-            <div class="cb-switch"><span class="cb-check__text"><span class="cb-check__label">Students</span><span class="cb-check__desc">Admissions and student records</span></span><button class="cb-switch__track" data-on="3.6"><span class="cb-switch__thumb"></span></button></div>
-            <div class="cb-switch"><span class="cb-check__text"><span class="cb-check__label">Exam centre</span><span class="cb-check__desc">Seating, duties and dispatch for board exams</span></span><button class="cb-switch__track" data-on="4.0"><span class="cb-switch__thumb"></span></button></div>
-            <div class="cb-switch"><span class="cb-check__text"><span class="cb-check__label">Assets</span><span class="cb-check__desc">What the school owns, and where it is</span></span><button class="cb-switch__track" data-on="4.4"><span class="cb-switch__thumb"></span></button></div>
-            <div class="cb-switch"><span class="cb-check__text"><span class="cb-check__label">Finance</span><span class="cb-check__desc">Fees, receipts and payroll</span></span><button class="cb-switch__track" data-on="4.8"><span class="cb-switch__thumb"></span></button></div>
-            <div class="cb-switch"><span class="cb-check__text"><span class="cb-check__label">Appointments</span><span class="cb-check__desc">Parent and visitor meetings</span></span><button class="cb-switch__track" data-on="5.2"><span class="cb-switch__thumb"></span></button></div>
+  <!-- 4 Attendance -->
+  <section class="scene" data-s="8" data-e="10.5" data-link="9.05,9.6,560">
+    <div class="top"><span class="when" data-rise="8.05">8:00 am</span><h2 class="h" data-words data-t="8.1">Attendance, <span class="a">marked in class.</span></h2></div>
+    <div class="area"><div class="ui" data-rise="8.2">
+      <div class="cb-card" style="width:740px">
+        <div class="cb-card__head"><div><div class="cb-card__title">Class 7-A · Attendance</div><div class="cb-card__subtitle">Thu, 22 Oct · Period 1</div></div><div class="cb-card__action" data-pop="9.0"><span class="cb-badge cb-badge--success"><span class="cb-badge__dot"></span>29 present · 1 absent</span></div></div>
+        <div class="cb-card__body" style="padding:12px 0 6px">
+          <div class="rows" id="att"></div>
+        </div>
+      </div>
+    </div></div>
+  </section>
+
+  <!-- 5 Timetable + homework -->
+  <section class="scene" data-s="10.5" data-e="13" data-link="11.45,12.0,560">
+    <div class="top"><span class="when" data-rise="10.55">9:00 am</span><h2 class="h" data-words data-t="10.6">Periods planned. <span class="a">Homework set.</span></h2></div>
+    <div class="area"><div class="ui" style="display:flex; gap:14px;">
+      <div class="cb-card" style="width:400px" data-rise="10.7">
+        <div class="cb-card__head"><div><div class="cb-card__title">My day</div><div class="cb-card__subtitle">Ms. Kaur · Thursday</div></div></div>
+        <div class="cb-card__body" style="padding:12px 16px 16px; display:flex; flex-direction:column; gap:6px;">
+          <div style="display:grid; grid-template-columns:64px 1fr; gap:10px; align-items:center" data-rise="10.8"><div><div class="t" style="font:600 13px/18px var(--font-sans)">P1</div><div class="lbl">8:00 am</div></div><div class="cb-tt__slot cb-tt__slot--c1" style="min-height:44px"><span class="cb-tt__subject">Maths</span><span class="cb-tt__detail">Class 7-A · Room 12</span></div></div>
+          <div style="display:grid; grid-template-columns:64px 1fr; gap:10px; align-items:center" data-rise="10.9"><div><div class="t" style="font:600 13px/18px var(--font-sans)">P2</div><div class="lbl">8:45 am</div></div><div class="cb-tt__slot cb-tt__slot--c1" style="min-height:44px"><span class="cb-tt__subject">Maths</span><span class="cb-tt__detail">Class 8-B · Room 14</span></div></div>
+          <div style="display:grid; grid-template-columns:64px 1fr; gap:10px; align-items:center" data-rise="11.0"><div><div class="t" style="font:600 13px/18px var(--font-sans)">P3</div><div class="lbl">9:30 am</div></div><div class="cb-tt__slot is-free" style="min-height:44px"><span class="cb-tt__free">Free period</span></div></div>
+          <div style="display:grid; grid-template-columns:64px 1fr; gap:10px; align-items:center" data-rise="11.1"><div><div class="t" style="font:600 13px/18px var(--font-sans)">P4</div><div class="lbl">10:30 am</div></div><div class="cb-tt__slot cb-tt__slot--c1" style="min-height:44px"><span class="cb-tt__subject">Maths</span><span class="cb-tt__detail">Class 7-C · Room 9</span></div></div>
+        </div>
+      </div>
+      <div class="cb-card" style="width:326px; align-self:flex-start" data-rise="10.85">
+        <div class="cb-card__head"><div><div class="cb-card__title">Homework</div><div class="cb-card__subtitle">Class 7-A · Maths</div></div></div>
+        <div class="cb-card__body" style="padding:12px 16px 16px; display:flex; flex-direction:column; gap:10px;">
+          <div><div class="t" style="font-weight:600">Exercise 4.2, questions 1–10</div><div class="lbl" style="margin-top:2px">Due Fri, 23 Oct</div></div>
+          <div data-pop="11.4"><span class="cb-badge cb-badge--success"><span class="cb-badge__dot"></span>Published</span></div>
+        </div>
+      </div>
+    </div></div>
+  </section>
+
+  <!-- 6 Fees -->
+  <section class="scene" data-s="13" data-e="15.5" data-link="13.95,14.5,560">
+    <div class="top"><span class="when" data-rise="13.05">11:00 am</span><h2 class="h" data-words data-t="13.1">Fee paid. <span class="a">Receipt sent.</span></h2></div>
+    <div class="area"><div class="ui" data-rise="13.2">
+      <div class="cb-card" style="width:740px">
+        <div class="cb-card__head"><div><div class="cb-card__title">Record payment</div><div class="cb-card__subtitle">Fee collection · Term 2</div></div><div class="cb-card__action" data-pop="13.95"><span class="cb-badge cb-badge--success"><span class="cb-badge__dot"></span>Paid</span></div></div>
+        <div class="cb-card__body" style="padding:14px 20px 16px; display:grid; grid-template-columns:1fr 1fr; gap:14px 24px;">
+          <div><div class="lbl">Student</div><div style="font-weight:600">Aarav Sharma</div><div class="lbl">Class 7-A · Adm. no. 2041</div></div>
+          <div><div class="lbl">Fee</div><div style="font-weight:600">Term 2 tuition</div><div class="lbl">Due 15 Oct</div></div>
+          <div><div class="lbl">Amount</div><div style="font:600 22px/28px var(--font-sans); font-variant-numeric:tabular-nums">₹14,200</div></div>
+          <div><div class="lbl">Paid by</div><div style="font-weight:600">UPI</div></div>
+        </div>
+        <div class="cb-card__foot" style="display:flex; justify-content:flex-end; gap:8px;">
+          <button class="cb-btn cb-btn--secondary">Cancel</button>
+          <button class="cb-btn cb-btn--primary" id="paybtn">Record payment</button>
+        </div>
+      </div>
+    </div></div>
+  </section>
+
+  <!-- 7 Everything in between -->
+  <section class="scene" data-s="15.5" data-e="17.5">
+    <div class="top"><span class="when" data-rise="15.55">All day</span><h2 class="h" data-words data-t="15.6">And everything <span class="a">in between.</span></h2></div>
+    <div class="area"><div class="ui" style="display:grid; grid-template-columns:363px 363px; gap:14px;">
+      <div class="cb-card" data-rise="15.7"><div class="cb-card__body" style="padding:14px 16px"><div class="lbl">Library</div><div style="font-weight:600; margin-top:4px">The Jungle Book issued</div><div class="lbl" style="margin:2px 0 10px">Class 5-B · due 4 Nov</div><span class="cb-badge cb-badge--info"><span class="cb-badge__dot"></span>Issued</span></div></div>
+      <div class="cb-card" data-rise="15.85"><div class="cb-card__body" style="padding:14px 16px"><div class="lbl">Clinic</div><div style="font-weight:600; margin-top:4px">Visit logged, 10:40 am</div><div class="lbl" style="margin:2px 0 10px">Class 3-A · rested, back to class</div><span class="cb-badge cb-badge--success"><span class="cb-badge__dot"></span>Back in class</span></div></div>
+      <div class="cb-card" data-rise="16.0"><div class="cb-card__body" style="padding:14px 16px"><div class="lbl">Assets</div><div style="font-weight:600; margin-top:4px">Science lab audit</div><div class="lbl" style="margin:2px 0 10px">42 of 42 items found</div><span class="cb-badge cb-badge--success"><span class="cb-badge__dot"></span>Complete</span></div></div>
+      <div class="cb-card" data-rise="16.15"><div class="cb-card__body" style="padding:14px 16px"><div class="lbl">Activities</div><div style="font-weight:600; margin-top:4px">Tagore House +10</div><div class="lbl" style="margin:2px 0 10px">Inter-house quiz, final round</div><span class="cb-badge cb-badge--neutral" style="padding-left:8px">House points</span></div></div>
+    </div></div>
+  </section>
+
+  <!-- 8 Exams -->
+  <section class="scene" data-s="17.5" data-e="20" data-link="18.45,19.0,560">
+    <div class="top"><span class="when" data-rise="17.55">Exam season</span><h2 class="h" data-words data-t="17.6">Marks become <span class="a">report cards.</span></h2></div>
+    <div class="area"><div class="ui" data-rise="17.7">
+      <div class="cb-card" style="width:740px">
+        <div class="cb-card__head"><div><div class="cb-card__title">Marks · Term 2</div><div class="cb-card__subtitle">Class 7-A · out of 100</div></div><div class="cb-card__action" data-pop="18.45"><span class="cb-badge cb-badge--success"><span class="cb-badge__dot"></span>Report cards published</span></div></div>
+        <div class="cb-card__body" style="padding:12px 0 6px">
+          <div class="thead" style="grid-template-columns:1fr 90px 90px 90px"><span>Student</span><span>Maths</span><span>Science</span><span>English</span></div>
+          <div class="rows" id="marks"></div>
+        </div>
+      </div>
+    </div></div>
+  </section>
+
+  <!-- 9 Board exams -->
+  <section class="scene" data-s="20" data-e="21.2">
+    <div class="left"><h2 class="h" data-words data-t="20.05">Board exams <span class="a">too.</span></h2></div>
+    <div class="right"><div class="ui" data-rise="20.08" style="zoom:1.5">
+      <div class="cb-card" style="width:560px">
+        <div class="cb-card__head"><div><div class="cb-card__title">Hall 3 · Seating plan</div><div class="cb-card__subtitle">Mathematics · Class 12 · 9 Mar</div></div><div class="cb-card__action" data-pop="20.7"><span class="cb-badge cb-badge--success"><span class="cb-badge__dot"></span>32 of 32 seated</span></div></div>
+        <div class="cb-card__body" style="padding:14px 20px 20px;"><div id="seats" style="display:grid; grid-template-columns:repeat(8, 1fr); gap:6px;"></div></div>
+      </div>
+    </div></div>
+  </section>
+
+  <!-- 10 Payroll -->
+  <section class="scene" data-s="21.2" data-e="23.5">
+    <div class="top"><span class="when" data-rise="21.25">Month end</span><h2 class="h" data-words data-t="21.3">Nothing <span class="a">entered twice.</span></h2></div>
+    <div class="area"><div class="ui" data-rise="21.4">
+      <div class="cb-card" style="width:1170px">
+        <div class="cb-card__head"><div><div class="cb-card__title">Salary · October 2026</div><div class="cb-card__subtitle">Days come from staff attendance</div></div></div>
+        <div class="cb-card__body" style="padding:12px 0 6px">
+          <div class="thead" style="grid-template-columns:1fr 160px 300px 140px"><span>Staff</span><span>Days present</span><span>Loss of pay</span><span>Net pay</span></div>
+          <div class="rows">
+            <div class="r" style="grid-template-columns:1fr 160px 300px 140px" data-rise="21.55"><div><div class="t">Ms. Kaur</div><div class="s">Maths teacher</div></div><div class="n">26 of 26</div><div class="n">—</div><div class="t" style="font-variant-numeric:tabular-nums">₹48,600</div></div>
+            <div class="r" style="grid-template-columns:1fr 160px 300px 140px" data-rise="21.67" data-hl="22.0"><div><div class="t">Mr. Rao</div><div class="s">English teacher</div></div><div class="n">24.5 of 26</div><div data-pop="22.0" style="display:flex; gap:8px; align-items:center"><span class="t" style="font-variant-numeric:tabular-nums">1.5 days</span><span class="cb-badge cb-badge--info" style="padding-left:8px">From attendance</span></div><div class="t" style="font-variant-numeric:tabular-nums">₹43,900</div></div>
+            <div class="r" style="grid-template-columns:1fr 160px 300px 140px" data-rise="21.79"><div><div class="t">Ms. Iyer</div><div class="s">Science teacher</div></div><div class="n">26 of 26</div><div class="n">—</div><div class="t" style="font-variant-numeric:tabular-nums">₹46,200</div></div>
           </div>
         </div>
       </div>
-    </div>
+    </div></div>
   </section>
 
-  <!-- 3 Timetable -->
-  <section class="scene" id="s3" data-s="7" data-e="11">
-    <div style="position:absolute; left:140px; right:140px; top:110px;">
-      <h2 class="h" data-words data-t="7.1">Timetable, <span class="a">without the clashes.</span></h2>
-    </div>
-    <div style="position:absolute; left:140px; top:300px;">
-      <div class="ui" style="zoom:1.42" data-rise="7.25">
-        <div class="cb-card" style="width:1153px;">
-          <div class="cb-card__head">
-            <div><div class="cb-card__title">Class 7-A</div><div class="cb-card__subtitle">Session 2026–27 · Term 2</div></div>
-            <div class="cb-card__action" data-pop="9.55"><span class="cb-badge cb-badge--success cb-badge--lg"><span class="cb-badge__dot"></span>No clashes</span></div>
-          </div>
-          <div class="cb-card__body" style="padding:14px 20px 20px;">
-            <div class="cb-tt"><table class="cb-tt__table" id="tt"></table></div>
-          </div>
-        </div>
+  <!-- 11 Modular -->
+  <section class="scene" data-s="23.5" data-e="26.5">
+    <div class="left"><h2 class="h" data-words data-t="23.55">Start small. <span class="a">Switch on the rest.</span></h2></div>
+    <div class="right"><div class="ui" data-rise="23.65" style="zoom:1.5">
+      <div class="cb-card" style="width:520px">
+        <div class="cb-card__head"><div><div class="cb-card__title">Modules</div><div class="cb-card__subtitle">Each works alone. Together they share one school.</div></div></div>
+        <div class="cb-card__body mods" style="padding:6px 20px 12px;" id="mods"></div>
       </div>
-    </div>
+    </div></div>
   </section>
 
-  <!-- 4 Appointments -->
-  <section class="scene" id="s4" data-s="11" data-e="15.5">
-    <div class="left">
-      <h2 class="h" data-words data-t="11.1">Appointments already know <span class="a">who's teaching.</span></h2>
-    </div>
-    <div class="right">
-      <div class="ui" data-rise="11.25" style="zoom:1.55">
-        <div class="cb-card" style="width:520px;">
-          <div class="cb-card__head"><div><div class="cb-card__title">Book a meeting</div><div class="cb-card__subtitle">Parent meeting · Ms. Kaur, Maths</div></div></div>
-          <div class="cb-card__body" style="padding:14px 20px 18px; display:flex; flex-direction:column; gap:14px;">
-            <div style="display:flex; gap:24px;">
-              <div><div class="cb-field__label" style="color:var(--ink-muted)">Date</div><div style="font-weight:600">Thu, 22 Oct</div></div>
-              <div><div class="cb-field__label" style="color:var(--ink-muted)">Student</div><div style="font-weight:600">Class 7-A · Roll no. 14</div></div>
-            </div>
-            <fieldset class="cb-field cb-slots">
-              <legend class="cb-field__label">Time</legend>
-              <div class="cb-slots__grid" id="slots"></div>
-              <div class="cb-slots__legend"><span class="cb-slot cb-slot--caution cb-slot--key"></span>Teaching period, from Timetable</div>
-            </fieldset>
-          </div>
-          <div class="cb-card__foot" style="display:flex; justify-content:flex-end; gap:8px;">
-            <button class="cb-btn cb-btn--secondary">Cancel</button>
-            <button class="cb-btn cb-btn--primary" id="bookbtn">Book meeting</button>
-          </div>
-        </div>
+  <!-- 12 Outro -->
+  <section class="scene" data-s="26.5" data-e="30.1" data-last>
+    <div style="position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:34px;">
+      <img src="logo.svg" id="biglogo" style="width:180px; height:180px;">
+      <div style="position:relative; width:1700px; height:110px;">
+        <h2 class="h" id="outA" data-words data-t="26.8" style="position:absolute; inset:0; text-align:center; font-size:92px;">Your whole school. <span class="a">One platform.</span></h2>
+        <h2 class="h" id="outB" data-words data-t="28.4" style="position:absolute; inset:0; text-align:center; font-size:92px;">Assurance of <span class="a">capability.</span></h2>
       </div>
-    </div>
-    <div class="toastwrap" data-rise="13.45">
-      <div class="cb-toast cb-toast--success">
-        <span class="cb-toast__icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>
-        <span class="cb-toast__text"><div class="cb-toast__title">Meeting booked</div><div class="cb-toast__desc">Thu, 22 Oct · 11:30 am with Ms. Kaur</div></span>
-      </div>
+      <p class="sub" data-rise="27.3" style="font-size:32px; color:var(--ink);">School OS by Capabble · <span style="color:var(--accent-strong); font-weight:600">school.capabble.cloud</span></p>
     </div>
   </section>
 
-  <!-- 5 Exam centre -->
-  <section class="scene" id="s5" data-s="15.5" data-e="18.5">
-    <div class="left">
-      <h2 class="h" data-words data-t="15.6">Exam centre, <span class="a">down to the seat.</span></h2>
-    </div>
-    <div class="right">
-      <div class="ui" data-rise="15.7" style="zoom:1.5">
-        <div class="cb-card" style="width:560px;">
-          <div class="cb-card__head">
-            <div><div class="cb-card__title">Hall 3 · Seating plan</div><div class="cb-card__subtitle">Mathematics · Class 12 · 9 Mar</div></div>
-            <div class="cb-card__action" data-pop="17.35"><span class="cb-badge cb-badge--success"><span class="cb-badge__dot"></span>24 of 24 seated</span></div>
-          </div>
-          <div class="cb-card__body" style="padding:14px 20px 20px;">
-            <div class="front">Invigilator desk</div>
-            <div id="seats" style="display:grid; grid-template-columns:repeat(6, 76px); gap:8px; justify-content:space-between;"></div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- 6 Outro -->
-  <section class="scene" id="s6" data-s="18.5" data-e="22.1">
-    <div style="position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:36px;">
-      <img src="logo.svg" id="biglogo" style="width:200px; height:200px;">
-      <h2 class="h" data-words data-t="18.85" style="font-size:96px;">Assurance of <span class="a">capability.</span></h2>
-      <p class="sub" data-rise="19.45" style="font-size:34px; color:var(--ink);">School OS by Capabble</p>
-      <p class="sub" data-rise="19.75" style="font-size:28px; color:var(--accent-strong); font-weight:600;">school.capabble.cloud</p>
-    </div>
-  </section>
-
-  <div class="bug" id="bug"><img src="logo.svg"><span>Capabble</span></div>
+  <!-- parent phone, persistent through the day -->
+  <div id="phone">
+    <div class="ph-head"><div class="ph-app"><img src="logo.svg">Parent app</div><div class="ph-kid">Aarav Sharma · Class 7-A</div></div>
+    <div class="feed" id="feed"></div>
+  </div>
+  <svg id="link"><line id="linkline" stroke="var(--accent)" stroke-width="3" stroke-dasharray="6 8" stroke-linecap="round"/><circle id="linkdot" r="9" fill="var(--accent-strong)"/></svg>
   <div class="ring" id="ring"></div>
   <svg id="cursor" viewBox="0 0 24 24"><path d="M4 2.5 L4 19.5 L8.6 15.2 L11.6 21.8 L14.6 20.4 L11.7 13.9 L18 13.9 Z" fill="#191B1C" stroke="#fff" stroke-width="1.4" stroke-linejoin="round"/></svg>
 </div>
@@ -173,102 +253,90 @@ const p = (t, a, d) => cl((t - a) / d);
 const eo = x => 1 - Math.pow(1 - x, 3);
 const eio = x => x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
 const back = x => { const c = 1.6; x = x - 1; return 1 + (c + 1) * x * x * x + c * x * x; };
+const $ = id => document.getElementById(id);
 
-// --- build timetable
-const periods = [['P1','8:00'],['P2','8:45'],['P3','9:30'],null,['P4','10:30'],['P5','11:15'],['P6','12:00']];
-const subj = {
-  Maths:['c1','Ms. Kaur'], English:['c2','Mr. Rao'], Science:['c5','Ms. Iyer'], Hindi:['c3','Mr. Verma'],
-  Social:['c4','Ms. Das'], Computer:['c6','Mr. Sen'], Art:['c3','Ms. Paul'], Games:['c5','Mr. Gill'],
-};
-const days = {
-  Mon:['Maths','English','Science','Hindi','Social','Computer'],
-  Tue:['English','Maths','Hindi','Science','Art','Social'],
-  Wed:['Science','Maths','English','Social','Hindi','Games'],
-  Thu:['Hindi','Science','Maths','English','Computer','Social'],
-  Fri:['Social','English','Maths','Science','Hindi','Art'],
-};
-const tt = document.getElementById('tt');
-let h = '<thead><tr><th class="cb-tt__corner"></th>';
-periods.forEach(pp => { h += pp ? `<th><span class="cb-tt__plabel">${pp[0]}</span><span class="cb-tt__ptime">${pp[1]} am</span></th>` : '<th class="is-break"><span class="cb-tt__plabel">Break</span></th>'; });
-h = h.replace('12:00 am', '12:00 pm') + '</tr></thead><tbody>';
-const ttCells = [];
-Object.entries(days).forEach(([d, list], di) => {
-  h += `<tr${d === 'Thu' ? ' class="is-today"' : ''}><th class="cb-tt__day">${d}</th>`;
-  let pi = 0;
-  periods.forEach(pp => {
-    if (!pp) { h += '<td class="is-break"></td>'; return; }
-    const s = list[pi]; const [c, tch] = subj[s];
-    h += `<td><div class="cb-tt__slot is-free" style="position:relative" data-di="${di}" data-pi="${pi}"><span class="cb-tt__free">&nbsp;</span><div class="cb-tt__slot cb-tt__slot--${c} ttfill" style="position:absolute; inset:-1px;"><span class="cb-tt__subject">${s}</span><span class="cb-tt__detail">${tch}</span></div></div></td>`;
-    pi++;
-  });
-  h += '</tr>';
-});
-tt.innerHTML = h + '</tbody>';
-document.querySelectorAll('.ttfill').forEach(el => {
-  const par = el.parentElement; ttCells.push({ el, t: 7.55 + (+par.dataset.pi) * 0.17 + (+par.dataset.di) * 0.07 });
-});
+// hook chips
+const chipWords = ['Admissions','Attendance','Timetable','Homework','Fees','Payroll','Exams','Report cards','Buses','Library','Clinic','Assets','Sports','Parent meetings','Alumni'];
+$('chips').innerHTML = chipWords.map((w, i) => `<span class="chip" data-rise="${(0.75 + i * 0.09).toFixed(2)}">${w}</span>`).join('');
 
-// --- build slots
-const slotDefs = [['8:00','caution'],['8:30','free'],['9:00','busy'],['9:30','caution'],['10:00','caution'],['10:30','free'],
-  ['11:00','busy'],['11:30','free'],['12:00','caution'],['12:30','caution'],['1:00','free'],['1:30','free']];
-document.getElementById('slots').innerHTML = slotDefs.map(([s, st]) => {
-  const ap = (s.startsWith('8') || s.startsWith('9') || s.startsWith('10') || s.startsWith('11')) ? 'am' : 'pm';
-  const dis = st !== 'free' ? ' is-disabled' : '';
-  return `<label class="cb-slot cb-slot--${st}${dis}" data-slot="${s}"><span class="is-num">${s} ${ap}</span></label>`;
-}).join('');
+// module tiles
+const tiles = [['Students','Admissions and records'],['Staff','Profiles and recruitment'],['Attendance','Students and staff'],['Timetable','Periods and substitutions'],
+  ['Academics','Lesson plans and homework'],['Exams','Marks and report cards'],['Exam centre','Board exam seating and duties'],['Finance','Fees, expenses and payroll'],
+  ['Transport','Buses and routes'],['Library','Catalogue and loans'],['Clinic','Visits and medical stock'],['Assets','Everything the school owns'],
+  ['Activities','Houses, sports and clubs'],['Appointments','Parent and visitor meetings'],['Alumni','Passed-out students'],['Parent app','Everything about their child']];
+$('tiles').innerHTML = tiles.map(([n, d], i) => `<div class="tile${n === 'Parent app' ? ' is-key' : ''}" data-rise="${(3.35 + ((i % 4) + Math.floor(i / 4)) * 0.07).toFixed(2)}"><b>${n}</b><span>${d}</span></div>`).join('');
 
-// --- build seats
-const seats = document.getElementById('seats');
+// attendance rows
+const kids = [['Aarav Sharma', 1, 0], ['Diya Malik', 2, 0], ['Ishaan Verma', 3, 0], ['Kavya Rathee', 4, 1], ['Meera Dahiya', 5, 0], ['Rohan Gill', 6, 0]];
+$('att').innerHTML = kids.map(([n, roll, st], i) => `<div class="r${i === 0 ? '" data-hl="8.95' : ''}" style="grid-template-columns:1fr auto" data-rise="${(8.3 + i * 0.07).toFixed(2)}"><div><div class="t">${n}</div><div class="s">Roll no. ${roll}</div></div><div class="opts" data-mark="${(8.45 + i * 0.09).toFixed(2)}" data-st="${st}"><span>Present</span><span>Absent</span><span>Half day</span></div></div>`).join('');
+
+// marks
+const mk = [['Aarav Sharma', 86, 91, 78], ['Diya Malik', 92, 88, 95], ['Ishaan Verma', 74, 81, 69], ['Kavya Rathee', 88, 79, 84]];
+$('marks').innerHTML = mk.map((row, r) => `<div class="r" style="grid-template-columns:1fr 90px 90px 90px"><div class="t" data-rise="${(17.8 + r * 0.08).toFixed(2)}">${row[0]}</div>${row.slice(1).map((v, c) => `<div class="t" style="font-variant-numeric:tabular-nums" data-rise="${(17.9 + r * 0.1 + c * 0.06).toFixed(2)}">${v}</div>`).join('')}</div>`).join('');
+
+// seats
 const seatEls = [];
-for (let i = 0; i < 24; i++) {
-  const r = 26145301 + i * 3;
+for (let i = 0; i < 32; i++) {
   const d = document.createElement('div'); d.className = 'seat';
-  d.innerHTML = `<span>${i + 1}</span><div class="fill"><span class="roll">${r}</span><span class="sno">Seat ${i + 1}</span></div>`;
-  seats.appendChild(d);
-  const row = Math.floor(i / 6), col = i % 6;
-  seatEls.push({ el: d.querySelector('.fill'), t: 15.95 + (row * 6 + (row % 2 ? 5 - col : col)) * 0.055 });
+  d.innerHTML = `<div class="fill">${String(26145301 + i * 3).slice(-4)}</div>`;
+  $('seats').appendChild(d);
+  seatEls.push({ el: d.firstChild, t: 20.2 + i * 0.015 });
 }
 
-// --- split headline words
+// module switches
+const modList = [['Students','Admissions and records',0],['Attendance','Students and staff',24.2],['Timetable','Periods and substitutions',24.45],['Finance','Fees, expenses and payroll',24.7],
+  ['Exams','Marks and report cards',24.95],['Transport','Buses and routes',25.2],['Library','Catalogue and loans',25.45]];
+$('mods').innerHTML = modList.map(([n, d, on]) => `<div class="cb-switch"><span class="cb-check__text"><span class="cb-check__label">${n}</span><span class="cb-check__desc">${d}</span></span><button class="cb-switch__track" data-on="${on}"><span class="cb-switch__thumb"></span></button></div>`).join('');
+
+// phone feed (newest on top)
+const feedItems = [
+  [6.9, 'Transport', 'Bus on the way', 'Route 4 · arriving 7:51 am', 'info', 'On the way'],
+  [9.6, 'Attendance', 'Present today', 'Marked 8:02 am · Period 1', 'success', 'Present'],
+  [12.0, 'Timetable', "Today's timetable", 'Maths, English, Science…', null, null],
+  [14.5, 'Fees', '₹14,200 paid', 'Term 2 tuition · receipt ready', 'success', 'Paid'],
+  [19.0, 'Results', 'Term 2 report card', 'Published by the school', 'info', 'New'],
+];
+$('feed').innerHTML = feedItems.map(([, l, t, d, tone, b]) => `<div class="fi"><div class="fl"><span>${l}</span>${tone ? `<span class="cb-badge cb-badge--${tone}"><span class="cb-badge__dot"></span>${b}</span>` : ''}</div><div class="ft">${t}</div><div class="fd">${d}</div></div>`).join('');
+const feedEls = [...document.querySelectorAll('.fi')];
+
+// split headline words
 document.querySelectorAll('[data-words]').forEach(h => {
-  const walk = node => {
-    [...node.childNodes].forEach(n => {
-      if (n.nodeType === 3) {
-        const frag = document.createDocumentFragment();
-        n.textContent.split(/(\s+)/).forEach(part => {
-          if (!part) return;
-          if (/^\s+$/.test(part)) frag.appendChild(document.createTextNode(part));
-          else { const s = document.createElement('span'); s.className = 'w'; s.textContent = part; frag.appendChild(s); }
-        });
-        n.replaceWith(frag);
-      } else walk(n);
-    });
-  };
+  const walk = node => [...node.childNodes].forEach(n => {
+    if (n.nodeType === 3) {
+      const frag = document.createDocumentFragment();
+      n.textContent.split(/(\s+)/).forEach(part => {
+        if (!part) return;
+        if (/^\s+$/.test(part)) frag.appendChild(document.createTextNode(part));
+        else { const s = document.createElement('span'); s.className = 'w'; s.textContent = part; frag.appendChild(s); }
+      });
+      n.replaceWith(frag);
+    } else if (n.nodeName !== 'BR') walk(n);
+  });
   walk(h);
 });
 
 const scenes = [...document.querySelectorAll('.scene')];
-const $ = id => document.getElementById(id);
-
-function rise(el, t, a, d = 0.55, dist = 28) {
+function rise(el, t, a, d = 0.5, dist = 26) {
   const k = eo(p(t, a, d));
   el.style.opacity = k; el.style.transform = `translateY(${(1 - k) * dist}px)`;
 }
-
+function words(h, t, t0, out) {
+  h.querySelectorAll('.w').forEach((w, i) => {
+    const k = eo(p(t, t0 + i * 0.06, 0.45));
+    w.style.opacity = k * (1 - out); w.style.transform = `translateY(${(1 - k) * 0.4}em)`;
+  });
+}
 function setSwitch(btn, t) {
   const on = +btn.dataset.on;
   const k = on === 0 ? 1 : eio(p(t, on, 0.16));
   btn.classList.toggle('is-on', k > 0.5);
   btn.querySelector('.cb-switch__thumb').style.transform = `translateX(${16 * k}px)`;
-  const row = btn.closest('.cb-switch');
-  if (on > 0 && row.parentElement.classList.contains('mods')) {
-    const g = p(t, on, 0.12) * (1 - p(t, on + 0.25, 0.6));
-    row.style.background = `color-mix(in srgb, var(--accent-soft) ${Math.round(g * 100)}%, transparent)`;
+  if (on > 0) {
+    const g = p(t, on, 0.1) * (1 - p(t, on + 0.2, 0.5));
+    btn.closest('.cb-switch').style.background = `color-mix(in srgb, var(--accent-soft) ${Math.round(g * 100)}%, transparent)`;
   }
 }
-
 function cursorAt(t, keys) {
-  // keys: [[time, x, y]] — linear segments with ease
   if (t < keys[0][0]) return keys[0].slice(1);
   for (let i = 0; i < keys.length - 1; i++) {
     const [ta, xa, ya] = keys[i], [tb, xb, yb] = keys[i + 1];
@@ -276,90 +344,93 @@ function cursorAt(t, keys) {
   }
   return keys[keys.length - 1].slice(1);
 }
-
-function centerOf(el) {
-  const r = el.getBoundingClientRect();
-  return [r.left + r.width / 2, r.top + r.height / 2];
-}
+const centerOf = el => { const r = el.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; };
 
 window.render = function (t) {
+  let link = null;
   scenes.forEach(sc => {
     const s = +sc.dataset.s, e = +sc.dataset.e;
     const vis = t >= s && t < e;
     sc.style.display = vis ? 'block' : 'none';
     if (!vis) return;
-    const out = eo(p(t, e - 0.32, 0.32));
-    sc.style.opacity = sc.id === 's6' ? 1 : 1 - out;
-    sc.style.transform = `translateY(${-18 * out}px)`;
-
-    sc.querySelectorAll('[data-words]').forEach(hh => {
-      const t0 = +hh.dataset.t;
-      hh.querySelectorAll('.w').forEach((w, i) => {
-        const k = eo(p(t, t0 + i * 0.07, 0.5));
-        w.style.opacity = k; w.style.transform = `translateY(${(1 - k) * 0.42}em)`;
-      });
-    });
+    const out = sc.hasAttribute('data-last') ? 0 : eo(p(t, e - 0.28, 0.28));
+    sc.style.opacity = 1 - out;
+    sc.style.transform = `translateY(${-16 * out}px)`;
+    if (sc.dataset.link) link = sc.dataset.link.split(',').map(Number);
+    sc.querySelectorAll('[data-words]').forEach(h => words(h, t, +h.dataset.t, 0));
     sc.querySelectorAll('[data-rise]').forEach(el => rise(el, t, +el.dataset.rise));
     sc.querySelectorAll('[data-pop]').forEach(el => {
       const k = p(t, +el.dataset.pop, 0.35);
       el.style.opacity = cl(k * 3); el.style.transform = `scale(${0.8 + 0.2 * back(k)})`;
     });
+    sc.querySelectorAll('[data-hl]').forEach(el => el.classList.toggle('is-hl', t >= +el.dataset.hl));
     sc.querySelectorAll('.cb-switch__track').forEach(b => setSwitch(b, t));
-  });
-
-  // scene 1 card
-  if (t < 3) rise($('s1card'), t, 0.55, 0.6, 30);
-
-  // timetable cells
-  if (t >= 7 && t < 11) ttCells.forEach(({ el, t: a }) => {
-    const k = p(t, a, 0.3);
-    el.style.opacity = eo(k); el.style.transform = `scale(${0.86 + 0.14 * back(k)})`;
+    sc.querySelectorAll('[data-mark]').forEach(o => {
+      const on = t >= +o.dataset.mark, st = +o.dataset.st;
+      [...o.children].forEach((c, i) => { c.className = on && i === st ? (st === 1 ? 'on-danger' : 'on-success') : ''; });
+    });
   });
 
   // seats
-  if (t >= 15.5 && t < 18.5) seatEls.forEach(({ el, t: a }) => {
-    const k = p(t, a, 0.25);
-    el.style.opacity = eo(k); el.style.transform = `scale(${0.8 + 0.2 * back(k)})`;
+  if (t >= 20 && t < 21.2) seatEls.forEach(({ el, t: a }) => { const k = p(t, a, 0.2); el.style.opacity = eo(k); el.style.transform = `scale(${0.8 + 0.2 * back(k)})`; });
+
+  // outro: line A, then line B
+  if (t >= 26.5) {
+    const k = p(t, 26.55, 0.6), L = $('biglogo');
+    L.style.opacity = eo(cl(k * 1.6)); L.style.transform = `scale(${0.6 + 0.4 * back(k)}) rotate(${(1 - eo(k)) * -8}deg)`;
+    const aOut = eo(p(t, 28.1, 0.25));
+    words($('outA'), t, 26.8, aOut);
+    $('outA').style.transform = `translateY(${-14 * aOut}px)`;
+    $('outB').style.display = t >= 28.3 ? 'block' : 'none';
+  }
+
+  // phone
+  const ph = $('phone');
+  const pin = eo(p(t, 5.55, 0.6)), pout = eo(p(t, 19.7, 0.3));
+  ph.style.display = t >= 5.5 && t < 20 ? 'block' : 'none';
+  ph.style.opacity = cl(pin * 1.5) * (1 - pout);
+  ph.style.transform = `translateX(${(1 - pin) * 120 + pout * 60}px)`;
+  feedEls.forEach((el, i) => {
+    const ti = feedItems[i][0];
+    const k = p(t, ti, 0.45);
+    let y = 0;
+    for (let j = i + 1; j < feedItems.length; j++) y += eo(p(t, feedItems[j][0], 0.45)) * 120;
+    el.style.opacity = eo(k);
+    el.style.transform = `translateY(${y + (1 - eo(k)) * -16}px) scale(${0.94 + 0.06 * back(k)})`;
+    const glow = p(t, ti, 0.1) * (1 - p(t, ti + 0.3, 0.7));
+    el.style.borderColor = glow > 0 ? `color-mix(in srgb, var(--accent) ${Math.round(glow * 70)}%, var(--border))` : '';
   });
 
-  // appointments cursor
-  const cur = $('cursor'), ring = $('ring');
-  cur.style.display = 'none'; ring.style.display = 'none';
-  if (t >= 11 && t < 15.5) {
-    const slot = document.querySelector('[data-slot="11:30"]');
-    const picked = t >= 12.55;
-    slot.classList.toggle('is-on', picked);
-    const btn = $('bookbtn');
-    const press = t >= 13.2 && t < 13.35;
-    btn.style.filter = press ? 'brightness(0.85)' : '';
-    if (t >= 12.0 && t < 14.9) {
-      const [sx, sy] = centerOf(slot), [bx, by] = centerOf(btn);
-      const [x, y] = cursorAt(t, [[12.0, 1500, 980], [12.5, sx, sy], [12.75, sx, sy], [13.15, bx, by]]);
-      const fade = cl((t - 12.0) / 0.15) * (1 - p(t, 14.6, 0.3));
-      cur.style.display = 'block'; cur.style.opacity = fade;
-      const down = (t >= 12.5 && t < 12.6) || (t >= 13.15 && t < 13.25);
-      cur.style.transform = `translate(${x - 8}px, ${y - 4}px) scale(${down ? 0.88 : 1})`;
-      [[12.52, sx, sy], [13.17, bx, by]].forEach(([ct, cx, cy]) => {
-        const k = p(t, ct, 0.4);
-        if (k > 0 && k < 1) {
-          ring.style.display = 'block'; ring.style.left = cx + 'px'; ring.style.top = cy + 'px';
-          ring.style.opacity = 0.7 * (1 - k); ring.style.transform = `scale(${0.4 + 0.9 * eo(k)})`;
-        }
-      });
+  // link: dashed line from the module card to the phone, dot travels along it
+  const L = $('link');
+  L.style.display = 'none';
+  if (link) {
+    const [a, b, y] = link;
+    const k = p(t, a - 0.25, 0.25) * (1 - p(t, b + 0.2, 0.3));
+    if (k > 0) {
+      L.style.display = 'block';
+      const x1 = 1196, x2 = 1404;
+      const line = $('linkline'); line.setAttribute('x1', x1); line.setAttribute('y1', y); line.setAttribute('x2', x2); line.setAttribute('y2', y);
+      line.style.opacity = 0.6 * k;
+      const m = eio(p(t, a, b - a));
+      const dot = $('linkdot'); dot.setAttribute('cx', x1 + (x2 - x1) * m); dot.setAttribute('cy', y);
+      dot.style.opacity = (t >= a && t <= b + 0.05) ? 1 : 0;
     }
   }
 
-  // outro logo
-  if (t >= 18.5) {
-    const k = p(t, 18.55, 0.6);
-    const L = $('biglogo');
-    L.style.opacity = eo(cl(k * 1.6)); L.style.transform = `scale(${0.6 + 0.4 * back(k)}) rotate(${(1 - eo(k)) * -8}deg)`;
+  // fees cursor
+  const cur = $('cursor'), ring = $('ring');
+  cur.style.display = 'none'; ring.style.display = 'none';
+  if (t >= 13.25 && t < 15.1) {
+    const [bx, by] = centerOf($('paybtn'));
+    const [x, y] = cursorAt(t, [[13.25, 1300, 1040], [13.8, bx, by]]);
+    cur.style.display = 'block'; cur.style.opacity = cl((t - 13.25) / 0.15) * (1 - p(t, 14.7, 0.3));
+    const down = t >= 13.82 && t < 13.92;
+    cur.style.transform = `translate(${x - 8}px, ${y - 4}px) scale(${down ? 0.88 : 1})`;
+    $('paybtn').style.filter = down ? 'brightness(0.85)' : '';
+    const k = p(t, 13.84, 0.4);
+    if (k > 0 && k < 1) { ring.style.display = 'block'; ring.style.left = bx + 'px'; ring.style.top = by + 'px'; ring.style.opacity = 0.7 * (1 - k); ring.style.transform = `scale(${0.4 + 0.9 * eo(k)})`; }
   }
-
-  // corner bug: visible through scenes 2–5
-  const bug = $('bug');
-  const bk = p(t, 3.3, 0.5) * (1 - p(t, 18.2, 0.3));
-  bug.style.opacity = bk;
 };
 
 window.ready = Promise.all([document.fonts.ready, ...[...document.images].map(i => i.complete ? 1 : new Promise(r => { i.onload = r; i.onerror = r; }))]);
