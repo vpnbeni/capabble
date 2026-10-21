@@ -1,0 +1,368 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="components.css">
+<link rel="stylesheet" href="app.css">
+<style>
+  *, *::before, *::after { transition: none !important; animation: none !important; }
+  html, body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; }
+  #stage { position: relative; width: 1920px; height: 1080px; overflow: hidden; }
+  .scene { position: absolute; inset: 0; display: none; }
+  .h { margin: 0; font-weight: 800; font-size: 84px; line-height: 1.04; letter-spacing: -0.04em; color: var(--ink); }
+  .h .w { display: inline-block; will-change: transform; }
+  .h .a { color: var(--accent-strong); }
+  .sub { margin: 0; font-size: 30px; line-height: 42px; color: var(--ink-muted); font-weight: 500; letter-spacing: -0.01em; }
+  .ui { zoom: 1.6; }
+  .bug { position: absolute; left: 96px; bottom: 64px; display: flex; align-items: center; gap: 14px; font: 600 24px/1 var(--font-sans); color: var(--ink); letter-spacing: -0.01em; }
+  .bug img { width: 40px; height: 40px; }
+  .left { position: absolute; left: 140px; top: 0; bottom: 0; width: 700px; display: flex; flex-direction: column; justify-content: center; gap: 28px; }
+  .right { position: absolute; left: 920px; top: 0; bottom: 0; display: flex; align-items: center; }
+  .row-hl { border-radius: var(--radius-md); }
+  .mods .cb-switch { padding: 10px 12px; margin: 0 -12px; border-radius: 8px; }
+  .mods .cb-switch + .cb-switch { margin-top: 2px; }
+  .seat { width: 76px; height: 50px; border-radius: 6px; border: 1px dashed var(--border-strong); display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 12px; line-height: 16px; color: var(--ink-subtle); position: relative; }
+  .seat .fill { position: absolute; inset: -1px; border-radius: 6px; background: var(--accent-soft); border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent); display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .seat .roll { font: 600 12px/16px var(--font-sans); color: var(--accent-soft-ink); font-variant-numeric: tabular-nums; }
+  .seat .sno { font-size: 12px; line-height: 16px; color: var(--ink-muted); }
+  .front { height: 30px; border-radius: 6px; background: var(--surface-sunken); display: flex; align-items: center; justify-content: center; font: 500 12px/16px var(--font-sans); color: var(--ink-muted); margin-bottom: 14px; }
+  #cursor { position: absolute; width: 44px; height: 44px; left: 0; top: 0; z-index: 50; display: none; pointer-events: none; }
+  .ring { position: absolute; width: 60px; height: 60px; margin: -30px 0 0 -30px; border-radius: 50%; border: 3px solid var(--accent); z-index: 49; display: none; }
+  .toastwrap { position: absolute; right: 120px; bottom: 96px; width: 600px; }
+  .toastwrap .cb-toast { zoom: 1.45; }
+</style>
+</head>
+<body class="cb-app">
+<div id="stage">
+
+  <!-- 1 Hook -->
+  <section class="scene" id="s1" data-s="0" data-e="3">
+    <div style="position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:72px;">
+      <h1 class="h" data-words data-t="0.15">Start with <span class="a">one module.</span></h1>
+      <div class="ui" id="s1card">
+        <div class="cb-card" style="width:440px;">
+          <div class="cb-card__body" style="padding:14px 18px;">
+            <div class="cb-switch">
+              <span class="cb-check__text"><span class="cb-check__label" style="font-weight:600">Timetable</span><span class="cb-check__desc">Bell timings, teachers and classes</span></span>
+              <button class="cb-switch__track" data-on="1.55"><span class="cb-switch__thumb"></span></button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2 Reveal -->
+  <section class="scene" id="s2" data-s="3" data-e="7">
+    <div class="left">
+      <h2 class="h" data-words data-t="3.1">Add the rest with <span class="a">one click.</span></h2>
+      <p class="sub" data-rise="4.4">They work alone. Better together.</p>
+    </div>
+    <div class="right">
+      <div class="ui" data-rise="3.15">
+        <div class="cb-card" style="width:500px;">
+          <div class="cb-card__head"><div><div class="cb-card__title">Modules</div><div class="cb-card__subtitle">Turn on what your school needs</div></div></div>
+          <div class="cb-card__body mods" style="padding:8px 20px 14px;">
+            <div class="cb-switch"><span class="cb-check__text"><span class="cb-check__label">Timetable</span><span class="cb-check__desc">Bell timings, teachers and classes</span></span><button class="cb-switch__track" data-on="0"><span class="cb-switch__thumb"></span></button></div>
+            <div class="cb-switch"><span class="cb-check__text"><span class="cb-check__label">Students</span><span class="cb-check__desc">Admissions and student records</span></span><button class="cb-switch__track" data-on="3.6"><span class="cb-switch__thumb"></span></button></div>
+            <div class="cb-switch"><span class="cb-check__text"><span class="cb-check__label">Exam centre</span><span class="cb-check__desc">Seating, duties and dispatch for board exams</span></span><button class="cb-switch__track" data-on="4.0"><span class="cb-switch__thumb"></span></button></div>
+            <div class="cb-switch"><span class="cb-check__text"><span class="cb-check__label">Assets</span><span class="cb-check__desc">What the school owns, and where it is</span></span><button class="cb-switch__track" data-on="4.4"><span class="cb-switch__thumb"></span></button></div>
+            <div class="cb-switch"><span class="cb-check__text"><span class="cb-check__label">Finance</span><span class="cb-check__desc">Fees, receipts and payroll</span></span><button class="cb-switch__track" data-on="4.8"><span class="cb-switch__thumb"></span></button></div>
+            <div class="cb-switch"><span class="cb-check__text"><span class="cb-check__label">Appointments</span><span class="cb-check__desc">Parent and visitor meetings</span></span><button class="cb-switch__track" data-on="5.2"><span class="cb-switch__thumb"></span></button></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3 Timetable -->
+  <section class="scene" id="s3" data-s="7" data-e="11">
+    <div style="position:absolute; left:140px; right:140px; top:110px;">
+      <h2 class="h" data-words data-t="7.1">Timetable, <span class="a">without the clashes.</span></h2>
+    </div>
+    <div style="position:absolute; left:140px; top:300px;">
+      <div class="ui" style="zoom:1.42" data-rise="7.25">
+        <div class="cb-card" style="width:1153px;">
+          <div class="cb-card__head">
+            <div><div class="cb-card__title">Class 7-A</div><div class="cb-card__subtitle">Session 2026–27 · Term 2</div></div>
+            <div class="cb-card__action" data-pop="9.55"><span class="cb-badge cb-badge--success cb-badge--lg"><span class="cb-badge__dot"></span>No clashes</span></div>
+          </div>
+          <div class="cb-card__body" style="padding:14px 20px 20px;">
+            <div class="cb-tt"><table class="cb-tt__table" id="tt"></table></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4 Appointments -->
+  <section class="scene" id="s4" data-s="11" data-e="15.5">
+    <div class="left">
+      <h2 class="h" data-words data-t="11.1">Appointments already know <span class="a">who's teaching.</span></h2>
+    </div>
+    <div class="right">
+      <div class="ui" data-rise="11.25" style="zoom:1.55">
+        <div class="cb-card" style="width:520px;">
+          <div class="cb-card__head"><div><div class="cb-card__title">Book a meeting</div><div class="cb-card__subtitle">Parent meeting · Ms. Kaur, Maths</div></div></div>
+          <div class="cb-card__body" style="padding:14px 20px 18px; display:flex; flex-direction:column; gap:14px;">
+            <div style="display:flex; gap:24px;">
+              <div><div class="cb-field__label" style="color:var(--ink-muted)">Date</div><div style="font-weight:600">Thu, 22 Oct</div></div>
+              <div><div class="cb-field__label" style="color:var(--ink-muted)">Student</div><div style="font-weight:600">Class 7-A · Roll no. 14</div></div>
+            </div>
+            <fieldset class="cb-field cb-slots">
+              <legend class="cb-field__label">Time</legend>
+              <div class="cb-slots__grid" id="slots"></div>
+              <div class="cb-slots__legend"><span class="cb-slot cb-slot--caution cb-slot--key"></span>Teaching period, from Timetable</div>
+            </fieldset>
+          </div>
+          <div class="cb-card__foot" style="display:flex; justify-content:flex-end; gap:8px;">
+            <button class="cb-btn cb-btn--secondary">Cancel</button>
+            <button class="cb-btn cb-btn--primary" id="bookbtn">Book meeting</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="toastwrap" data-rise="13.45">
+      <div class="cb-toast cb-toast--success">
+        <span class="cb-toast__icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>
+        <span class="cb-toast__text"><div class="cb-toast__title">Meeting booked</div><div class="cb-toast__desc">Thu, 22 Oct · 11:30 am with Ms. Kaur</div></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5 Exam centre -->
+  <section class="scene" id="s5" data-s="15.5" data-e="18.5">
+    <div class="left">
+      <h2 class="h" data-words data-t="15.6">Exam centre, <span class="a">down to the seat.</span></h2>
+    </div>
+    <div class="right">
+      <div class="ui" data-rise="15.7" style="zoom:1.5">
+        <div class="cb-card" style="width:560px;">
+          <div class="cb-card__head">
+            <div><div class="cb-card__title">Hall 3 · Seating plan</div><div class="cb-card__subtitle">Mathematics · Class 12 · 9 Mar</div></div>
+            <div class="cb-card__action" data-pop="17.35"><span class="cb-badge cb-badge--success"><span class="cb-badge__dot"></span>24 of 24 seated</span></div>
+          </div>
+          <div class="cb-card__body" style="padding:14px 20px 20px;">
+            <div class="front">Invigilator desk</div>
+            <div id="seats" style="display:grid; grid-template-columns:repeat(6, 76px); gap:8px; justify-content:space-between;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 6 Outro -->
+  <section class="scene" id="s6" data-s="18.5" data-e="22.1">
+    <div style="position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:36px;">
+      <img src="logo.svg" id="biglogo" style="width:200px; height:200px;">
+      <h2 class="h" data-words data-t="18.85" style="font-size:96px;">Assurance of <span class="a">capability.</span></h2>
+      <p class="sub" data-rise="19.45" style="font-size:34px; color:var(--ink);">School OS by Capabble</p>
+      <p class="sub" data-rise="19.75" style="font-size:28px; color:var(--accent-strong); font-weight:600;">school.capabble.cloud</p>
+    </div>
+  </section>
+
+  <div class="bug" id="bug"><img src="logo.svg"><span>Capabble</span></div>
+  <div class="ring" id="ring"></div>
+  <svg id="cursor" viewBox="0 0 24 24"><path d="M4 2.5 L4 19.5 L8.6 15.2 L11.6 21.8 L14.6 20.4 L11.7 13.9 L18 13.9 Z" fill="#191B1C" stroke="#fff" stroke-width="1.4" stroke-linejoin="round"/></svg>
+</div>
+
+<script>
+const cl = x => Math.max(0, Math.min(1, x));
+const p = (t, a, d) => cl((t - a) / d);
+const eo = x => 1 - Math.pow(1 - x, 3);
+const eio = x => x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+const back = x => { const c = 1.6; x = x - 1; return 1 + (c + 1) * x * x * x + c * x * x; };
+
+// --- build timetable
+const periods = [['P1','8:00'],['P2','8:45'],['P3','9:30'],null,['P4','10:30'],['P5','11:15'],['P6','12:00']];
+const subj = {
+  Maths:['c1','Ms. Kaur'], English:['c2','Mr. Rao'], Science:['c5','Ms. Iyer'], Hindi:['c3','Mr. Verma'],
+  Social:['c4','Ms. Das'], Computer:['c6','Mr. Sen'], Art:['c3','Ms. Paul'], Games:['c5','Mr. Gill'],
+};
+const days = {
+  Mon:['Maths','English','Science','Hindi','Social','Computer'],
+  Tue:['English','Maths','Hindi','Science','Art','Social'],
+  Wed:['Science','Maths','English','Social','Hindi','Games'],
+  Thu:['Hindi','Science','Maths','English','Computer','Social'],
+  Fri:['Social','English','Maths','Science','Hindi','Art'],
+};
+const tt = document.getElementById('tt');
+let h = '<thead><tr><th class="cb-tt__corner"></th>';
+periods.forEach(pp => { h += pp ? `<th><span class="cb-tt__plabel">${pp[0]}</span><span class="cb-tt__ptime">${pp[1]} am</span></th>` : '<th class="is-break"><span class="cb-tt__plabel">Break</span></th>'; });
+h = h.replace('12:00 am', '12:00 pm') + '</tr></thead><tbody>';
+const ttCells = [];
+Object.entries(days).forEach(([d, list], di) => {
+  h += `<tr${d === 'Thu' ? ' class="is-today"' : ''}><th class="cb-tt__day">${d}</th>`;
+  let pi = 0;
+  periods.forEach(pp => {
+    if (!pp) { h += '<td class="is-break"></td>'; return; }
+    const s = list[pi]; const [c, tch] = subj[s];
+    h += `<td><div class="cb-tt__slot is-free" style="position:relative" data-di="${di}" data-pi="${pi}"><span class="cb-tt__free">&nbsp;</span><div class="cb-tt__slot cb-tt__slot--${c} ttfill" style="position:absolute; inset:-1px;"><span class="cb-tt__subject">${s}</span><span class="cb-tt__detail">${tch}</span></div></div></td>`;
+    pi++;
+  });
+  h += '</tr>';
+});
+tt.innerHTML = h + '</tbody>';
+document.querySelectorAll('.ttfill').forEach(el => {
+  const par = el.parentElement; ttCells.push({ el, t: 7.55 + (+par.dataset.pi) * 0.17 + (+par.dataset.di) * 0.07 });
+});
+
+// --- build slots
+const slotDefs = [['8:00','caution'],['8:30','free'],['9:00','busy'],['9:30','caution'],['10:00','caution'],['10:30','free'],
+  ['11:00','busy'],['11:30','free'],['12:00','caution'],['12:30','caution'],['1:00','free'],['1:30','free']];
+document.getElementById('slots').innerHTML = slotDefs.map(([s, st]) => {
+  const ap = (s.startsWith('8') || s.startsWith('9') || s.startsWith('10') || s.startsWith('11')) ? 'am' : 'pm';
+  const dis = st !== 'free' ? ' is-disabled' : '';
+  return `<label class="cb-slot cb-slot--${st}${dis}" data-slot="${s}"><span class="is-num">${s} ${ap}</span></label>`;
+}).join('');
+
+// --- build seats
+const seats = document.getElementById('seats');
+const seatEls = [];
+for (let i = 0; i < 24; i++) {
+  const r = 26145301 + i * 3;
+  const d = document.createElement('div'); d.className = 'seat';
+  d.innerHTML = `<span>${i + 1}</span><div class="fill"><span class="roll">${r}</span><span class="sno">Seat ${i + 1}</span></div>`;
+  seats.appendChild(d);
+  const row = Math.floor(i / 6), col = i % 6;
+  seatEls.push({ el: d.querySelector('.fill'), t: 15.95 + (row * 6 + (row % 2 ? 5 - col : col)) * 0.055 });
+}
+
+// --- split headline words
+document.querySelectorAll('[data-words]').forEach(h => {
+  const walk = node => {
+    [...node.childNodes].forEach(n => {
+      if (n.nodeType === 3) {
+        const frag = document.createDocumentFragment();
+        n.textContent.split(/(\s+)/).forEach(part => {
+          if (!part) return;
+          if (/^\s+$/.test(part)) frag.appendChild(document.createTextNode(part));
+          else { const s = document.createElement('span'); s.className = 'w'; s.textContent = part; frag.appendChild(s); }
+        });
+        n.replaceWith(frag);
+      } else walk(n);
+    });
+  };
+  walk(h);
+});
+
+const scenes = [...document.querySelectorAll('.scene')];
+const $ = id => document.getElementById(id);
+
+function rise(el, t, a, d = 0.55, dist = 28) {
+  const k = eo(p(t, a, d));
+  el.style.opacity = k; el.style.transform = `translateY(${(1 - k) * dist}px)`;
+}
+
+function setSwitch(btn, t) {
+  const on = +btn.dataset.on;
+  const k = on === 0 ? 1 : eio(p(t, on, 0.16));
+  btn.classList.toggle('is-on', k > 0.5);
+  btn.querySelector('.cb-switch__thumb').style.transform = `translateX(${16 * k}px)`;
+  const row = btn.closest('.cb-switch');
+  if (on > 0 && row.parentElement.classList.contains('mods')) {
+    const g = p(t, on, 0.12) * (1 - p(t, on + 0.25, 0.6));
+    row.style.background = `color-mix(in srgb, var(--accent-soft) ${Math.round(g * 100)}%, transparent)`;
+  }
+}
+
+function cursorAt(t, keys) {
+  // keys: [[time, x, y]] — linear segments with ease
+  if (t < keys[0][0]) return keys[0].slice(1);
+  for (let i = 0; i < keys.length - 1; i++) {
+    const [ta, xa, ya] = keys[i], [tb, xb, yb] = keys[i + 1];
+    if (t <= tb) { const k = eio(cl((t - ta) / (tb - ta))); return [xa + (xb - xa) * k, ya + (yb - ya) * k]; }
+  }
+  return keys[keys.length - 1].slice(1);
+}
+
+function centerOf(el) {
+  const r = el.getBoundingClientRect();
+  return [r.left + r.width / 2, r.top + r.height / 2];
+}
+
+window.render = function (t) {
+  scenes.forEach(sc => {
+    const s = +sc.dataset.s, e = +sc.dataset.e;
+    const vis = t >= s && t < e;
+    sc.style.display = vis ? 'block' : 'none';
+    if (!vis) return;
+    const out = eo(p(t, e - 0.32, 0.32));
+    sc.style.opacity = sc.id === 's6' ? 1 : 1 - out;
+    sc.style.transform = `translateY(${-18 * out}px)`;
+
+    sc.querySelectorAll('[data-words]').forEach(hh => {
+      const t0 = +hh.dataset.t;
+      hh.querySelectorAll('.w').forEach((w, i) => {
+        const k = eo(p(t, t0 + i * 0.07, 0.5));
+        w.style.opacity = k; w.style.transform = `translateY(${(1 - k) * 0.42}em)`;
+      });
+    });
+    sc.querySelectorAll('[data-rise]').forEach(el => rise(el, t, +el.dataset.rise));
+    sc.querySelectorAll('[data-pop]').forEach(el => {
+      const k = p(t, +el.dataset.pop, 0.35);
+      el.style.opacity = cl(k * 3); el.style.transform = `scale(${0.8 + 0.2 * back(k)})`;
+    });
+    sc.querySelectorAll('.cb-switch__track').forEach(b => setSwitch(b, t));
+  });
+
+  // scene 1 card
+  if (t < 3) rise($('s1card'), t, 0.55, 0.6, 30);
+
+  // timetable cells
+  if (t >= 7 && t < 11) ttCells.forEach(({ el, t: a }) => {
+    const k = p(t, a, 0.3);
+    el.style.opacity = eo(k); el.style.transform = `scale(${0.86 + 0.14 * back(k)})`;
+  });
+
+  // seats
+  if (t >= 15.5 && t < 18.5) seatEls.forEach(({ el, t: a }) => {
+    const k = p(t, a, 0.25);
+    el.style.opacity = eo(k); el.style.transform = `scale(${0.8 + 0.2 * back(k)})`;
+  });
+
+  // appointments cursor
+  const cur = $('cursor'), ring = $('ring');
+  cur.style.display = 'none'; ring.style.display = 'none';
+  if (t >= 11 && t < 15.5) {
+    const slot = document.querySelector('[data-slot="11:30"]');
+    const picked = t >= 12.55;
+    slot.classList.toggle('is-on', picked);
+    const btn = $('bookbtn');
+    const press = t >= 13.2 && t < 13.35;
+    btn.style.filter = press ? 'brightness(0.85)' : '';
+    if (t >= 12.0 && t < 14.9) {
+      const [sx, sy] = centerOf(slot), [bx, by] = centerOf(btn);
+      const [x, y] = cursorAt(t, [[12.0, 1500, 980], [12.5, sx, sy], [12.75, sx, sy], [13.15, bx, by]]);
+      const fade = cl((t - 12.0) / 0.15) * (1 - p(t, 14.6, 0.3));
+      cur.style.display = 'block'; cur.style.opacity = fade;
+      const down = (t >= 12.5 && t < 12.6) || (t >= 13.15 && t < 13.25);
+      cur.style.transform = `translate(${x - 8}px, ${y - 4}px) scale(${down ? 0.88 : 1})`;
+      [[12.52, sx, sy], [13.17, bx, by]].forEach(([ct, cx, cy]) => {
+        const k = p(t, ct, 0.4);
+        if (k > 0 && k < 1) {
+          ring.style.display = 'block'; ring.style.left = cx + 'px'; ring.style.top = cy + 'px';
+          ring.style.opacity = 0.7 * (1 - k); ring.style.transform = `scale(${0.4 + 0.9 * eo(k)})`;
+        }
+      });
+    }
+  }
+
+  // outro logo
+  if (t >= 18.5) {
+    const k = p(t, 18.55, 0.6);
+    const L = $('biglogo');
+    L.style.opacity = eo(cl(k * 1.6)); L.style.transform = `scale(${0.6 + 0.4 * back(k)}) rotate(${(1 - eo(k)) * -8}deg)`;
+  }
+
+  // corner bug: visible through scenes 2–5
+  const bug = $('bug');
+  const bk = p(t, 3.3, 0.5) * (1 - p(t, 18.2, 0.3));
+  bug.style.opacity = bk;
+};
+
+window.ready = Promise.all([document.fonts.ready, ...[...document.images].map(i => i.complete ? 1 : new Promise(r => { i.onload = r; i.onerror = r; }))]);
+</script>
+</body>
+</html>

@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">Capabble icon</title>
+  <desc id="desc">Blue geometric mark with a stylized person and V shape.</desc>
+  <defs>
+    <linearGradient id="faceTop" x1="188" y1="334" x2="836" y2="334" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#58B8FF"/>
+      <stop offset="1" stop-color="#3368DA"/>
+    </linearGradient>
+    <linearGradient id="faceLeft" x1="512" y1="807" x2="188" y2="334" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#2747BE"/>
+      <stop offset="1" stop-color="#67BDF7"/>
+    </linearGradient>
+    <linearGradient id="faceRight" x1="512" y1="807" x2="836" y2="334" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#7FD5F2"/>
+      <stop offset="1" stop-color="#396FEC"/>
+    </linearGradient>
+    <linearGradient id="halo" x1="512" y1="142" x2="512" y2="454" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#3E84F4"/>
+      <stop offset="1" stop-color="#233FB8"/>
+    </linearGradient>
+  </defs>
+
+  <path fill="url(#faceTop)" d="M512 142 188 334l324 189 324-189z"/>
+  <path fill="url(#faceLeft)" d="M188 334v314l324 159V523z"/>
+  <path fill="url(#faceRight)" d="M836 334v314L512 807V523z"/>
+
+  <path
+    fill="url(#halo)"
+    d="M512 142c78 44 127 78 127 145 0 105-55 168-127 168s-127-63-127-168c0-67 49-101 127-145Z"
+  />
+  <circle cx="512" cy="364" r="62" fill="#F5F7FB"/>
+
+  <path
+    fill="#F6F7FB"
+    d="M188 334c112 94 210 125 324 125s212-31 324-125L620 583c-35 40-66 87-108 170-43-83-74-130-109-170Z"
+  />
+  <path fill="#8ACDEB" d="M188 334 512 807c-12-97-39-154-86-229L188 334Z"/>
+  <path fill="#9AD6EA" d="M836 334 512 807c12-97 39-154 86-229L836 334Z"/>
+</svg>
