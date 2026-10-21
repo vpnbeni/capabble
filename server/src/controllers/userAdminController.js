@@ -35,6 +35,19 @@ const {
   buildInviteUrl,
   sendInviteEmail
 } = require('../rbac/credentials');
+const eventBus = require('../events/eventBus');
+const EVENTS = require('../events/eventNames');
+const { openSections } = require('../rbac/portalSections');
+
+/** Tell the person about a change to their own login (welcome, access, security). */
+const announce = (req, user, change, details = {}) => {
+  eventBus.emitFromRequest(req, EVENTS.USER_ACCOUNT_CHANGED, {
+    userId: String(user._id),
+    change,
+    ...(change === 'created' && user.kind !== USER_KINDS.STAFF ? { sections: openSections(req, user.kind) } : {}),
+    ...details
+  });
+};
 
 const objectId = Joi.string().pattern(/^[0-9a-fA-F]{24}$/).messages({ 'string.pattern.base': 'Invalid ID' });
 const usernameRule = Joi.string().trim().lowercase().pattern(/^[a-z0-9][a-z0-9._-]{1,39}$/)
@@ -411,6 +424,7 @@ const createUser = handle(async (req, res) => {
     details: { kind: user.kind, roles: doc.roles || [], method: body.credential.method }
   });
   const delivery = await deliverCredential(req, user, credential);
+  announce(req, user, 'created');
   const [serialized] = await serializeUsers(req, [user.toObject()]);
 
   res.status(201).json({ success: true, message: 'Login created', data: { user: serialized, ...delivery } });
@@ -501,6 +515,12 @@ const updateUser = handle(async (req, res) => {
   else if (changes.isActive === true) event = 'user_reactivated';
   else if (changes.roles) event = 'roles_changed';
   await recordAuthEvent(req, { event, target: user, details: changes });
+  if (changes.isActive === true) announce(req, user, 'reactivated');
+  if (changes.roles && user.isActive) announce(req, user, 'roles_changed', changes.roles);
+  if (changes.students && user.isActive) {
+    const added = changes.students.to.filter((roll) => !changes.students.from.includes(roll));
+    if (added.length) announce(req, user, 'students_linked', { rollNumbers: added });
+  }
 
   const [serialized] = await serializeUsers(req, [user.toObject()]);
   res.json({ success: true, message: 'Login updated', data: serialized });
@@ -524,6 +544,7 @@ const resetUserPassword = handle(async (req, res) => {
   await user.save();
 
   await recordAuthEvent(req, { event: 'password_reset_by_admin', target: user, details: { method: credentialInput.method } });
+  announce(req, user, 'password_reset');
   const delivery = await deliverCredential(req, user, credential);
   res.json({ success: true, message: 'Password reset. The person has been signed out everywhere.', data: delivery });
 });
@@ -537,6 +558,7 @@ const signOutEverywhere = handle(async (req, res) => {
   revokeAllSessions(user);
   await user.save({ validateBeforeSave: false });
   await recordAuthEvent(req, { event: 'sessions_revoked', target: user });
+  announce(req, user, 'signed_out_everywhere');
   res.json({ success: true, message: 'Signed out on every device.' });
 });
 
@@ -569,6 +591,7 @@ const bulkCreatePortalLogins = handle(async (req, res) => {
     await user.save();
     await recordAuthEvent(req, { event: 'user_created', target: user, details: { kind: user.kind, bulk: true } });
     const delivery = await deliverCredential(req, user, credential);
+    announce(req, user, 'created');
     created.push({
       userId: user._id,
       name: user.name,
@@ -654,6 +677,7 @@ const bulkCreatePortalLogins = handle(async (req, res) => {
           existingUser.tokenVersion = (existingUser.tokenVersion || 0) + 1;
           // eslint-disable-next-line no-await-in-loop
           await existingUser.save();
+          announce(req, existingUser, 'students_linked', { rollNumbers: missing.map((l) => l.rollNumber) });
           linked.push({ userId: existingUser._id, name: existingUser.name, loginId: email, ...label });
         } else {
           skipped.push({ ...label, reason: 'Parent already has a login for these students' });

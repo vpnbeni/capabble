@@ -1,5 +1,6 @@
 // Billing emails: each one is recorded before it is sent, and the unique key
 // (account, kind, subject, day) makes it once-only even if a job or webhook runs twice.
+// Each one is also posted to the school administrators' notifications (src/notifications/billing.js).
 const { eq } = require('drizzle-orm');
 const { getDb } = require('../db/client');
 const s = require('../db/schema');
@@ -9,6 +10,7 @@ const invoices = require('./invoiceService');
 const pdf = require('./pdfService');
 const { rupees } = require('../domain/money');
 const mailTemplates = require('../../../mail/templates');
+const { notifyBillingAdminsSafely } = require('../../../notifications/billing');
 
 const isoDay = (value) => new Date(value).toISOString().slice(0, 10);
 const dateLabel = (value) => new Intl.DateTimeFormat('en-IN', {
@@ -30,8 +32,12 @@ const methodLabel = (method) => METHOD_LABELS[method] || 'Online payment';
 
 /** Returns 'sent', 'skipped' (mail not set up or no address), 'duplicate' or 'failed'. */
 async function sendOnce({ accountId, kind, subjectId, dueOn, to, message }) {
-  if (!to) return 'skipped';
   const db = getDb();
+  // The school's administrators also see it in-app (once per key, mail or not).
+  db.select({ tenantSlug: s.accounts.tenantSlug }).from(s.accounts).where(eq(s.accounts.id, accountId))
+    .then(([account]) => notifyBillingAdminsSafely({ tenantSlug: account?.tenantSlug, kind, subjectId, dueOn, title: message?.subject }))
+    .catch(() => {});
+  if (!to) return 'skipped';
   const [row] = await db.insert(s.notifications)
     .values({ accountId, kind, subjectId, dueOn, recipient: to, status: 'sent' })
     .onConflictDoNothing()

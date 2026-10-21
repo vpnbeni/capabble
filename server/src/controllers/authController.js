@@ -14,6 +14,8 @@ const {
 } = require('../rbac/session');
 const { buildAuthUserPayload } = require('../rbac/userPayload');
 const { recordAuthEvent } = require('../rbac/audit');
+const eventBus = require('../events/eventBus');
+const EVENTS = require('../events/eventNames');
 const { ensureUserIndexes } = require('../rbac/userIndexes');
 const { generateResponse } = require('../utils/helpers');
 const { SUCCESS_MESSAGES, HTTP_STATUS } = require('../utils/constants');
@@ -374,6 +376,7 @@ const changePassword = asyncHandler(async (req, res) => {
   await user.save();
   await issueSession({ req, res, user, tenantSlug: req.tenant.slug, rememberMe: true });
   await recordAuthEvent(req, { event: 'password_changed', actor: user, target: user });
+  eventBus.emitFromRequest(req, EVENTS.USER_ACCOUNT_CHANGED, { userId: String(user._id), change: 'password_changed' });
 
   return sendAuthUser(req, res, user, { message: 'Password changed. Other devices have been signed out.' });
 });
@@ -597,6 +600,7 @@ const resetPassword = asyncHandler(async (req, res) => {
   clearPasswordResetOtpState(user);
   await user.save();
   await recordAuthEvent(req, { event: 'password_reset', actor: user, target: user });
+  eventBus.emitFromRequest(req, EVENTS.USER_ACCOUNT_CHANGED, { userId: String(user._id), change: 'password_changed' });
 
   clearSessionCookies(res);
 

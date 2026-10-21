@@ -101,3 +101,16 @@
   .cb-app .tr-crew__student-actions > .cb-btn { flex: 1; }
   .cb-app .tr-crew__student-actions > .cb-badge { margin-right: auto; }
 }
+
+/* Stop place picker: search row, results, then the map. */
+.cb-app .tr-picker { display: flex; flex-direction: column; gap: var(--space-3); }
+.cb-app .tr-picker__search { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: var(--space-2); align-items: start; }
+.cb-app .tr-picker__results { max-height: 180px; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius-md); }
+.cb-app .tr-picker__results .tr-list__row { min-height: 48px; padding: var(--space-2) var(--space-3); }
+@media (max-width: 640px) {
+  .cb-app .tr-picker__search { grid-template-columns: 1fr 1fr; }
+  .cb-app .tr-picker__search > :first-child { grid-column: 1 / -1; }
+}
+.cb-app .tr-picker__paste { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-2); align-items: start; padding-bottom: var(--space-3); border-bottom: 1px solid var(--border); }
+/* Line the button up with the input, under the field label. */
+.cb-app .tr-picker__paste > .cb-btn { margin-top: 26px; }

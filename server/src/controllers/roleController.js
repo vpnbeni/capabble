@@ -14,6 +14,8 @@ const {
 } = require('../rbac/catalog');
 const { CUSTOM_PREFIX } = require('../rbac/permissions');
 const { recordAuthEvent } = require('../rbac/audit');
+const eventBus = require('../events/eventBus');
+const EVENTS = require('../events/eventNames');
 
 const grantSchema = Joi.object({
   key: Joi.string().trim().max(80).required(),
@@ -128,6 +130,7 @@ const updateRole = handle(async (req, res) => {
   const role = await Role.findById(req.params.id);
   if (!role) throw httpError(404, 'Role not found.');
   const value = validateRole(req, req.body);
+  const permissionsBefore = JSON.stringify(role.toObject().permissions || []);
 
   role.name = value.name;
   role.description = value.description;
@@ -139,6 +142,9 @@ const updateRole = handle(async (req, res) => {
   // token version so open sessions refresh and re-read their permissions.
   await User.updateMany({ roles: `${CUSTOM_PREFIX}${role._id}` }, { $inc: { tokenVersion: 1 } });
   await recordAuthEvent(req, { event: 'role_updated', target: null, details: { roleId: role._id, name: role.name } });
+  if (JSON.stringify(role.toObject().permissions || []) !== permissionsBefore) {
+    eventBus.emitFromRequest(req, EVENTS.ROLE_PERMISSIONS_CHANGED, { roleKey: `${CUSTOM_PREFIX}${role._id}`, roleName: role.name });
+  }
   res.json({ success: true, message: 'Role updated', data: { ...role.toObject(), key: `${CUSTOM_PREFIX}${role._id}` } });
 });
 

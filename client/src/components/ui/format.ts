@@ -37,6 +37,22 @@ export const formatTime = (value: string | null | undefined) => {
   return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${suffix}`
 }
 
+/** "Just now", "5 min ago", "3 hours ago", "Yesterday", then the date (7 Oct). For feeds and activity. */
+export const formatRelative = (d: Date | string | number | null | undefined, now: Date = new Date()) => {
+  if (d == null || d === '') return '—'
+  const x = d instanceof Date ? d : new Date(d)
+  if (Number.isNaN(x.getTime())) return '—'
+  const minutes = Math.floor((now.getTime() - x.getTime()) / 60000)
+  if (minutes < 1) return 'Just now'
+  if (minutes < 60) return `${minutes} min ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24 && x.getDate() === now.getDate()) return `${hours} hour${hours === 1 ? '' : 's'} ago`
+  const yesterday = new Date(now)
+  yesterday.setDate(now.getDate() - 1)
+  if (x.toDateString() === yesterday.toDateString()) return 'Yesterday'
+  return formatDate(x, { year: x.getFullYear() !== now.getFullYear() })
+}
+
 /** Shows "—" for empty values, as the design system asks. */
 export const orDash = (value: unknown) => {
   if (value == null) return '—'

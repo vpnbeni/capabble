@@ -8,6 +8,7 @@ import { Avatar, Menu, Select, type MenuItem } from '@/components/ui'
 import { logout } from '@/redux/slices/authSlice'
 import type { AppDispatch } from '@/redux/store'
 import { useTheme } from '@/utils/theme'
+import NotificationBell from '@/components/notifications/NotificationBell'
 import { usePortal } from './PortalContext'
 import type { PortalSection } from './portalService'
 import './portal.css'
@@ -84,6 +85,7 @@ const PortalLayout: React.FC = () => {
             </span>
           ) : null}
         </div>
+        <NotificationBell audience="portal" viewAllPath="/portal/notifications" />
         <Menu items={accountItems} label="Account" />
       </header>
 

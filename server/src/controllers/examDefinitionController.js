@@ -1,5 +1,7 @@
 const asyncHandler = require('../middleware/asyncHandler');
 const ExamDefinition = require('../models/ExamDefinition');
+const eventBus = require('../events/eventBus');
+const EVENTS = require('../events/eventNames');
 
 const normalizeCode = (value) => String(value || '').trim().toUpperCase();
 const normalizeName = (value) => String(value || '').trim();
@@ -268,6 +270,7 @@ const setResultsPublication = asyncHandler(async (req, res) => {
   if (!exam) {
     return res.status(404).json({ success: false, message: 'Exam not found.' });
   }
+  if (published) eventBus.emitFromRequest(req, EVENTS.EXAM_RESULTS_PUBLISHED, { examId: String(exam._id), examName: exam.name });
 
   return res.status(200).json({
     success: true,

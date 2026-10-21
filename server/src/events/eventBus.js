@@ -50,6 +50,16 @@ class EventBus extends EventEmitter {
     }
     return true;
   }
+
+  /** Emit from a request handler: adds the tenant ref and who did it. */
+  emitFromRequest(req, eventName, data = {}) {
+    return this.emit(eventName, {
+      tenant: { dbName: req.tenant?.dbName, slug: req.tenant?.slug, id: String(req.tenant?.id || '') },
+      actorId: req.user?._id ? String(req.user._id) : null,
+      actorName: req.user?.name || req.user?.email || '',
+      ...data,
+    });
+  }
 }
 
 const bus = new EventBus();

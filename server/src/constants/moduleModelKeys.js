@@ -32,6 +32,7 @@ const MODULE_MODEL_KEYS = Object.freeze({
     'SupportTicket',
     'OnboardingSession',
     'SchoolProfile',
+    'Notification',
   ]),
   cntr: Object.freeze([
     'Student',

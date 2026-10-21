@@ -251,6 +251,17 @@ export type AssignmentRow = {
   assignment: { _id: string; routeId: string; stopId: string | null; stopName: string; shift: AssignmentShift } | null
 }
 
+export type PlaceResult = { name: string; address: string; kind?: string; lat: number; lng: number }
+
+/** Search OpenStreetMap places in India, nearest to `near` first. */
+const searchPlaces = async (query: string, near?: { lat: number; lng: number } | null) => {
+  const response = await api.get('/trnst/places', {
+    params: { q: query, near: near ? `${near.lat},${near.lng}` : undefined },
+    _silent: true,
+  } as any)
+  return (response.data.data || []) as PlaceResult[]
+}
+
 const getLive = async () => {
   const response = await api.get('/trnst/live', { _silent: true } as any)
   return response.data.data as { at: string; trips: TripSummary[] }
@@ -325,6 +336,7 @@ const trnstService = {
   getSelfStudents,
   saveSelfStudent,
   deleteSelfStudent,
+  searchPlaces,
   getLive,
   getTrips,
   getTrip,

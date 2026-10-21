@@ -37,6 +37,7 @@ const CbseRegistration = require('../models/CbseRegistration');
 const CbseClassSubjectMatrix = require('../models/CbseClassSubjectMatrix');
 const { StaffAttendanceDaily, StudentAttendanceDaily, StudentAttendanceDay } = require('../models/AttndDailyRecord');
 const SchoolProfile = require('../models/SchoolProfile');
+const Notification = require('../models/Notification');
 const Alumni = require('../models/Alumni');
 const TransportVehicle = require('../models/TransportVehicle');
 const TransportRoute = require('../models/TransportRoute');
@@ -155,6 +156,7 @@ const tenantModelExports = {
   StudentAttendanceDaily,
   StudentAttendanceDay,
   SchoolProfile,
+  Notification,
   Alumni,
   TransportVehicle,
   TransportRoute,

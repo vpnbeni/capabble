@@ -61,6 +61,7 @@ When the artifact changes, resync this file and bump the version line.
 
 - Money `formatINR(n)` → ₹1,25,000; stats `formatINR(n, { compact: true })` → ₹18.4 L.
 - Dates `formatDate(d)` → 7 Oct 2026; `{ year: false }` inside the current year. Times `formatTime('14:30')` → 2:30 pm.
+- Feeds and activity `formatRelative(d)` → Just now, 5 min ago, 3 hours ago, Yesterday, then 7 Oct (not in the artifact yet: added to our kit).
 - Missing values `orDash(v)` → "—". Also: `cx`, `initials`.
 
 ## Icons

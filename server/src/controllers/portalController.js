@@ -8,9 +8,8 @@
  */
 const asyncHandler = require('../middleware/asyncHandler');
 const { setRequestContext } = require('../tenancy/requestContext');
-const { normalizeTenantFeatureToggles } = require('../constants/tenantFeatures');
 const { USER_KINDS } = require('../rbac/permissions');
-const { catalog } = require('../rbac/catalog');
+const { featureOn, portalSections, openSections } = require('../rbac/portalSections');
 const { buildClassPDFContext } = require('../services/timetableExportService');
 const { buildCardData } = require('./reportCardController');
 const { receiptPdf } = require('./cpitl/collectionController');
@@ -29,13 +28,6 @@ const pad2 = (value) => String(value).padStart(2, '0');
 const monthKey = (date = new Date()) => `${date.getFullYear()}-${pad2(date.getMonth() + 1)}`;
 const dateKey = (date = new Date()) => `${monthKey(date)}-${pad2(date.getDate())}`;
 
-const featureOn = (req, ...keys) => {
-  const toggles = normalizeTenantFeatureToggles(req.tenant?.featureToggles);
-  return keys.some((key) => toggles[key] !== false);
-};
-
-/** Sections of the portal each kind of account may open. */
-const portalSections = (kind) => catalog.portal[kind] || [];
 const canOpen = (req, section) => portalSections(req.user.kind).includes(section);
 
 /**
@@ -85,16 +77,7 @@ const getHome = asyncHandler(async (req, res) => {
   ]);
   const byRoll = new Map(students.map((student) => [student.rollNumber, student]));
 
-  const sections = portalSections(req.user.kind).filter((section) => ({
-    attendance: featureOn(req, 'attnd_student_attendance'),
-    timetable: featureOn(req, 'timetable_classes', 'timetable_class_wise'),
-    results: featureOn(req, 'exmcl_exams', 'exmcl_result'),
-    fees: featureOn(req, 'cpitl_fees'),
-    notices: featureOn(req, 'exmcl_centre_guidelines'),
-    transport: featureOn(req, 'trnst_transport'),
-    appointments: featureOn(req, 'appnt_desk') && Boolean(req.models?.Appointment),
-    profile: true
-  }[section]));
+  const sections = openSections(req, req.user.kind);
 
   res.json({
     success: true,

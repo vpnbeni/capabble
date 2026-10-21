@@ -20,6 +20,7 @@ const {
 const crew = require('../controllers/trnst/crewController');
 const live = require('../controllers/trnst/liveController');
 const assignments = require('../controllers/trnst/assignmentController');
+const places = require('../controllers/trnst/placesController');
 
 const router = express.Router();
 
@@ -50,6 +51,9 @@ router.delete('/crew/trips/:id/boarding/:studentId/:event', crew.unmarkBoarding)
 router.get('/live', live.getLive);
 router.get('/trips', live.listTrips);
 router.get('/trips/:id', live.getTrip);
+
+// Place search for putting stops on the map.
+router.get('/places', places.searchPlaces);
 
 // Which route and stop each student uses.
 router.get('/assignments', assignments.listAssignments);

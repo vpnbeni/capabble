@@ -4,11 +4,13 @@
  * - A staff member leaving (teacher deactivated/deleted) closes their host
  *   profile and cancels their upcoming appointments, so nobody turns up to
  *   meet someone who is gone.
- * - Appointment events send best-effort emails to the visitor and the host.
+ * - Appointment events send best-effort emails to the visitor and the host
+ *   (in-app notifications for the same events: src/notifications/listeners.js).
  *   Email is optional: no SMTP setup, or notifications switched off, means no mail.
  */
 const { getTenantConnectionAndModels } = require('../../tenancy/tenantConnectionManager');
 const EVENTS = require('../../events/eventNames');
+const eventBus = require('../../events/eventBus');
 const { sendMail } = require('../../utils/mailer');
 const { appointmentUpdate } = require('../../mail/templates');
 const { schoolNow } = require('./lifecycle');
@@ -25,12 +27,13 @@ const closeHostForTeacher = async ({ tenant, teacherId }) => {
 
   const today = schoolNow().date;
   const upcoming = await models.Appointment.find({ host: host._id, date: { $gte: today }, status: { $in: ['requested', 'confirmed'] } });
-  await Promise.all(upcoming.map((appointment) => {
+  await Promise.all(upcoming.map(async (appointment) => {
     appointment.status = 'cancelled';
     appointment.slotKey = undefined;
     appointment.cancelReason = HOST_GONE;
     appointment.timeline.push({ status: 'cancelled', by: 'System', note: HOST_GONE });
-    return appointment.save();
+    await appointment.save();
+    eventBus.emit(EVENTS.APPOINTMENT_STATUS_CHANGED, { tenant, appointmentId: String(appointment._id), event: 'cancelled', notifyHost: false });
   }));
 };
 

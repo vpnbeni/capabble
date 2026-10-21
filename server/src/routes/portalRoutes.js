@@ -5,12 +5,14 @@ const { requireAudience } = require('../rbac/middleware');
 const { AUDIENCE } = require('../rbac/session');
 const ctrl = require('../controllers/portalController');
 const appnt = require('../controllers/appntPortalController');
+const notifications = require('../controllers/notificationController');
 const { portalRequestSchema } = require('../validations/appntValidation');
 
 /**
  * Parent / student portal. Only portal sessions reach here (the tenant access
  * gate also rejects staff sessions). Everything is limited to the account's own
- * linked students and read-only, except meeting requests (appointments).
+ * linked students and read-only, except meeting requests (appointments) and
+ * marking the account's own notifications read.
  */
 const router = express.Router();
 router.use(protect);
@@ -20,6 +22,12 @@ router.use(ctrl.usePortalSession);
 router.get('/home', ctrl.getHome);
 router.get('/notices', ctrl.listNotices);
 router.get('/notices/:id', ctrl.getNotice);
+
+// The account's own notifications (marking them read is the only other write here).
+router.get('/notifications', notifications.listNotifications);
+router.get('/notifications/unread-count', notifications.unreadCount);
+router.post('/notifications/read-all', notifications.markAllRead);
+router.post('/notifications/:id/read', notifications.markRead);
 
 // Meeting requests: at most 20 writes per account in 15 minutes.
 const appointmentWriteLimiter = rateLimit({

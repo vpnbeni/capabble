@@ -16,7 +16,7 @@ const BILLING_ERROR_RESPONSE = {
 };
 
 const CORE_ALLOWED_MODULES = new Set(['dashboard', 'candidates', 'subjects', 'datesheets', 'billing', 'auth']);
-const SAFE_ALWAYS_ALLOWED_PREFIXES = ['/auth', '/billing', '/onboarding', '/users', '/roles'];
+const SAFE_ALWAYS_ALLOWED_PREFIXES = ['/auth', '/billing', '/onboarding', '/users', '/roles', '/notifications'];
 const WRITE_METHODS = ['POST', 'PUT', 'PATCH', 'DELETE'];
 
 const parseBooleanEnv = (value, fallback) => {

@@ -83,6 +83,7 @@ import DialogShowcase from './pages/DialogShowcase'
 import Billing from './pages/Billing'
 import GetStarted from './pages/GetStarted'
 import AccountSettings from './pages/AccountSettings'
+import Notifications from './pages/Notifications'
 import HelpSupport from './pages/HelpSupport'
 import SessionSelector from './pages/SessionSelector'
 import Pricing from './pages/Pricing'
@@ -556,6 +557,7 @@ function App() {
               <Route path="billing" element={<Billing />} />
               <Route path="get-started" element={<GetStarted />} />
               <Route path="account-settings" element={<AccountSettings />} />
+              <Route path="notifications" element={<Notifications />} />
               <Route path="settings/users" element={<UsersAndAccess />} />
               <Route path="settings/users/:id" element={<UserDetail />} />
               <Route path="settings/roles" element={<RolesPage />} />

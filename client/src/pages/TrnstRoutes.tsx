@@ -18,7 +18,7 @@ import {
   type DataTableColumn,
 } from '@/components/ui'
 import { Entity, SHIFT_LABEL, errorMessage, routeVehicle, vehicleName } from '@/components/trnst/TrnstUi'
-import TransportMap from '@/components/trnst/TransportMap'
+import StopPlacePicker from '@/components/trnst/StopPlacePicker'
 
 const emptyStop = (): TransportStop => ({ name: '', landmark: '', pickupTime: '', dropTime: '' })
 
@@ -430,7 +430,7 @@ const TrnstRoutes: React.FC = () => {
         onClose={() => setPinning(null)}
         size="lg"
         title={`Set ${form.stops[pinning ?? 0]?.name.trim() || `stop ${(pinning ?? 0) + 1}`} on the map`}
-        description="Click the map where the bus stops. Parents see this point on the bus map."
+        description="Paste the spot from Google Maps, search a place, or click the map where the bus stops. Parents see this point on the bus map."
         footer={
           <>
             {pinValue ? (
@@ -446,9 +446,8 @@ const TrnstRoutes: React.FC = () => {
         }
       >
         {pinning !== null ? (
-          <TransportMap
-            label="Choose the stop's position"
-            className="tr-map--short"
+          <StopPlacePicker
+            initialQuery={form.stops[pinning]?.name.trim() || ''}
             stops={form.stops.map((stop, index) => ({
               id: String(index),
               name: stop.name || `Stop ${index + 1}`,
@@ -456,7 +455,8 @@ const TrnstRoutes: React.FC = () => {
               lat: index === pinning ? null : stop.lat ?? null,
               lng: index === pinning ? null : stop.lng ?? null,
             }))}
-            pick={{ value: pinValue, onChange: setPinValue }}
+            value={pinValue}
+            onChange={setPinValue}
           />
         ) : null}
       </Dialog>

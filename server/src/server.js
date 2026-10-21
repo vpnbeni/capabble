@@ -30,6 +30,7 @@ if (process.env.VERCEL) {
       console.log(`✅ Platform database '${getCentralDbName()}' connected (Vercel)`.green.bold);
       await runTenantModelStartupSanityCheck();
       require('./events/registerAllListeners')();
+    require('./notifications/scheduler').start();
     } catch (error) {
       console.error('❌ Server initialization failed (Vercel):'.red.bold, error.message);
     }

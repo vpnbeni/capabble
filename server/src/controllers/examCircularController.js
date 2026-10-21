@@ -1,5 +1,7 @@
 const asyncHandler = require('../middleware/asyncHandler');
 const ExamCircular = require('../models/ExamCircular');
+const eventBus = require('../events/eventBus');
+const EVENTS = require('../events/eventNames');
 
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -197,6 +199,7 @@ const publishCircular = asyncHandler(async (req, res) => {
       message: 'Circular not found.',
     });
   }
+  eventBus.emitFromRequest(req, EVENTS.EXAM_NOTICE_PUBLISHED, { circularId: String(circular._id), title: circular.title });
 
   res.status(200).json({
     success: true,

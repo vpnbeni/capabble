@@ -27,7 +27,6 @@ const fail = (message, statusCode = 400, extra = {}) => Object.assign(new Error(
 const send = (res, data, status = 200) => res.status(status).json({ success: true, data });
 const actor = (req) => String(req.user?.name || req.user?.email || '').trim();
 const escapeRegex = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-const tenantRef = (req) => ({ dbName: req.tenant?.dbName, slug: req.tenant?.slug, id: String(req.tenant?.id || '') });
 
 /** Wraps a handler so thrown errors with statusCode become JSON responses. */
 const handle = (fn) => async (req, res, next) => {
@@ -59,11 +58,10 @@ const handle = (fn) => async (req, res, next) => {
   }
 };
 
-/** event: 'booked' for a new appointment, otherwise confirmed | declined | cancelled | rescheduled. */
+/** event: 'booked' for a new appointment, otherwise confirmed | declined | cancelled | rescheduled | checked_in. */
 const emit = (req, appointment, event) => {
   const booked = event === 'booked';
-  eventBus.emit(booked ? EVENTS.APPOINTMENT_BOOKED : EVENTS.APPOINTMENT_STATUS_CHANGED, {
-    tenant: tenantRef(req),
+  eventBus.emitFromRequest(req, booked ? EVENTS.APPOINTMENT_BOOKED : EVENTS.APPOINTMENT_STATUS_CHANGED, {
     appointmentId: String(appointment._id),
     event: booked ? appointment.status : event
   });
@@ -266,7 +264,7 @@ const createAppointment = async (req, { walkIn = false } = {}) => {
     timeline: [{ status, by, note: walkIn ? 'Walk-in' : '' }],
     createdBy: by
   });
-  if (!walkIn) emit(req, appointment, 'booked');
+  emit(req, appointment, walkIn ? 'checked_in' : 'booked');
   return appointment;
 };
 
@@ -302,7 +300,7 @@ exports.act = handle(async (req, res) => {
   if (!isActive(to)) appointment.slotKey = undefined;
   appointment.timeline.push({ status: to, by: actor(req), note });
   await appointment.save();
-  if (['confirmed', 'declined', 'cancelled'].includes(to)) emit(req, appointment, to);
+  if (['confirmed', 'declined', 'cancelled', 'checked_in'].includes(to)) emit(req, appointment, to);
   send(res, await access.redact(req, appointment));
 });
 

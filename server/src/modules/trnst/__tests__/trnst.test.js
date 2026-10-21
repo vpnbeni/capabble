@@ -8,6 +8,7 @@ const access = require('../access');
 const crew = require('../../../controllers/trnst/crewController');
 const portal = require('../../../controllers/portalController');
 const idCards = require('../../../controllers/idCardController');
+const places = require('../../../controllers/trnst/placesController');
 
 const MY_BUS = 'aaaaaaaaaaaaaaaaaaaaaaaa';
 const OTHER_BUS = 'bbbbbbbbbbbbbbbbbbbbbbbb';
@@ -270,5 +271,41 @@ describe('ID cards', () => {
     const updates = req.models.Student.bulkWrite.mock.calls[0][0];
     expect(updates).toHaveLength(1);
     expect(updates[0].updateOne.update.$set.idCardToken).not.toBe(TOKEN);
+  });
+});
+
+describe('TRNST place search', () => {
+  const found = [
+    { name: 'Jawahar Circle', display_name: 'Jawahar Circle, Jaipur, Rajasthan', lat: '26.8398', lon: '75.8009' }
+  ];
+
+  afterEach(() => jest.restoreAllMocks());
+
+  it('asks for at least 3 letters before searching', async () => {
+    const fetchSpy = jest.spyOn(global, 'fetch');
+    const result = await run(places.searchPlaces, { query: { q: 'ab' } });
+    expect(result.status).toBe(400);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('searches India with our app name and caches the answer', async () => {
+    const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue({ ok: true, json: async () => found });
+    const first = await run(places.searchPlaces, { query: { q: 'Jawahar Circle', near: '26.85,75.80' } });
+    expect(first.body.data).toEqual([
+      { name: 'Jawahar Circle', address: 'Jawahar Circle, Jaipur, Rajasthan', kind: '', lat: 26.8398, lng: 75.8009 }
+    ]);
+    const [url, options] = fetchSpy.mock.calls[0];
+    expect(url).toContain('countrycodes=in');
+    expect(url).toContain('viewbox=');
+    expect(options.headers['User-Agent']).toMatch(/Capabble/);
+
+    await run(places.searchPlaces, { query: { q: 'jawahar circle', near: '26.85,75.80' } });
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('says so when the search service is down', async () => {
+    jest.spyOn(global, 'fetch').mockResolvedValue({ ok: false, status: 503, json: async () => [] });
+    const result = await run(places.searchPlaces, { query: { q: 'Sector 14 Gurgaon' } });
+    expect(result.status).toBe(502);
   });
 });

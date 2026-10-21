@@ -129,6 +129,7 @@
     { "prefix": "/school-profile", "methods": ["GET"], "staff": true },
     { "prefix": "/school-profile", "resource": "core.school" },
     { "prefix": "/support", "staff": true },
+    { "prefix": "/notifications", "staff": true },
     { "prefix": "/search", "staff": true },
     { "prefix": "/dashboard", "staff": true },
     { "prefix": "/billing", "resource": "core.billing", "writeAction": "manage" },

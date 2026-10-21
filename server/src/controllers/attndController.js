@@ -4,6 +4,8 @@ const Teacher = require('../models/Teacher');
 const Student = require('../models/Student');
 const TimetableState = require('../models/TimetableState');
 const { sortSectionNames, sortClassNames } = require('../utils/sortSections');
+const eventBus = require('../events/eventBus');
+const EVENTS = require('../events/eventNames');
 
 const normalizeDateKey = (value) => {
   const date = new Date(value);
@@ -268,6 +270,12 @@ const getStudentAttendance = async (req, res) => {
   }
 };
 
+/** Tell families about absences in a day's register (the listener ignores older days). */
+const announceAbsences = (req, date, docs) => {
+  if (!docs.length) return;
+  eventBus.emitFromRequest(req, EVENTS.STUDENTS_MARKED_ABSENT, { date, studentIds: [...new Set(docs.map((d) => d.studentId))] });
+};
+
 const saveStudentAttendance = async (req, res) => {
   try {
     const StudentAttendanceModel = req.models?.StudentAttendanceDaily || StudentAttendanceDaily;
@@ -301,6 +309,7 @@ const saveStudentAttendance = async (req, res) => {
         }))
         .filter((item) => item.studentId && item.className && item.section && !holidayKeys.has(`${item.className}||${item.section}`));
       if (docs.length > 0) await StudentAttendanceModel.insertMany(docs, { ordered: false });
+      announceAbsences(req, date, docs);
 
       const dayOps = daySettings
         .map((item) => {
@@ -351,6 +360,7 @@ const saveStudentAttendance = async (req, res) => {
           }))
           .filter((item) => item.studentId && item.status === 'A');
         if (docs.length > 0) await StudentAttendanceModel.insertMany(docs, { ordered: false });
+        announceAbsences(req, date, docs);
       }
     } else {
       await StudentAttendanceModel.deleteMany({
