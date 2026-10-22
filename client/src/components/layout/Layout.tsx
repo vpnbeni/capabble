@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { Outlet } from 'react-router-dom'
+import { Outlet, useLocation } from 'react-router-dom'
+import { OverlayShell } from '@/components/ui/overlays'
 import Sidebar from './Sidebar'
 import Header from './Header'
 import BillingBanner from './BillingBanner'
@@ -10,6 +11,7 @@ const SIDEBAR_EXPANDED_DEFAULT = 248
 const SIDEBAR_EXPANDED_MIN = 232
 const SIDEBAR_EXPANDED_MAX = 420
 const SIDEBAR_COLLAPSED_WIDTH = 64
+const MOBILE_NAV_WIDTH = 288
 const SIDEBAR_WIDTH_STORAGE_KEY = 'layout:sidebarWidth:v2'
 const SIDEBAR_WIDTH_MANUAL_KEY = 'layout:sidebarWidthManual:v2'
 
@@ -30,7 +32,7 @@ const Layout: React.FC = () => {
   isSidebarCollapsedRef.current = isSidebarCollapsed
   isResizingSidebarRef.current = isResizingSidebar
 
-  // Below 1024px the sidebar shows icons only, so pages keep their width on tablets and phones.
+  // Below 1024px the sidebar shows icons only, so pages keep their width on tablets.
   useEffect(() => {
     const query = window.matchMedia('(max-width: 1023px)')
     const apply = () => {
@@ -40,6 +42,23 @@ const Layout: React.FC = () => {
     query.addEventListener('change', apply)
     return () => query.removeEventListener('change', apply)
   }, [])
+
+  // Phones get no rail at all: the header's menu button opens the full sidebar as a drawer.
+  const location = useLocation()
+  const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 767px)').matches)
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false)
+  useEffect(() => {
+    const query = window.matchMedia('(max-width: 767px)')
+    const apply = () => {
+      setIsMobile(query.matches)
+      if (!query.matches) setIsMobileNavOpen(false)
+    }
+    query.addEventListener('change', apply)
+    return () => query.removeEventListener('change', apply)
+  }, [])
+  useEffect(() => {
+    setIsMobileNavOpen(false)
+  }, [location.pathname])
 
   useEffect(() => {
     const manual = window.localStorage.getItem(SIDEBAR_WIDTH_MANUAL_KEY) === '1'
@@ -115,17 +134,30 @@ const Layout: React.FC = () => {
     <CommandPaletteProvider>
     <AttndMatrixModeProvider>
     <div className="cb-shell relative flex h-screen overflow-hidden">
-      {/* Sidebar */}
-      <Sidebar
-        isCollapsed={isSidebarCollapsed}
-        expandedWidth={sidebarWidth}
-        collapsedWidth={SIDEBAR_COLLAPSED_WIDTH}
-        fitToContent={fitToContent}
-        onContentWidthChange={handleContentWidthChange}
-      />
+      {isMobile ? (
+        <OverlayShell open={isMobileNavOpen} onClose={() => setIsMobileNavOpen(false)} variant="drawer">
+          {(trapRef) => (
+            <div ref={trapRef} className="cb-navdrawer" role="dialog" aria-modal="true" aria-label="Main menu">
+              <Sidebar
+                isCollapsed={false}
+                expandedWidth={MOBILE_NAV_WIDTH}
+                collapsedWidth={SIDEBAR_COLLAPSED_WIDTH}
+              />
+            </div>
+          )}
+        </OverlayShell>
+      ) : (
+        <Sidebar
+          isCollapsed={isSidebarCollapsed}
+          expandedWidth={sidebarWidth}
+          collapsedWidth={SIDEBAR_COLLAPSED_WIDTH}
+          fitToContent={fitToContent}
+          onContentWidthChange={handleContentWidthChange}
+        />
+      )}
 
       {/* Resize handle sits on the sidebar's right border (below sidebar z so account menus stay on top) */}
-      <div
+      {!isMobile ? <div
         role="separator"
         aria-orientation="vertical"
         aria-label="Resize sidebar"
@@ -142,14 +174,15 @@ const Layout: React.FC = () => {
             isResizingSidebar ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
           }`}
         />
-      </div>
+      </div> : null}
 
       {/* Main Content */}
       <div className="relative min-w-0 flex-1 flex flex-col overflow-hidden">
         {/* Header */}
         <Header
-          isSidebarCollapsed={isSidebarCollapsed}
-          onToggleSidebar={() => setIsSidebarCollapsed((prev) => !prev)}
+          isSidebarCollapsed={isMobile ? !isMobileNavOpen : isSidebarCollapsed}
+          isMobileNav={isMobile}
+          onToggleSidebar={() => (isMobile ? setIsMobileNavOpen((prev) => !prev) : setIsSidebarCollapsed((prev) => !prev))}
         />
         <BillingBanner />
 

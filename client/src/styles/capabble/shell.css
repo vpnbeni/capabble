@@ -174,3 +174,14 @@
 .cb-app .cb-shellnav__customize:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
 .cb-app .cb-sidenav.is-collapsed .cb-shellnav__homewrap { justify-content: center; }
 .cb-app .cb-sidenav.is-collapsed .cb-shellnav__homewrap .cb-shellnav__home { flex: none; }
+
+/* ---------- Phones: sidebar as a drawer, panels that fit the screen ---------- */
+.cb-app .cb-overlay.cb-overlay--drawer { justify-content: flex-start; align-items: stretch; padding: 0; }
+.cb-app .cb-navdrawer { position: relative; display: flex; height: 100%; animation: cb-navdrawer-in .2s ease-out; }
+.cb-app .cb-navdrawer .cb-shellnav { height: 100dvh; max-width: calc(100vw - 56px); box-shadow: var(--shadow-overlay); padding-bottom: env(safe-area-inset-bottom, 0px); }
+@keyframes cb-navdrawer-in { from { transform: translateX(-100%); } to { transform: none; } }
+@media (prefers-reduced-motion: reduce) { .cb-app .cb-navdrawer { animation: none; } }
+
+@media (max-width: 767px) {
+  .cb-app .cb-shellhead__notifications { position: fixed; top: 72px; left: 12px; right: 12px; width: auto; }
+}

@@ -13,7 +13,7 @@ import { Button, Icon } from './primitives'
 export const OverlayShell: React.FC<{
   open: boolean
   onClose?: () => void
-  variant: 'dialog' | 'sheet' | 'command'
+  variant: 'dialog' | 'sheet' | 'command' | 'drawer'
   children: (trapRef: React.RefObject<HTMLDivElement>) => React.ReactNode
 }> = ({ open, onClose, variant, children }) => {
   useEscape(open, onClose)

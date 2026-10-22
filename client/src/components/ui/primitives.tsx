@@ -1,4 +1,4 @@
-import React, { forwardRef, useState } from 'react'
+import React, { forwardRef, useLayoutEffect, useRef, useState } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import { cx, initials } from './format'
 import { HoverCard } from './hovercard'
@@ -143,7 +143,15 @@ export type ColumnChartItem = {
   detailLabel?: string
 }
 
-/** Column chart on a fixed 0–`max` scale, one column per item, with an optional dashed target line. */
+/** Narrowest a column may get before the chart switches to one horizontal bar per item. */
+const COLUMN_MIN_WIDTH = 44
+const COLUMN_GAP = 8
+
+/**
+ * Column chart on a fixed 0–`max` scale, one column per item, with an optional dashed target line.
+ * When the columns would be narrower than 44px (phones, many classes) it draws one horizontal
+ * bar per item instead, so no label overlaps and every item stays visible.
+ */
 export const ColumnChart: React.FC<{
   items: ColumnChartItem[]
   max?: number
@@ -152,14 +160,58 @@ export const ColumnChart: React.FC<{
   label: string
   className?: string
 }> = ({ items, max = 100, target, unit = '%', label, className }) => {
+  const ref = useRef<HTMLDivElement>(null)
+  const [rows, setRows] = useState(false)
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el || typeof ResizeObserver === 'undefined') return undefined
+    const needed = items.length * COLUMN_MIN_WIDTH + Math.max(0, items.length - 1) * COLUMN_GAP
+    const check = () => setRows(el.clientWidth > 0 && el.clientWidth < needed)
+    check()
+    const observer = new ResizeObserver(check)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [items.length])
+
   const pos = (value: number) => Math.max(0, Math.min(100, max > 0 ? (value / max) * 100 : 0))
-  const withDetail = (item: ColumnChartItem, node: React.ReactNode, focusable = true) =>
+  const withDetail = (item: ColumnChartItem, node: React.ReactNode, focusable = true, extra?: string) =>
     item.detail ? (
-      <HoverCard className="cb-columns__hover" label={item.detailLabel || item.label} content={item.detail} focusable={focusable}>{node}</HoverCard>
+      <HoverCard className={cx('cb-columns__hover', extra)} label={item.detailLabel || item.label} content={item.detail} focusable={focusable}>{node}</HoverCard>
     ) : node
   const interactive = items.some((item) => item.detail)
+  const rootProps = {
+    ref,
+    role: interactive ? 'group' : 'img',
+    'aria-label': label,
+  }
+
+  if (rows) {
+    return (
+      <div
+        {...rootProps}
+        className={cx('cb-columns cb-columns--rows', className)}
+        style={target ? ({ '--target': pos(target.value) } as React.CSSProperties) : undefined}
+      >
+        {items.map((item) => (
+          <div key={item.label} className="cb-columns__row">
+            <span className="cb-columns__name">{item.label}</span>
+            {withDetail(item, (
+              <span className={cx('cb-columns__track', target ? 'has-target' : null)} title={target?.label}>
+                <i className={`cb-columns__bar cb-columns__bar--${item.tone || 'accent'}`} style={{ '--pos': pos(item.value) } as React.CSSProperties} />
+              </span>
+            ), false, 'is-track')}
+            <span className="cb-columns__value is-num">{`${item.value}${unit}`}</span>
+            {withDetail(item, (
+              <span className={cx('cb-columns__caption', item.detail ? 'has-detail' : null)}>{item.caption || ''}</span>
+            ))}
+          </div>
+        ))}
+      </div>
+    )
+  }
+
   return (
-    <div className={cx('cb-columns', className)} role={interactive ? 'group' : 'img'} aria-label={label}>
+    <div {...rootProps} className={cx('cb-columns', className)}>
       <div className="cb-columns__plot">
         {target ? (
           <div className="cb-columns__target" style={{ '--pos': pos(target.value) } as React.CSSProperties} title={target.label} />
