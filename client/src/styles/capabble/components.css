@@ -347,7 +347,14 @@
 .cb-app .cb-menu__panel--end { right: 0; }
 .cb-app .cb-menu__panel--start { left: 0; }
 /* Portalled panel: fixed to the viewport, above sheets and dialogs (z 100). */
-.cb-app .cb-menu__panel--floating { position: fixed; z-index: 130; max-height: calc(100vh - 16px); overflow-y: auto; }
+.cb-app .cb-menu__panel--floating { position: fixed; z-index: 130; max-width: calc(100vw - 16px); max-height: calc(100vh - 16px); overflow-y: auto; }
+/* Narrow screens: let a long label or hint wrap instead of widening the panel past the viewport. */
+@media (max-width: 480px) {
+  .cb-app .cb-menu__item { height: auto; min-height: 34px; padding-block: 7px; white-space: normal; }
+  .cb-app .cb-menu__item:has(.cb-menu__hint) { flex-wrap: wrap; row-gap: 0; }
+  .cb-app .cb-menu__item .cb-menu__hint { flex-basis: 100%; }
+  .cb-app .cb-menu__item:has(> .cb-icon) .cb-menu__hint { padding-left: 26px; }
+}
 .cb-app .cb-menu__item { display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px; border: 0; background: none; border-radius: 6px; color: var(--ink); font: 400 14px/20px var(--font-sans); text-align: left; cursor: pointer; white-space: nowrap; }
 .cb-app .cb-menu__item .cb-icon { color: var(--ink-muted); }
 .cb-app .cb-menu__item:hover, .cb-app .cb-menu__item:focus-visible { background: var(--surface-hover); outline: none; }
