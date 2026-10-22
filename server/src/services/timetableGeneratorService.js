@@ -13,7 +13,9 @@
  *     result (most filled slots, fewest conflicts).
  *  4. Apply consecutive-period constraints (lab doubles) in a dedicated pass.
  *  5. Apply parallel-pair and common-period constraints.
- *  6. Return the filled grid plus a detailed conflict report.
+ *  6. Repair: place lessons the greedy pass left out by swapping lessons along
+ *     teacher/class chains, never moving rule-placed cells.
+ *  7. Return the filled grid plus a detailed conflict report.
  */
 
 'use strict';
@@ -294,6 +296,11 @@ const runOneAttempt = (
 
   const grid = initGrid(classes, DAYS, periodIds);
 
+  // Cells placed by a rule (class teacher's first period, doubles, parallel and
+  // common periods) that the repair phase must never move: `classId::day::periodId`
+  const locked = new Set();
+  const lock = (classId, day, periodId) => locked.add(`${classId}::${day}::${periodId}`);
+
   /**
    * Try to assign a specific (subject, teacher) to a (class, day, period) cell.
    * Also handles consecutive-period assignment for lab subjects.
@@ -325,6 +332,7 @@ const runOneAttempt = (
         const pid = periodIdList[periodIdx + k];
         grid[classId][day][pid] = { subject: subjectName, teacher: teacherName };
         markTeacherOccupied(teacherName, day, pid);
+        lock(classId, day, pid);
       }
       localDemand[classId][subjectName] -= consecutiveCount;
       if (localDemand[classId][subjectName] <= 0) {
@@ -433,6 +441,14 @@ const runOneAttempt = (
     const firstPeriodId = periodIds[0];
     if (!firstPeriodId) return;
 
+    // A lab subject opens the day as a double instead of a single period.
+    if (consecutiveSet.has(subjectName.toLowerCase())) {
+      DAYS.forEach((day) => {
+        tryAssign(cls.id, day, firstPeriodId, subjectName, inchargeName, periodIds);
+      });
+      return;
+    }
+
     DAYS.forEach((day) => {
       if ((localDemand[cls.id][subjectName] || 0) <= 0) return;
       if (grid[cls.id][day][firstPeriodId].subject) return;
@@ -440,8 +456,134 @@ const runOneAttempt = (
 
       grid[cls.id][day][firstPeriodId] = { subject: subjectName, teacher: inchargeName };
       markTeacherOccupied(inchargeName, day, firstPeriodId);
+      lock(cls.id, day, firstPeriodId);
       localDemand[cls.id][subjectName]--;
       if (localDemand[cls.id][subjectName] <= 0) delete localDemand[cls.id][subjectName];
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Phase 0a-ii: Lab doubles first, while the grid is still open — one block a
+  //              day where possible, a second block on a day only if needed.
+  // ---------------------------------------------------------------------------
+  shuffledClasses.forEach((cls) => {
+    Object.keys(localDemand[cls.id] || {})
+      .filter((subjectName) => consecutiveSet.has(subjectName.toLowerCase()))
+      .forEach((subjectName) => {
+        const teacher = teacherLookup[`${cls.id}::${subjectName.toLowerCase()}`] || '';
+        const blockSize = consecutiveCountMap[subjectName.toLowerCase()] || 2;
+        [false, true].forEach((allowSecondBlock) => {
+          shuffle(DAYS).forEach((day) => {
+            if ((localDemand[cls.id][subjectName] || 0) < blockSize) return;
+            if (!allowSecondBlock && countSubjectOnDay(grid, cls.id, day, subjectName) > 0) return;
+            shuffle(periodIds).some((periodId) => tryAssign(cls.id, day, periodId, subjectName, teacher, periodIds));
+          });
+        });
+      });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Phase 1: Assign parallel pairs — combined cells ("SubjectA/SubjectB").
+  //          Runs before the column pass so both subjects still have periods left.
+  // ---------------------------------------------------------------------------
+  shuffledClasses.forEach((cls) => {
+    const classNameKey = cls.className.trim().toLowerCase();
+    const pairs = parallelPairMap[classNameKey] || [];
+
+    pairs.forEach(([subjectALower, subjectBLower]) => {
+      // Find canonical names from remaining demand keys
+      const classSubjects = Object.keys(localDemand[cls.id] || {});
+      const subjectA = classSubjects.find((s) => s.toLowerCase() === subjectALower);
+      const subjectB = classSubjects.find((s) => s.toLowerCase() === subjectBLower);
+
+      // If either subject has no remaining demand (already filled by Phase 0b), skip
+      if (!subjectA && !subjectB) return;
+
+      // Allow partial pair: one subject may already be fully scheduled
+      const effectiveA = subjectA || subjectALower;
+      const effectiveB = subjectB || subjectBLower;
+
+      const teacherA = teacherLookup[`${cls.id}::${subjectALower}`] || '';
+      const teacherB = teacherLookup[`${cls.id}::${subjectBLower}`] || '';
+
+      // Fill all parallel demand: loop until min(demandA, demandB) slots assigned
+      for (const [day, periodId] of allSlotPairs) {
+        const demA = (localDemand[cls.id] || {})[effectiveA] || 0;
+        const demB = (localDemand[cls.id] || {})[effectiveB] || 0;
+        if (demA <= 0 || demB <= 0) break;
+
+        if (grid[cls.id][day][periodId].subject) continue;
+        if (teacherA && isTeacherOccupied(teacherA, day, periodId)) continue;
+        if (teacherB && isTeacherOccupied(teacherB, day, periodId)) continue;
+
+        // Assign combined cell: "SubjectA/SubjectB", "TeacherA/TeacherB"
+        const combinedSubject = `${effectiveA}/${effectiveB}`;
+        const combinedTeacher = [teacherA, teacherB].filter(Boolean).join('/');
+        grid[cls.id][day][periodId] = { subject: combinedSubject, teacher: combinedTeacher };
+        lock(cls.id, day, periodId);
+
+        if (teacherA) markTeacherOccupied(teacherA, day, periodId);
+        if (teacherB) markTeacherOccupied(teacherB, day, periodId);
+
+        if (localDemand[cls.id][effectiveA] > 0) {
+          localDemand[cls.id][effectiveA]--;
+          if (localDemand[cls.id][effectiveA] <= 0) delete localDemand[cls.id][effectiveA];
+        }
+        if (localDemand[cls.id][effectiveB] > 0) {
+          localDemand[cls.id][effectiveB]--;
+          if (localDemand[cls.id][effectiveB] <= 0) delete localDemand[cls.id][effectiveB];
+        }
+        // No break — continue to fill all remaining parallel demand
+      }
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Phase 2: Assign common periods (same teacher, multiple sections same slot),
+  //          also before the column pass for the same reason.
+  // ---------------------------------------------------------------------------
+  Object.entries(commonPeriodMap).forEach(([classNameKey, subjectMap]) => {
+    Object.entries(subjectMap).forEach(([subjectNameKey, classIds]) => {
+      if (!classIds || classIds.length < 2) return;
+
+      // Find canonical names
+      const firstClassId = classIds[0];
+      const classSubjects = Object.keys(localDemand[firstClassId] || {});
+      const subjectName = classSubjects.find((s) => s.toLowerCase() === subjectNameKey);
+      if (!subjectName) return;
+
+      const teacherName = teacherLookup[`${firstClassId}::${subjectNameKey}`] || '';
+
+      for (const [day, periodId] of allSlotPairs) {
+        const allHaveRemainingDemand = classIds.every(
+          (cid) => (localDemand[cid] || {})[subjectName] > 0
+        );
+        if (!allHaveRemainingDemand) break;
+
+        const allSlotsEmpty = classIds.every(
+          (cid) => !(grid[cid]?.[day]?.[periodId]?.subject)
+        );
+        if (!allSlotsEmpty) continue;
+        if (isTeacherOccupied(teacherName, day, periodId)) continue;
+
+        // Check all classes satisfy soft constraint
+        const allOkDay = classIds.every(
+          (cid) => countSubjectOnDay(grid, cid, day, subjectName) < MAX_SAME_SUBJECT_PER_DAY
+        );
+        if (!allOkDay) continue;
+
+        // Assign to all sections simultaneously
+        classIds.forEach((cid) => {
+          grid[cid][day][periodId] = { subject: subjectName, teacher: teacherName };
+          lock(cid, day, periodId);
+          if (localDemand[cid][subjectName] > 0) {
+            localDemand[cid][subjectName]--;
+            if (localDemand[cid][subjectName] <= 0) delete localDemand[cid][subjectName];
+          }
+        });
+        markTeacherOccupied(teacherName, day, periodId);
+        break;
+      }
     });
   });
 
@@ -459,6 +601,7 @@ const runOneAttempt = (
 
     subjectsByDemand.forEach(([subjectName, subjectDemand]) => {
       if ((localDemand[cls.id][subjectName] || 0) <= 0) return; // already fulfilled by 0a
+      if (consecutiveSet.has(subjectName.toLowerCase())) return; // doubles are placed as blocks
       const teacher = teacherLookup[`${cls.id}::${subjectName.toLowerCase()}`] || '';
 
       let remainingDem = localDemand[cls.id][subjectName] || 0;
@@ -505,107 +648,6 @@ const runOneAttempt = (
   });
 
   // ---------------------------------------------------------------------------
-  // Phase 1: Assign parallel pairs — combined cells ("SubjectA/SubjectB")
-  // ---------------------------------------------------------------------------
-  shuffledClasses.forEach((cls) => {
-    const classNameKey = cls.className.trim().toLowerCase();
-    const pairs = parallelPairMap[classNameKey] || [];
-
-    pairs.forEach(([subjectALower, subjectBLower]) => {
-      // Find canonical names from remaining demand keys
-      const classSubjects = Object.keys(localDemand[cls.id] || {});
-      const subjectA = classSubjects.find((s) => s.toLowerCase() === subjectALower);
-      const subjectB = classSubjects.find((s) => s.toLowerCase() === subjectBLower);
-
-      // If either subject has no remaining demand (already filled by Phase 0b), skip
-      if (!subjectA && !subjectB) return;
-
-      // Allow partial pair: one subject may already be fully scheduled
-      const effectiveA = subjectA || subjectALower;
-      const effectiveB = subjectB || subjectBLower;
-
-      const teacherA = teacherLookup[`${cls.id}::${subjectALower}`] || '';
-      const teacherB = teacherLookup[`${cls.id}::${subjectBLower}`] || '';
-
-      // Fill all parallel demand: loop until min(demandA, demandB) slots assigned
-      for (const [day, periodId] of allSlotPairs) {
-        const demA = (localDemand[cls.id] || {})[effectiveA] || 0;
-        const demB = (localDemand[cls.id] || {})[effectiveB] || 0;
-        if (demA <= 0 || demB <= 0) break;
-
-        if (grid[cls.id][day][periodId].subject) continue;
-        if (teacherA && isTeacherOccupied(teacherA, day, periodId)) continue;
-        if (teacherB && isTeacherOccupied(teacherB, day, periodId)) continue;
-
-        // Assign combined cell: "SubjectA/SubjectB", "TeacherA/TeacherB"
-        const combinedSubject = `${effectiveA}/${effectiveB}`;
-        const combinedTeacher = [teacherA, teacherB].filter(Boolean).join('/');
-        grid[cls.id][day][periodId] = { subject: combinedSubject, teacher: combinedTeacher };
-
-        if (teacherA) markTeacherOccupied(teacherA, day, periodId);
-        if (teacherB) markTeacherOccupied(teacherB, day, periodId);
-
-        if (localDemand[cls.id][effectiveA] > 0) {
-          localDemand[cls.id][effectiveA]--;
-          if (localDemand[cls.id][effectiveA] <= 0) delete localDemand[cls.id][effectiveA];
-        }
-        if (localDemand[cls.id][effectiveB] > 0) {
-          localDemand[cls.id][effectiveB]--;
-          if (localDemand[cls.id][effectiveB] <= 0) delete localDemand[cls.id][effectiveB];
-        }
-        // No break — continue to fill all remaining parallel demand
-      }
-    });
-  });
-
-  // ---------------------------------------------------------------------------
-  // Phase 2: Assign common periods (same teacher, multiple sections same slot)
-  // ---------------------------------------------------------------------------
-  Object.entries(commonPeriodMap).forEach(([classNameKey, subjectMap]) => {
-    Object.entries(subjectMap).forEach(([subjectNameKey, classIds]) => {
-      if (!classIds || classIds.length < 2) return;
-
-      // Find canonical names
-      const firstClassId = classIds[0];
-      const classSubjects = Object.keys(localDemand[firstClassId] || {});
-      const subjectName = classSubjects.find((s) => s.toLowerCase() === subjectNameKey);
-      if (!subjectName) return;
-
-      const teacherName = teacherLookup[`${firstClassId}::${subjectNameKey}`] || '';
-
-      for (const [day, periodId] of allSlotPairs) {
-        const allHaveRemainingDemand = classIds.every(
-          (cid) => (localDemand[cid] || {})[subjectName] > 0
-        );
-        if (!allHaveRemainingDemand) break;
-
-        const allSlotsEmpty = classIds.every(
-          (cid) => !(grid[cid]?.[day]?.[periodId]?.subject)
-        );
-        if (!allSlotsEmpty) continue;
-        if (isTeacherOccupied(teacherName, day, periodId)) continue;
-
-        // Check all classes satisfy soft constraint
-        const allOkDay = classIds.every(
-          (cid) => countSubjectOnDay(grid, cid, day, subjectName) < MAX_SAME_SUBJECT_PER_DAY
-        );
-        if (!allOkDay) continue;
-
-        // Assign to all sections simultaneously
-        classIds.forEach((cid) => {
-          grid[cid][day][periodId] = { subject: subjectName, teacher: teacherName };
-          if (localDemand[cid][subjectName] > 0) {
-            localDemand[cid][subjectName]--;
-            if (localDemand[cid][subjectName] <= 0) delete localDemand[cid][subjectName];
-          }
-        });
-        markTeacherOccupied(teacherName, day, periodId);
-        break;
-      }
-    });
-  });
-
-  // ---------------------------------------------------------------------------
   // Phase 3: Main greedy fill — process every (day, period) slot
   // ---------------------------------------------------------------------------
   allSlotPairs.forEach(([day, periodId]) => {
@@ -630,8 +672,9 @@ const runOneAttempt = (
       shuffledClasses.forEach((cls) => {
         if (grid[cls.id][day][periodId].subject) return;
 
+        // Lab subjects stay out: a single here would split a double.
         const candidates = Object.entries(localDemand[cls.id] || {})
-          .filter(([, rem]) => rem > 0)
+          .filter(([subjectName, rem]) => rem > 0 && !consecutiveSet.has(subjectName.toLowerCase()))
           .sort(([, a], [, b]) => b - a);
 
         for (const [subjectName] of candidates) {
@@ -662,14 +705,317 @@ const runOneAttempt = (
     });
   });
 
-  return { grid, remainingDemand: localDemand };
+  return { grid, remainingDemand: localDemand, locked };
+};
+
+// ---------------------------------------------------------------------------
+// Repair phase: place what the greedy pass left out by swapping lessons
+// ---------------------------------------------------------------------------
+//
+// The greedy pass stops when a class's last free periods fall exactly when its
+// teacher is busy elsewhere. For a missing lesson (class C, teacher T) take a
+// period A where C is free and a period B where T is free, then swap the A and B
+// lessons of every class along the chain "T teaches C1 at A, C1's B teacher
+// teaches C3 at A, ...". After the swap T is free at A and the lesson goes there.
+// The chain never reaches C (classes are only entered through period-A lessons
+// and C has none), so when no teacher has more periods than there are slots a
+// clash-free placement always exists. Rule-placed cells are never moved, and
+// moves that break a soft rule are only used after every rule-keeping move is
+// exhausted, the same order the greedy pass relaxes them in.
+
+const MAX_REPAIR_ROUNDS = 50;
+const MAX_POLISH_ROUNDS = 6;
+// Time budget for the whole generation; later attempts and polishing stop once it's spent.
+const GENERATION_BUDGET_MS = 6000;
+const SAME_DAY_WEIGHT = 3;
+
+/** Teachers in a cell; parallel-pair cells hold two ("A/B"). */
+const cellTeachers = (cell) => (cell && cell.teacher
+  ? cell.teacher.split('/').map((name) => name.trim()).filter(Boolean)
+  : []);
+
+const repairGrid = ({
+  grid,
+  remainingDemand,
+  locked,
+  classes,
+  periodIds,
+  teacherLookup,
+  consecutiveSet,
+  consecutiveCountMap,
+  sportsSubjectNames,
+  deadline = Infinity,
+}) => {
+  const slots = DAYS.flatMap((day) => periodIds.map((periodId) => ({ day, periodId, key: `${day}::${periodId}` })));
+  const isLocked = (classId, slot) => locked.has(`${classId}::${slot.key}`);
+  const isSports = (subject) => Boolean(subject) && sportsSubjectNames.has(subject.trim().toLowerCase());
+
+  // teacher → slotKey → Set<classId>
+  const busy = new Map();
+  const occupy = (teacher, slotKey, classId, on) => {
+    if (!busy.has(teacher)) busy.set(teacher, new Map());
+    const bySlot = busy.get(teacher);
+    if (!bySlot.has(slotKey)) bySlot.set(slotKey, new Set());
+    if (on) bySlot.get(slotKey).add(classId);
+    else bySlot.get(slotKey).delete(classId);
+  };
+  const classesOf = (teacher, slotKey) => [...(busy.get(teacher)?.get(slotKey) || [])];
+  const isFree = (teacher, slotKey) => !teacher || classesOf(teacher, slotKey).length === 0;
+
+  const getCell = (classId, slot) => grid[classId][slot.day][slot.periodId];
+  const setCell = (classId, slot, cell) => {
+    cellTeachers(getCell(classId, slot)).forEach((teacher) => occupy(teacher, slot.key, classId, false));
+    grid[classId][slot.day][slot.periodId] = cell;
+    cellTeachers(cell).forEach((teacher) => occupy(teacher, slot.key, classId, true));
+  };
+
+  classes.forEach((cls) => slots.forEach((slot) => {
+    cellTeachers(getCell(cls.id, slot)).forEach((teacher) => occupy(teacher, slot.key, cls.id, true));
+  }));
+
+  // Soft-rule cost of the parts of the grid a move touches.
+  const classDayCost = (classId, day) => {
+    const counts = {};
+    periodIds.forEach((periodId) => {
+      const subject = grid[classId][day][periodId].subject;
+      if (subject) counts[subject.toLowerCase()] = (counts[subject.toLowerCase()] || 0) + 1;
+    });
+    return Object.values(counts).reduce((sum, n) => sum + Math.max(0, n - MAX_SAME_SUBJECT_PER_DAY), 0);
+  };
+  const teacherDayCost = (teacher, day) => {
+    let cost = 0;
+    let run = 0;
+    periodIds.forEach((periodId) => {
+      run = isFree(teacher, `${day}::${periodId}`) ? 0 : run + 1;
+      if (run > MAX_CONSECUTIVE_TEACHER_PERIODS) cost += 1;
+    });
+    return cost;
+  };
+  const sportsOverflow = (slot) => {
+    const count = classes.filter((cls) => isSports(getCell(cls.id, slot).subject)).length;
+    return Math.max(0, count - MAX_CONCURRENT_SPORTS_CLASSES);
+  };
+  const scopeCost = (classIds, teachers, touchedSlots) => {
+    const days = [...new Set(touchedSlots.map((slot) => slot.day))];
+    let soft = 0;
+    classIds.forEach((classId) => days.forEach((day) => { soft += classDayCost(classId, day); }));
+    teachers.forEach((teacher) => days.forEach((day) => { soft += teacherDayCost(teacher, day); }));
+    const sports = touchedSlots.reduce((sum, slot) => sum + sportsOverflow(slot), 0);
+    return { soft, sports };
+  };
+
+  /**
+   * Classes whose A and B lessons must swap so `teacher` becomes free at A,
+   * or null when the chain runs into a locked or shared cell.
+   */
+  const buildChain = (teacher, slotA, slotB) => {
+    const chain = [];
+    const inChain = new Set();
+    let current = teacher;
+    for (let guard = 0; guard <= classes.length; guard += 1) {
+      const atA = classesOf(current, slotA.key);
+      if (atA.length === 0) return chain;
+      if (atA.length > 1) return null; // a common period: several classes at once
+      const classId = atA[0];
+      if (inChain.has(classId)) return chain; // same teacher at A and B in this class
+      if (isLocked(classId, slotA) || isLocked(classId, slotB)) return null;
+      const cellA = getCell(classId, slotA);
+      const cellB = getCell(classId, slotB);
+      if (cellTeachers(cellA).length > 1 || cellTeachers(cellB).length > 1) return null;
+      chain.push(classId);
+      inChain.add(classId);
+      const [next] = cellTeachers(cellB);
+      if (!next) return chain;
+      current = next;
+    }
+    return null;
+  };
+
+  const swapAll = (chain, slotA, slotB) => {
+    const cells = chain.map((classId) => [getCell(classId, slotA), getCell(classId, slotB)]);
+    chain.forEach((classId, i) => {
+      setCell(classId, slotA, { subject: '', teacher: '' });
+      setCell(classId, slotB, { subject: '', teacher: '' });
+      setCell(classId, slotA, cells[i][1]);
+      setCell(classId, slotB, cells[i][0]);
+    });
+  };
+
+  /** Try one way of placing the lesson; returns its cost, leaving the grid unchanged. */
+  const evaluate = (classId, subject, teacher, slotA, slotB, chain) => {
+    const touched = slotB ? [slotA, slotB] : [slotA];
+    const classIds = [classId, ...chain];
+    const teachers = new Set(teacher ? [teacher] : []);
+    chain.forEach((cid) => touched.forEach((slot) => cellTeachers(getCell(cid, slot)).forEach((t) => teachers.add(t))));
+    const before = scopeCost(classIds, teachers, touched);
+    if (chain.length) swapAll(chain, slotA, slotB);
+    setCell(classId, slotA, { subject, teacher });
+    const after = scopeCost(classIds, teachers, touched);
+    setCell(classId, slotA, { subject: '', teacher: '' });
+    if (chain.length) swapAll(chain, slotA, slotB);
+    return { soft: after.soft - before.soft, sports: after.sports - before.sports };
+  };
+
+  const placeOne = (classId, subject, relaxed) => {
+    const teacher = teacherLookup[`${classId}::${subject.toLowerCase()}`] || '';
+    const freeSlots = slots.filter((slot) => !getCell(classId, slot).subject);
+    let best = null;
+    const consider = (slotA, slotB, chain) => {
+      const cost = evaluate(classId, subject, teacher, slotA, slotB, chain);
+      if (cost.sports > 0) return;
+      if (!relaxed && cost.soft > 0) return;
+      const rank = [cost.soft, chain.length];
+      if (!best || rank[0] < best.rank[0] || (rank[0] === best.rank[0] && rank[1] < best.rank[1])) {
+        best = { slotA, slotB, chain, rank };
+      }
+    };
+    freeSlots.forEach((slotA) => {
+      if (isFree(teacher, slotA.key)) {
+        consider(slotA, null, []);
+        return;
+      }
+      slots.forEach((slotB) => {
+        if (slotB.key === slotA.key || !isFree(teacher, slotB.key)) return;
+        const chain = buildChain(teacher, slotA, slotB);
+        if (chain) consider(slotA, slotB, chain);
+      });
+    });
+    if (!best) return false;
+    if (best.chain.length) swapAll(best.chain, best.slotA, best.slotB);
+    setCell(classId, best.slotA, { subject, teacher });
+    remainingDemand[classId][subject] -= 1;
+    if (remainingDemand[classId][subject] <= 0) delete remainingDemand[classId][subject];
+    return true;
+  };
+
+  // Rule-keeping moves first; then allow soft-rule breaks for whatever is left.
+  [false, true].forEach((relaxed) => {
+    for (let round = 0; round < MAX_REPAIR_ROUNDS; round += 1) {
+      if (Date.now() > deadline) break;
+      const missing = shuffle(Object.entries(remainingDemand)
+        .flatMap(([classId, subjectMap]) => Object.entries(subjectMap)
+        // A lab subject is only repaired as a leftover single (an odd period count).
+        .filter(([subject, count]) => count > 0
+          && (!consecutiveSet.has(subject.toLowerCase()) || count < (consecutiveCountMap[subject.toLowerCase()] || 2)))
+        .map(([subject]) => [classId, subject])));
+      if (!missing.length) return;
+      const placed = missing.filter(([classId, subject]) => placeOne(classId, subject, relaxed)).length;
+      if (!placed) break;
+    }
+  });
+
+  // Polish: swap two movable periods of one class whenever that lowers the
+  // soft-rule cost. A subject three times in a day weighs more than a long
+  // teacher run, since every student in the class feels it.
+  const weighted = (classIds, teachers, touchedSlots) => {
+    const days = [...new Set(touchedSlots.map((slot) => slot.day))];
+    let cost = 0;
+    classIds.forEach((classId) => days.forEach((day) => { cost += SAME_DAY_WEIGHT * classDayCost(classId, day); }));
+    teachers.forEach((teacher) => days.forEach((day) => { cost += teacherDayCost(teacher, day); }));
+    return { cost, sports: touchedSlots.reduce((sum, slot) => sum + sportsOverflow(slot), 0) };
+  };
+  /**
+   * Classes that must swap their slot1/slot2 lessons together so no teacher is
+   * double-booked when `classId` swaps its own (a Kempe chain), or null when the
+   * chain reaches a locked or shared cell.
+   */
+  const swapGroup = (classId, slot1, slot2) => {
+    const group = new Set([classId]);
+    const queue = [classId];
+    while (queue.length) {
+      const current = queue.shift();
+      if (isLocked(current, slot1) || isLocked(current, slot2)) return null;
+      const teachers1 = cellTeachers(getCell(current, slot1));
+      const teachers2 = cellTeachers(getCell(current, slot2));
+      if (teachers1.length > 1 || teachers2.length > 1) return null;
+      // A teacher moving into a period must leave whichever other class holds them there.
+      const pulled = [
+        ...teachers1.flatMap((t) => classesOf(t, slot2.key)),
+        ...teachers2.flatMap((t) => classesOf(t, slot1.key)),
+      ];
+      for (const other of pulled) {
+        if (!group.has(other)) {
+          if (group.size >= classes.length) return null;
+          group.add(other);
+          queue.push(other);
+        }
+      }
+    }
+    return [...group];
+  };
+  // Only lessons sitting in a rule break are worth moving.
+  const isHot = (classId, slot) => {
+    const cell = getCell(classId, slot);
+    if (!cell.subject) return false;
+    if (classDayCost(classId, slot.day) > 0) return true;
+    return cellTeachers(cell).some((teacher) => teacherDayCost(teacher, slot.day) > 0);
+  };
+  for (let round = 0; round < MAX_POLISH_ROUNDS; round += 1) {
+    if (Date.now() > deadline) break;
+    let improved = false;
+    classes.forEach((cls) => {
+      const movable = slots.filter((slot) => !isLocked(cls.id, slot));
+      const hot = movable.filter((slot) => isHot(cls.id, slot));
+      for (const slot1 of hot) {
+        for (const slot2 of movable) {
+          if (slot2.key === slot1.key) continue;
+          const cell1 = getCell(cls.id, slot1);
+          const cell2 = getCell(cls.id, slot2);
+          if (!cell1.subject) break; // moved away by an earlier swap
+          if (cell1.subject === cell2.subject && cell1.teacher === cell2.teacher) continue;
+          const group = swapGroup(cls.id, slot1, slot2);
+          if (!group) continue;
+          const teachers = [...new Set(group.flatMap((cid) => [
+            ...cellTeachers(getCell(cid, slot1)), ...cellTeachers(getCell(cid, slot2)),
+          ]))];
+          const before = weighted(group, teachers, [slot1, slot2]);
+          swapAll(group, slot1, slot2);
+          const after = weighted(group, teachers, [slot1, slot2]);
+          if (after.cost < before.cost && after.sports <= before.sports) {
+            improved = true;
+          } else {
+            swapAll(group, slot1, slot2);
+          }
+        }
+      }
+    });
+    if (!improved) break;
+  }
+};
+
+/** Weighted soft-rule breaks in a grid, used to choose between equally full attempts. */
+const countSoftBreaks = (grid, classes, periodIds) => {
+  let breaks = 0;
+  const teacherDays = new Map();
+  classes.forEach((cls) => DAYS.forEach((day) => {
+    const counts = {};
+    periodIds.forEach((periodId, index) => {
+      const cell = grid[cls.id][day][periodId];
+      if (cell.subject) counts[cell.subject.toLowerCase()] = (counts[cell.subject.toLowerCase()] || 0) + 1;
+      cellTeachers(cell).forEach((teacher) => {
+        const key = `${teacher}::${day}`;
+        if (!teacherDays.has(key)) teacherDays.set(key, new Set());
+        teacherDays.get(key).add(index);
+      });
+    });
+    const repeats = Object.values(counts).reduce((sum, n) => sum + Math.max(0, n - MAX_SAME_SUBJECT_PER_DAY), 0);
+    breaks += SAME_DAY_WEIGHT * repeats;
+  }));
+  teacherDays.forEach((indexes) => {
+    let run = 0;
+    periodIds.forEach((_, index) => {
+      run = indexes.has(index) ? run + 1 : 0;
+      if (run > MAX_CONSECUTIVE_TEACHER_PERIODS) breaks += 1;
+    });
+  });
+  return breaks;
 };
 
 // ---------------------------------------------------------------------------
 // Build conflict report from remaining demand
 // ---------------------------------------------------------------------------
 
-const buildConflictReport = (remainingDemand, originalDemand, classes) => {
+const buildConflictReport = (remainingDemand, originalDemand, classes, sportsLimit = null, overload = null) => {
   const report = [];
   const classMap = {};
   (classes || []).forEach((cls) => {
@@ -688,7 +1034,14 @@ const buildConflictReport = (remainingDemand, originalDemand, classes) => {
         type: 'underallocated',
         expected,
         actual,
-        message: `${subjectName} needs ${remaining} more period(s) per week for ${classMap[classId] || classId}`,
+        message: [
+          `${subjectName} needs ${remaining} more period(s) per week for ${classMap[classId] || classId}`,
+          overload && overload.byClassSubject[`${classId}::${subjectName.toLowerCase()}`],
+          sportsLimit && sportsLimit.subjects.has(subjectName.trim().toLowerCase())
+            ? `At most ${MAX_CONCURRENT_SPORTS_CLASSES} classes can have sports in the same period, which allows `
+              + `${sportsLimit.capacity} sports periods a week; your classes need ${sportsLimit.demand}`
+            : '',
+        ].filter(Boolean).join('. '),
       });
     });
   });
@@ -775,10 +1128,11 @@ const generate = (state) => {
 
   let bestGrid = null;
   let bestFilled = -1;
+  let bestSoftBreaks = Infinity;
   let bestRemainingDemand = null;
 
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-    const { grid, remainingDemand } = runOneAttempt(
+    const { grid, remainingDemand, locked } = runOneAttempt(
       classes,
       periodIds,
       originalDemand,
@@ -790,21 +1144,63 @@ const generate = (state) => {
       sportsSubjectNames
     );
 
+    repairGrid({
+      grid,
+      remainingDemand,
+      locked,
+      classes,
+      periodIds,
+      teacherLookup,
+      consecutiveSet,
+      consecutiveCountMap,
+      sportsSubjectNames,
+      deadline: startTime + GENERATION_BUDGET_MS,
+    });
+
     const filled = countFilled(grid);
-    if (filled > bestFilled) {
+    const softBreaks = countSoftBreaks(grid, classes, periodIds);
+    if (filled > bestFilled || (filled === bestFilled && softBreaks < bestSoftBreaks)) {
       bestFilled = filled;
+      bestSoftBreaks = softBreaks;
       bestGrid = grid;
       bestRemainingDemand = remainingDemand;
     }
 
-    // If perfectly filled, no need to try more
-    if (filled === totalSlots) break;
+    // Nothing left to place and no rule bent: no need to try more
+    const unmet = Object.values(remainingDemand).some((subjectMap) => Object.values(subjectMap).some((n) => n > 0));
+    if (!unmet && softBreaks === 0) break;
+    // Keep big schools responsive: stop trying once the time budget is spent.
+    if (Date.now() - startTime > GENERATION_BUDGET_MS) break;
   }
 
+  // Explain sports shortfalls that come from the "few classes at sports at once" rule.
+  const sportsDemand = Object.values(originalDemand).reduce((sum, subjectMap) => sum + Object.entries(subjectMap)
+    .filter(([subject]) => sportsSubjectNames.has(subject.trim().toLowerCase()))
+    .reduce((acc, [, count]) => acc + count, 0), 0);
+  const sportsCapacity = MAX_CONCURRENT_SPORTS_CLASSES * DAYS.length * periodIds.length;
+  // Teachers given more periods than the week holds can never be fully placed.
+  const weekSlots = DAYS.length * periodIds.length;
+  const teacherLoad = {};
+  Object.entries(originalDemand).forEach(([classId, subjectMap]) => {
+    Object.entries(subjectMap).forEach(([subject, count]) => {
+      const teacher = teacherLookup[`${classId}::${subject.toLowerCase()}`];
+      if (teacher) teacherLoad[teacher] = (teacherLoad[teacher] || 0) + count;
+    });
+  });
+  const byClassSubject = {};
+  Object.entries(teacherLookup).forEach(([key, teacher]) => {
+    if ((teacherLoad[teacher] || 0) > weekSlots) {
+      byClassSubject[key] = `${teacher} has ${teacherLoad[teacher]} periods a week, but the week has only ${weekSlots}`;
+    }
+  });
   const conflictReport = buildConflictReport(
     bestRemainingDemand,
     originalDemand,
-    classes
+    classes,
+    sportsDemand > sportsCapacity
+      ? { subjects: sportsSubjectNames, capacity: sportsCapacity, demand: sportsDemand }
+      : null,
+    { byClassSubject }
   );
 
   return {
