@@ -255,7 +255,7 @@ describe('APPNT booking', () => {
 });
 
 describe('family portal routes', () => {
-  it('opens meeting requests and marking notifications read, keeps everything else read-only', () => {
+  it('opens meeting requests, calendar replies and marking notifications read, keeps everything else read-only', () => {
     const router = require('../../../routes/portalRoutes');
     const routes = router.stack.filter((layer) => layer.route).map((layer) => `${Object.keys(layer.route.methods).join(',')} ${layer.route.path}`);
     expect(routes).toEqual(expect.arrayContaining([
@@ -264,8 +264,11 @@ describe('family portal routes', () => {
     ]));
     expect(routes[routes.length - 1]).toBe('_all *');
     expect(routes).toEqual(expect.arrayContaining(['post /notifications/read-all', 'post /notifications/:id/read']));
+    expect(routes).toEqual(expect.arrayContaining(['post /calendar/events/:id/respond']));
     expect(routes.filter((route) => /^(post|put|patch|delete)/.test(route))
-      .every((route) => /appointments/.test(route) || /^post \/notifications\/(read-all|:id\/read)$/.test(route))).toBe(true);
+      .every((route) => /appointments/.test(route)
+        || /^post \/notifications\/(read-all|:id\/read)$/.test(route)
+        || route === 'post /calendar/events/:id/respond')).toBe(true);
   });
 
   it('keeps student logins out of meeting requests', async () => {

@@ -18,6 +18,7 @@ calendar.use(requireTenantFeature('clndr_calendar'));
 calendar.get('/me', ctrl.getMine);
 calendar.get('/days', ctrl.getDays);
 calendar.get('/view/:id', ctrl.viewEvent);
+calendar.post('/view/:id/respond', ctrl.body(schemas.respond), ctrl.respondToEvent);
 
 const events = express.Router();
 events.use(requireTenantFeature('clndr_events'));
@@ -30,6 +31,8 @@ events.post('/:id/publish', ctrl.body(schemas.publishEvent), ctrl.publishEvent);
 events.post('/:id/approve', ctrl.approveEvent);
 events.post('/:id/reject', ctrl.body(schemas.rejectEvent), ctrl.rejectEvent);
 events.post('/:id/cancel', ctrl.body(schemas.cancelEvent), ctrl.cancelEvent);
+events.get('/:id/responses', ctrl.listResponses);
+events.post('/:id/remind-pending', ctrl.remindPending);
 calendar.use('/events', events);
 
 calendar.get('/audience/options', requireTenantFeature('clndr_events'), ctrl.audienceOptions);

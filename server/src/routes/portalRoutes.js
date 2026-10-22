@@ -12,8 +12,8 @@ const { portalRequestSchema } = require('../validations/appntValidation');
 /**
  * Parent / student portal. Only portal sessions reach here (the tenant access
  * gate also rejects staff sessions). Everything is limited to the account's own
- * linked students and read-only, except meeting requests (appointments) and
- * marking the account's own notifications read.
+ * linked students and read-only, except meeting requests (appointments),
+ * replies to calendar events and marking the account's own notifications read.
  */
 const router = express.Router();
 router.use(protect);
@@ -48,6 +48,16 @@ const validateRequest = (req, res, next) => {
 // The family's calendar: school days, events for them and their children, fee dues, meetings.
 router.get('/calendar', calendar.getCalendar);
 router.get('/calendar/events/:id', calendar.viewEvent);
+// Replies to events that ask for one (acknowledge, RSVP, consent): a narrow write, rate limited.
+const calendarReplyLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `${req.tenant?.slug || ''}:${req.user?._id || req.ip}`,
+  message: { success: false, message: 'Too many replies. Try again in a few minutes.' }
+});
+router.post('/calendar/events/:id/respond', calendarReplyLimiter, calendar.respondToEvent);
 
 router.get('/appointments', appnt.listMine);
 router.post('/appointments/:id/cancel', appointmentWriteLimiter, appnt.cancel);

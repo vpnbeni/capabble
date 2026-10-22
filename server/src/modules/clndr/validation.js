@@ -84,6 +84,13 @@ const cancelEvent = Joi.object({
   notify: Joi.boolean().default(true)
 });
 const rejectEvent = Joi.object({ note: Joi.string().allow('').max(500).default('') });
+const respond = Joi.object({
+  segmentKey: Joi.string().max(40).required(),
+  studentId: Joi.string().max(40).allow('', null),
+  value: Joi.string().valid('acknowledged', 'yes', 'no', 'maybe', 'given', 'declined').required(),
+  count: Joi.number().integer().min(0).max(20),
+  note: Joi.string().allow('').max(500).default('')
+});
 const previewAudience = Joi.object({ segments: Joi.array().items(segment).min(1).max(20).required() });
 
 const ruleFields = {
@@ -127,5 +134,14 @@ const updateRule = Joi.object({ ...ruleFields, announce: announce.allow(null) })
 const bulkRules = Joi.object({ rules: Joi.array().items(createRule).min(1).max(200).required() });
 
 module.exports = {
-  createEvent, updateEvent, publishEvent, cancelEvent, rejectEvent, previewAudience, createRule, updateRule, bulkRules
+  createEvent,
+  updateEvent,
+  publishEvent,
+  cancelEvent,
+  rejectEvent,
+  previewAudience,
+  createRule,
+  updateRule,
+  bulkRules,
+  respond
 };

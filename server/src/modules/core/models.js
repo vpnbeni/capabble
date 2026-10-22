@@ -21,6 +21,7 @@ module.exports = {
   OnboardingSession: require('../../models/OnboardingSession'),
   SchoolDayRule: require('../../models/SchoolDayRule'),
   CalendarEvent: require('../../models/CalendarEvent'),
+  CalendarResponse: require('../../models/CalendarResponse'),
   SchoolMailSettings: mailRecords.SchoolMailSettings,
   MailOutbox: mailRecords.MailOutbox,
   MailSuppression: mailRecords.MailSuppression,

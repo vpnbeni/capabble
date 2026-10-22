@@ -32,7 +32,7 @@ const changedText = (changes = []) => {
 const firstName = (name) => String(name || '').trim().split(/\s+/)[0];
 
 const icsMethodFor = (change, occurrence) => {
-  if (change === 'reminder') return '';
+  if (change === 'reminder' || change === 'response_reminder') return '';
   if (change === 'cancelled' || change === 'removed') return occurrence ? '' : 'CANCEL';
   return 'PUBLISH';
 };
@@ -93,9 +93,9 @@ const queueEventEmails = async ({ tenant, models, event, users, data }) => {
         unsubscribeUrl: unsubscribe,
         replyToSchool
       });
-      const step = change === 'reminder'
-        ? `${occurrence}:${slot}`
-        : `r${event.revision}:${change}${occurrence ? `:${occurrence}` : ''}`;
+      let step = `r${event.revision}:${change}${occurrence ? `:${occurrence}` : ''}`;
+      if (change === 'reminder') step = `${occurrence}:${slot}`;
+      if (change === 'response_reminder') step = `reply:${slot}`;
       return {
         dedupeKey: `calendar:${event._id}:${step}:${id}`,
         category: 'calendar',

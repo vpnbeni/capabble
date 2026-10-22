@@ -266,7 +266,7 @@ describe('recipients', () => {
     };
     const { recipients, stats } = await resolveRecipients(models, event);
     expect([...recipients.keys()]).toEqual([ID(1)]);
-    expect(recipients.get(ID(1)).segments).toEqual([{ key: 'p', children: ['Riya'] }]);
+    expect(recipients.get(ID(1)).segments).toEqual([{ key: 'p', children: ['Riya'], childIds: [ID(12)] }]);
     expect(stats[0]).toMatchObject({ people: 1, students: 2, noLogin: 1, noEmail: 0 });
   });
 });

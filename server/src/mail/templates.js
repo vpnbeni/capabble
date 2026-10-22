@@ -256,7 +256,8 @@ const calendarEvent = ({
     changed: `Changed: ${title}`,
     cancelled: `Cancelled: ${title}`,
     removed: `No longer for you: ${title}`,
-    reminder: title
+    reminder: title,
+    response_reminder: `Reply needed: ${title}`
   }[change] || title;
   const subject = {
     published: `${title}, ${when}`,
@@ -264,7 +265,8 @@ const calendarEvent = ({
     changed: `Changed: ${title}, ${when}`,
     cancelled: `Cancelled: ${title}, ${when}`,
     removed: `No longer for you: ${title}`,
-    reminder: `Reminder: ${title}, ${when}`
+    reminder: `Reminder: ${title}, ${when}`,
+    response_reminder: `Reply needed: ${title}, ${when}`
   }[change] || title;
   const lead = {
     published: `${schoolName || 'Your school'} has added an event to your calendar.`,
@@ -272,7 +274,8 @@ const calendarEvent = ({
     changed: `${changedText || 'Some details changed.'} Here is what it looks like now.`,
     cancelled: `This event is cancelled.${reason ? ` ${reason}` : ''}`,
     removed: 'The school changed who this event is for, and it no longer includes you.',
-    reminder: 'A reminder about this event.'
+    reminder: 'A reminder about this event.',
+    response_reminder: 'The school is waiting for your reply about this event. Open it in the calendar to answer.'
   }[change] || '';
   const live = !['cancelled', 'removed'].includes(change);
   return renderEmail({

@@ -54,6 +54,11 @@ const changedText = (changes = []) => {
 
 const reasonText = (reason) => (reason ? ` ${reason}` : '');
 
+const childLine = (parts = []) => {
+  const names = [...new Set(parts.flatMap((part) => part.children || []))].map(firstName);
+  return names.length ? ` For ${names.join(' and ')}.` : '';
+};
+
 const linkFor = (event, occurrence, portal) => `${portal ? '/portal/calendar' : '/calendar'}?event=${event.id}`
   + `&date=${occurrence || event.startDate}`;
 
@@ -61,9 +66,12 @@ module.exports = {
   'calendar.event': {
     module: 'clndr',
     section: 'calendar',
-    dedupeKey: (data) => (data.change === 'reminder'
-      ? `${data.event.id}:${data.occurrence}:${data.slot}`
-      : `${data.event.id}:r${data.event.revision}:${data.change}`),
+    dedupeKey: (data) => {
+      if (data.change === 'reminder') return `${data.event.id}:${data.occurrence}:${data.slot}`;
+      // At most one "please reply" nudge a day.
+      if (data.change === 'response_reminder') return `${data.event.id}:reply:${data.slot}`;
+      return `${data.event.id}:r${data.event.revision}:${data.change}`;
+    },
     build: (data, user) => {
       const { event, change } = data;
       const parts = data.parts?.[String(user._id)] || [];
@@ -79,6 +87,10 @@ module.exports = {
         reminder: [
           `${data.slot === 'morning_07' ? 'Today' : 'Tomorrow'}: ${event.title}`,
           `${when}${venue}. ${notes}`
+        ],
+        response_reminder: [
+          `Reply needed: ${event.title}`,
+          `The school is waiting for your reply about ${event.title} (${when}). Open it to answer.${childLine(parts)}`
         ]
       }[change];
       if (!copy) return null;

@@ -370,13 +370,18 @@ const resolveRecipients = async (models, event, { onlySegments = null } = {}) =>
   const cache = {};
   const { User } = models;
 
-  const addRecipient = (user, segmentKey, childNames = []) => {
+  // children: names for copy; childIds: the same children's Student ids (for per-child replies).
+  const addRecipient = (user, segmentKey, childNames = [], childIds = []) => {
     const id = String(user._id);
     if (!recipients.has(id)) recipients.set(id, { user, segments: [] });
     const entry = recipients.get(id);
     const existing = entry.segments.find((s) => s.key === segmentKey);
-    if (existing) existing.children = uniq([...existing.children, ...childNames]);
-    else entry.segments.push({ key: segmentKey, children: uniq(childNames) });
+    if (existing) {
+      existing.children = uniq([...existing.children, ...childNames]);
+      existing.childIds = uniq([...(existing.childIds || []), ...childIds]);
+    } else {
+      entry.segments.push({ key: segmentKey, children: uniq(childNames), childIds: uniq(childIds) });
+    }
   };
 
   // eslint-disable-next-line no-restricted-syntax
@@ -408,6 +413,7 @@ const resolveRecipients = async (models, event, { onlySegments = null } = {}) =>
       const excludedRolls = new Set(excluded.map((s) => String(s.rollNumber).toUpperCase()));
       const students = included.filter((s) => !excludedRolls.has(String(s.rollNumber).toUpperCase()));
       const nameByRoll = new Map(students.map((s) => [String(s.rollNumber).toUpperCase(), s.name || s.rollNumber]));
+      const idByRoll = new Map(students.map((s) => [String(s.rollNumber).toUpperCase(), String(s._id)]));
       const rolls = [...nameByRoll.keys()];
       const logins = rolls.length
         ? await activeUsers(User, { kind, 'linkedStudents.rollNumber': { $in: rolls } })
@@ -417,7 +423,8 @@ const resolveRecipients = async (models, event, { onlySegments = null } = {}) =>
         const childRolls = (user.linkedStudents || []).map((link) => String(link.rollNumber || '').toUpperCase())
           .filter((roll) => nameByRoll.has(roll));
         childRolls.forEach((roll) => reachedRolls.add(roll));
-        addRecipient(user, segment.key, childRolls.map((roll) => nameByRoll.get(roll)));
+        const names = childRolls.map((roll) => nameByRoll.get(roll));
+        addRecipient(user, segment.key, names, childRolls.map((roll) => idByRoll.get(roll)));
       });
       const named = (segment.scopes || []).filter((scope) => scope.type === 'user')
         .map((scope) => scope.value).filter(isObjectId);

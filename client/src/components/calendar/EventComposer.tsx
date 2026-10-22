@@ -19,6 +19,7 @@ import {
   type NotifyLevel,
   type PersonType,
   type ReminderPreset,
+  type ResponseType,
   type Scope,
   type ScopeType,
   type Segment,
@@ -27,6 +28,7 @@ import {
 import {
   CATEGORY_LABELS, NOTIFY_LABELS, PERSON_LABELS, REMINDER_LABELS, ROLE_LABELS, SCOPE_LABELS, STATUS_LABELS,
 } from './calendarUi'
+import ReplyTracker from './ReplyTracker'
 import './calendar.css'
 
 type Repeat = 'none' | 'daily' | 'weekly' | 'monthly'
@@ -296,6 +298,20 @@ const SegmentEditor: React.FC<{
             disabled={segment.notify !== 'now'}
             onChange={(email) => set({ email })}
           />
+          <Select
+            label="Ask them to reply"
+            value={segment.response || 'none'}
+            options={[
+              { value: 'none', label: 'No reply needed' },
+              { value: 'acknowledge', label: 'Acknowledge they have read it' },
+              { value: 'rsvp', label: 'RSVP: coming or not, and how many' },
+              ...(segment.personType === 'parent' ? [{ value: 'consent', label: 'Consent for each child' }] : []),
+            ]}
+            onChange={(e) => set({ response: e.target.value as ResponseType })}
+          />
+          {segment.response && segment.response !== 'none' ? (
+            <TextField label="Reply by (optional)" type="date" value={segment.responseDeadline || ''} onChange={(e) => set({ responseDeadline: e.target.value || null })} />
+          ) : null}
           {(Object.keys(REMINDER_LABELS) as ReminderPreset[]).map((preset) => (
             <Checkbox
               key={preset}
@@ -500,6 +516,12 @@ const EventComposer: React.FC<{ open: boolean; eventId: string | null; defaultDa
         {editing && isLoading ? <Skeleton height={400} /> : (
           <div className="cb-stack cl-composer">
             {existing?.rejectionNote && status === 'draft' ? <Banner tone="warning" title="Sent back by the principal">{existing.rejectionNote}</Banner> : null}
+            {isPublished && existing?.segments.some((s) => s.response && s.response !== 'none') && eventId ? (
+              <section className="cb-form-section">
+                <h4 className="cb-form-section__title">Replies</h4>
+                <ReplyTracker eventId={eventId} />
+              </section>
+            ) : null}
             {isPublished ? (
               <Banner tone="info" title="This event is published">
                 Changes to the date, time, venue or instructions are sent to the people they affect.

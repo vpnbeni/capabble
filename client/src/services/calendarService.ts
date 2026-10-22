@@ -43,7 +43,24 @@ export type CalendarPart = {
   response: string
   responseDeadline?: string | null
   child?: { studentId: string; name: string } | null
+  myResponse?: { value: ResponseValue; count?: number; note?: string; respondedAt: string } | null
 }
+
+export type ResponseType = 'none' | 'acknowledge' | 'rsvp' | 'consent'
+export type ResponseValue = 'acknowledged' | 'yes' | 'no' | 'maybe' | 'given' | 'declined'
+export type ReplyInput = { segmentKey: string; studentId?: string | null; value: ResponseValue; count?: number; note?: string }
+
+export type ReplyTracker = Array<{
+  key: string
+  label: string
+  type: Exclude<ResponseType, 'none'>
+  deadline: string | null
+  expected: number
+  counts: Partial<Record<ResponseValue, number>>
+  headcount: number
+  responded: Array<{ name: string; child: string; value: ResponseValue; count?: number; note?: string; at: string }>
+  pending: Array<{ userId: string; name: string; child: string }>
+}>
 
 export type CalendarItem = {
   id: string
@@ -128,7 +145,8 @@ export type Segment = {
   notify: NotifyLevel
   email: boolean
   reminders: ReminderPreset[]
-  response?: string
+  response?: ResponseType
+  responseDeadline?: string | null
 }
 
 export type Recurrence = {
@@ -293,6 +311,11 @@ const calendarService = {
   cancel: (id: string, input: { reason?: string; occurrence?: string | null; notify?: boolean }) =>
     data<{ id: string; status: EventStatus }>(api.post(`/calendar/events/${id}/cancel`, input)),
   remove: (id: string) => data<{ id: string }>(api.delete(`/calendar/events/${id}`)),
+
+  respond: (eventId: string, input: ReplyInput) => data<ReplyInput>(api.post(`/calendar/view/${eventId}/respond`, input)),
+  replies: (eventId: string) => data<ReplyTracker>(api.get(`/calendar/events/${eventId}/responses`)),
+  remindPending: (eventId: string, segmentKey?: string) =>
+    data<{ reminded: number }>(api.post(`/calendar/events/${eventId}/remind-pending`, { segmentKey })),
 
   audienceOptions: () => data<AudienceOptions>(api.get('/calendar/audience/options')),
   people: (q: string, kind: PersonType, by?: 'student') =>

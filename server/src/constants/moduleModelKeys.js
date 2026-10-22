@@ -34,6 +34,7 @@ const MODULE_MODEL_KEYS = Object.freeze({
     'Notification',
     'SchoolDayRule',
     'CalendarEvent',
+    'CalendarResponse',
     'SchoolMailSettings',
     'MailOutbox',
     'MailSuppression',

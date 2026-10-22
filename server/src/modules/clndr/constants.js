@@ -26,6 +26,13 @@ const REMINDER_PRESETS = Object.freeze({
   morning_07: { label: '7 am on the day', dayOffset: 0, hour: 7, lastHour: 11 }
 });
 const RESPONSE_TYPES = Object.freeze(['none', 'acknowledge', 'rsvp', 'consent']);
+// What each response type accepts.
+const RESPONSE_VALUES = Object.freeze(['acknowledged', 'yes', 'no', 'maybe', 'given', 'declined']);
+const VALUES_FOR = Object.freeze({
+  acknowledge: ['acknowledged'],
+  rsvp: ['yes', 'no', 'maybe'],
+  consent: ['given', 'declined']
+});
 const RECURRENCE_FREQS = Object.freeze(['daily', 'weekly', 'monthly']);
 
 // Calendar layers: each item belongs to one, shown with a fixed tone and label.
@@ -52,6 +59,8 @@ module.exports = {
   NOTIFY_LEVELS,
   REMINDER_PRESETS,
   RESPONSE_TYPES,
+  RESPONSE_VALUES,
+  VALUES_FOR,
   RECURRENCE_FREQS,
   LAYERS
 };

@@ -3,8 +3,11 @@ import { Link } from 'react-router-dom'
 import { CalendarDays, Paperclip } from 'lucide-react'
 import { Badge, Button, DetailList, EmptyState, Sheet, Skeleton, formatDayKey, formatTime } from '@/components/ui'
 import { useEventView } from '@/hooks/useCalendar'
+import { usePermissions } from '@/hooks/usePermissions'
 import type { CalendarItem, CalendarPart } from '@/services/calendarService'
 import { CATEGORY_LABELS, LAYER_LABELS, ROLE_LABELS, STATUS_LABELS } from './calendarUi'
+import ReplyControls from './ReplyControls'
+import './calendar.css'
 
 const whenText = (item: { startDate: string; endDate: string; allDay: boolean; startTime?: string | null; endTime?: string | null }) => {
   const days = item.endDate && item.endDate !== item.startDate
@@ -14,7 +17,7 @@ const whenText = (item: { startDate: string; endDate: string; allDay: boolean; s
   return `${days}, ${formatTime(item.startTime)}${item.endTime ? ` to ${formatTime(item.endTime)}` : ''}`
 }
 
-const PartBlock: React.FC<{ part: CalendarPart }> = ({ part }) => (
+const PartBlock: React.FC<{ part: CalendarPart; eventId?: string }> = ({ part, eventId }) => (
   <div className="cl-part">
     <div className="cl-part__head">
       <span className="cb-strong">{part.child ? `For ${part.child.name}` : part.label || 'For you'}</span>
@@ -28,7 +31,7 @@ const PartBlock: React.FC<{ part: CalendarPart }> = ({ part }) => (
         ))}
       </ul>
     ) : null}
-    {part.responseDeadline ? <p className="cb-muted">Reply by {formatDayKey(part.responseDeadline, { weekday: 'short' })}</p> : null}
+    {eventId && part.response && part.response !== 'none' ? <ReplyControls eventId={eventId} part={part} /> : null}
   </div>
 )
 
@@ -43,6 +46,7 @@ const CalendarItemSheet: React.FC<{
   onCancel?: (item: CalendarItem) => void
 }> = ({ item, onClose, onEdit, onCancel }) => {
   const isEvent = Boolean(item?.eventId)
+  const { isPortal } = usePermissions()
   const { data: view, isLoading } = useEventView(isEvent && !item?.parts ? item?.eventId : null)
   const parts = item?.parts || view?.parts || []
   const status = item?.status ? STATUS_LABELS[item.status] : null
@@ -96,6 +100,13 @@ const CalendarItemSheet: React.FC<{
               ))}
             </ul>
           ) : null}
+          {item.category === 'ptm' && item.status !== 'cancelled' ? (
+            <p>
+              <Link className="cb-link" to={isPortal ? '/portal/appointments' : '/appnt/today'} onClick={onClose}>
+                {isPortal ? 'Book a time to meet a teacher' : 'See meeting bookings'}
+              </Link>
+            </p>
+          ) : null}
           {isEvent ? (
             <section aria-label="What it means for you">
               <h4 className="cb-subhead">What it means for you</h4>
@@ -103,7 +114,7 @@ const CalendarItemSheet: React.FC<{
               {!isLoading && !parts.length ? (
                 <EmptyState compact title="Nothing for you to do" body="You can see this event, but it has no instructions for you." />
               ) : (
-                <div className="cl-parts">{parts.map((part) => <PartBlock key={`${part.segmentKey}:${part.child?.studentId || ''}`} part={part} />)}</div>
+                <div className="cl-parts">{parts.map((part) => <PartBlock key={`${part.segmentKey}:${part.child?.studentId || ''}`} part={part} eventId={item.status === 'cancelled' ? undefined : item.eventId} />)}</div>
               )}
             </section>
           ) : null}

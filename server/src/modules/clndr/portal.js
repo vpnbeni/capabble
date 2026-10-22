@@ -8,6 +8,8 @@ const { calendarFor, timeZoneFor } = require('./service');
 const { viewerContext } = require('./audience');
 const { viewForViewer } = require('./events');
 const { handle } = require('./controller');
+const { respond, attachResponses } = require('./responses');
+const schemas = require('./validation');
 
 const assertOpen = (req) => {
   if (!openSections(req, req.user.kind).includes('calendar')) {
@@ -33,7 +35,17 @@ const viewEvent = handle(async (req, res) => {
   const viewer = event && event.status !== 'draft' ? await viewerContext(req) : null;
   const view = viewer && ['published', 'cancelled'].includes(event.status) ? viewForViewer(event, viewer) : null;
   if (!view) return res.status(404).json({ success: false, message: 'Event not found.' });
+  await attachResponses(req.models, viewer.userId, [{ eventId: view.id, parts: view.parts }]);
   return res.json({ success: true, data: { ...view, canEdit: false } });
 });
 
-module.exports = { getCalendar, viewEvent };
+// POST /api/portal/calendar/events/:id/respond — acknowledge, RSVP or give consent (own family only)
+const respondToEvent = handle(async (req, res) => {
+  assertOpen(req);
+  const { error, value } = schemas.respond.validate(req.body || {}, { abortEarly: true, stripUnknown: true });
+  if (error) return res.status(400).json({ success: false, message: error.details[0].message.replace(/"/g, '') });
+  const result = await respond(req, req.params.id, value, { timeZone: await timeZoneFor(req.models) });
+  return res.json({ success: true, data: result });
+});
+
+module.exports = { getCalendar, viewEvent, respondToEvent };

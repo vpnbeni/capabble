@@ -16,6 +16,9 @@ const {
 const { viewerContext, resolveRecipients } = require('./audience');
 const { deliverLater, summary, tenantRefOf } = require('./delivery');
 const { summaryFor } = require('../../mail/outbox');
+const {
+  respond, tracker, pendingRecipients, attachResponses
+} = require('./responses');
 
 /** Wrap a handler: errors with `status` become that response; anything else goes to the error handler. */
 const handle = (fn) => async (req, res, next) => {
@@ -88,6 +91,7 @@ const viewEvent = handle(async (req, res) => {
   const viewer = await viewerContext(req);
   const view = viewForViewer(event, viewer, { canManage: can(req, PERMISSIONS.MANAGE) });
   if (!view) throw httpError(404, 'Event not found.');
+  await attachResponses(req.models, viewer.userId, [{ eventId: view.id, parts: view.parts }]);
   res.json({ success: true, data: view });
 });
 
@@ -381,6 +385,33 @@ const deleteEvent = handle(async (req, res) => {
   }
   await event.deleteOne();
   res.json({ success: true, data: { id: String(event._id), deleted: true } });
+});
+
+// ---------------------------------------------------------------------------
+// Replies (acknowledge, RSVP, consent)
+// ---------------------------------------------------------------------------
+
+// POST /api/calendar/view/:id/respond { segmentKey, value, count?, note? } — the signed-in person's reply
+const respondToEvent = handle(async (req, res) => {
+  const result = await respond(req, req.params.id, req.body, { timeZone: await timeZoneFor(req.models) });
+  res.json({ success: true, data: result });
+});
+
+// GET /api/calendar/events/:id/responses — who has and hasn't replied
+const listResponses = handle(async (req, res) => {
+  const event = await loadEditable(req);
+  res.json({ success: true, data: await tracker(req.models, event.toObject()) });
+});
+
+// POST /api/calendar/events/:id/remind-pending { segmentKey? } — nudge people who haven't replied
+const remindPending = handle(async (req, res) => {
+  const event = await loadEditable(req);
+  if (event.status !== 'published') throw httpError(400, 'Only a published event can send reminders.');
+  const extraUsers = await pendingRecipients(req.models, event.toObject(), req.body?.segmentKey || null);
+  if (!extraUsers.length) return res.json({ success: true, data: { reminded: 0 } });
+  const today = schoolDate.today(await timeZoneFor(req.models));
+  await deliverLater(req, event, { change: 'response_reminder', extraUsers, slot: today });
+  return res.json({ success: true, data: { reminded: extraUsers.length } });
 });
 
 // ---------------------------------------------------------------------------
@@ -704,6 +735,9 @@ module.exports = {
   viewEvent,
   listEvents,
   getEvent,
+  respondToEvent,
+  listResponses,
+  remindPending,
   createEvent,
   updateEvent,
   publishEvent,

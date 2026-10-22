@@ -13,6 +13,7 @@ const schoolDays = require('./schoolDays');
 const { viewerContext, allViewerKeys } = require('./audience');
 const { eventItems, visibleEventsFilter, PERMISSIONS } = require('./events');
 const providers = require('./providers');
+const { attachResponses } = require('./responses');
 const { LAYERS } = require('./constants');
 
 const MAX_RANGE_DAYS = 100;
@@ -132,8 +133,10 @@ const calendarFor = async (req, { from, to, layers = null, portal = false }) => 
         .select('-sendLog -targetKeys').lean()
       : [];
     const canManage = viewer.kind === 'staff' && Boolean(req.rbac?.has(PERMISSIONS.MANAGE));
-    items.push(...eventItems(events, viewer, from, to, { isWorking, canManage, portal })
-      .filter((entry) => want(entry.layer)));
+    const evItems = eventItems(events, viewer, from, to, { isWorking, canManage, portal })
+      .filter((entry) => want(entry.layer));
+    await attachResponses(models, viewer.userId, evItems);
+    items.push(...evItems);
   }
 
   const toggles = normalizeTenantFeatureToggles(req.tenant?.featureToggles);
