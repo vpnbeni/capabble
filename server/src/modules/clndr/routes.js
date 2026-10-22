@@ -3,6 +3,7 @@ const { protect } = require('../../middleware/auth');
 const { requireTenantFeature } = require('../../middleware/tenantFeatureAccess');
 const ctrl = require('./controller');
 const schemas = require('./validation');
+const mailSettings = require('../../mail/settingsController');
 
 /**
  * /api/calendar — the signed-in staff member's calendar and calendar events.
@@ -51,6 +52,8 @@ schoolDays.post('/rules/:id/cancel', ctrl.cancelRule);
 const mountRoutes = (router) => {
   router.use('/calendar', calendar);
   router.use('/school-days', schoolDays);
+  // School email (Settings → School email): used by calendar emails and any later school mail.
+  mailSettings.mountRoutes(router);
 };
 
 module.exports = { mountRoutes };

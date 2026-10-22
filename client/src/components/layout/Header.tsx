@@ -629,6 +629,7 @@ const Header: React.FC<HeaderProps> = ({ isSidebarCollapsed, isMobileNav = false
             ? { title: segments[2] === 'new' ? 'New role' : 'Role', subtitle: 'What people with this role can see and change.' }
             : { title: 'Roles', subtitle: 'Bundles of access you give to staff logins.' },
           'school-days': { title: 'School days', subtitle: 'Weekly offs, holidays, vacations, half days and closures.' },
+          email: { title: 'School email', subtitle: 'Send calendar emails from your school’s own address.' },
         }
         const info = titleMap[subPage] || { title: 'Settings', subtitle: '' }
         return {

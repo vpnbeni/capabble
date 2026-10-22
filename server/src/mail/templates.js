@@ -241,6 +241,66 @@ const appointmentUpdate = ({ schoolName, subject, body }) => renderEmail({
     : 'You’re getting this because of a meeting booked through Capabble.'
 });
 
+/* ---------- Calendar ---------- */
+
+/**
+ * A school calendar event: new, changed, cancelled, a reminder, or no longer for
+ * this person. `parts` are only this person's instructions (per child for parents).
+ */
+const calendarEvent = ({
+  schoolName, change, title, when, venue, description, parts = [], changedText, reason, url, unsubscribeUrl, replyToSchool
+}) => {
+  const heading = {
+    published: title,
+    added: title,
+    changed: `Changed: ${title}`,
+    cancelled: `Cancelled: ${title}`,
+    removed: `No longer for you: ${title}`,
+    reminder: title
+  }[change] || title;
+  const subject = {
+    published: `${title}, ${when}`,
+    added: `${title}, ${when}`,
+    changed: `Changed: ${title}, ${when}`,
+    cancelled: `Cancelled: ${title}, ${when}`,
+    removed: `No longer for you: ${title}`,
+    reminder: `Reminder: ${title}, ${when}`
+  }[change] || title;
+  const lead = {
+    published: `${schoolName || 'Your school'} has added an event to your calendar.`,
+    added: `${schoolName || 'Your school'} has added you to this event.`,
+    changed: `${changedText || 'Some details changed.'} Here is what it looks like now.`,
+    cancelled: `This event is cancelled.${reason ? ` ${reason}` : ''}`,
+    removed: 'The school changed who this event is for, and it no longer includes you.',
+    reminder: 'A reminder about this event.'
+  }[change] || '';
+  const live = !['cancelled', 'removed'].includes(change);
+  return renderEmail({
+    subject: schoolName ? `${subject} · ${schoolName}` : subject,
+    preheader: live && parts[0]?.instructions ? parts[0].instructions : lead,
+    context: schoolName || undefined,
+    heading,
+    intro: [lead],
+    details: live ? [['When', when], ...(venue ? [['Where', venue]] : [])] : [['Was on', when]],
+    lists: live && parts.length ? parts.map((part) => ({ title: part.forWhom || 'For you', items: [part.instructions] })) : undefined,
+    outro: live && description ? [description] : [],
+    button: url ? { label: live ? 'Open in calendar' : 'Open calendar', url } : undefined,
+    footnote: schoolName ? `You're getting this because ${schoolName} added you to this event.` : undefined,
+    replyHint: replyToSchool ? `Replies go to ${schoolName || 'the school'}.` : undefined,
+    unsubscribe: unsubscribeUrl ? { label: 'Stop calendar emails', url: unsubscribeUrl } : undefined
+  });
+};
+
+/** Confirms a school's own email account works (Settings → School email). */
+const mailSettingsTest = ({ schoolName, fromEmail }) => renderEmail({
+  subject: `Test email from ${schoolName || 'your school'}`,
+  preheader: 'Your school email is set up in Capabble.',
+  context: schoolName || undefined,
+  heading: 'Your school email works',
+  intro: [['Calendar emails from Capabble will now be sent from ', { strong: fromEmail }, '.']],
+  footnote: 'You’re getting this because someone tested the school email settings in Capabble.'
+});
+
 /* ---------- Billing ---------- */
 
 const invoiceEmail = ({ variant, name, invoiceNumber, amountDue, dueDate, url }) => {
@@ -585,6 +645,8 @@ module.exports = {
   demoRequestAlert,
   demoRequestReceived,
   appointmentUpdate,
+  calendarEvent,
+  mailSettingsTest,
   invoiceEmail,
   paymentReceived,
   accessEmail

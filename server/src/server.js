@@ -32,6 +32,7 @@ if (process.env.VERCEL) {
       require('./events/registerAllListeners')();
     require('./notifications/scheduler').start();
     require('./modules/clndr/jobs').start();
+    require('./mail/outbox').start();
     } catch (error) {
       console.error('❌ Server initialization failed (Vercel):'.red.bold, error.message);
     }
@@ -72,6 +73,7 @@ const initializeServer = async () => {
     // Hourly reminders: fees due, meetings tomorrow, maintenance due (off with NOTIFICATION_SCHEDULER_ENABLED=false).
     require('./notifications/scheduler').start();
     require('./modules/clndr/jobs').start();
+    require('./mail/outbox').start();
 
     if (isMailConfigured()) {
       // Log in to the mail server once so a wrong password shows up at startup, not at the first signup.
@@ -149,6 +151,7 @@ process.on('SIGTERM', () => {
   require('./modules/dataLifecycle').stopScheduler();
   require('./notifications/scheduler').stop();
   require('./modules/clndr/jobs').stop();
+  require('./mail/outbox').stop();
   if (isAttendanceQueueReady()) {
     const worker = require('./workers/attendanceWorker');
     worker.close().catch(() => {});
@@ -165,6 +168,7 @@ process.on('SIGINT', () => {
   require('./modules/dataLifecycle').stopScheduler();
   require('./notifications/scheduler').stop();
   require('./modules/clndr/jobs').stop();
+  require('./mail/outbox').stop();
   if (isAttendanceQueueReady()) {
     const worker = require('./workers/attendanceWorker');
     worker.close().catch(() => {});

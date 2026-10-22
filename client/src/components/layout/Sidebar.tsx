@@ -18,6 +18,7 @@ import {
   CreditCard,
   LifeBuoy,
   LogOut,
+  Mail,
   PartyPopper,
   Settings,
   SlidersHorizontal,
@@ -1770,6 +1771,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   const canAccessHelpSupport = isPathAllowed('/help-support')
   const canManageUsers = isPathAllowed('/settings/users')
   const canManageSchoolDays = isPathAllowed('/settings/school-days')
+  const canManageSchoolEmail = isPathAllowed('/settings/email')
   const currentSidebarWidth = isCollapsed ? collapsedWidth : expandedWidth
 
   useLayoutEffect(() => {
@@ -2165,6 +2167,16 @@ const Sidebar: React.FC<SidebarProps> = ({
                     >
                       <CalendarDays size={16} strokeWidth={1.75} aria-hidden />
                       School days
+                    </NavLink>
+                  )}
+                  {canManageSchoolEmail && (
+                    <NavLink
+                      to="/settings/email"
+                      role="menuitem"
+                      className={({ isActive }) => `cb-shellnav__schoolitem${isActive ? ' is-current' : ''}`}
+                    >
+                      <Mail size={16} strokeWidth={1.75} aria-hidden />
+                      School email
                     </NavLink>
                   )}
                   {canAccessBilling && (

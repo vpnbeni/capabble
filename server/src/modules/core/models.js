@@ -7,6 +7,8 @@
  * Canonical source of truth for core model ownership.
  * Keep in sync with MODULE_MODEL_KEYS.core in constants/moduleModelKeys.js.
  */
+const mailRecords = require('../../models/MailRecords');
+
 module.exports = {
   User: require('../../models/User'),
   Teacher: require('../../models/Teacher'),
@@ -19,4 +21,7 @@ module.exports = {
   OnboardingSession: require('../../models/OnboardingSession'),
   SchoolDayRule: require('../../models/SchoolDayRule'),
   CalendarEvent: require('../../models/CalendarEvent'),
+  SchoolMailSettings: mailRecords.SchoolMailSettings,
+  MailOutbox: mailRecords.MailOutbox,
+  MailSuppression: mailRecords.MailSuppression,
 };

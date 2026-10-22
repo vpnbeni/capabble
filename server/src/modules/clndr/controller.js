@@ -15,6 +15,7 @@ const {
 } = require('./events');
 const { viewerContext, resolveRecipients } = require('./audience');
 const { deliverLater, summary, tenantRefOf } = require('./delivery');
+const { summaryFor } = require('../../mail/outbox');
 
 /** Wrap a handler: errors with `status` become that response; anything else goes to the error handler. */
 const handle = (fn) => async (req, res, next) => {
@@ -131,11 +132,12 @@ const loadEditable = async (req) => {
   return event;
 };
 
-// GET /api/calendar/events/:id — everything, for the editor
+// GET /api/calendar/events/:id — everything, for the editor, with how its emails went
 const getEvent = handle(async (req, res) => {
   const event = await loadEditable(req);
   const plain = event.toObject();
-  res.json({ success: true, data: { ...plain, id: String(plain._id), mine: isMine(req, event) } });
+  const emails = await summaryFor(req.models, plain._id);
+  res.json({ success: true, data: { ...plain, id: String(plain._id), mine: isMine(req, event), emails } });
 });
 
 // ---------------------------------------------------------------------------

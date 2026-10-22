@@ -14,6 +14,7 @@ const CBSEDatesheet = require('../models/CBSEDatesheet');
 const CBSECircular = require('../models/CBSECircular');
 const SchoolDayRule = require('../models/SchoolDayRule');
 const CalendarEvent = require('../models/CalendarEvent');
+const { SchoolMailSettings, MailOutbox, MailSuppression } = require('../models/MailRecords');
 const { Form66, Form66Upload } = require('../models/Form66');
 const Guideline = require('../models/Guideline');
 const Undertaking = require('../models/Undertaking');
@@ -130,6 +131,9 @@ const tenantModelExports = {
   CBSECircular,
   SchoolDayRule,
   CalendarEvent,
+  SchoolMailSettings,
+  MailOutbox,
+  MailSuppression,
   Form66,
   Form66Upload,
   Guideline,

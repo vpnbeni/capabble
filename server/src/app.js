@@ -241,6 +241,8 @@ platformModule.mountRoutes(app);
 
 // Signed workspace-archive download links (from emails): no sign-in, the signature is the key.
 app.use('/api/workspace-archives', dataLifecycle.publicRouter);
+// Unsubscribe links in school emails: signed, no sign-in, no tenant header.
+app.use('/api/mail/unsubscribe', require('./mail/unsubscribe').router);
 
 // Tenant-scoped routes — each module registers its own routes via mountAll()
 const tenantScopedRouter = express.Router();

@@ -635,6 +635,16 @@ const EventComposer: React.FC<{ open: boolean; eventId: string | null; defaultDa
               {existing?.sendLog?.length ? (
                 <div className="cl-sendlog">
                   <h4 className="cb-subhead">Sent so far</h4>
+                  {existing.emails && Object.keys(existing.emails).length ? (
+                    <p className="cb-muted">
+                      Emails: {existing.emails.sent || 0} sent
+                      {existing.emails.queued ? `, ${existing.emails.queued} waiting` : ''}
+                      {existing.emails.capped ? ` (daily limit reached, the rest go tomorrow)` : ''}
+                      {existing.emails.failed ? `, ${existing.emails.failed} failed` : ''}
+                      {existing.emails.suppressed ? `, ${existing.emails.suppressed} skipped (address bounced before)` : ''}
+                      {existing.emails.skipped ? `, ${existing.emails.skipped} not sent (no email account set up)` : ''}.
+                    </p>
+                  ) : null}
                   <ul>
                     {existing.sendLog.slice().reverse().slice(0, 6).map((run) => (
                       <li key={run._id}>

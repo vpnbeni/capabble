@@ -147,6 +147,7 @@
     { "prefix": "/calendar", "resource": "clndr.events" },
     { "prefix": "/school-days", "methods": ["GET"], "staff": true },
     { "prefix": "/school-days", "resource": "core.schooldays" },
+    { "prefix": "/mail-settings", "resource": "core.school" },
     { "prefix": "/search", "staff": true },
     { "prefix": "/dashboard", "staff": true },
     { "prefix": "/billing", "resource": "core.billing", "writeAction": "manage" },

@@ -184,6 +184,7 @@ export type CalendarEventFull = Omit<EventInput, 'segments'> & {
   publishedAt?: string | null
   sendLog: SendRun[]
   mine: boolean
+  emails?: Partial<Record<'queued' | 'sending' | 'sent' | 'failed' | 'suppressed' | 'capped' | 'skipped', number>>
 }
 
 export type EventListRow = {
@@ -304,6 +305,32 @@ const calendarService = {
   createRules: (rules: RuleInput[]) => data<{ created: number }>(api.post('/school-days/rules/bulk', { rules })),
   updateRule: (id: string, input: RuleInput) => data<{ id: string }>(api.patch(`/school-days/rules/${id}`, input)),
   cancelRule: (id: string, reason?: string) => data<{ id: string }>(api.post(`/school-days/rules/${id}/cancel`, { reason })),
+}
+
+export type MailSettings = {
+  enabled: boolean
+  host: string
+  port: number
+  secure: boolean
+  user: string
+  hasPassword: boolean
+  fromName: string
+  fromEmail: string
+  replyTo: string
+  dailyLimit: number
+  lastTestAt: string | null
+  lastTestOk: boolean | null
+  lastError: string
+  fallback: { fromEmail: string; dailyLimit: number } | null
+  usage: { sentToday: number; queued: number; failedWeek: number }
+}
+
+export type MailSettingsInput = Omit<MailSettings, 'hasPassword' | 'lastTestAt' | 'lastTestOk' | 'lastError' | 'fallback' | 'usage'> & { password?: string }
+
+export const mailSettingsService = {
+  get: () => data<MailSettings>(api.get('/mail-settings')),
+  save: (input: MailSettingsInput) => data<MailSettings>(baseApi.put('/mail-settings', input, silent())),
+  test: () => data<{ sentTo: string }>(api.post('/mail-settings/test')),
 }
 
 export const apiMessage = (error: unknown, fallback: string) => {

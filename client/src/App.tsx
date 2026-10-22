@@ -12,6 +12,7 @@ import UsersAndAccess from './pages/settings/UsersAndAccess'
 import UserDetail from './pages/settings/UserDetail'
 import RolesPage from './pages/settings/Roles'
 import SchoolDays from './pages/settings/SchoolDays'
+import SchoolEmail from './pages/settings/SchoolEmail'
 import CalendarPage from './pages/calendar/CalendarPage'
 import CalendarEvents from './pages/calendar/CalendarEvents'
 import RoleEditor from './pages/settings/RoleEditor'
@@ -567,6 +568,7 @@ function App() {
               <Route path="settings/users/:id" element={<UserDetail />} />
               <Route path="settings/roles" element={<RolesPage />} />
               <Route path="settings/school-days" element={<SchoolDays />} />
+              <Route path="settings/email" element={<SchoolEmail />} />
               <Route path="settings/roles/new" element={<RoleEditor />} />
               <Route path="settings/roles/:roleKey" element={<RoleEditor />} />
               <Route path="help-support" element={<HelpSupport />} />

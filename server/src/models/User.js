@@ -96,6 +96,11 @@ const userSchema = new mongoose.Schema({
     type: [linkedStudentSchema],
     default: undefined
   },
+  // Email categories this person turned off (e.g. 'calendar'); in-app notices still arrive.
+  emailOptOut: {
+    type: [String],
+    default: undefined
+  },
   mustChangePassword: {
     type: Boolean,
     default: false

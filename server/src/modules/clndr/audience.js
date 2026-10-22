@@ -23,7 +23,7 @@ const {
 } = require('../../rbac/scope');
 const { SCOPE_TYPES } = require('./constants');
 
-const USER_FIELDS = 'name email username kind roles role teacher linkedStudents assignedSections isActive';
+const USER_FIELDS = 'name email username kind roles role teacher linkedStudents assignedSections emailOptOut isActive';
 const STUDENT_FIELDS = 'name rollNumber class section houseId isActive';
 const FAMILY_TYPES = new Set(['parent', 'student']);
 
