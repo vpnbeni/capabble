@@ -6,6 +6,7 @@ import { Button, Card, EmptyState, Page, PageHeader, StatCard, formatDate, forma
 import { usePortal } from '../PortalContext'
 import { usePortalAttendance, usePortalFees, usePortalNotices, usePortalResults, usePortalTimetable } from '../usePortal'
 import { monthKey, NoChild } from './shared'
+import { PortalComingUp } from './PortalCalendar'
 
 const DAY_NAMES = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY']
 
@@ -71,6 +72,7 @@ const PortalOverview: React.FC = () => {
       </div>
 
       <div className="cb-grid-6-6">
+        {has('calendar') ? <PortalComingUp /> : null}
         {has('timetable') ? (
           <Card
             title="Today's periods"

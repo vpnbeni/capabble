@@ -19,6 +19,7 @@ import type { AppNotification, NotificationAudience } from '@/services/notificat
 
 const AREAS: Record<string, string> = {
   core: 'Account',
+  clndr: 'Calendar',
   appnt: 'Appointments',
   exmcl: 'Exams',
   cntr: 'Exam centre',
@@ -32,8 +33,8 @@ const AREAS: Record<string, string> = {
 
 // What each audience can receive, in the order the filter lists them.
 const AREA_OPTIONS: Record<NotificationAudience, string[]> = {
-  staff: ['core', 'appnt', 'exmcl', 'cntr', 'timetable', 'cpitl', 'asets', 'billing'],
-  portal: ['core', 'attnd', 'exmcl', 'cpitl', 'timetable', 'trnst', 'appnt'],
+  staff: ['core', 'clndr', 'appnt', 'exmcl', 'cntr', 'timetable', 'cpitl', 'asets', 'billing'],
+  portal: ['core', 'clndr', 'attnd', 'exmcl', 'cpitl', 'timetable', 'trnst', 'appnt'],
 }
 
 const areaLabel = (audience: NotificationAudience, module: string) =>

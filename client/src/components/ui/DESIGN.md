@@ -63,6 +63,7 @@ When the artifact changes, resync this file and bump the version line.
 - Dates `formatDate(d)` → 7 Oct 2026; `{ year: false }` inside the current year. Times `formatTime('14:30')` → 2:30 pm.
 - Feeds and activity `formatRelative(d)` → Just now, 5 min ago, 3 hours ago, Yesterday, then 7 Oct (not in the artifact yet: added to our kit).
 - Missing values `orDash(v)` → "—". Also: `cx`, `initials`.
+- School days ('YYYY-MM-DD' keys, never a browser Date) `formatDayKey(key, { weekday, month, year })` → Fri 14 Nov; `formatMonth('2026-11')` → November 2026; `dayKeyAdd`, `monthAdd`, `monthGrid` (calendar.tsx).
 
 ## Icons
 
@@ -74,7 +75,7 @@ Lucide (`lucide-react`), passed as components: `icon={Plus}`. 1.75 stroke is app
 - Choice by count: `RadioGroup` 2–5; `Select` ≤15; `Combobox` for long/searchable lists (students, teachers, subjects).
 - On/off: `Switch` applies immediately; `Checkbox` inside a saved form.
 - One of 2–4 short options that applies immediately (theme, view density): `SegmentedControl`. Not for switching views (that's `Tabs`).
-- Dates: `TextField type="date"` (the system's DatePicker/Calendar aren't ported yet).
+- Dates: `TextField type="date"` to type or pick one date (the system's DatePicker isn't ported yet). Showing what is on which day: `MonthCalendar` (full month), `MiniCalendar` (small month with dots, in a card) or `AgendaList` (by day; the phone view).
 - Times from a fixed set of slots: `SlotPicker`. A free-form time: `TextField type="time"`.
 
 ## Kit components (`import { … } from '@/components/ui'`)
@@ -120,6 +121,9 @@ Lucide (`lucide-react`), passed as components: `icon={Plus}`. 1.75 stroke is app
 | `Menu` | `items[{label, icon, hint, onSelect, tone:'danger', disabled} \| {divider:true}], label, align, trigger` | "…" row/card actions; destructive last and still confirm |
 | `PaperStage`, `Paper`, `PaperCopies`, `FormatToolbar` | `Paper pageSize: 'A4' \| 'legal' \| 'letter'` | Print previews (paper stays white in both themes) |
 | `PdfFrame` | `src, title, toolbar` | Embedded PDF preview |
+| `MonthCalendar` | `month ('YYYY-MM'), onMonthChange, today, selected, onSelect, entries[{id,startDate,endDate,title,startTime,category 1–6,note,muted}], onEntryClick, days{[key]:{off,label}}, maxPerDay, toolbar, loading` | The full month: labelled items per day ("+N more"), days off shaded with their name. Category colour (`--chart-N`) always sits next to the item's own words. Turns into a dot grid under 600px; pair it with an `AgendaList` for the selected day. Not in the artifact yet: added to our kit |
+| `MiniCalendar` | `month, onMonthChange, today, selected, onSelect, days{[key]:{off,label,tones}}, legend, weekStartsOn` | Small month (`.cb-cal`) with up to three status dots per day and a legend; for a card ("This month") or picking a day. Not in the artifact yet: added to our kit |
+| `AgendaList` | `groups[{date,dayLabel,off,entries[{…entry, meta, aside}]}], today, onEntryClick, empty, compact` | Items grouped by day with "Today" / "Tomorrow" headings; the calendar's phone view and a dashboard's "Coming up". `compact` inside cards. Not in the artifact yet: added to our kit |
 
 Toasts: `react-hot-toast` (`toast.success`, `toast.error`); the `Toaster` is in `main.tsx`. Services opt out of the global axios toasts with `_silent: true` (see `cpitlService.ts`).
 

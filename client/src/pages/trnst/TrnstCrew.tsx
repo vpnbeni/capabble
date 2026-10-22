@@ -33,6 +33,7 @@ import { DIRECTION_LABEL, LiveBadge, errorMessage, secondsSince, vehicleName } f
 import { trnstKeys, useCrewMe, useRoster } from '@/hooks/useTrnst'
 import { useTripTracker } from '@/hooks/useTripTracker'
 import { usePermissions } from '@/hooks/usePermissions'
+import { MyCalendarCard } from '@/components/calendar/MyCalendarCards'
 
 const EVENT_LABEL: Record<BoardingEvent, string> = { boarded: 'Boarded', dropped: 'Dropped', absent: 'Absent' }
 const EVENT_TONE: Record<BoardingEvent, 'success' | 'info' | 'danger'> = { boarded: 'success', dropped: 'info', absent: 'danger' }
@@ -462,6 +463,8 @@ const TrnstCrew: React.FC = () => {
         ) : (
           <StartTrip vehicles={data.vehicles} todayTrips={todayTrips} onStarted={() => void refresh()} />
         )}
+        {/* School days, closures and duties for the crew too; hidden during a trip to keep the screen clear. */}
+        {!activeTrip && !isLoading ? <div className="cl-crew-card"><MyCalendarCard title="Coming up" days={3} limit={5} /></div> : null}
       </div>
     </Page>
   )

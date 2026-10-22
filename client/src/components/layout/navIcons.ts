@@ -84,6 +84,9 @@ import {
 /** Lucide glyph for each sidebar destination, by route. */
 const BY_HREF: Record<string, LucideIcon> = {
   '/home': LayoutDashboard,
+  '/calendar': CalendarDays,
+  '/calendar/events': CalendarDays,
+  '/settings/school-days': CalendarDays,
   '/school-hub': School,
   '/time-table/teachers': UserRound,
   '/time-table/classes': LayoutGrid,

@@ -3,7 +3,6 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import {
   ArrowRight,
-  CalendarCheck,
   CalendarDays,
   CheckCircle2,
   ClipboardCheck,
@@ -19,6 +18,7 @@ import { isFeatureEnabledForPath } from '@/constants/featureAccess'
 import { STATUS_META } from '@/components/appnt/AppntUi'
 import { formatCount } from '@/components/students/studentFormat'
 import type { QuickAction } from './quickActions'
+import { MonthGlanceCard, MyCalendarCard } from '@/components/calendar/MyCalendarCards'
 
 const pad = (n: number) => String(n).padStart(2, '0')
 const todayKey = () => {
@@ -127,10 +127,6 @@ export const PrincipalDesk: React.FC<{ actions: QuickAction[]; onEditActions: ()
     `/attnd/student-attendance?${new URLSearchParams({ class: className, ...(sections.length === 1 ? { section: sections[0] } : {}), month })}`
   const absentRate = students ? rate(students.todayAbsent, students.strength) : 0
   const halfDayRate = students ? rate(students.todayHalfDay, students.strength) : 0
-  // Calendar events are not exposed by the current API. Keep the school-day label local
-  // so the desk does not issue a failing request while that integration is added.
-  const dayOfWeek = new Date().getDay()
-  const today = { isWeekend: dayOfWeek === 0 || dayOfWeek === 6, isHoliday: false, holidayName: '' }
   return (
     <div className="principal-desk">
       <section className="principal-metrics" aria-label="Today's school overview">
@@ -253,13 +249,7 @@ export const PrincipalDesk: React.FC<{ actions: QuickAction[]; onEditActions: ()
           ) : null}
         </Card>
 
-        <Card
-          title="Today's schedule"
-          subtitle="Events from the academic calendar."
-          action={<Button variant="tertiary" size="sm" iconRight={ArrowRight} onClick={() => navigate('/actvt/calendar')}>Open calendar</Button>}
-        >
-          <EmptyState compact icon={CalendarDays} title="No scheduled events today" body="Academic events and appointments will appear here when they are added to the calendar." />
-        </Card>
+        <MyCalendarCard title="Today and coming up" />
       </section>
 
       <section className="principal-queues">
@@ -297,9 +287,7 @@ export const PrincipalDesk: React.FC<{ actions: QuickAction[]; onEditActions: ()
       </section>
 
       <section className="principal-bottom">
-        <Card title="Academic calendar · today" subtitle={today?.isHoliday ? today.holidayName || 'School holiday' : today?.isWeekend ? 'Weekend' : 'School day'} action={<Button variant="tertiary" size="sm" iconRight={ArrowRight} onClick={() => navigate('/actvt/calendar')}>View calendar</Button>}>
-          <div className="principal-day"><span className="principal-day__icon"><Icon icon={today?.isHoliday ? CalendarDays : CalendarCheck} size={22} /></span><div><strong>{today?.isHoliday ? 'No academic activity planned' : 'Regular academic day'}</strong><p>{today?.isHoliday ? 'Review the holiday schedule and notices for families.' : 'Classes, attendance and daily operations are in progress.'}</p></div></div>
-        </Card>
+        <MonthGlanceCard />
         <Card title="Quick actions" action={<Button variant="tertiary" size="sm" onClick={onEditActions}>Choose actions</Button>}>
           {actions.length ? <div className="principal-actions">{actions.slice(0, 6).map((action) => <button key={action.id} type="button" onClick={() => navigate(action.path)}><Icon icon={action.icon} size={18} /><span>{action.label}</span></button>)}</div> : <EmptyState compact icon={ClipboardCheck} title="No quick actions chosen" action={<Button size="sm" onClick={onEditActions}>Choose actions</Button>} />}
         </Card>

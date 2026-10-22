@@ -207,6 +207,20 @@ const Header: React.FC<HeaderProps> = ({ isSidebarCollapsed, isMobileNav = false
           showBackButton: isDetailRoute,
           backTo: backToPath,
         }
+      case 'calendar':
+        return segments[1] === 'events'
+          ? {
+            pageTitle: 'Calendar events',
+            pageSubtitle: 'Events you created, drafts, and events waiting for approval.',
+            showBackButton: true,
+            backTo: '/calendar',
+          }
+          : {
+            pageTitle: 'Calendar',
+            pageSubtitle: 'What is on for you: school events, holidays, exams, duties and more.',
+            showBackButton: false,
+            backTo: null,
+          }
       case 'notifications':
         return {
           pageTitle: 'Notifications',
@@ -614,6 +628,7 @@ const Header: React.FC<HeaderProps> = ({ isSidebarCollapsed, isMobileNav = false
           roles: isDetail
             ? { title: segments[2] === 'new' ? 'New role' : 'Role', subtitle: 'What people with this role can see and change.' }
             : { title: 'Roles', subtitle: 'Bundles of access you give to staff logins.' },
+          'school-days': { title: 'School days', subtitle: 'Weekly offs, holidays, vacations, half days and closures.' },
         }
         const info = titleMap[subPage] || { title: 'Settings', subtitle: '' }
         return {

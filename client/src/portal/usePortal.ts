@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import portalService, { type PortalAppointmentRequest } from './portalService'
 
 const keys = {
@@ -8,9 +8,20 @@ const keys = {
   notices: () => [...keys.all, 'notices'] as const,
   appointments: () => [...keys.all, 'appointments'] as const,
   notice: (id: string) => [...keys.all, 'notice', id] as const,
+  calendar: (from: string, to: string) => [...keys.all, 'calendar', from, to] as const,
 }
 
 const STALE = 2 * 60 * 1000
+
+/** The family's calendar between two school days (all linked children merged). */
+export const usePortalCalendar = (from: string, to: string, enabled = true) =>
+  useQuery({
+    queryKey: keys.calendar(from, to),
+    queryFn: () => portalService.calendar(from, to),
+    enabled: enabled && Boolean(from && to),
+    placeholderData: keepPreviousData,
+    staleTime: 60_000,
+  })
 
 export const usePortalHome = () => useQuery({ queryKey: keys.home(), queryFn: portalService.home, staleTime: STALE })
 

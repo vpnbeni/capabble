@@ -640,3 +640,68 @@
 .cb-app .cb-columns--rows .cb-columns__hover { width: auto; }
 .cb-app .cb-columns--rows .cb-columns__hover > .cb-hovercard__trigger { flex-direction: row; }
 .cb-app .cb-columns--rows .cb-columns__hover.is-track { width: 100%; }
+
+/* ---------- MonthCalendar · AgendaList (calendar.tsx; not in the artifact yet) ---------- */
+.cb-app .cb-month { width: 100%; }
+.cb-app .cb-month.is-loading .cb-month__grid { opacity: .6; }
+.cb-app .cb-month__head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-bottom: var(--space-3); flex-wrap: wrap; }
+.cb-app .cb-month__title { font: 600 18px/26px var(--font-sans); color: var(--ink); }
+.cb-app .cb-month__nav { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+.cb-app .cb-month__grid { border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; background: var(--surface); }
+.cb-app .cb-month__row { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.cb-app .cb-month__row + .cb-month__row { border-top: 1px solid var(--border); }
+.cb-app .cb-month__row--head { background: var(--surface-sunken); }
+.cb-app .cb-month__weekday { padding: 6px var(--space-2); font: 500 12px/16px var(--font-sans); color: var(--ink-subtle); text-align: left; }
+.cb-app .cb-month__cell { position: relative; min-height: 112px; padding: 6px; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.cb-app .cb-month__cell + .cb-month__cell { border-left: 1px solid var(--border); }
+.cb-app .cb-month__cell.is-outside { background: var(--surface-hover); }
+.cb-app .cb-month__cell.is-outside .cb-month__date { color: var(--ink-subtle); }
+.cb-app .cb-month__cell.is-off { background: var(--surface-sunken); }
+.cb-app .cb-month__cell.is-selected { box-shadow: inset 0 0 0 2px var(--accent); }
+.cb-app .cb-month__date { align-self: flex-start; min-width: 28px; height: 28px; padding: 0 6px; border: 0; border-radius: var(--radius-full); background: none; color: var(--ink); font: 500 13px/18px var(--font-sans); font-variant-numeric: tabular-nums; cursor: pointer; }
+.cb-app .cb-month__date:hover { background: var(--surface-hover); }
+.cb-app .cb-month__date:focus-visible, .cb-app .cb-month__item:focus-visible, .cb-app .cb-month__more:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+.cb-app .cb-month__cell.is-today .cb-month__date { background: var(--accent-strong); color: var(--on-accent); font-weight: 600; }
+.cb-app .cb-month__daylabel { font: 500 12px/16px var(--font-sans); color: var(--ink-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cb-app .cb-month__items { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.cb-app .cb-month__item { width: 100%; display: flex; align-items: center; gap: 6px; padding: 2px 6px; border: 0; border-radius: var(--radius-sm); background: var(--surface-sunken); color: var(--ink); font: 400 12px/16px var(--font-sans); text-align: left; cursor: pointer; min-width: 0; }
+.cb-app .cb-month__item:hover { background: var(--surface-hover); box-shadow: inset 0 0 0 1px var(--border); }
+.cb-app .cb-month__item.is-muted { color: var(--ink-muted); text-decoration: line-through; }
+.cb-app .cb-month__time { color: var(--ink-muted); font-variant-numeric: tabular-nums; flex: none; }
+.cb-app .cb-month__text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.cb-app .cb-month__swatch { flex: none; display: inline-block; width: 8px; height: 8px; border-radius: var(--radius-full); background: var(--accent); }
+.cb-app .cb-month__swatch--c1 { background: var(--chart-1); } .cb-app .cb-month__swatch--c2 { background: var(--chart-2); } .cb-app .cb-month__swatch--c3 { background: var(--chart-3); }
+.cb-app .cb-month__swatch--c4 { background: var(--chart-4); } .cb-app .cb-month__swatch--c5 { background: var(--chart-5); } .cb-app .cb-month__swatch--c6 { background: var(--chart-6); }
+.cb-app .cb-month__more { align-self: flex-start; padding: 0 6px; border: 0; background: none; color: var(--accent-strong); font: 500 12px/16px var(--font-sans); cursor: pointer; }
+.cb-app .cb-month__more:hover { text-decoration: underline; }
+.cb-app .cb-month__dots { display: none; gap: 3px; justify-content: center; }
+@media (max-width: 600px) {
+  .cb-app .cb-month__cell { min-height: 52px; padding: 4px 2px; align-items: center; }
+  .cb-app .cb-month__date { align-self: center; min-width: 32px; height: 32px; }
+  .cb-app .cb-month__items, .cb-app .cb-month__more, .cb-app .cb-month__daylabel { display: none; }
+  .cb-app .cb-month__dots { display: flex; }
+  .cb-app .cb-month__swatch { width: 6px; height: 6px; }
+  .cb-app .cb-month__weekday { text-align: center; padding: 6px 0; }
+}
+
+.cb-app .cb-agenda { display: flex; flex-direction: column; gap: var(--space-4); }
+.cb-app .cb-agenda__date { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); margin: 0 0 var(--space-2); font: 600 13px/18px var(--font-sans); color: var(--ink); }
+.cb-app .cb-agenda__daylabel { font-weight: 500; color: var(--ink-muted); }
+.cb-app .cb-agenda__day.is-off .cb-agenda__date > span:first-child { color: var(--ink-muted); }
+.cb-app .cb-agenda__list { list-style: none; margin: 0; padding: 0; border: 1px solid var(--border); border-radius: var(--radius-md); overflow: hidden; }
+.cb-app .cb-agenda__list > li + li { border-top: 1px solid var(--border); }
+.cb-app .cb-agenda__item { width: 100%; display: grid; grid-template-columns: 64px 8px minmax(0, 1fr) auto; align-items: center; gap: var(--space-3); padding: 10px var(--space-3); border: 0; background: var(--surface); color: var(--ink); font: 400 14px/20px var(--font-sans); text-align: left; min-height: 44px; }
+.cb-app button.cb-agenda__item { cursor: pointer; }
+.cb-app button.cb-agenda__item:hover { background: var(--surface-hover); }
+.cb-app button.cb-agenda__item:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+.cb-app .cb-agenda__item.is-muted .cb-agenda__title { color: var(--ink-muted); text-decoration: line-through; }
+.cb-app .cb-agenda__time { font: 400 13px/18px var(--font-sans); color: var(--ink-muted); font-variant-numeric: tabular-nums; }
+.cb-app .cb-agenda__body { display: flex; flex-direction: column; min-width: 0; }
+.cb-app .cb-agenda__title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cb-app .cb-agenda__note { color: var(--ink-muted); }
+.cb-app .cb-agenda__meta { font: 400 13px/18px var(--font-sans); color: var(--ink-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cb-app .cb-agenda__aside { display: inline-flex; align-items: center; gap: var(--space-2); }
+.cb-app .cb-agenda--compact { gap: var(--space-3); }
+.cb-app .cb-agenda--compact .cb-agenda__list { border: 0; border-radius: 0; }
+.cb-app .cb-agenda--compact .cb-agenda__item { padding: 8px 0; grid-template-columns: 56px 8px minmax(0, 1fr) auto; }
+@media (max-width: 600px) { .cb-app .cb-agenda__item { grid-template-columns: 52px 8px minmax(0, 1fr); } .cb-app .cb-agenda__aside { grid-column: 3; } }

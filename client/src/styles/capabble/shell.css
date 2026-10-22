@@ -168,6 +168,8 @@
 /* School OS (Home) link above the module switcher. */
 .cb-app .cb-shellnav__homewrap { display: flex; align-items: center; gap: var(--space-1); padding-bottom: var(--space-3); border-bottom: 1px solid var(--border); }
 .cb-app.cb-shellnav .cb-shellnav__home { font-weight: 600; }
+.cb-app .cb-shellnav__homewrap.has-next { padding-bottom: var(--space-1); border-bottom: 0; }
+.cb-app .cb-shellnav__calendarwrap { margin-top: 0; }
 .cb-app .cb-shellnav__homewrap .cb-shellnav__home { flex: 1; min-width: 0; }
 .cb-app .cb-shellnav__customize { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; padding: 0; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--ink-muted); cursor: pointer; }
 .cb-app .cb-shellnav__customize:hover { background: var(--surface-hover); color: var(--ink); }
