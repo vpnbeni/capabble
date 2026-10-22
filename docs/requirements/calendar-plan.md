@@ -1,6 +1,6 @@
 # Calendar (CLNDR) — implementation plan
 
-Status: draft for review · 22 Oct 2026 · builds on [universal-calendar-research.md](universal-calendar-research.md)
+Status: built 23 Oct 2026 (phases 0–6; see §13 for what was left for later) · builds on [universal-calendar-research.md](universal-calendar-research.md)
 
 ## 1. Name and packaging
 
@@ -293,3 +293,23 @@ Each phase can ship on its own and is usable when it lands.
 3. **Creators:** principal, administrator and office staff can create events for anyone. Class and subject teachers can create them only for their own sections. Teacher events that reach parents wait for the principal's approval. Schools can change this in Roles.
 4. **Email:** no new paid service. A school can connect its own email (SMTP); otherwise event mail goes from the Hostinger mailbox `events@capabble.cloud`. `no-reply@` is kept for login, reset, invite and billing mail (see §7).
 5. **Activities events:** stay in ACTVT and appear read-only on the Calendar. Merging them into Calendar events is decided in phase 4.
+
+## 13. Build notes (23 Oct 2026)
+
+Built and committed on `stage` (not pushed): phases 0–6 as above, with these differences and gaps.
+
+**Changed from the plan**
+- Event times are stored as school-day keys plus local `HH:MM` (not UTC instants): simpler for one-zone schools; the `.ics` output carries the zone.
+- Email uses no paid service (decision 4): the school's own SMTP or `events@capabble.cloud`, through a per-school outbox.
+- Recurrence edits support "all dates" and "cancel one date"; "this and following" is not built.
+- Approval: a teacher's material change to a published family event goes back to the principal (the event is hidden until approved again).
+
+**Left for later**
+- Attendance day-wise matrix views (`AttndDaywiseMatrix`, `AttndStaffDaywiseMatrix`) still use their own holiday toggles; the month registers, dashboard and portal use School days.
+- Transport has no trip schedule to change; closures reach crews and families through the announcement (all staff + families of the classes).
+- Consent combined with a CPITL fee, web push, a daily digest, quiet hours, WhatsApp/SMS, a printable year planner, saved ad-hoc groups, CPD hour tracking, and class teacher as a stored reference (today: timetable in-charge or class_teacher role + assigned sections).
+- Board exam days (CBSE datesheet) and LIBRY/ASETS/TRNST-document/ACDMC items are not calendar sources yet (the registry makes each one a small `calendar.js`).
+
+**To roll out**
+- `npm run migrate:rbac` (dry run, then `-- --apply`) so existing tenants' roles pick up the calendar permissions; `npm run migrate:calendar` (dry run, then `-- --apply`) to copy any old holidays.
+- Create `events@capabble.cloud`, set `MAIL_EVENTS_*` and `MAIL_CREDENTIALS_KEY` on the server.
