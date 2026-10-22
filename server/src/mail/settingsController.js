@@ -12,10 +12,23 @@ const templates = require('./templates');
 const { platformSender, schoolSender } = require('./outbox');
 const schoolDate = require('../utils/schoolDate');
 
+const HOST_HINT = 'Enter your mail provider\'s server name, e.g. smtp.gmail.com';
+
+const isPublicMailHost = (host) => {
+  const value = String(host || '').toLowerCase();
+  if (!value) return true;
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(value) || value.includes(':')) return false;
+  if (!value.includes('.')) return false;
+  return !/(^|\.)(localhost|local|internal|intranet|lan|home|corp)$/.test(value);
+};
+
 const schema = Joi.object({
   enabled: Joi.boolean().required(),
-  host: Joi.string().trim().hostname().max(200).allow(''),
-  port: Joi.number().integer().min(1).max(65535).default(587),
+  // A mail provider's host name (not an IP address or an internal name) on a mail port only.
+  host: Joi.string().trim().hostname().max(200).allow('')
+    .custom((value, helpers) => (isPublicMailHost(value) ? value : helpers.message(HOST_HINT))),
+  port: Joi.number().integer().valid(25, 465, 587, 2525).default(587)
+    .messages({ 'any.only': 'Use port 465, 587, 2525 or 25' }),
   secure: Joi.boolean().default(false),
   user: Joi.string().trim().max(200).allow(''),
   // Leave empty to keep the stored password.
@@ -162,4 +175,4 @@ router.post('/test', requirePermission('core.school.write'), testSettings);
 
 const mountRoutes = (tenantRouter) => tenantRouter.use('/mail-settings', router);
 
-module.exports = { mountRoutes, view };
+module.exports = { mountRoutes, view, isPublicMailHost };

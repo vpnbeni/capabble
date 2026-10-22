@@ -3,7 +3,9 @@
  * creating, publishing, approving and cancelling events.
  */
 const schoolDate = require('../../utils/schoolDate');
-const { getAssignedSections, normalizeClassName, sectionKey } = require('../../rbac/scope');
+const {
+  getAssignedSections, buildSectionFilter, normalizeClassName, sectionKey
+} = require('../../rbac/scope');
 const { roleTemplates } = require('../../rbac/catalog');
 const { send } = require('../../notifications/send');
 const recipients = require('../../notifications/recipients');
@@ -212,6 +214,8 @@ const publish = async (req, event, { publishAt } = {}) => {
   await assertCanTarget(actorFor(req), event.segments, event.visibility);
 
   if (needsApproval(req.rbac, event.segments)) {
+    // Each submission is a new revision, so the principal is told again after a send-back.
+    if (event.submittedBy || event.rejectionNote) event.revision += 1;
     event.status = 'pending_approval';
     event.submittedBy = req.user._id;
     event.rejectionNote = '';
@@ -268,6 +272,12 @@ const updateEvent = handle(async (req, res) => {
   const diff = diffEvents(before, event.toObject());
 
   if (event.status !== 'published') {
+    // An approved event waiting for its publish time goes back to the principal if a non-approver changes it.
+    if (event.status === 'scheduled' && diff.material && needsApproval(req.rbac, event.segments)) {
+      event.status = 'draft';
+      const outcome = await publish(req, event);
+      return res.json({ success: true, data: { id: String(event._id), ...outcome, changed: diff } });
+    }
     await event.save();
     return res.json({ success: true, data: { id: String(event._id), status: event.status, changed: diff } });
   }
@@ -313,6 +323,9 @@ const publishEvent = handle(async (req, res) => {
 const loadPending = async (req) => {
   const event = await req.models.CalendarEvent.findById(req.params.id);
   if (!event) throw httpError(404, 'Event not found.');
+  if (!can(req, PERMISSIONS.APPROVE, PERMISSIONS.MANAGE)) {
+    throw httpError(403, 'Only the principal can approve events.');
+  }
   if (event.status !== 'pending_approval') throw httpError(400, 'This event is not waiting for approval.');
   if (isMine(req, event) && !can(req, PERMISSIONS.MANAGE)) {
     throw httpError(403, 'Someone else has to approve your event.');
@@ -523,9 +536,16 @@ const lookupPeople = handle(async (req, res) => {
   const pattern = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
   const kind = ['staff', 'parent', 'student'].includes(req.query.kind) ? req.query.kind : 'staff';
   const { User, Student } = req.models;
+  // Teachers limited to their own sections only find students and families of those sections, and no emails.
+  const wide = can(req, PERMISSIONS.MANAGE, PERMISSIONS.PUBLISH_WIDE);
+  const assignedOnly = !wide && req.rbac.scopeOf(PERMISSIONS.CREATE) === 'assigned';
+  const sectionFilter = assignedOnly ? await buildSectionFilter(req, PERMISSIONS.CREATE) : null;
+  const showEmail = !assignedOnly;
   if (kind !== 'staff' && req.query.by === 'student' && Student) {
-    const students = await Student.find({ isActive: { $ne: false }, $or: [{ name: pattern }, { rollNumber: pattern }] })
-      .select('name rollNumber class section').limit(20).lean();
+    const students = await Student.find({
+      isActive: { $ne: false },
+      $and: [{ $or: [{ name: pattern }, { rollNumber: pattern }] }, ...(sectionFilter ? [sectionFilter] : [])]
+    }).select('name rollNumber class section').limit(20).lean();
     return res.json({
       success: true,
       data: students.map((s) => ({
@@ -535,15 +555,21 @@ const lookupPeople = handle(async (req, res) => {
       }))
     });
   }
-  const users = await User.find({
-    kind, isActive: { $ne: false }, $or: [{ name: pattern }, { email: pattern }, { username: pattern }]
-  }).select('name email username').limit(20).lean();
+  const searchable = [{ name: pattern }, ...(showEmail ? [{ email: pattern }, { username: pattern }] : [])];
+  const filter = { kind, isActive: { $ne: false }, $or: searchable };
+  if (assignedOnly && kind !== 'staff') {
+    const mine = Student
+      ? await Student.find({ isActive: { $ne: false }, ...(sectionFilter || {}) }).select('rollNumber').lean()
+      : [];
+    filter['linkedStudents.rollNumber'] = { $in: mine.map((s) => String(s.rollNumber).toUpperCase()) };
+  }
+  const users = await User.find(filter).select('name email username').limit(20).lean();
   return res.json({
     success: true,
     data: users.map((u) => ({
       type: 'user',
       value: String(u._id),
-      label: [u.name || u.username, u.email && `(${u.email})`].filter(Boolean).join(' ')
+      label: [u.name || u.username, showEmail && u.email && `(${u.email})`].filter(Boolean).join(' ')
     }))
   });
 });
@@ -574,7 +600,8 @@ const listSchoolDays = handle(async (req, res) => {
       today,
       rules: rules.map((rule) => ({ ...rule, id: String(rule._id) })),
       summary: { days: Object.keys(days).length, working, off: Object.keys(days).length - working },
-      usingDefaultSunday: !rules.some((rule) => rule.kind === 'weekly_off' && rule.status === 'active')
+      usingDefaultSunday: !rules.some((rule) => rule.kind === 'weekly_off' && rule.status === 'active'
+        && rule.weekly?.weekday === 0)
     }
   });
 });
@@ -650,6 +677,10 @@ const announceRule = async (req, rule, options) => {
 // POST /api/school-days/rules
 const createRule = handle(async (req, res) => {
   const { SchoolDayRule } = req.models;
+  if (req.body.announce && !can(req, PERMISSIONS.PUBLISH_WIDE, PERMISSIONS.MANAGE)) {
+    const message = 'Only the principal or office can announce school days to everyone. Save it without announcing.';
+    throw httpError(403, message);
+  }
   const rule = new SchoolDayRule({ createdBy: req.user._id, updatedBy: req.user._id });
   applyRuleInput(rule, req.body);
   await rule.validate();

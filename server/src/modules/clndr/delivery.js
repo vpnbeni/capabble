@@ -17,6 +17,9 @@ const { resolveRecipients } = require('./audience');
 
 const LOG_LIMIT = 30;
 const STALE_MS = 10 * 60 * 1000;
+const SENDING_STALE_MS = 45 * 60 * 1000;
+// Runs for a hand-picked list of people (not stored) can't be re-run safely.
+const NOT_RESUMABLE = new Set(['removed', 'response_reminder']);
 
 let mail = null;
 const mailer = () => {
@@ -125,7 +128,7 @@ const finishRun = (models, eventId, runId, fields) => models.CalendarEvent.updat
 const runLogged = async ({ tenant, models, eventId, runId, opts }) => {
   const event = await models.CalendarEvent.findById(eventId).lean();
   if (!event) return null;
-  await finishRun(models, eventId, runId, { status: 'sending' });
+  await finishRun(models, eventId, runId, { status: 'sending', at: new Date() });
   try {
     const result = await deliver({ tenant, models, event, ...opts });
     await finishRun(models, eventId, runId, {
@@ -173,15 +176,25 @@ const resumeStale = async (tenant, models, now = new Date()) => {
   const { CalendarEvent } = models;
   if (!CalendarEvent) return 0;
   const before = new Date(now.getTime() - STALE_MS);
+  const sendingBefore = new Date(now.getTime() - SENDING_STALE_MS);
+  const stale = (run) => (run.status === 'queued' && run.at < before)
+    || (run.status === 'sending' && run.at < sendingBefore);
   const events = await CalendarEvent.find({
     sendLog: { $elemMatch: { status: { $in: ['queued', 'sending'] }, at: { $lt: before } } }
   }).select('sendLog').lean();
   let resumed = 0;
   // eslint-disable-next-line no-restricted-syntax
   for (const event of events) {
-    const runs = (event.sendLog || []).filter((run) => ['queued', 'sending'].includes(run.status) && run.at < before);
+    const runs = (event.sendLog || []).filter(stale);
     // eslint-disable-next-line no-restricted-syntax
     for (const run of runs) {
+      if (NOT_RESUMABLE.has(run.change)) {
+        // eslint-disable-next-line no-await-in-loop
+        await finishRun(models, event._id, run._id, {
+          status: 'failed', finishedAt: now, error: 'Stopped by a restart; send it again'
+        });
+        continue; // eslint-disable-line no-continue
+      }
       const opts = {
         change: run.change,
         occurrence: run.occurrence,

@@ -171,6 +171,11 @@ const drainTenant = async (tenant, { now = new Date(), transportOverride = null 
   const result = {
     sent: 0, failed: 0, capped: 0, retried: 0, suppressed: 0
   };
+  // A send cut off by a restart is left 'sending': after 15 minutes it is queued again.
+  await MailOutbox.updateMany(
+    { status: 'sending', updatedAt: { $lt: new Date(now.getTime() - 15 * 60000) } },
+    { $set: { status: 'queued', lastError: 'Interrupted; trying again' } }
+  );
   const due = await MailOutbox.find({ status: 'queued', nextAttemptAt: { $lte: now } })
     .sort({ createdAt: 1 }).limit(BATCH).lean();
   if (!due.length) return result;

@@ -115,3 +115,15 @@ describe('legacy calendar migration', () => {
     expect(legacyHolidays(docs)).toEqual([{ date: '2026-11-08', title: 'Diwali' }]);
   });
 });
+
+describe('Sunday with other weekly offs', () => {
+  it('keeps Sunday off when the school only adds a Saturday rule', async () => {
+    const saturday = { _id: 's', kind: 'weekly_off', status: 'active', startDate: '2026-04-01', endDate: '9999-12-31', weekly: { weekday: 6, weeksOfMonth: [2, 4] }, appliesTo: { scope: 'school' } };
+    const models = {
+      SchoolDayRule: { find: () => ({ lean: async () => [saturday] }), countDocuments: async (filter) => (filter['weekly.weekday'] === 0 ? 0 : 1) }
+    };
+    const days = await range(models, '2026-10-24', '2026-10-25');
+    expect(days['2026-10-24'].working).toBe(false);
+    expect(days['2026-10-25'].working).toBe(false);
+  });
+});

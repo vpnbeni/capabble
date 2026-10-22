@@ -143,10 +143,14 @@ const prepareSegments = (segments = []) => segments.map((segment) => {
 }).filter((segment) => SCOPE_TYPES[segment.personType] && segment.scopes.length);
 
 /** Fields that, when changed after publishing, make it a new revision people should hear about. */
-const MATERIAL_FIELDS = ['title', 'startDate', 'endDate', 'startTime', 'endTime', 'allDay', 'venue'];
+const MATERIAL_FIELDS = [
+  'title', 'startDate', 'endDate', 'startTime', 'endTime', 'allDay', 'venue',
+  'description', 'category', 'critical', 'circularNo'
+];
 
 const segmentFingerprint = (segment) => JSON.stringify([
-  segment.personType, segment.scopes, segment.exclude, segment.instructions, segment.role, segment.attachments
+  segment.personType, segment.scopes, segment.exclude, segment.instructions, segment.role, segment.attachments,
+  segment.response, segment.responseDeadline || null, Boolean(segment.email), segment.notify
 ]);
 
 /**
@@ -156,6 +160,7 @@ const segmentFingerprint = (segment) => JSON.stringify([
 const diffEvents = (before, after) => {
   const fields = MATERIAL_FIELDS.filter((field) => String(before[field] ?? '') !== String(after[field] ?? ''));
   if (JSON.stringify(before.recurrence || {}) !== JSON.stringify(after.recurrence || {})) fields.push('recurrence');
+  if (JSON.stringify(before.attachments || []) !== JSON.stringify(after.attachments || [])) fields.push('attachments');
   const beforeSegments = new Map((before.segments || []).map((s) => [s.key, s]));
   const afterSegments = new Map((after.segments || []).map((s) => [s.key, s]));
   const changedSegments = [...afterSegments.values()]

@@ -113,7 +113,8 @@ const tracker = async (models, event) => {
     recipients.forEach(({ user, segments }) => {
       const hit = segments.find((s) => s.key === segment.key);
       if (!hit) return;
-      if (segment.personType === 'parent' && hit.childIds?.length) {
+      // Family logins answer per child (a student login's child is themselves).
+      if (segment.personType !== 'staff' && hit.childIds?.length) {
         hit.childIds.forEach((studentId, i) => expected.push({ user, studentId, child: hit.children[i] || '' }));
       } else {
         expected.push({ user, studentId: '', child: '' });
@@ -168,7 +169,7 @@ const pendingRecipients = async (models, event, segmentKey = null) => {
       .map((hit) => {
         const segment = segments.find((s) => s.key === hit.key);
         if (!segment) return null;
-        if (segment.personType === 'parent' && hit.childIds?.length) {
+        if (segment.personType !== 'staff' && hit.childIds?.length) {
           const idx = hit.childIds
             .map((id, i) => (done.has(`${hit.key}:${user._id}:${id}`) ? -1 : i))
             .filter((i) => i >= 0);

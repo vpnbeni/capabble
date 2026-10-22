@@ -73,6 +73,13 @@ const SCOPE_TYPE_LABELS: Partial<Record<ScopeType, string>> = {
 }
 const STAFF_SECTION_LABEL = 'Teachers of these sections'
 
+/** A stored instant as the browser-local 'YYYY-MM-DDTHH:MM' a datetime-local field expects. */
+const toLocalInput = (value: string) => {
+  const d = new Date(value)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
 const newKey = () => Math.random().toString(36).slice(2, 10)
 
 const blankSegment = (personType: PersonType, scopeType: ScopeType = 'section'): Segment & { key: string } => ({
@@ -403,7 +410,7 @@ const EventComposer: React.FC<{ open: boolean; eventId: string | null; defaultDa
       critical: Boolean(existing.critical),
       circularNo: existing.circularNo || '',
       when: existing.publishAt && existing.status !== 'published' ? 'later' : 'now',
-      publishAt: existing.publishAt ? new Date(existing.publishAt).toISOString().slice(0, 16) : '',
+      publishAt: existing.publishAt ? toLocalInput(existing.publishAt) : '',
       segments: existing.segments.map((s) => ({ ...s, exclude: s.exclude || [], reminders: s.reminders || [] })),
     })
   }, [existing, open])

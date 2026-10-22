@@ -26,7 +26,7 @@ const withEffectiveDueDates = async (models, demands, { mode = null, settings = 
     const keys = demands.map((d) => (d.dueDate ? schoolDate.dateKey(d.dueDate) : '')).filter(Boolean).sort();
     if (!keys.length) return demands;
     const from = keys[0];
-    const to = schoolDate.addDays(keys[keys.length - 1], 45);
+    const to = schoolDate.addDays(keys[keys.length - 1], 120);
     // A session of instalments spans more than the 400 days one lookup allows: read it in windows.
     const rules = await schoolDays.loadRules(models, from, to);
     const days = {};
@@ -37,7 +37,8 @@ const withEffectiveDueDates = async (models, demands, { mode = null, settings = 
     }
     const nextWorking = (key) => {
       let cursor = key;
-      for (let i = 0; i < 45; i += 1) {
+      // Long vacations (summer) can push a due date up to four months.
+      for (let i = 0; i < 120; i += 1) {
         if (!days[cursor] || days[cursor].working) return cursor;
         cursor = schoolDate.addDays(cursor, 1);
       }

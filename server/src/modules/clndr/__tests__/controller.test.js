@@ -240,3 +240,40 @@ describe('school days', () => {
     expect(created[0].endDate).toBe('9999-12-31');
   });
 });
+
+describe('review fixes', () => {
+  const pending = (createdBy) => new CalendarEvent({
+    uid: 'p@test', title: 'Trip', startDate: '2026-11-20', endDate: '2026-11-20', status: 'pending_approval', createdBy, revision: 1,
+    segments: [{ key: 'p', personType: 'parent', scopes: [{ type: 'section', value: '7|B' }] }]
+  });
+
+  it('lets only approvers approve or send back someone else\'s event', async () => {
+    const req = baseReq('class_teacher');
+    const event = pending(new mongoose.Types.ObjectId());
+    req.params.id = String(event._id);
+    req.models.CalendarEvent = Object.assign(Object.create(CalendarEvent), { findById: async () => event });
+    let res = await run(ctrl.approveEvent, req);
+    expect(res.status).toHaveBeenCalledWith(403);
+    res = await run(ctrl.rejectEvent, { ...req, body: { note: 'x' } }, schemas.rejectEvent);
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(event.status).toBe('pending_approval');
+  });
+
+  it('sends an approved, scheduled event back for approval when its teacher changes it', async () => {
+    const req = baseReq('class_teacher');
+    const event = pending(req.user._id);
+    event.status = 'scheduled';
+    event.publishAt = new Date(Date.now() + 86400000);
+    req.params.id = String(event._id);
+    req.models.CalendarEvent = Object.assign(Object.create(CalendarEvent), { findById: async () => event });
+    req.body = { description: 'Now with a different plan' };
+    const res = await run(ctrl.updateEvent, req, schemas.updateEvent);
+    expect(res.json.mock.calls[0][0].data.status).toBe('pending_approval');
+  });
+
+  it('refuses mail servers on internal addresses', () => {
+    const { isPublicMailHost } = require('../../../mail/settingsController'); // eslint-disable-line global-require
+    expect(isPublicMailHost('smtp.gmail.com')).toBe(true);
+    ['169.254.169.254', '10.0.0.5', 'localhost', 'mongo', 'db.internal', '::1'].forEach((host) => expect(isPublicMailHost(host)).toBe(false));
+  });
+});

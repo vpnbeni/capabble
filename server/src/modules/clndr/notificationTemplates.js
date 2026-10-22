@@ -70,7 +70,7 @@ module.exports = {
       if (data.change === 'reminder') return `${data.event.id}:${data.occurrence}:${data.slot}`;
       // At most one "please reply" nudge a day.
       if (data.change === 'response_reminder') return `${data.event.id}:reply:${data.slot}`;
-      return `${data.event.id}:r${data.event.revision}:${data.change}`;
+      return `${data.event.id}:r${data.event.revision}:${data.change}${data.occurrence ? `:${data.occurrence}` : ''}`;
     },
     build: (data, user) => {
       const { event, change } = data;

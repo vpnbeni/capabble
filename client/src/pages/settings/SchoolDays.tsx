@@ -514,7 +514,7 @@ const SchoolDays: React.FC = () => {
 
         <Card
           title="Weekly days off"
-          subtitle={data?.usingDefaultSunday ? 'Sunday is off unless you set a pattern here.' : undefined}
+          subtitle={data?.usingDefaultSunday ? 'Every Sunday is off. Patterns added here are off as well.' : undefined}
           action={<Button size="sm" variant="tertiary" onClick={() => setSheet({ open: true, rule: null, kind: 'weekly_off' })}>Add a weekly day off</Button>}
         >
           {weeklyOffs.length ? (

@@ -7,8 +7,8 @@
  *   days['2026-11-14'] // { working: false, kind: 'holiday', label: "Children's Day", ... }
  *
  * Precedence on one day: closure > working-day override > vacation > holiday >
- * weekly off. A half day only applies to a working day. A school with no weekly
- * off rule at all has Sunday off.
+ * weekly off. A half day only applies to a working day. Sunday is off unless
+ * the school set its own Sunday rule (a working-day override opens a Sunday).
  */
 const schoolDate = require('../../utils/schoolDate');
 const { normalizeClassName, sectionKey } = require('../../rbac/scope');
@@ -145,11 +145,12 @@ const assertRange = (from, to) => {
 const loadRules = async (models, from, to) => {
   const { SchoolDayRule } = models;
   if (!SchoolDayRule) return [IMPLICIT_SUNDAY];
-  const [rules, weeklyCount] = await Promise.all([
+  const [rules, sundayRules] = await Promise.all([
     SchoolDayRule.find({ status: 'active', startDate: { $lte: to }, endDate: { $gte: from } }).lean(),
-    SchoolDayRule.countDocuments({ status: 'active', kind: 'weekly_off' })
+    SchoolDayRule.countDocuments({ status: 'active', kind: 'weekly_off', 'weekly.weekday': 0 })
   ]);
-  return weeklyCount ? rules : [...rules, IMPLICIT_SUNDAY];
+  // Sunday is off unless the school set its own Sunday pattern; a Saturday rule adds to it.
+  return sundayRules ? rules : [...rules, IMPLICIT_SUNDAY];
 };
 
 /** Day info for every day in [from, to] for the given audience (null = whole school). */

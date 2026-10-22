@@ -19,7 +19,7 @@ const fees = {
     if (!FeeDemand) return [];
     const dueDate = dateFieldRange(from, to, timeZone);
     // Look a little earlier too: a due date on a holiday may have moved into this range.
-    const widened = (range) => ({ ...range, $gte: new Date(range.$gte.getTime() - 14 * 86400000) });
+    const widened = (range) => ({ ...range, $gte: new Date(range.$gte.getTime() - 120 * 86400000) });
     const inRange = (demand) => {
       const key = schoolDate.dateKey(dueDateOf(demand), timeZone);
       return key >= from && key <= to;
