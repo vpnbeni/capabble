@@ -14,6 +14,8 @@ const { buildClassPDFContext } = require('../services/timetableExportService');
 const { buildCardData } = require('./reportCardController');
 const { receiptPdf } = require('./cpitl/collectionController');
 const { sectionKey } = require('../rbac/scope');
+const schoolDays = require('../modules/clndr/schoolDays');
+const { withEffectiveDueDates, dueDateOf } = require('../modules/cpitl/dueDates');
 const {
   closeStaleTrips, serviceDate, sortedStops, publicStop, staleSeconds
 } = require('../modules/trnst/trips');
@@ -171,14 +173,19 @@ const getAttendance = asyncHandler(async (req, res) => {
 
   const [year, monthNumber] = month.split('-').map(Number);
   const today = dateKey();
+  const lastDay = `${month}-${pad2(new Date(year, monthNumber, 0).getDate())}`;
+  // Weekly offs, holidays and closures for this child's class come from the school calendar.
+  const calendar = await schoolDays.range(req.models, `${month}-01`, lastDay, { className: student.class, section: student.section })
+    .catch(() => null);
   const days = Array.from({ length: new Date(year, monthNumber, 0).getDate() }, (_, index) => {
     const key = `${month}-${pad2(index + 1)}`;
+    const day = calendar?.[key];
     let status = 'present';
     if (key > today) status = 'upcoming';
-    else if (new Date(`${key}T00:00:00`).getDay() === 0) status = 'weekly_off';
-    else if (holidays.has(key)) status = 'holiday';
+    else if (day ? day.kind === 'weekly_off' : new Date(`${key}T00:00:00`).getDay() === 0) status = 'weekly_off';
+    else if (holidays.has(key) || (day && !day.working)) status = 'holiday';
     else if (marks.has(key)) status = marks.get(key);
-    return { date: key, status };
+    return { date: key, status, ...(day && day.kind !== 'working' && day.label ? { label: day.label } : {}) };
   });
 
   const count = (status) => days.filter((day) => day.status === status).length;
@@ -293,7 +300,7 @@ const getFees = asyncHandler(async (req, res) => {
   const account = await loadFeeAccount(req);
   if (!account || !FeeDemand || !FeePayment) return res.json({ success: true, data: null });
 
-  const [demands, payments] = await Promise.all([
+  const [storedDemands, payments] = await Promise.all([
     FeeDemand.find({ accountId: account._id, status: { $ne: 'waived' } })
       .select('label periodKey dueDate total paid balance status lines.name lines.net')
       .sort({ dueDate: 1 }).lean(),
@@ -302,6 +309,7 @@ const getFees = asyncHandler(async (req, res) => {
       .sort({ date: -1 }).lean()
   ]);
   const now = new Date();
+  const demands = await withEffectiveDueDates(req.models, storedDemands);
 
   return res.json({
     success: true,
@@ -314,12 +322,13 @@ const getFees = asyncHandler(async (req, res) => {
       demands: demands.map((demand) => ({
         _id: demand._id,
         label: demand.label || demand.periodKey,
-        dueDate: demand.dueDate,
+        dueDate: dueDateOf(demand),
+        ...(demand.dueDateMovedFrom ? { dueDateMovedFrom: demand.dueDateMovedFrom } : {}),
         total: demand.total,
         paid: demand.paid,
         balance: demand.balance,
         status: demand.status,
-        isOverdue: demand.balance > 0 && demand.dueDate && new Date(demand.dueDate) < now,
+        isOverdue: demand.balance > 0 && demand.dueDate && new Date(dueDateOf(demand)) < now,
         lines: (demand.lines || []).map((line) => ({ name: line.name, amount: line.net }))
       })),
       payments: payments.map((payment) => ({

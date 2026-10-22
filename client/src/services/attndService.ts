@@ -114,6 +114,18 @@ const getStudentDirectory = async (className?: string, section?: string): Promis
   return Array.isArray(response?.data?.data) ? response.data.data : []
 }
 
+/** Staff absences for a month plus the school calendar's days off for it. */
+const getStaffMonth = async (month: string): Promise<{
+  records: Array<{ staffId: string; attendanceDate: string; status: AttendanceStatus; remarks?: string }>
+  schoolDays: SchoolDayMap
+}> => {
+  const response = await api.get('/attnd/staff', { params: { month } })
+  return {
+    records: Array.isArray(response?.data?.data) ? response.data.data : [],
+    schoolDays: response?.data?.schoolDays || {},
+  }
+}
+
 const getStaffAttendance = async (
   options: { month?: string; date?: string }
 ): Promise<Array<{ staffId: string; attendanceDate: string; status: AttendanceStatus; remarks?: string }>> => {
@@ -137,19 +149,27 @@ const getStudentAttendance = async (
 ): Promise<{
   records: Array<{ studentId: string; attendanceDate: string; status: AttendanceStatus; remarks?: string; className?: string; section?: string }>
   daySettings: Array<{ attendanceDate: string; category?: 'academic' | 'non-academic'; className?: string; section?: string }>
+  schoolDays: SchoolDayMap
 }> => {
   const response = await api.get('/attnd/students', {
     params: { className, section, date: options.date, month: options.month },
   })
   const payload = response?.data?.data
   if (Array.isArray(payload)) {
-    return { records: payload, daySettings: [] }
+    return { records: payload, daySettings: [], schoolDays: {} }
   }
   return {
     records: Array.isArray(payload?.records) ? payload.records : [],
     daySettings: Array.isArray(payload?.daySettings) ? payload.daySettings : [],
+    schoolDays: payload?.schoolDays || {},
   }
 }
+
+/** Days off or shortened by the school calendar: { 'YYYY-MM-DD': { working, kind, label, implicit } }. */
+export type SchoolDayMap = Record<string, { working: boolean; kind: string; label: string; halfDayEndTime?: string; implicit?: boolean }>
+
+/** Days the school set as closed (holidays, closures, weekly offs it chose) — not the default Sunday. */
+export const isSchoolClosed = (map: SchoolDayMap, dateKey: string) => Boolean(map[dateKey] && !map[dateKey].working && !map[dateKey].implicit)
 
 const saveStudentAttendance = async (
   className: string,
@@ -200,6 +220,7 @@ const attndService = {
   getStudentFilters,
   getStudentDirectory,
   getStaffAttendance,
+  getStaffMonth,
   saveStaffAttendance,
   getStudentAttendance,
   saveStudentAttendance,

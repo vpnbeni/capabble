@@ -1,4 +1,5 @@
 const { StaffAttendanceDaily, StudentAttendanceDaily, StudentAttendanceDay } = require('../models/AttndDailyRecord');
+const schoolDays = require('../modules/clndr/schoolDays');
 const { isAssignedScope, getAssignedSections, sectionKey } = require('../rbac/scope');
 const Teacher = require('../models/Teacher');
 const Student = require('../models/Student');
@@ -163,11 +164,13 @@ const getStaffAttendance = async (req, res) => {
     if (date) filter.attendanceDate = date;
     else filter.attendanceDate = { $regex: `^${month}-` };
 
-    const records = await StaffAttendanceModel.find(filter)
-      .select('staffId attendanceDate status remarks')
-      .lean();
+    const [records, schoolDaysMap] = await Promise.all([
+      StaffAttendanceModel.find(filter).select('staffId attendanceDate status remarks').lean(),
+      schoolDayMap(req, { month: month || date.slice(0, 7), date })
+    ]);
 
-    res.json({ success: true, data: records });
+    // `data` stays the list of records for older screens; school days ride alongside.
+    res.json({ success: true, data: records, schoolDays: schoolDaysMap });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Failed to fetch staff attendance', error: error.message });
   }
@@ -256,13 +259,17 @@ const getStudentAttendance = async (req, res) => {
     const dayFilter = { className, section };
     if (date) dayFilter.attendanceDate = date;
     else dayFilter.attendanceDate = { $regex: `^${month}-` };
-    const daySettings = await DayModel.find(dayFilter).select('attendanceDate category').lean();
+    const [daySettings, schoolDaysMap] = await Promise.all([
+      DayModel.find(dayFilter).select('attendanceDate category').lean(),
+      schoolDayMap(req, { month: month || date.slice(0, 7), date, className, section })
+    ]);
 
     return res.json({
       success: true,
       data: {
         records,
         daySettings,
+        schoolDays: schoolDaysMap,
       },
     });
   } catch (error) {
@@ -418,6 +425,32 @@ const localMonthKey = (date = new Date()) => localDateKey(date).slice(0, 7);
 
 const isSundayKey = (dateKey) => new Date(`${dateKey}T00:00:00`).getDay() === 0;
 
+/**
+ * Days the school calendar marks as not ordinary working days (holidays, closures,
+ * half days) for a month or a date, for one class-section or the whole school.
+ * { [date]: { working, kind, label, halfDayEndTime, implicit } }. Fails soft to {}.
+ */
+const schoolDayMap = async (req, { month, date, className, section }) => {
+  try {
+    const from = date || `${month}-01`;
+    const to = date || daysInMonthKeys(month).slice(-1)[0];
+    const scope = className ? { className, section } : null;
+    const days = await schoolDays.range(req.models, from, to, scope);
+    return Object.fromEntries(Object.values(days)
+      .filter((day) => day.kind !== 'working')
+      .map((day) => [day.date, {
+        working: day.working,
+        kind: day.kind,
+        label: day.label,
+        halfDayEndTime: day.halfDayEndTime,
+        implicit: day.rules.length > 0 && day.rules.every((rule) => rule.implicit)
+      }]));
+  } catch (error) {
+    console.warn(`[attnd] school days unavailable: ${error.message}`);
+    return {};
+  }
+};
+
 const daysInMonthKeys = (month) => {
   const [yearValue, monthValue] = String(month).split('-').map(Number);
   const count = new Date(yearValue, monthValue, 0).getDate();
@@ -487,7 +520,10 @@ const getDashboard = async (req, res) => {
     ]);
 
     const dayKeys = daysInMonthKeys(month);
-    const elapsedDays = dayKeys.filter((dateKey) => dateKey <= viewDate && !isSundayKey(dateKey));
+    // Working days come from the school calendar (weekly offs, holidays, closures); Sunday if unset.
+    const offDays = await schoolDayMap(req, { month });
+    const isWorkingKey = (dateKey) => (offDays[dateKey] ? offDays[dateKey].working : true);
+    const elapsedDays = dayKeys.filter((dateKey) => dateKey <= viewDate && isWorkingKey(dateKey));
     const workingDayCount = Math.max(elapsedDays.length, 1);
 
     const staffToday = summarizeRecords(staffRecords, viewDate);
@@ -608,6 +644,8 @@ const getDashboard = async (req, res) => {
         date: dateKey,
         weekday: new Date(`${dateKey}T00:00:00`).toLocaleDateString('en-US', { weekday: 'short' }),
         isSunday: isSundayKey(dateKey),
+        isWorking: isWorkingKey(dateKey),
+        dayLabel: offDays[dateKey]?.label || '',
         staffAbsent: staffDay.absent,
         staffHalfDay: staffDay.halfDay,
         studentAbsent: studentDay.absent,
@@ -621,6 +659,7 @@ const getDashboard = async (req, res) => {
         month,
         date: viewDate,
         workingDays: elapsedDays.length,
+        today: offDays[viewDate] ? { working: offDays[viewDate].working, label: offDays[viewDate].label } : { working: true, label: '' },
         staff: {
           strength: staffStrength,
           todayPresent: Math.max(staffStrength - staffToday.absent - staffToday.halfDay, 0),

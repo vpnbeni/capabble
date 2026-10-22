@@ -333,6 +333,25 @@ export const mailSettingsService = {
   test: () => data<{ sentTo: string }>(api.post('/mail-settings/test')),
 }
 
+/**
+ * The first working day on or after `key` for a class (or the whole school), from the
+ * school calendar. Falls back to `key` when the calendar can't be read.
+ */
+export const firstWorkingDay = async (key: string, scope: { className?: string; section?: string } = {}) => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) return key
+  try {
+    const end = new Date(`${key}T00:00:00Z`)
+    end.setUTCDate(end.getUTCDate() + 21)
+    const { days } = await calendarService.days({
+      from: key, to: end.toISOString().slice(0, 10), class: scope.className || undefined, section: scope.section || undefined,
+    })
+    const found = Object.keys(days).sort().find((day) => days[day].working)
+    return found || key
+  } catch {
+    return key
+  }
+}
+
 export const apiMessage = (error: unknown, fallback: string) => {
   const message = (error as { response?: { data?: { message?: string } } })?.response?.data?.message
   return message || fallback

@@ -11,6 +11,8 @@ import { AttndSettingsButton } from '@/components/attnd/AttndSettingsDialog'
 import { sortSectionNames } from '@/constants/studentClasses'
 import { useAttndMatrixMode } from '@/contexts/AttndMatrixModeContext'
 import attndService, {
+  isSchoolClosed,
+  type SchoolDayMap,
   type StudentClassOption,
   type StudentDirectoryItem,
 } from '@/services/attndService'
@@ -55,6 +57,8 @@ const AttndStudentAttendance: React.FC = () => {
   const [studentRows, setStudentRows] = useState<StudentDirectoryItem[]>([])
   const [absenceMap, setAbsenceMap] = useState<AbsenceMap>({})
   const [dayCategoryMap, setDayCategoryMap] = useState<DayCategoryMap>({})
+  // Holidays and closures from the school calendar always win over this register's own day settings.
+  const [schoolDays, setSchoolDays] = useState<SchoolDayMap>({})
   const todayKey = useMemo(() => {
     const now = new Date()
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
@@ -132,6 +136,7 @@ const AttndStudentAttendance: React.FC = () => {
         nextDays[item.attendanceDate] = item.category === 'non-academic' ? 'non-academic' : 'academic'
       })
       setDayCategoryMap(nextDays)
+      setSchoolDays(attendance.schoolDays || {})
     } catch (error: any) {
       toast.error(String(error?.response?.data?.message || error?.message || 'Failed to load student attendance data.'))
     } finally {
@@ -157,9 +162,9 @@ const AttndStudentAttendance: React.FC = () => {
     )
   }, [studentRows, searchQuery])
 
-  const isHoliday = (dateKey: string) =>
-    (dayCategoryMap[dateKey] || defaultDayCategory(dateKey, settings.sundayHoliday)) === 'non-academic'
-  const workingDays = useMemo(() => days.filter((day) => !isHoliday(day.dateKey)), [days, dayCategoryMap, settings.sundayHoliday])
+  const isHoliday = (dateKey: string) => isSchoolClosed(schoolDays, dateKey)
+    || (dayCategoryMap[dateKey] || defaultDayCategory(dateKey, settings.sundayHoliday)) === 'non-academic'
+  const workingDays = useMemo(() => days.filter((day) => !isHoliday(day.dateKey)), [days, dayCategoryMap, schoolDays, settings.sundayHoliday])
 
   const counts = useMemo(() => {
     const next = emptyCounts()
@@ -190,6 +195,10 @@ const AttndStudentAttendance: React.FC = () => {
   }
 
   const toggleDayCategory = (dateKey: string) => {
+    if (isSchoolClosed(schoolDays, dateKey)) {
+      toast(`${schoolDays[dateKey].label || 'This day'} is set in School days. Change it there.`)
+      return
+    }
     const currentlyHoliday = isHoliday(dateKey)
     setDayCategoryMap((prev) => ({
       ...prev,

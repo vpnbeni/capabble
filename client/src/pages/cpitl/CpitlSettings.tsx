@@ -258,6 +258,16 @@ const CpitlSettings: React.FC = () => {
                   value={form.defaultDueDay}
                   onChange={(e) => setForm({ ...form, defaultDueDay: Number(e.target.value) })}
                 />
+                <Select
+                  label="When a due date falls on a holiday"
+                  hint="Uses the holidays in Settings → School days. Printed slips keep their date."
+                  value={form.holidayDueDates || 'keep'}
+                  options={[
+                    { value: 'keep', label: 'Keep the due date' },
+                    { value: 'next_working_day', label: 'Move it to the next working day' },
+                  ]}
+                  onChange={(e) => setForm({ ...form, holidayDueDates: e.target.value as 'keep' | 'next_working_day' })}
+                />
               </div>
             </div>
             <div className="cb-form-section">

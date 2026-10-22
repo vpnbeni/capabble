@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-const { assertCopyTransition, calculateDueAt, assertBorrowingEligibility } = require('../modules/libry/lifecycle');
+const { assertCopyTransition, workingDueAt, assertBorrowingEligibility } = require('../modules/libry/lifecycle');
 
 const model = (req, key) => {
   const Model = req.models?.[key];
@@ -187,7 +187,7 @@ exports.issueLoan = async (req, res) => {
       assertBorrowingEligibility({ member, policy, activeLoans });
       const copy = await Copy.findOneAndUpdate({ _id: body.copyId, isActive: true, status: 'available' }, { status: 'issued', updatedBy: actor(req) }, { new: true, session });
       if (!copy) throw Object.assign(new Error('This copy is not available to issue.'), { statusCode: 409 });
-      const dueAt = calculateDueAt(new Date(), policy.loanDays);
+      const dueAt = await workingDueAt(req.models, new Date(), policy.loanDays);
       [loan] = await Loan.create([{ copyId: copy._id, memberId: member._id, dueAt, issuedBy: actor(req) }], { session });
     });
     res.status(201).json({ success: true, data: loan });
@@ -225,7 +225,7 @@ exports.renewLoan = async (req, res) => {
     const Loan = model(req, 'LibraryLoan'); const Policy = model(req, 'LibraryPolicy'); const Member = model(req, 'LibraryMember'); const loan = await Loan.findOne({ _id: req.params.id, status: 'active' }).populate('memberId');
     if (!loan) throw Object.assign(new Error('Active loan not found.'), { statusCode: 404 }); const policy = await Policy.findOne({ memberType: loan.memberId.memberType, isActive: true });
     if (!policy || loan.renewals >= policy.maxRenewals) throw Object.assign(new Error('This loan cannot be renewed under the current policy.'), { statusCode: 400 });
-    loan.renewals += 1; loan.dueAt = calculateDueAt(new Date(), policy.loanDays); await loan.save(); res.json({ success: true, data: loan });
+    loan.renewals += 1; loan.dueAt = await workingDueAt(req.models, new Date(), policy.loanDays); await loan.save(); res.json({ success: true, data: loan });
   } catch (error) { fail(res, error); }
 };
 

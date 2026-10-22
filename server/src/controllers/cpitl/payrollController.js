@@ -1,4 +1,5 @@
 const ExcelJS = require('exceljs');
+const schoolDays = require('../../modules/clndr/schoolDays');
 const asyncHandler = require('../../middleware/asyncHandler');
 const eventBus = require('../../events/eventBus');
 const EVENTS = require('../../events/eventNames');
@@ -350,9 +351,12 @@ const createRun = asyncHandler(async (req, res) => {
   const attendanceUsed = Boolean(req.models.StaffAttendanceDaily);
   if (attendanceUsed) {
     const records = await req.models.StaffAttendanceDaily.find({ attendanceDate: { $regex: `^${month}-` }, status: { $in: ['A', 'HD'] } })
-      .select('staffId status')
+      .select('staffId status attendanceDate')
       .lean();
-    lopByStaff = attendanceLop(records);
+    // An absence marked on a day the school was closed (a holiday declared later) is not loss of pay.
+    const lastDay = `${month}-${String(new Date(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0).getDate()).padStart(2, '0')}`;
+    const days = await schoolDays.range(req.models, `${month}-01`, lastDay).catch(() => ({}));
+    lopByStaff = attendanceLop(records.filter((r) => !days[r.attendanceDate] || days[r.attendanceDate].working));
   }
 
   const settings = await payrollSettings(req.models);

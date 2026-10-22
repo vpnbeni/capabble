@@ -38,4 +38,32 @@ const calculateFine = ({ overdueDays, graceDays = 0, dailyRate, maximum = null }
 
 const orderReservations = (reservations) => [...reservations].filter((row) => row.status === 'queued').sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
 
-module.exports = { COPY_STATUS_TRANSITIONS, assertCopyTransition, calculateDueAt, assertBorrowingEligibility, calculateFine, orderReservations };
+/**
+ * Due date that never lands on a day the school is closed: moved to the next
+ * working day (school calendar), keeping the time of day. Fails soft to the plain date.
+ */
+const workingDueAt = async (models, issuedAt, loanDays) => {
+  const due = calculateDueAt(issuedAt, loanDays);
+  try {
+    // eslint-disable-next-line global-require
+    const schoolDays = require('../clndr/schoolDays');
+    // eslint-disable-next-line global-require
+    const schoolDate = require('../../utils/schoolDate');
+    const key = schoolDate.dateKey(due);
+    const next = await schoolDays.nextWorkingDay(models, key);
+    if (next !== key) due.setTime(due.getTime() + schoolDate.daysBetween(key, next) * 86400000);
+  } catch (err) {
+    // Keep the plain due date.
+  }
+  return due;
+};
+
+module.exports = {
+  COPY_STATUS_TRANSITIONS,
+  assertCopyTransition,
+  calculateDueAt,
+  workingDueAt,
+  assertBorrowingEligibility,
+  calculateFine,
+  orderReservations
+};

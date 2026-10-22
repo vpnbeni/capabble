@@ -177,7 +177,8 @@ const computeLateFee = (demand, rule, asOf = new Date()) => {
   const amount = Number(rule.amount) || 0;
   if (amount <= 0) return 0;
   const graceMs = (Number(rule.graceDays) || 0) * 86400000;
-  const due = new Date(demand.dueDate).getTime();
+  // A due date moved off a holiday (dueDates.withEffectiveDueDates) counts from the new day.
+  const due = new Date(demand.effectiveDueDate || demand.dueDate).getTime();
   const lateMs = new Date(asOf).getTime() - (due + graceMs);
   if (lateMs <= 0) return 0;
   let fee = rule.type === 'per_day' ? amount * Math.ceil(lateMs / 86400000) : amount;

@@ -5,6 +5,7 @@
  */
 const schoolDate = require('../../utils/schoolDate');
 const { item, dateFieldRange } = require('../clndr/providers');
+const { withEffectiveDueDates, dueDateOf } = require('./dueDates');
 
 const OPEN = { status: { $in: ['due', 'partial'] }, balance: { $gt: 0 } };
 
@@ -17,6 +18,12 @@ const fees = {
     const { FeeDemand, StudentFeeAccount } = models;
     if (!FeeDemand) return [];
     const dueDate = dateFieldRange(from, to, timeZone);
+    // Look a little earlier too: a due date on a holiday may have moved into this range.
+    const widened = (range) => ({ ...range, $gte: new Date(range.$gte.getTime() - 14 * 86400000) });
+    const inRange = (demand) => {
+      const key = schoolDate.dateKey(dueDateOf(demand), timeZone);
+      return key >= from && key <= to;
+    };
 
     if (viewer.kind === 'parent') {
       if (portal && !portalSections.includes('fees')) return [];
@@ -27,15 +34,19 @@ const fees = {
         String(account._id), viewer.children.find((c) => c.studentId === String(account.student))
       ]));
       if (!accounts.length) return [];
-      const demands = await FeeDemand.find({ ...OPEN, accountId: { $in: accounts.map((a) => a._id) }, dueDate })
-        .select('accountId label periodKey dueDate balance').lean();
-      return demands.map((demand) => {
+      const demands = await withEffectiveDueDates(models, await FeeDemand.find({
+        ...OPEN, accountId: { $in: accounts.map((a) => a._id) }, dueDate: widened(dueDate)
+      }).select('accountId label periodKey dueDate balance').lean());
+      return demands.filter((demand) => inRange(demand)).map((demand) => {
         const child = childByAccount.get(String(demand.accountId));
         return item({
           id: `fee:${demand._id}`,
           title: `Fee due: ${demand.label || demand.periodKey}`,
-          startDate: schoolDate.dateKey(demand.dueDate, timeZone),
-          detail: `Balance ₹${Number(demand.balance || 0).toLocaleString('en-IN')}`,
+          startDate: schoolDate.dateKey(dueDateOf(demand), timeZone),
+          detail: [
+            `Balance ₹${Number(demand.balance || 0).toLocaleString('en-IN')}`,
+            demand.dueDateMovedFrom ? `moved from ${demand.dueDateMovedFrom} (school holiday)` : ''
+          ].filter(Boolean).join(', '),
           link: '/portal/fees',
           child: child ? { studentId: child.studentId, name: child.name } : null
         });
@@ -43,10 +54,11 @@ const fees = {
     }
 
     if (viewer.kind !== 'staff' || !rbac?.has('cpitl.finance.view')) return [];
-    const demands = await FeeDemand.find({ ...OPEN, dueDate }).select('dueDate balance').lean();
+    const demands = await withEffectiveDueDates(models, await FeeDemand.find({ ...OPEN, dueDate: widened(dueDate) })
+      .select('dueDate balance').lean());
     const byDay = new Map();
-    demands.forEach((demand) => {
-      const day = schoolDate.dateKey(demand.dueDate, timeZone);
+    demands.filter((demand) => inRange(demand)).forEach((demand) => {
+      const day = schoolDate.dateKey(dueDateOf(demand), timeZone);
       const entry = byDay.get(day) || { count: 0, balance: 0 };
       entry.count += 1;
       entry.balance += Number(demand.balance || 0);

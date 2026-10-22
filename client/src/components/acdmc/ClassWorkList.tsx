@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
+import { firstWorkingDay } from '@/services/calendarService'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { Archive, Copy, Pencil, Plus, RotateCcw, SearchX, Send, Trash2, type LucideIcon } from 'lucide-react'
@@ -287,7 +288,17 @@ const ClassWorkList: React.FC<Config> = ({ kind, icon, emptyBody }) => {
   }, [searchParams, setSearchParams, kind])
 
   const openCreate = () => {
-    setDraft({ ...emptyClassWork(kind), className, section, subjectName })
+    const fresh = { ...emptyClassWork(kind), className, section, subjectName }
+    setDraft(fresh)
+    // Default dates skip holidays and days off (school calendar); a date the teacher already changed is kept.
+    void Promise.all([
+      fresh.dueDate ? firstWorkingDay(fresh.dueDate, { className, section }) : Promise.resolve(fresh.dueDate),
+      fresh.date ? firstWorkingDay(fresh.date, { className, section }) : Promise.resolve(fresh.date),
+    ]).then(([dueDate, date]) => setDraft((current) => ({
+      ...current,
+      dueDate: current.dueDate === fresh.dueDate ? dueDate : current.dueDate,
+      date: current.date === fresh.date ? date : current.date,
+    })))
     setErrors({})
     setSheetOpen(true)
   }

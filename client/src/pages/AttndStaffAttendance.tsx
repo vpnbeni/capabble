@@ -8,7 +8,7 @@ import { Button, Card, FilterBar, Page, Select } from '@/components/ui'
 import { addMark, emptyCounts, isSundayDate, markState, useAttndSettings } from '@/components/attnd/attndSettings'
 import { AttndSettingsButton } from '@/components/attnd/AttndSettingsDialog'
 import { useAttndMatrixMode } from '@/contexts/AttndMatrixModeContext'
-import attndService, { type StaffDirectoryItem } from '@/services/attndService'
+import attndService, { isSchoolClosed, type SchoolDayMap, type StaffDirectoryItem } from '@/services/attndService'
 import {
   designationOf,
   getStaffTypeId,
@@ -48,6 +48,8 @@ const AttndStaffAttendance: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('')
   const [absenceMap, setAbsenceMap] = useState<AbsenceMap>({})
   const [dayCategoryMap, setDayCategoryMap] = useState<DayCategoryMap>({})
+  // Holidays and closures from the school calendar (Settings → School days).
+  const [schoolDays, setSchoolDays] = useState<SchoolDayMap>({})
   const todayKey = useMemo(() => {
     const now = new Date()
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
@@ -100,13 +102,14 @@ const AttndStaffAttendance: React.FC = () => {
     const loadData = async () => {
       setLoading(true)
       try {
-        const [staff, attendance] = await Promise.all([
+        const [staff, month] = await Promise.all([
           attndService.getStaffDirectory(),
-          attndService.getStaffAttendance({ month: selectedMonth }),
+          attndService.getStaffMonth(selectedMonth),
         ])
         setAllStaff(staff)
+        setSchoolDays(month.schoolDays)
         const nextAbsence: AbsenceMap = {}
-        attendance.forEach((item) => {
+        month.records.forEach((item) => {
           const id = String(item.staffId || '')
           if (!id || !item.attendanceDate || item.status !== 'A') return
           if (!nextAbsence[id]) nextAbsence[id] = {}
@@ -138,9 +141,9 @@ const AttndStaffAttendance: React.FC = () => {
     )
   }, [staffRows, searchQuery])
 
-  const isHoliday = (dateKey: string) =>
-    (dayCategoryMap[dateKey] || defaultDayCategory(dateKey, settings.sundayHoliday)) === 'non-academic'
-  const workingDays = useMemo(() => days.filter((day) => !isHoliday(day.dateKey)), [days, dayCategoryMap, settings.sundayHoliday])
+  const isHoliday = (dateKey: string) => isSchoolClosed(schoolDays, dateKey)
+    || (dayCategoryMap[dateKey] || defaultDayCategory(dateKey, settings.sundayHoliday)) === 'non-academic'
+  const workingDays = useMemo(() => days.filter((day) => !isHoliday(day.dateKey)), [days, dayCategoryMap, schoolDays, settings.sundayHoliday])
 
   const counts = useMemo(() => {
     const next = emptyCounts()
@@ -171,6 +174,10 @@ const AttndStaffAttendance: React.FC = () => {
   }
 
   const toggleDayCategory = (dateKey: string) => {
+    if (isSchoolClosed(schoolDays, dateKey)) {
+      toast(`${schoolDays[dateKey].label || 'This day'} is set in School days. Change it there.`)
+      return
+    }
     const currentlyHoliday = isHoliday(dateKey)
     setDayCategoryMap((prev) => ({
       ...prev,

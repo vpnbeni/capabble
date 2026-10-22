@@ -4,9 +4,16 @@
  * Owned by the timetable module so other modules (e.g. appointments) can ask
  * "when is this teacher in class?" without knowing the grid format.
  * Grid cells name the teacher, so the Teacher id is mapped to a name through
- * TimetableState.teachers.
+ * TimetableState.teachers. Days the school is closed have no teaching; on a
+ * half day, periods after school ends are dropped (modules/clndr/schoolDays).
  */
+const schoolDays = require('../clndr/schoolDays');
+
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+/** A grid cell names one teacher, or two for a shared period ("Ms Rao/Mr Sen"). */
+const cellHasTeacher = (cellTeacher, name) => String(cellTeacher || '').split('/')
+  .some((part) => part.trim().toLowerCase() === String(name).trim().toLowerCase());
 
 const toMinutes = (time) => {
   const [h, m] = String(time || '08:00').split(':').map(Number);
@@ -35,7 +42,7 @@ const busyPeriodsFromGrid = ({ grid, bellTimings, teacherName, dayName, classes 
   Object.entries(grid).forEach(([classId, days]) => {
     const cell = (days || {})[dayName] || {};
     Object.entries(cell).forEach(([periodId, slot]) => {
-      if (!slot || slot.teacher !== teacherName || !periods.has(periodId)) return;
+      if (!slot || !cellHasTeacher(slot.teacher, teacherName) || !periods.has(periodId)) return;
       const period = periods.get(periodId);
       const cls = classes.find((row) => row.id === classId);
       const className = cls ? [cls.className, cls.section].filter(Boolean).join(' ') : '';
@@ -62,7 +69,14 @@ const getTeacherBusyPeriods = async (models, teacherId, date) => {
   const published = Version ? await Version.findOne({ status: 'published' }).sort({ publishedAt: -1 }).select('grid').lean() : null;
   const grid = published?.grid || state.timetableGrid || {};
   const dayName = DAY_NAMES[new Date(`${date}T00:00:00Z`).getUTCDay()];
-  return busyPeriodsFromGrid({ grid, bellTimings: state.bellTimings, teacherName: teacher.name, dayName, classes: state.classes });
+  const day = await schoolDays.dayInfo(models, date).catch(() => null);
+  if (day && !day.working) return [];
+  const busy = busyPeriodsFromGrid({
+    grid, bellTimings: state.bellTimings, teacherName: teacher.name, dayName, classes: state.classes
+  });
+  return day?.halfDayEndTime ? busy.filter((period) => period.start < day.halfDayEndTime) : busy;
 };
 
-module.exports = { getTeacherBusyPeriods, busyPeriodsFromGrid, periodTimes };
+module.exports = {
+  getTeacherBusyPeriods, busyPeriodsFromGrid, periodTimes, cellHasTeacher
+};

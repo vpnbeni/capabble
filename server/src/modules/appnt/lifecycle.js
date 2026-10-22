@@ -80,7 +80,9 @@ const daysBetween = (from, to) => Math.round((Date.parse(`${to}T00:00:00Z`) - Da
  *
  * Returns { slots, closed, reason } — closed when the host isn't available that day at all.
  */
-const buildSlots = ({ host, date, appointments = [], busyPeriods = [], now = new Date(), minNoticeHours = 0, maxAdvanceDays = 365 }) => {
+const buildSlots = ({
+  host, date, appointments = [], busyPeriods = [], now = new Date(), minNoticeHours = 0, maxAdvanceDays = 365, latestEnd = null
+}) => {
   if (!host || host.isActive === false) return { slots: [], closed: true, reason: 'This person is not taking appointments.' };
   const blocked = (host.blockedDates || []).find((row) => row.date === date);
   if (blocked) return { slots: [], closed: true, reason: blocked.reason || 'Not available on this date.' };
@@ -107,7 +109,9 @@ const buildSlots = ({ host, date, appointments = [], busyPeriods = [], now = new
     .filter(([start, end]) => Number.isFinite(start) && Number.isFinite(end) && end > start)
     .sort((a, b) => a[0] - b[0])
     .forEach(([windowStart, windowEnd]) => {
-      for (let start = windowStart; start + length <= windowEnd; start += step) {
+      // On a half day nothing runs past the time school ends.
+      const lastEnd = latestEnd ? Math.min(windowEnd, toMinutes(latestEnd)) : windowEnd;
+      for (let start = windowStart; start + length <= lastEnd; start += step) {
         const end = start + length;
         const slot = { start: toTime(start), end: toTime(end), state: 'free', reason: '' };
         const tooSoon = ahead * 1440 + start < earliest;

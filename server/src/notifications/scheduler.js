@@ -12,6 +12,7 @@ const { normalizeTenantFeatureToggles } = require('../constants/tenantFeatures')
 const { USER_KINDS } = require('../rbac/permissions');
 const { send, modelsFor } = require('./send');
 const recipients = require('./recipients');
+const { withEffectiveDueDates, dueDateOf } = require('../modules/cpitl/dueDates');
 
 const DAY = 86400 * 1000;
 const FEE_NOTICE_DAYS = 3;
@@ -31,6 +32,8 @@ const feeReminders = async (tenant, models, now) => {
     dueDate: { $gte: new Date(today.getTime() - 7 * DAY), $lt: soonEnd }
   }).select('student label dueDate balance').lean();
   if (!demands.length) return 0;
+  // A due date on a school holiday may count from the next working day (Finance settings).
+  await withEffectiveDueDates(models, demands);
 
   const students = await recipients.loadStudents(models, { _id: { $in: [...new Set(demands.map((d) => String(d.student)))] } });
   const byId = new Map(students.map((s) => [String(s._id), s]));
@@ -43,12 +46,12 @@ const feeReminders = async (tenant, models, now) => {
     if (!student) continue;
     // eslint-disable-next-line no-await-in-loop
     const { users, studentsByRoll } = await recipients.familyFor(models, [student], { kinds: [USER_KINDS.PARENT] });
-    const overdue = new Date(demand.dueDate) < today;
+    const overdue = new Date(dueDateOf(demand)) < today;
     // eslint-disable-next-line no-await-in-loop
     sent += await send(tenant, users, overdue ? 'fees.overdue' : 'fees.due_soon', {
       demandId: String(demand._id),
       label: demand.label,
-      dueDate: demand.dueDate,
+      dueDate: dueDateOf(demand),
       balance: demand.balance,
       studentsByRoll
     });
