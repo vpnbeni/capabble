@@ -33,7 +33,8 @@ const SERVER_ROOT = path.resolve(__dirname, '../../..');
  * matches today's data. Add new tenant migrations here (they must accept --apply --tenant=<slug>).
  */
 const TENANT_MIGRATIONS = [
-  { name: 'rbac', script: 'scripts/migrations/migrate-rbac.js' }
+  { name: 'rbac', script: 'scripts/migrations/migrate-rbac.js' },
+  { name: 'legacy-calendar', script: 'scripts/migrations/migrate-legacy-calendar.js' }
 ];
 
 const tenantDbNameFor = (slug) => `${process.env.TENANT_DB_PREFIX || 'capabble_tenant_'}${slug.replace(/-/g, '_')}`;

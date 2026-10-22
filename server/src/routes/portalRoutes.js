@@ -6,6 +6,7 @@ const { AUDIENCE } = require('../rbac/session');
 const ctrl = require('../controllers/portalController');
 const appnt = require('../controllers/appntPortalController');
 const notifications = require('../controllers/notificationController');
+const calendar = require('../modules/clndr/portal');
 const { portalRequestSchema } = require('../validations/appntValidation');
 
 /**
@@ -44,6 +45,10 @@ const validateRequest = (req, res, next) => {
   req.body = value;
   return next();
 };
+// The family's calendar: school days, events for them and their children, fee dues, meetings.
+router.get('/calendar', calendar.getCalendar);
+router.get('/calendar/events/:id', calendar.viewEvent);
+
 router.get('/appointments', appnt.listMine);
 router.post('/appointments/:id/cancel', appointmentWriteLimiter, appnt.cancel);
 

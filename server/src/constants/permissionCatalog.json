@@ -14,7 +14,8 @@
     { "key": "asets", "label": "Assets" },
     { "key": "cpitl", "label": "Finance" },
     { "key": "libry", "label": "Library" },
-    { "key": "appnt", "label": "Appointments" }
+    { "key": "appnt", "label": "Appointments" },
+    { "key": "clndr", "label": "Calendar" }
   ],
   "actionLabels": {
     "read": "View",
@@ -42,7 +43,9 @@
     "payroll": "Payroll",
     "book": "Book for anyone",
     "host": "Take appointments (own only)",
-    "notes": "Read private meeting notes"
+    "notes": "Read private meeting notes",
+    "publish_wide": "Send to the whole school",
+    "approve": "Approve"
   },
   "resources": [
     { "key": "core.users", "module": "core", "label": "User logins and roles", "actions": ["read", "manage"] },
@@ -50,6 +53,15 @@
     { "key": "core.billing", "module": "core", "label": "Subscription and billing", "actions": ["read", "manage"] },
     { "key": "core.subjects", "module": "core", "label": "Subjects", "actions": ["read", "write", "delete"] },
     { "key": "core.dashboard", "module": "core", "label": "Dashboards", "actions": ["read"] },
+    { "key": "core.schooldays", "module": "core", "label": "School days: holidays, closures and weekly offs", "actions": ["read", "write"] },
+    {
+      "key": "clndr.events",
+      "module": "clndr",
+      "label": "Calendar events and who they are for",
+      "enforce": "route",
+      "scopable": true,
+      "actions": ["create", "publish_wide", "approve", "manage"]
+    },
 
     { "key": "stdnt.students", "module": "stdnt", "label": "Student records", "actions": ["read", "write", "delete"], "scopable": true },
     { "key": "stdnt.alumni", "module": "stdnt", "label": "Alumni directory", "actions": ["read", "write"] },
@@ -131,6 +143,10 @@
     { "prefix": "/school-profile", "resource": "core.school" },
     { "prefix": "/support", "staff": true },
     { "prefix": "/notifications", "staff": true },
+    { "prefix": "/calendar", "path": "^/(me|days|view)(/|$)", "methods": ["GET"], "staff": true },
+    { "prefix": "/calendar", "resource": "clndr.events" },
+    { "prefix": "/school-days", "methods": ["GET"], "staff": true },
+    { "prefix": "/school-days", "resource": "core.schooldays" },
     { "prefix": "/search", "staff": true },
     { "prefix": "/dashboard", "staff": true },
     { "prefix": "/billing", "resource": "core.billing", "writeAction": "manage" },
@@ -206,6 +222,8 @@
   ],
   "features": {
     "dashboard": "core.dashboard.read",
+    "clndr_calendar": null,
+    "clndr_events": "clndr.events.create",
     "school_hub": null,
     "timetable_classes": "timetable.timetable.read",
     "timetable_subjects": "timetable.timetable.read",
@@ -295,6 +313,8 @@
       "description": "Sees everything and signs off academics, attendance and results. Cannot manage logins or billing.",
       "designations": ["principal", "vice principal", "headmaster", "headmistress", "director"],
       "permissions": [
+        "clndr.events.create", "clndr.events.publish_wide", "clndr.events.approve", "clndr.events.manage",
+        "core.schooldays.read", "core.schooldays.write",
         "core.users.read", "core.school.read", "core.billing.read", "core.subjects.read", "core.dashboard.read",
         "stdnt.students.read", "stdnt.students.write", "stdnt.alumni.read", "stdnt.idcards.read", "stdnt.idcards.write",
         "staaf.staff.read",
@@ -315,6 +335,7 @@
       "name": "Class teacher",
       "description": "Runs their own class: student records, daily attendance, marks and classwork.",
       "permissions": [
+        { "key": "clndr.events.create", "scope": "assigned" },
         "core.dashboard.read", "core.subjects.read",
         { "key": "stdnt.students.read", "scope": "assigned" },
         { "key": "attnd.students.read", "scope": "assigned" },
@@ -332,6 +353,7 @@
       "description": "Teaches assigned sections: views those students, enters marks and sets classwork.",
       "designations": ["teacher", "pgt", "tgt", "prt", "lecturer", "instructor", "coach"],
       "permissions": [
+        { "key": "clndr.events.create", "scope": "assigned" },
         "core.dashboard.read", "core.subjects.read",
         { "key": "stdnt.students.read", "scope": "assigned" },
         { "key": "attnd.students.read", "scope": "assigned" },
@@ -348,6 +370,7 @@
       "description": "Runs internal and board exams end to end.",
       "designations": ["exam", "examination", "superintendent"],
       "permissions": [
+        "clndr.events.create",
         "core.dashboard.read", "core.subjects.read", "core.subjects.write",
         "stdnt.students.read", "staaf.staff.read",
         "exam.setup.read", "exam.setup.write", "exam.setup.delete",
@@ -364,6 +387,7 @@
       "description": "Fees, expenses, budgets and payroll.",
       "designations": ["accountant", "accounts", "cashier", "bursar", "finance"],
       "permissions": [
+        "clndr.events.create",
         "core.dashboard.read", "stdnt.students.read", "staaf.staff.read", "trnst.transport.read",
         "cpitl.finance.view", "cpitl.finance.collect", "cpitl.finance.manage_structures", "cpitl.finance.manage_accounts",
         "cpitl.finance.cancel_receipt", "cpitl.finance.expense_log", "cpitl.finance.expense_void",
@@ -376,6 +400,7 @@
       "description": "Day-to-day data entry across modules. Cannot delete key records, manage logins or change settings.",
       "designations": ["clerk", "office", "data entry", "receptionist", "assistant", "operator"],
       "permissions": [
+        "clndr.events.create", "clndr.events.publish_wide", "core.schooldays.read", "core.schooldays.write",
         "core.school.read", "core.subjects.read", "core.subjects.write", "core.subjects.delete", "core.dashboard.read",
         "stdnt.students.read", "stdnt.students.write", "stdnt.students.delete", "stdnt.alumni.read", "stdnt.alumni.write",
         "stdnt.idcards.read", "stdnt.idcards.write",
@@ -441,7 +466,7 @@
     }
   ],
   "portal": {
-    "parent": ["profile", "attendance", "timetable", "results", "fees", "notices", "transport", "appointments"],
-    "student": ["profile", "attendance", "timetable", "results", "notices", "transport"]
+    "parent": ["profile", "calendar", "attendance", "timetable", "results", "fees", "notices", "transport", "appointments"],
+    "student": ["profile", "calendar", "attendance", "timetable", "results", "notices", "transport"]
   }
 }

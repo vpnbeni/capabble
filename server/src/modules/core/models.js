@@ -17,4 +17,6 @@ module.exports = {
   Feedback: require('../../models/Feedback'),
   SupportTicket: require('../../models/SupportTicket'),
   OnboardingSession: require('../../models/OnboardingSession'),
+  SchoolDayRule: require('../../models/SchoolDayRule'),
+  CalendarEvent: require('../../models/CalendarEvent'),
 };

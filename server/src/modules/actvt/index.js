@@ -1,4 +1,5 @@
 const { mountRoutes } = require('./routes');
+const calendar = require('./calendar');
 
 module.exports = {
   key: 'actvt',
@@ -6,4 +7,5 @@ module.exports = {
   mountRoutes,
   models: {},
   listeners: [],
+  calendar,
 };

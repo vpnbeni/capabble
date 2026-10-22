@@ -23,6 +23,7 @@ const openSections = (req, kind) => portalSections(kind).filter((section) => ({
   notices: featureOn(req, 'exmcl_centre_guidelines'),
   transport: featureOn(req, 'trnst_transport'),
   appointments: featureOn(req, 'appnt_desk') && Boolean(req.models?.Appointment),
+  calendar: featureOn(req, 'clndr_calendar'),
   profile: true
 }[section]));
 

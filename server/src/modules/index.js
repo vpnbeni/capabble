@@ -26,10 +26,11 @@ const libryModule = require('./libry');
 const appntModule = require('./appnt');
 const cpitlModule = require('./cpitl');
 const searchModule = require('./search');
+const clndrModule = require('./clndr');
 
 const modules = [
   coreModule, cntrModule, timetableModule, attndModule, almniModule, trnstModule,
-  acdmcModule, actvtModule, mdclModule, asetsModule, libryModule, appntModule, cpitlModule, searchModule
+  acdmcModule, actvtModule, mdclModule, asetsModule, libryModule, appntModule, cpitlModule, searchModule, clndrModule
 ];
 
 /**

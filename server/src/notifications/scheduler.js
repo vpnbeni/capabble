@@ -140,18 +140,31 @@ const runOnce = async (now = new Date()) => {
   return summary;
 };
 
+const LEASE = 'notification-reminders';
 let timer = null;
 let running = false;
 
 const start = ({ intervalMs = 60 * 60 * 1000, initialDelayMs = 60 * 1000 } = {}) => {
   if (timer || String(process.env.NOTIFICATION_SCHEDULER_ENABLED || 'true') !== 'true') return;
   // A slow run (many tenants) must not overlap the next tick.
-  const tick = () => {
+  // Every reminder is deduplicated, but the lease also stops two servers doing the same work.
+  const tick = async () => {
     if (running) return;
     running = true;
-    runOnce()
-      .catch((error) => console.error('[notifications] reminders failed', error.message))
-      .finally(() => { running = false; });
+    try {
+      // eslint-disable-next-line global-require
+      const { acquireLease, releaseLease } = require('../modules/dataLifecycle/lease');
+      if (!await acquireLease(LEASE, 50)) return;
+      try {
+        await runOnce();
+      } finally {
+        await releaseLease(LEASE);
+      }
+    } catch (error) {
+      console.error('[notifications] reminders failed', error.message);
+    } finally {
+      running = false;
+    }
   };
   setTimeout(tick, initialDelayMs).unref();
   timer = setInterval(tick, intervalMs);

@@ -9,6 +9,22 @@
     "fallbackPriority": 10
   },
   {
+    "key": "clndr_calendar",
+    "label": "Calendar",
+    "path": "/calendar",
+    "group": "Core",
+    "module": "core",
+    "prefixes": ["/calendar"]
+  },
+  {
+    "key": "clndr_events",
+    "label": "Calendar events",
+    "path": "/calendar/events",
+    "group": "Core",
+    "module": "core",
+    "prefixes": ["/calendar/events"]
+  },
+  {
     "key": "school_hub",
     "label": "School Hub",
     "path": "/school-hub",
