@@ -73,14 +73,14 @@ const loginInvite = ({ schoolName, name, inviteUrl, loginHint, hours }) => rende
 /* ---------- Closing a workspace ---------- */
 
 /** Confirms to the administrator that their school asked to close its workspace. */
-const workspaceClosureRequested = ({ schoolName, name, exportUntil, deleteAfter, url }) => renderEmail({
+const workspaceClosureRequested = ({ schoolName, name, exportUntil, deleteAfter, url, archive = false }) => renderEmail({
   subject: `We have your request to close ${schoolName} on Capabble`,
   preheader: `Your workspace stays open until ${exportUntil} so you can download your data.`,
   context: schoolName,
   heading: 'Your workspace will close',
   intro: [
     name ? `Hi ${name},` : null,
-    ['You asked to close the Capabble workspace for ', { strong: schoolName }, '. Everyone at your school can keep using it until ', { strong: exportUntil }, ', so you have time to download your data from the Export options on each list.'],
+    ['You asked to close the Capabble workspace for ', { strong: schoolName }, '. Everyone at your school can keep using it until ', { strong: exportUntil }, ', so you have time to download your data', archive ? '. We’re making an archive of all of it and will email you a link when it’s ready. Keep that file: we can bring your workspace back from it.' : ' from the Export options on each list.'],
     ['After that the workspace closes and we delete its data by ', { strong: deleteAfter }, '. Fees already paid are not refunded.']
   ].filter(Boolean),
   notice: ['Changed your mind? Open Settings → Account and choose “Cancel closure” before ', { strong: exportUntil }, '.'],
@@ -89,7 +89,69 @@ const workspaceClosureRequested = ({ schoolName, name, exportUntil, deleteAfter,
   footnote: `You’re getting this because you are an administrator of ${schoolName} on Capabble.`
 });
 
+/** The school's workspace archive is ready to download (on closing, or when an admin asks). */
+const workspaceArchiveReady = ({ schoolName, name, url, linkExpiresOn, exportUntil, settingsUrl }) => renderEmail({
+  subject: `Your Capabble data for ${schoolName} is ready to download`,
+  preheader: `Download it before ${linkExpiresOn}. Keep the file: we can bring your workspace back from it.`,
+  context: schoolName,
+  heading: 'Your workspace archive is ready',
+  intro: [
+    name ? `Hi ${name},` : null,
+    ['We made a copy of all of ', { strong: schoolName }, '’s data on Capabble: every record and the files you uploaded, in one .zip file.'],
+    ['Keep this file somewhere safe. If your school comes back to Capabble, we can bring your workspace back from it.']
+  ].filter(Boolean),
+  notice: exportUntil
+    ? ['This link works until ', { strong: linkExpiresOn }, '. You can make a new one in Settings → Account until ', { strong: exportUntil }, '.']
+    : ['This link works until ', { strong: linkExpiresOn }, '. You can make a new one in Settings → Account.'],
+  button: { label: 'Download archive', url },
+  link: settingsUrl ? { label: 'Open account settings', url: settingsUrl } : undefined,
+  footnote: `You’re getting this because you are an administrator of ${schoolName} on Capabble.`
+});
+
+/** Seven days before a closed workspace's data is deleted. */
+const workspaceDeletionNotice = ({ schoolName, name, deleteAfter, supportEmail }) => renderEmail({
+  subject: `${schoolName}’s data on Capabble will be deleted on ${deleteAfter}`,
+  preheader: `Your closed workspace’s data will be deleted on ${deleteAfter}.`,
+  context: schoolName,
+  heading: 'Your data will be deleted soon',
+  intro: [
+    name ? `Hi ${name},` : null,
+    ['Your school closed its Capabble workspace. As we said then, we will delete its data on ', { strong: deleteAfter }, '.'],
+    ['If you kept the archive file we sent, you can still bring your workspace back from it later.']
+  ].filter(Boolean),
+  outro: [`Need more time, or a copy of your data? Write to ${supportEmail} before ${deleteAfter}.`],
+  footnote: `You’re getting this because you are an administrator of ${schoolName} on Capabble.`
+});
+
 /* ---------- Internal ---------- */
+
+/** Tells support that the nightly backup failed (fully or for some databases). */
+const backupFailed = ({ runId, status, failures, time, environment }) => renderEmail({
+  subject: `Backup ${status === 'failed' ? 'failed' : 'partly failed'}: ${environment}`,
+  preheader: `${failures.length} database(s) were not backed up in run ${runId}.`,
+  context: 'Capabble team',
+  heading: status === 'failed' ? 'The nightly backup failed' : 'Some databases were not backed up',
+  details: [
+    ['Environment', environment],
+    ['Run', runId],
+    ['Time', time],
+    ...failures.slice(0, 20).map((failure) => [failure.label, failure.error])
+  ],
+  outro: ['The job tries again later today. See server/docs/backups.md for what to check.'],
+  footnote: 'You’re getting this because this address receives Capabble support requests.'
+});
+
+/** Tells support that closed workspaces are due for deletion and need a platform admin's approval. */
+const workspacePurgeDue = ({ workspaces, adminUrl }) => renderEmail({
+  subject: `Approve deletion: ${workspaces.length} closed workspace${workspaces.length === 1 ? '' : 's'}`,
+  preheader: 'Closed workspaces passed their deletion date and wait for approval.',
+  context: 'Capabble team',
+  heading: 'Closed workspaces are due for deletion',
+  details: workspaces.map((w) => [`${w.name} (${w.slug})`, `due ${w.dueAt}`]),
+  outro: ['Nothing is deleted until a platform admin approves it under Workspace data in the admin portal.'],
+  button: adminUrl ? { label: 'Review in admin portal', url: adminUrl } : undefined,
+  footnote: 'You’re getting this because this address receives Capabble support requests.'
+});
 
 /** Tells Capabble support a school asked to close its workspace. */
 const workspaceClosureAlert = ({ tenantName, tenantSlug, requestedBy, requestedByEmail, exportUntil, deleteAfter, time }) => renderEmail({
@@ -516,6 +578,10 @@ module.exports = {
   newSchoolAlert,
   workspaceClosureRequested,
   workspaceClosureAlert,
+  workspaceArchiveReady,
+  workspaceDeletionNotice,
+  backupFailed,
+  workspacePurgeDue,
   demoRequestAlert,
   demoRequestReceived,
   appointmentUpdate,

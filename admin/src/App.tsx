@@ -12,6 +12,7 @@ import { SchoolDirectoryPage } from './pages/SchoolDirectoryPage'
 import { RemunerationPage } from './pages/RemunerationPage'
 import { PackingDispatchPage } from './pages/PackingDispatchPage'
 import { DemoRequestsPage } from './pages/DemoRequestsPage'
+import { WorkspaceDataPage } from './pages/WorkspaceDataPage'
 import { platformAuthApi } from './services/platformApi'
 import type { PlatformAdmin } from './types/platform'
 import LoginScreen from './components/LoginScreen'
@@ -25,6 +26,7 @@ import {
   ChevronDown,
   ClipboardCheck,
   CreditCard,
+  Database,
   FileText,
   IndianRupee,
   LogOut,
@@ -172,6 +174,7 @@ function App() {
           { label: 'School directory', icon: School, path: '/school-directory', matcher: (path: string) => path === '/school-directory' },
           { label: 'Features', icon: ToggleRight, path: '/features', matcher: (path: string) => path.startsWith('/features') },
           { label: 'Rollouts', icon: RefreshCw, path: '/rollouts', matcher: (path: string) => path.startsWith('/rollouts') },
+          { label: 'Workspace data', icon: Database, path: '/workspace-data', matcher: (path: string) => path === '/workspace-data' },
         ],
       },
       {
@@ -252,6 +255,10 @@ function App() {
 
     if (currentPath === '/demo-requests') {
       return <DemoRequestsPage />
+    }
+
+    if (currentPath === '/workspace-data') {
+      return <WorkspaceDataPage />
     }
 
     if (currentPath === '/school-directory') {

@@ -97,6 +97,14 @@ const tenantContextMiddleware = async (req, res, next) => {
       });
     }
 
+    if (tenantRecord.status === TENANT_STATUS.CLOSED || tenantRecord.status === TENANT_STATUS.DELETED) {
+      return res.status(403).json({
+        success: false,
+        message: 'This workspace has been closed.',
+        errorCode: 'workspace_closed',
+      });
+    }
+
     if (tenantRecord.status !== TENANT_STATUS.ACTIVE) {
       return res.status(403).json({
         success: false,

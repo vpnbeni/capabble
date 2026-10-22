@@ -113,3 +113,6 @@ export const Sun = make(<>
 export const Moon = make(<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />)
 export const Search = make(<><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></>)
 export const LayoutGrid = make(<><rect width="7" height="7" x="3" y="3" rx="1" /><rect width="7" height="7" x="14" y="3" rx="1" /><rect width="7" height="7" x="14" y="14" rx="1" /><rect width="7" height="7" x="3" y="14" rx="1" /></>)
+export const Database = make(<>
+  <ellipse cx="12" cy="5" rx="9" ry="3" /><path d="M3 5V19A9 3 0 0 0 21 19V5" /><path d="M3 12A9 3 0 0 0 21 12" />
+</>)

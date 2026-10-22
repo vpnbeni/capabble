@@ -24,6 +24,7 @@ const { tenantContextMiddleware } = require('./tenancy/tenantContextMiddleware')
 const { mountAll } = require('./modules');
 const platformModule = require('./modules/platform');
 const billing = require('./modules/billing');
+const dataLifecycle = require('./modules/dataLifecycle');
 
 // Create Express app
 const app = express();
@@ -238,6 +239,9 @@ app.get('/api', (req, res) => {
 
 // Platform admin routes (central control plane)
 platformModule.mountRoutes(app);
+
+// Signed workspace-archive download links (from emails): no sign-in, the signature is the key.
+app.use('/api/workspace-archives', dataLifecycle.publicRouter);
 
 // Tenant-scoped routes — each module registers its own routes via mountAll()
 const tenantScopedRouter = express.Router();

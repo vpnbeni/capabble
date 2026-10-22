@@ -21,6 +21,11 @@ import type {
   MasterPackingDispatch,
   MasterSchoolDirectory,
   SchoolDirectoryTypeSettings,
+  PurgePlan,
+  WorkspaceArchive,
+  WorkspaceDataOverview,
+  WorkspaceImport,
+  WorkspacePurge,
 } from '../types/platform'
 
 const configuredApiBaseUrl = (import.meta.env.VITE_PLATFORM_API_URL || '').trim()
@@ -438,6 +443,82 @@ export const rolloutApi = {
 
   async retry(id: string): Promise<DataRollout> {
     const response = await platformApi.post<ApiResponse<DataRollout>>(`/rollouts/${id}/retry`)
+    return response.data.data
+  },
+}
+
+/** Backups, workspace archives, purge approvals and re-imports (/api/admin/workspace-data). */
+export const workspaceDataApi = {
+  async overview(): Promise<WorkspaceDataOverview> {
+    const response = await platformApi.get<ApiResponse<WorkspaceDataOverview>>('/workspace-data/overview')
+    return response.data.data
+  },
+
+  async runBackup(): Promise<string> {
+    const response = await platformApi.post<ApiResponse<unknown>>('/workspace-data/backups/run')
+    return response.data.message || 'Backup started.'
+  },
+
+  async runLifecycle(): Promise<Record<string, unknown>> {
+    const response = await platformApi.post<ApiResponse<Record<string, unknown>>>('/workspace-data/lifecycle/run', undefined, {
+      timeout: 600000,
+    })
+    return response.data.data
+  },
+
+  async listArchives(tenantId: string): Promise<WorkspaceArchive[]> {
+    const response = await platformApi.get<ApiResponse<WorkspaceArchive[]>>('/workspace-data/archives', { params: { tenantId } })
+    return response.data.data
+  },
+
+  async createArchive(tenantId: string): Promise<WorkspaceArchive> {
+    const response = await platformApi.post<ApiResponse<WorkspaceArchive>>('/workspace-data/archives', { tenantId })
+    return response.data.data
+  },
+
+  async purgePlan(id: string): Promise<{ purge: WorkspacePurge; plan: PurgePlan }> {
+    const response = await platformApi.get<ApiResponse<{ purge: WorkspacePurge; plan: PurgePlan }>>(`/workspace-data/purges/${id}/plan`)
+    return response.data.data
+  },
+
+  async approvePurge(id: string, confirmSlug: string): Promise<WorkspacePurge> {
+    const response = await platformApi.post<ApiResponse<WorkspacePurge>>(`/workspace-data/purges/${id}/approve`, { confirmSlug }, {
+      timeout: 600000,
+    })
+    return response.data.data
+  },
+
+  async dismissPurge(id: string): Promise<WorkspacePurge> {
+    const response = await platformApi.post<ApiResponse<WorkspacePurge>>(`/workspace-data/purges/${id}/dismiss`)
+    return response.data.data
+  },
+
+  async uploadImport(file: File, targetSlug?: string): Promise<WorkspaceImport> {
+    const formData = new FormData()
+    formData.append('file', file)
+    if (targetSlug) formData.append('targetSlug', targetSlug)
+    const response = await platformApi.post<ApiResponse<WorkspaceImport>>('/workspace-data/imports/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 600000,
+    })
+    return response.data.data
+  },
+
+  async planImport(archiveId: string, targetSlug?: string): Promise<WorkspaceImport> {
+    const response = await platformApi.post<ApiResponse<WorkspaceImport>>('/workspace-data/imports/plan', {
+      archiveId,
+      targetSlug: targetSlug || undefined,
+    }, { timeout: 600000 })
+    return response.data.data
+  },
+
+  async getImport(id: string): Promise<WorkspaceImport> {
+    const response = await platformApi.get<ApiResponse<WorkspaceImport>>(`/workspace-data/imports/${id}`)
+    return response.data.data
+  },
+
+  async applyImport(id: string, confirmSlug: string): Promise<WorkspaceImport> {
+    const response = await platformApi.post<ApiResponse<WorkspaceImport>>(`/workspace-data/imports/${id}/apply`, { confirmSlug })
     return response.data.data
   },
 }
