@@ -30,6 +30,15 @@
         if (dark) document.querySelector('meta[name="theme-color"]').setAttribute('content', '#111314')
       })()
     </script>
+    <!-- Staff panel and family portal install as separate apps; src/pwa.ts keeps this link in step with the route -->
+    <link rel="manifest" id="app-manifest" href="/manifest.webmanifest" />
+    <script>
+      if (/^#\/portal/.test(location.hash) || /[?&]app=family\b/.test(location.search)) {
+        document.getElementById('app-manifest').setAttribute('href', '/family.webmanifest')
+      }
+    </script>
+    <link rel="apple-touch-icon" href="/pwa/apple-touch-icon.png" />
+    <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Capabble" />

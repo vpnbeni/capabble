@@ -70,6 +70,32 @@
       ],
       "cwd": "capabble-landing",
       "port": 3100
+    },
+    {
+      "name": "client-pwa",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "vite",
+        "preview",
+        "--port",
+        "4173",
+        "--strictPort"
+      ],
+      "cwd": "client",
+      "port": 4173
+    },
+    {
+      "name": "admin-pwa",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "vite",
+        "preview",
+        "--port",
+        "4174",
+        "--strictPort"
+      ],
+      "cwd": "admin",
+      "port": 4174
     }
   ]
 }

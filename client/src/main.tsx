@@ -9,6 +9,8 @@ import { store, persistor } from './redux/store'
 import { setStoreDispatch } from './services/api'
 import { AcademicSessionProvider } from './contexts/AcademicSessionContext'
 import { initTheme } from './utils/theme'
+import { initPwaManifest } from './pwa'
+import UpdatePrompt from './components/common/UpdatePrompt'
 import './styles/globals.css'
 import './styles/capabble/tokens.css'
 import './styles/capabble/components.css'
@@ -18,6 +20,7 @@ import './styles/capabble/shell.css'
 // Set up store dispatch for API interceptors
 setStoreDispatch(store.dispatch)
 initTheme()
+initPwaManifest()
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -33,6 +36,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <Provider store={store}>
       <QueryClientProvider client={queryClient}>
+        <UpdatePrompt />
         <PersistGate loading={null} persistor={persistor}>
           <AcademicSessionProvider>
             <App />

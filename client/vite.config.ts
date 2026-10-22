@@ -1,12 +1,42 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import { VitePWA } from 'vite-plugin-pwa'
 import path from 'path'
 
 const devProxyTarget = process.env.VITE_DEV_PROXY_TARGET || 'http://localhost:5000'
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    // Installable app. The two manifests (staff panel and family portal) live in public/;
+    // src/pwa.ts picks one and registers the service worker.
+    VitePWA({
+      registerType: 'prompt',
+      injectRegister: false,
+      manifest: false,
+      workbox: {
+        globPatterns: ['**/*.{js,css,html,svg,woff2}', 'pwa/*.png', '*.webmanifest'],
+        maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
+        cleanupOutdatedCaches: true,
+        navigateFallback: '/index.html',
+        // The API, and real files in public/ (PDFs, Excel samples, standalone HTML), never get the app shell.
+        navigateFallbackDenylist: [/^\/api\//, /\/[^/?]+\.[^/?]+$/],
+        runtimeCaching: [
+          {
+            urlPattern: ({ request, sameOrigin }) => sameOrigin && request.destination === 'image',
+            handler: 'StaleWhileRevalidate',
+            options: { cacheName: 'images', expiration: { maxEntries: 120, maxAgeSeconds: 30 * 24 * 60 * 60 } }
+          },
+          {
+            urlPattern: /^https:\/\/fonts\.(googleapis|gstatic)\.com\/.*/,
+            handler: 'StaleWhileRevalidate',
+            options: { cacheName: 'fonts', expiration: { maxEntries: 30, maxAgeSeconds: 365 * 24 * 60 * 60 } }
+          }
+        ]
+      }
+    })
+  ],
   resolve: {
     alias: {
       '@capabble/shared': path.resolve(__dirname, '../packages/shared/src'),
