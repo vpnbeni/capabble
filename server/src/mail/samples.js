@@ -61,6 +61,31 @@ const samples = {
     deleteAfter: '19 Jan 2027',
     time: '21 Oct 2026, 10:42 am IST'
   }),
+  'workspace-archive-ready': () => templates.workspaceArchiveReady({
+    schoolName: SCHOOL,
+    name: 'Anita Sharma',
+    url: 'https://api.capabble.cloud/api/workspace-archives/6716f0c2a1b2c3d4e5f60718/download?exp=1&sig=sample',
+    linkExpiresOn: '28 Oct 2026',
+    exportUntil: '20 Nov 2026',
+    settingsUrl: `${APP}/#/account-settings`
+  }),
+  'workspace-deletion-notice': () => templates.workspaceDeletionNotice({
+    schoolName: SCHOOL,
+    name: 'Anita Sharma',
+    deleteAfter: '19 Jan 2027',
+    supportEmail: 'support@capabble.cloud'
+  }),
+  'backup-failed': () => templates.backupFailed({
+    runId: '2026-10-22T0200-3f9a',
+    status: 'partial',
+    environment: 'sems_central',
+    time: '22 Oct 2026, 2:00 am IST',
+    failures: [{ label: 'tenant:redrose', error: 'mongodump exited with 1: connection refused' }]
+  }),
+  'workspace-purge-due': () => templates.workspacePurgeDue({
+    workspaces: [{ name: SCHOOL, slug: 'redrose', dueAt: '19 Jan 2027' }],
+    adminUrl: 'https://admin.capabble.cloud/workspace-data'
+  }),
   'demo-request-alert': () => templates.demoRequestAlert({
     name: 'Anita Sharma',
     institution: SCHOOL,

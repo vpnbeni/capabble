@@ -1,0 +1,23 @@
+/* Workspace data page (backups, closures, purges, re-imports). Tokens only. */
+
+.cb-app .wd-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; margin-bottom: var(--space-4); }
+.cb-app .wd-card-head .card-title { margin: 0; }
+.cb-app .wd-card-head p { margin: var(--space-1) 0 0; font-size: 13px; line-height: 18px; color: var(--ink-muted); }
+.cb-app .wd-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.cb-app .wd-row-actions { display: flex; flex-wrap: wrap; gap: var(--space-1); justify-content: flex-end; }
+.cb-app .wd-row-actions button,
+.cb-app .wd-row-actions a { display: inline-flex; align-items: center; height: 32px; padding: 0 var(--space-3); font-size: 13px; }
+.cb-app .wd-block { display: grid; gap: var(--space-4); margin-top: var(--space-5); }
+.cb-app .wd-subhead { margin: 0; font: 600 13px/18px var(--font-sans); color: var(--ink); }
+.cb-app .wd-list { margin: 0; padding-left: var(--space-5); display: grid; gap: var(--space-1); font-size: 13px; line-height: 18px; color: var(--ink); }
+.cb-app .wd-list .is-off { color: var(--ink-muted); }
+.cb-app .wd-cell-sub { display: block; font-size: 12px; line-height: 16px; color: var(--ink-muted); }
+.cb-app .wd-num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cb-app .wd-fail { margin: 0; padding: 0; list-style: none; display: grid; gap: 2px; font-size: 12px; line-height: 16px; color: var(--danger-ink); }
+.cb-app .wd-result { margin: 0; padding: var(--space-3) var(--space-4); border-radius: var(--radius-md); background: var(--surface-sunken); font: 400 12px/18px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--ink); white-space: pre-wrap; word-break: break-word; }
+.cb-app .wd-steps { margin: 0; padding: 0; list-style: none; display: grid; gap: var(--space-1); font-size: 13px; line-height: 18px; }
+.cb-app .wd-steps li { display: flex; gap: var(--space-3); }
+.cb-app .wd-steps time { flex: 0 0 auto; color: var(--ink-subtle); font-variant-numeric: tabular-nums; }
+.cb-app .wd-steps .is-failed { color: var(--danger-ink); }
+.cb-app .wd-confirm { display: flex; align-items: flex-end; gap: var(--space-3); flex-wrap: wrap; }
+.cb-app .wd-confirm .cb-field { flex: 1 1 260px; max-width: 360px; }

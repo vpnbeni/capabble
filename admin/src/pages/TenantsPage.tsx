@@ -613,14 +613,17 @@ export function TenantsPage({ navigateTo, currentPath }: TenantsPageProps) {
                     >
                       {loading ? 'Saving...' : 'Save Changes'}
                     </button>
-                    <button
-                      type="button"
-                      className="secondary"
-                      onClick={() => handleStatusChange(selectedTenant)}
-                      disabled={loading}
-                    >
-                      {selectedTenant.status === 'active' ? 'Suspend Tenant' : 'Activate Tenant'}
-                    </button>
+                    {/* A closed or deleted workspace is handled under Workspace data, not reactivated here. */}
+                    {(selectedTenant.status === 'active' || selectedTenant.status === 'suspended') && (
+                      <button
+                        type="button"
+                        className="secondary"
+                        onClick={() => handleStatusChange(selectedTenant)}
+                        disabled={loading}
+                      >
+                        {selectedTenant.status === 'active' ? 'Suspend Tenant' : 'Activate Tenant'}
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>

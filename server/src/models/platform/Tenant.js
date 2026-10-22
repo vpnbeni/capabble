@@ -4,6 +4,10 @@ const { createAllEnabledFeatureToggles } = require('../../constants/tenantFeatur
 const TENANT_STATUS = {
   ACTIVE: 'active',
   SUSPENDED: 'suspended',
+  // The school closed its workspace and the export window ended: no sign-in, data kept until purge.
+  CLOSED: 'closed',
+  // Purged: the database and files are gone. The record stays for billing history and audit.
+  DELETED: 'deleted',
 };
 
 const closureActorSchema = new mongoose.Schema({
@@ -24,7 +28,10 @@ const closureSchema = new mongoose.Schema({
   exportUntil: { type: Date, default: null },
   deleteAfter: { type: Date, default: null },
   canceledAt: { type: Date, default: null },
-  canceledBy: { type: closureActorSchema, default: null }
+  canceledBy: { type: closureActorSchema, default: null },
+  // Set by the daily workspace job (dataLifecycle/lifecycleJob.js).
+  closedAt: { type: Date, default: null },
+  deletionNoticeSentAt: { type: Date, default: null }
 }, { _id: false });
 
 const tenantSchema = new mongoose.Schema({
@@ -66,6 +73,15 @@ const tenantSchema = new mongoose.Schema({
   closure: {
     type: closureSchema,
     default: null
+  },
+  deletedAt: {
+    type: Date,
+    default: null,
+  },
+  // Set when the workspace was re-imported from an archive (admin portal).
+  restoredAt: {
+    type: Date,
+    default: null,
   },
   metadata: {
     createdBy: {

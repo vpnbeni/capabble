@@ -16,7 +16,9 @@ const BILLING_ERROR_RESPONSE = {
 };
 
 const CORE_ALLOWED_MODULES = new Set(['dashboard', 'candidates', 'subjects', 'datesheets', 'billing', 'auth']);
-const SAFE_ALWAYS_ALLOWED_PREFIXES = ['/auth', '/billing', '/onboarding', '/users', '/roles', '/notifications'];
+// /account: closing the workspace and downloading its archive must work whatever the plan state
+// (the 30-day export promise holds for unpaid and lapsed schools too). Administrators only.
+const SAFE_ALWAYS_ALLOWED_PREFIXES = ['/auth', '/billing', '/onboarding', '/users', '/roles', '/notifications', '/account'];
 const WRITE_METHODS = ['POST', 'PUT', 'PATCH', 'DELETE'];
 
 const parseBooleanEnv = (value, fallback) => {

@@ -120,7 +120,7 @@
   "routes": [
     { "prefix": "/users", "resource": "core.users", "writeAction": "manage" },
     { "prefix": "/roles", "resource": "core.users", "writeAction": "manage" },
-    { "prefix": "/account", "path": "^/closure", "permission": "core.billing.manage" },
+    { "prefix": "/account", "path": "^/(closure|archive)", "permission": "core.billing.manage" },
 
     { "prefix": "/sessions", "methods": ["GET"], "staff": true },
     { "prefix": "/sessions", "path": "^/?$", "methods": ["POST"], "staff": true },

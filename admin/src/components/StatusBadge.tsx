@@ -36,6 +36,16 @@ const TONES: Record<string, Tone> = {
   suspended_read_only: 'danger',
   failed: 'danger',
   canceled: 'neutral',
+  // Workspace data: backup runs, archives, purges and re-imports.
+  ok: 'success',
+  done: 'success',
+  ready: 'success',
+  building: 'info',
+  planned: 'info',
+  partial: 'warning',
+  awaiting_approval: 'warning',
+  dismissed: 'neutral',
+  deleted: 'neutral',
   void: 'neutral',
   refunded: 'neutral',
 }
@@ -50,6 +60,10 @@ const LABELS: Record<string, string> = {
   canceled: 'Cancelled',
   captured: 'Received',
   processed: 'Refunded',
+  ok: 'Complete',
+  partial: 'Partly done',
+  awaiting_approval: 'Waiting for approval',
+  planned: 'Dry run ready',
 }
 
 const labelForStatus = (status: string) => {

@@ -145,7 +145,19 @@ npm run seed:subjects                 # Seed subjects only
 npm run bootstrap:platform            # Bootstrap platform admin + central DB
 npm run platform:admin -- --email <new> --password --apply  # Change platform admin login/password (prompts; dry run without --apply)
 npm run backfill:tenant-user-directory # Backfill tenant user directory
+npm run backup:setup                  # Check backup storage + key, install the 30-day expiry rules
+npm run backup:run                    # Back up central, every tenant DB and billing now (encrypted)
+npm run backup:list                   # Backup runs in storage
+npm run backup:restore -- --run=latest --db=tenant:<slug> --to=<scratch db>   # Never over a live DB without --overwrite-live
+npm run workspace:archive -- --slug=<slug>    # Build a workspace archive and email the school admin
+npm run workspace:lifecycle [-- --now=<date>] # Daily workspace job; --now needs WORKSPACE_CLOCK_OVERRIDE_ALLOWED=true (never prod)
 ```
+
+### Backups, workspace archives and purges
+- Code in `server/src/modules/dataLifecycle`, runbook in `server/docs/backups.md`, admin UI at admin portal → Workspace data.
+- Nightly encrypted backups (central + every tenant DB + billing) and the daily workspace job run inside the API server with a lease in `job_leases`; both are off unless `BACKUP_ENABLED` / `WORKSPACE_LIFECYCLE_ENABLED` are `true`.
+- Closing a workspace builds a downloadable archive (Settings → Account). Closed workspaces are deleted only after a platform admin approves the purge; billing records are never purged (kept 8 years).
+- A new tenant data migration must be added to `TENANT_MIGRATIONS` in `importService.js` (accepting `--apply --tenant=<slug>`) so old archives still re-import. A new archive layout bumps `FORMAT_VERSION` in `archiveFormat.js` with an upgrade step.
 
 ## Architecture
 
@@ -277,6 +289,16 @@ See `.env.example` (root and `/server`) for required variables:
 **Email:** `SMTP_HOST` (smtp.hostinger.com), `SMTP_PORT` (465), `SMTP_SECURE` (true), `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` (`Capabble <no-reply@capabble.cloud>`), optional `MAIL_REPLY_TO`, `MAIL_SITE_URL`
 
 **Cloudinary:** `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`
+
+**Backups and workspace data** (see `server/docs/backups.md`):
+- `BACKUP_ENABLED`, `WORKSPACE_LIFECYCLE_ENABLED` - turn on the nightly backup / daily workspace job (default off)
+- `BACKUP_STORAGE` (`s3` or `local`), `BACKUP_S3_BUCKET`, `BACKUP_S3_REGION` (`ap-south-1`), optional `BACKUP_S3_ENDPOINT`, `BACKUP_LOCAL_DIR` (local driver), `BACKUP_PREFIX` (default: `CENTRAL_DB_NAME`)
+- `BACKUP_ENCRYPTION_KEY` - 32 random bytes, base64 (`openssl rand -base64 32`); keep a copy in the password manager, never next to the backups
+- `BACKUP_HOUR_IST` (default 2), `BACKUP_BILLING` (default true when `BILLING_DATABASE_URL` is set)
+- `MONGODUMP_PATH`, `MONGORESTORE_PATH`, `PG_DUMP_PATH`, `PG_RESTORE_PATH` - only if the tools aren't on `PATH`
+- `ARCHIVE_LINK_SECRET` (falls back to `JWT_SECRET`), `ARCHIVE_LINK_DAYS` (7), `ARCHIVE_MAX_FILES_MB` (500), `API_URL` (archive links), `ADMIN_URL` (purge email), `SUPPORT_EMAIL`
+- `WORKSPACE_CLOCK_OVERRIDE_ALLOWED` - testing only, lets `workspace:lifecycle --now` pretend a later date; never set in production
+- AWS credentials come from the EC2 instance role (or `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`)
 
 **Client** (`/client/.env.example`):
 - `VITE_ROOT_APP_DOMAIN`, `VITE_ROOT_API_DOMAIN`, `VITE_LOCAL_API_URL`, `VITE_API_URL`

@@ -56,6 +56,7 @@ const masterTeacherTemplateController = require('../controllers/admin/masterTeac
 const billingAdminController = require('../controllers/admin/billingAdminController');
 const billing = require('../modules/billing');
 const tenantFeaturesController = require('../controllers/admin/tenantFeaturesController');
+const dataLifecycle = require('../modules/dataLifecycle');
 
 const router = express.Router();
 
@@ -171,6 +172,9 @@ router.post(
 router.use(auth.protectPlatform);
 
 router.get('/auth/me', getPlatformMe);
+
+// Backups, workspace archives, purge approvals and re-imports.
+router.use('/workspace-data', dataLifecycle.adminRouter);
 router.post('/auth/logout', logoutPlatformAdmin);
 
 router.get('/tenants', validateQuery(tenantQuerySchema), listTenants);

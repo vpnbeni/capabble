@@ -9,6 +9,8 @@ const asyncHandler = require('../middleware/asyncHandler');
 const { getPlatformModels } = require('../tenancy/platformModels');
 const { sendMail } = require('../utils/mailer');
 const mailTemplates = require('../mail/templates');
+const { archiveOnClosure } = require('../modules/dataLifecycle');
+const { isStorageConfigured } = require('../modules/dataLifecycle/storage');
 
 const EXPORT_DAYS = 30;
 const DELETE_DAYS = 60;
@@ -93,7 +95,8 @@ const sendClosureEmails = (tenant, user) => {
         name: user.name,
         exportUntil,
         deleteAfter,
-        url: `${appUrl}/#/account-settings`
+        url: `${appUrl}/#/account-settings`,
+        archive: isStorageConfigured()
       })
     });
   }
@@ -162,6 +165,7 @@ const requestClosure = asyncHandler(async (req, res) => {
 
   console.info(`[account-closure] status=requested tenantSlug=${updated.slug} by=${closure.requestedBy.email}`);
   sendClosureEmails(updated, req.user);
+  archiveOnClosure(updated, req.user);
 
   return res.status(201).json({
     success: true,

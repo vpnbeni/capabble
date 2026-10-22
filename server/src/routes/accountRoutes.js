@@ -1,6 +1,7 @@
 const express = require('express');
 const { protect } = require('../middleware/auth');
 const ctrl = require('../controllers/accountClosureController');
+const { accountArchive } = require('../modules/dataLifecycle');
 const { requestClosureSchema } = require('../validations/accountClosureValidation');
 
 /** Validates req.body with a Joi schema; answers with the first problem as `message`. */
@@ -25,5 +26,9 @@ router.use(ctrl.requireAdministrator);
 router.get('/closure', ctrl.getClosure);
 router.post('/closure', validateBody(requestClosureSchema), ctrl.requestClosure);
 router.delete('/closure', ctrl.cancelClosure);
+
+// Workspace archive: a download of all the school's data while the workspace is closing.
+router.get('/archive', accountArchive.get);
+router.post('/archive', accountArchive.create);
 
 module.exports = router;
