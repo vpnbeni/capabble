@@ -7,6 +7,7 @@ const ctrl = require('../controllers/portalController');
 const appnt = require('../controllers/appntPortalController');
 const notifications = require('../controllers/notificationController');
 const calendar = require('../modules/clndr/portal');
+const calendarFeed = require('../modules/clndr/feed');
 const { portalRequestSchema } = require('../validations/appntValidation');
 
 /**
@@ -58,6 +59,10 @@ const calendarReplyLimiter = rateLimit({
   message: { success: false, message: 'Too many replies. Try again in a few minutes.' }
 });
 router.post('/calendar/events/:id/respond', calendarReplyLimiter, calendar.respondToEvent);
+// The account's own calendar feed link (subscribe from a phone calendar).
+router.get('/calendar/feed', calendarFeed.feedHandlers.status);
+router.post('/calendar/feed', calendarReplyLimiter, calendarFeed.feedHandlers.reset);
+router.delete('/calendar/feed', calendarFeed.feedHandlers.off);
 
 router.get('/appointments', appnt.listMine);
 router.post('/appointments/:id/cancel', appointmentWriteLimiter, appnt.cancel);

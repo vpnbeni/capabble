@@ -48,6 +48,7 @@ export type CalendarPart = {
 
 export type ResponseType = 'none' | 'acknowledge' | 'rsvp' | 'consent'
 export type ResponseValue = 'acknowledged' | 'yes' | 'no' | 'maybe' | 'given' | 'declined'
+export type FeedStatus = { active: boolean; url?: string; webcal?: string }
 export type ReplyInput = { segmentKey: string; studentId?: string | null; value: ResponseValue; count?: number; note?: string }
 
 export type ReplyTracker = Array<{
@@ -312,6 +313,9 @@ const calendarService = {
     data<{ id: string; status: EventStatus }>(api.post(`/calendar/events/${id}/cancel`, input)),
   remove: (id: string) => data<{ id: string }>(api.delete(`/calendar/events/${id}`)),
 
+  feed: () => data<FeedStatus>(api.get('/calendar/feed')),
+  resetFeed: () => data<FeedStatus>(api.post('/calendar/feed')),
+  feedOff: () => data<FeedStatus>(api.delete('/calendar/feed')),
   respond: (eventId: string, input: ReplyInput) => data<ReplyInput>(api.post(`/calendar/view/${eventId}/respond`, input)),
   replies: (eventId: string) => data<ReplyTracker>(api.get(`/calendar/events/${eventId}/responses`)),
   remindPending: (eventId: string, segmentKey?: string) =>

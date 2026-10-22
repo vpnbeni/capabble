@@ -268,7 +268,8 @@ describe('family portal routes', () => {
     expect(routes.filter((route) => /^(post|put|patch|delete)/.test(route))
       .every((route) => /appointments/.test(route)
         || /^post \/notifications\/(read-all|:id\/read)$/.test(route)
-        || route === 'post /calendar/events/:id/respond')).toBe(true);
+        || route === 'post /calendar/events/:id/respond'
+        || /^(post|delete) \/calendar\/feed$/.test(route))).toBe(true);
   });
 
   it('keeps student logins out of meeting requests', async () => {

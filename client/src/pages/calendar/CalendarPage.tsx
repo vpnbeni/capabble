@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import toast from 'react-hot-toast'
-import { CalendarPlus } from 'lucide-react'
+import { CalendarPlus, Smartphone } from 'lucide-react'
 import {
   AgendaList, Banner, Button, Card, Dialog, EmptyState, FilterBar, MonthCalendar, Page, Skeleton, Switch, Tabs, TextArea,
   formatDayKey, monthAdd, monthGrid, monthOf,
@@ -11,6 +11,7 @@ import { usePermissions } from '@/hooks/usePermissions'
 import { apiMessage, type CalendarItem, type CalendarLayerKey } from '@/services/calendarService'
 import CalendarItemSheet from '@/components/calendar/CalendarItemSheet'
 import EventComposer from '@/components/calendar/EventComposer'
+import CalendarFeedDialog from '@/components/calendar/CalendarFeedDialog'
 import { LAYER_LABELS, dayInfoFrom, findItem, groupByDay, toEntry } from '@/components/calendar/calendarUi'
 import '@/components/calendar/calendar.css'
 
@@ -82,6 +83,7 @@ const CalendarPage: React.FC = () => {
   const [openItem, setOpenItem] = useState<CalendarItem | null>(null)
   const [composer, setComposer] = useState<{ open: boolean; eventId?: string | null; date?: string }>({ open: false })
   const [cancelling, setCancelling] = useState<CalendarItem | null>(null)
+  const [feedOpen, setFeedOpen] = useState(false)
 
   const range = useMemo(() => monthGrid(month), [month])
   const { data, isLoading, isError, refetch } = useMyCalendar(range.from, range.to)
@@ -157,6 +159,7 @@ const CalendarPage: React.FC = () => {
                   onChange={(id) => setView(id as 'month' | 'agenda')}
                   items={[{ id: 'month', label: 'Month' }, { id: 'agenda', label: 'Agenda' }]}
                 />
+                <Button variant="secondary" icon={Smartphone} onClick={() => setFeedOpen(true)}>Add to phone</Button>
                 {canCreate ? (
                   <Button variant="primary" icon={CalendarPlus} onClick={() => setComposer({ open: true, eventId: null, date: selected })}>
                     New event
@@ -239,6 +242,7 @@ const CalendarPage: React.FC = () => {
         onCancel={(item) => { closeItem(); setCancelling(item) }}
       />
       <CancelEventDialog item={cancelling} onClose={() => setCancelling(null)} />
+      <CalendarFeedDialog open={feedOpen} onClose={() => setFeedOpen(false)} />
       <EventComposer
         open={composer.open}
         eventId={composer.eventId || null}

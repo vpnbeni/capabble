@@ -145,6 +145,7 @@
     { "prefix": "/notifications", "staff": true },
     { "prefix": "/calendar", "path": "^/(me|days|view)(/|$)", "methods": ["GET"], "staff": true },
     { "prefix": "/calendar", "path": "^/view/[^/]+/respond$", "methods": ["POST"], "staff": true },
+    { "prefix": "/calendar", "path": "^/feed$", "staff": true },
     { "prefix": "/calendar", "resource": "clndr.events" },
     { "prefix": "/school-days", "methods": ["GET"], "staff": true },
     { "prefix": "/school-days", "resource": "core.schooldays" },

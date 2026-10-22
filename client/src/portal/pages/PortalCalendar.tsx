@@ -6,6 +6,8 @@ import {
 import type { CalendarItem } from '@/services/calendarService'
 import CalendarItemSheet from '@/components/calendar/CalendarItemSheet'
 import CalendarAgendaCard from '@/components/calendar/CalendarAgendaCard'
+import CalendarFeedDialog from '@/components/calendar/CalendarFeedDialog'
+import { Smartphone } from 'lucide-react'
 import { dayInfoFrom, groupByDay, toEntry } from '@/components/calendar/calendarUi'
 import '@/components/calendar/calendar.css'
 import { usePortalCalendar } from '../usePortal'
@@ -23,6 +25,7 @@ export const PortalCalendar: React.FC = () => {
   const [selected, setSelected] = useState(params.get('date') || today)
   const [child, setChild] = useState<string>('all')
   const [open, setOpen] = useState<CalendarItem | null>(null)
+  const [feedOpen, setFeedOpen] = useState(false)
   const range = useMemo(() => monthGrid(month), [month])
   const { data, isLoading, isError } = usePortalCalendar(range.from, range.to)
 
@@ -70,7 +73,10 @@ export const PortalCalendar: React.FC = () => {
             ] : undefined}
             onChipClick={setChild}
             actions={(
-              <Tabs variant="segmented" label="Calendar view" value={view} onChange={(id) => setView(id as 'month' | 'agenda')} items={[{ id: 'month', label: 'Month' }, { id: 'agenda', label: 'Agenda' }]} />
+              <div className="cl-toolbar__actions">
+                <Tabs variant="segmented" label="Calendar view" value={view} onChange={(id) => setView(id as 'month' | 'agenda')} items={[{ id: 'month', label: 'Month' }, { id: 'agenda', label: 'Agenda' }]} />
+                <Button variant="secondary" icon={Smartphone} onClick={() => setFeedOpen(true)}>Add to phone</Button>
+              </div>
             )}
           />
         </div>
@@ -112,6 +118,7 @@ export const PortalCalendar: React.FC = () => {
         </Card>
       )}
       <CalendarItemSheet item={open} onClose={close} />
+      <CalendarFeedDialog portal open={feedOpen} onClose={() => setFeedOpen(false)} />
     </Page>
   )
 }

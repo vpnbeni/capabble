@@ -128,4 +128,57 @@ const buildIcs = (event, opts = {}) => {
   return lines.map(fold).join(CRLF) + CRLF;
 };
 
-module.exports = { buildIcs, escapeText, fold };
+/**
+ * A subscribable calendar (one person's feed) from calendar items: each item is one
+ * dated entry (events are already expanded to their occurrences).
+ * items: [{ uid, title, startDate, endDate, allDay, startTime, endTime, venue, description, cancelled }]
+ */
+const buildFeed = (items, opts = {}) => {
+  const { name = 'School calendar', timeZone = schoolDate.DEFAULT_TIME_ZONE, now = new Date() } = opts;
+  const lines = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//Capabble//School calendar//EN',
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH',
+    `X-WR-CALNAME:${escapeText(name)}`,
+    `X-WR-TIMEZONE:${timeZone}`,
+    'REFRESH-INTERVAL;VALUE=DURATION:PT1H',
+    'X-PUBLISHED-TTL:PT1H'
+  ];
+  const tz = timeZone === 'Asia/Kolkata';
+  if (items.some((item) => !item.allDay && item.startTime)) lines.push(...vtimezone(timeZone));
+  const stamp = utcStamp(now);
+  items.forEach((item) => {
+    const endDate = item.endDate || item.startDate;
+    lines.push('BEGIN:VEVENT', `UID:${item.uid}`, `DTSTAMP:${stamp}`);
+    if (!item.allDay && item.startTime) {
+      const param = tz ? ';TZID=Asia/Kolkata' : '';
+      const sameInstant = item.endTime === item.startTime && endDate === item.startDate;
+      const endTime = item.endTime && !sameInstant ? item.endTime : addHour(item.startTime);
+      lines.push(
+        `DTSTART${param}:${dateTimeValue(item.startDate, item.startTime)}`,
+        `DTEND${param}:${dateTimeValue(endDate, endTime)}`
+      );
+    } else {
+      lines.push(
+        `DTSTART;VALUE=DATE:${dateValue(item.startDate)}`,
+        `DTEND;VALUE=DATE:${dateValue(schoolDate.addDays(endDate, 1))}`
+      );
+    }
+    lines.push(`SUMMARY:${escapeText(item.title)}`);
+    if (item.venue) lines.push(`LOCATION:${escapeText(item.venue)}`);
+    if (item.description) lines.push(`DESCRIPTION:${escapeText(item.description)}`);
+    if (item.url) lines.push(`URL:${item.url}`);
+    let status = 'CONFIRMED';
+    if (item.cancelled) status = 'CANCELLED';
+    else if (item.tentative) status = 'TENTATIVE';
+    lines.push(`STATUS:${status}`, 'TRANSP:TRANSPARENT', 'END:VEVENT');
+  });
+  lines.push('END:VCALENDAR');
+  return lines.map(fold).join(CRLF) + CRLF;
+};
+
+module.exports = {
+  buildIcs, buildFeed, escapeText, fold
+};

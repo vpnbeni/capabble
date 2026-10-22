@@ -243,6 +243,8 @@ platformModule.mountRoutes(app);
 app.use('/api/workspace-archives', dataLifecycle.publicRouter);
 // Unsubscribe links in school emails: signed, no sign-in, no tenant header.
 app.use('/api/mail/unsubscribe', require('./mail/unsubscribe').router);
+// Private calendar feeds (Google / Apple / Outlook subscriptions): a secret link, no sign-in.
+app.use('/api/ical', require('./modules/clndr/feed').router);
 
 // Tenant-scoped routes — each module registers its own routes via mountAll()
 const tenantScopedRouter = express.Router();

@@ -4,6 +4,7 @@ const { requireTenantFeature } = require('../../middleware/tenantFeatureAccess')
 const ctrl = require('./controller');
 const schemas = require('./validation');
 const mailSettings = require('../../mail/settingsController');
+const feed = require('./feed');
 
 /**
  * /api/calendar — the signed-in staff member's calendar and calendar events.
@@ -18,6 +19,9 @@ calendar.use(requireTenantFeature('clndr_calendar'));
 calendar.get('/me', ctrl.getMine);
 calendar.get('/days', ctrl.getDays);
 calendar.get('/view/:id', ctrl.viewEvent);
+calendar.get('/feed', feed.feedHandlers.status);
+calendar.post('/feed', feed.feedHandlers.reset);
+calendar.delete('/feed', feed.feedHandlers.off);
 calendar.post('/view/:id/respond', ctrl.body(schemas.respond), ctrl.respondToEvent);
 
 const events = express.Router();

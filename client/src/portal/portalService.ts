@@ -1,6 +1,6 @@
 import type { AxiosRequestConfig } from 'axios'
 import baseApi from '@/services/api'
-import type { CalendarData, CalendarEventView, ReplyInput } from '@/services/calendarService'
+import type { CalendarData, CalendarEventView, FeedStatus, ReplyInput } from '@/services/calendarService'
 
 // Portal pages show their own empty/error states; skip the global toasts.
 const silent = (config?: AxiosRequestConfig): AxiosRequestConfig => ({ ...(config || {}), _silent: true } as AxiosRequestConfig)
@@ -231,6 +231,9 @@ const portalService = {
     (await post(`/portal/appointments/${encodeURIComponent(appointmentId)}/cancel`, { reason: reason || '' })).data.data,
   calendar: async (from: string, to: string): Promise<CalendarData> => (await get('/portal/calendar', { params: { from, to } })).data.data,
   calendarEvent: async (id: string): Promise<CalendarEventView> => (await get(`/portal/calendar/events/${encodeURIComponent(id)}`)).data.data,
+  calendarFeed: async (): Promise<FeedStatus> => (await get('/portal/calendar/feed')).data.data,
+  resetCalendarFeed: async (): Promise<FeedStatus> => (await post('/portal/calendar/feed')).data.data,
+  calendarFeedOff: async (): Promise<FeedStatus> => (await baseApi.delete('/portal/calendar/feed', silent())).data.data,
   respondToEvent: async (id: string, input: ReplyInput): Promise<ReplyInput> =>
     (await post(`/portal/calendar/events/${encodeURIComponent(id)}/respond`, input)).data.data,
   receiptPdf: async (studentId: string, paymentId: string): Promise<Blob> =>

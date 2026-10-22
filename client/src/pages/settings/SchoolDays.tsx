@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
-import { CalendarDays, CalendarPlus, Upload } from 'lucide-react'
+import { CalendarDays, CalendarPlus, Library, Upload } from 'lucide-react'
+import { useQueryClient } from '@tanstack/react-query'
 import {
   Badge, Banner, Button, Card, CardToolbar, Checkbox, DataTable, Dialog, EmptyState, Entity, FileField, FilterBar, Menu, Page, RadioGroup,
   Select, Sheet, StatCard, Switch, TextArea, TextField, formatDayKey,
@@ -8,7 +9,8 @@ import {
 import type { DataTableColumn, MenuItem } from '@/components/ui'
 import { useAudienceOptions, useCancelRule, useImportRules, useSaveRule, useSchoolDays } from '@/hooks/useCalendar'
 import { usePermissions } from '@/hooks/usePermissions'
-import { apiMessage, type RuleInput, type SchoolDayRule } from '@/services/calendarService'
+import calendarService, { apiMessage, type RuleInput, type SchoolDayRule } from '@/services/calendarService'
+import { NATIONAL_HOLIDAYS, OBSERVANCE_DAYS, dateInSession } from '@/components/calendar/dayLibrary'
 import '@/components/calendar/calendar.css'
 
 type Kind = SchoolDayRule['kind']
@@ -367,6 +369,66 @@ const ImportDialog: React.FC<{ open: boolean; onClose: () => void }> = ({ open, 
   )
 }
 
+/** Fixed-date observances added to the staff calendar, quietly (no notifications). */
+const ObservanceDialog: React.FC<{ open: boolean; onClose: () => void; sessionStart: string }> = ({ open, onClose, sessionStart }) => {
+  const [chosen, setChosen] = useState<string[]>([])
+  const [busy, setBusy] = useState(false)
+  const queryClient = useQueryClient()
+  React.useEffect(() => { if (open) setChosen(OBSERVANCE_DAYS.map((d) => d.title)) }, [open])
+  const add = async () => {
+    setBusy(true)
+    let added = 0
+    // eslint-disable-next-line no-restricted-syntax
+    for (const day of OBSERVANCE_DAYS.filter((d) => chosen.includes(d.title))) {
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        await calendarService.create({
+          title: day.title,
+          category: 'celebration',
+          allDay: true,
+          startDate: dateInSession(sessionStart, day.month, day.day),
+          visibility: 'all_staff',
+          segments: [{ label: 'All staff', personType: 'staff', scopes: [{ type: 'all', value: '' }], exclude: [], role: 'fyi', instructions: '', notify: 'silent', email: false, reminders: [] }],
+          publish: true,
+        })
+        added += 1
+      } catch (error) {
+        toast.error(apiMessage(error, `Could not add ${day.title}.`))
+      }
+    }
+    setBusy(false)
+    void queryClient.invalidateQueries({ queryKey: ['calendar'] })
+    if (added) toast.success(`${added} ${added === 1 ? 'day' : 'days'} added to the staff calendar. Edit one to add instructions for families.`)
+    onClose()
+  }
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      size="md"
+      title="Add observance days"
+      description="They go on the staff calendar without any notification. Open one later to add instructions for families."
+      footer={(
+        <>
+          <Button variant="secondary" onClick={onClose}>Close</Button>
+          <Button variant="primary" loading={busy} disabled={!chosen.length} onClick={add}>Add {chosen.length} {chosen.length === 1 ? 'day' : 'days'}</Button>
+        </>
+      )}
+    >
+      <div className="cl-checks">
+        {OBSERVANCE_DAYS.map((day) => (
+          <Checkbox
+            key={day.title}
+            label={`${day.title} · ${formatDayKey(dateInSession(sessionStart, day.month, day.day), { weekday: 'short', year: true })}`}
+            checked={chosen.includes(day.title)}
+            onChange={(on) => setChosen((list) => (on ? [...list, day.title] : list.filter((t) => t !== day.title)))}
+          />
+        ))}
+      </div>
+    </Dialog>
+  )
+}
+
 const SchoolDays: React.FC = () => {
   const [showCancelled, setShowCancelled] = useState(false)
   const { data, isLoading } = useSchoolDays({ all: showCancelled })
@@ -375,7 +437,30 @@ const SchoolDays: React.FC = () => {
   const [sheet, setSheet] = useState<{ open: boolean; rule: SchoolDayRule | null; kind?: Kind }>({ open: false, rule: null })
   const [importing, setImporting] = useState(false)
   const [removing, setRemoving] = useState<SchoolDayRule | null>(null)
+  const [observances, setObservances] = useState(false)
   const cancelRule = useCancelRule()
+  const importRules = useImportRules()
+  const { can } = usePermissions()
+  const canAnnounce = can(['clndr.events.publish_wide', 'clndr.events.manage'])
+
+  const addNationalHolidays = async () => {
+    if (!data) return
+    const have = new Set(data.rules.filter((r) => r.status === 'active').map((r) => r.startDate))
+    const missing = NATIONAL_HOLIDAYS
+      .map((h) => ({ kind: 'holiday' as const, title: h.title, startDate: dateInSession(data.from, h.month, h.day), category: 'national' as const }))
+      .filter((h) => !have.has(h.startDate))
+      .map((h) => ({ ...h, endDate: h.startDate }))
+    if (!missing.length) {
+      toast('National holidays are already in the list')
+      return
+    }
+    try {
+      await importRules.mutateAsync(missing)
+      toast.success(`${missing.map((h) => h.title).join(', ')} added`)
+    } catch (error) {
+      toast.error(apiMessage(error, 'Could not add the national holidays.'))
+    }
+  }
 
   const rules = data?.rules || []
   const weeklyOffs = rules.filter((r) => r.kind === 'weekly_off' && r.status === 'active')
@@ -463,6 +548,14 @@ const SchoolDays: React.FC = () => {
               actions={(
                 <div className="cl-toolbar__actions">
                   <Checkbox label="Show removed" checked={showCancelled} onChange={setShowCancelled} />
+                  <Menu
+                    label="Add from the library"
+                    items={[
+                      { label: 'National holidays', hint: '26 Jan, 15 Aug, 2 Oct', onSelect: () => { void addNationalHolidays() } },
+                      ...(canAnnounce ? [{ label: 'Observance days', hint: "Teachers' Day, Constitution Day…", onSelect: () => setObservances(true) }] : []),
+                    ]}
+                    trigger={(props) => <Button {...props} icon={Library}>Add from library</Button>}
+                  />
                   <Button icon={Upload} onClick={() => setImporting(true)}>Import list</Button>
                   <Button variant="primary" icon={CalendarPlus} onClick={() => setSheet({ open: true, rule: null })}>Add day</Button>
                 </div>
@@ -485,6 +578,7 @@ const SchoolDays: React.FC = () => {
 
       <RuleSheet open={sheet.open} rule={sheet.rule} kind={sheet.kind} onClose={() => setSheet({ open: false, rule: null })} />
       <ImportDialog open={importing} onClose={() => setImporting(false)} />
+      {data ? <ObservanceDialog open={observances} onClose={() => setObservances(false)} sessionStart={data.from} /> : null}
       <Dialog
         open={Boolean(removing)}
         onClose={() => setRemoving(null)}
