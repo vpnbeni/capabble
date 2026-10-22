@@ -477,7 +477,7 @@ const Generate: React.FC = () => {
               icon={Eye}
               aria-label={`View ${v.name} in class grid`}
               title="View in class grid"
-              onClick={() => navigate('/time-table/class-wise')}
+              onClick={() => navigate(`/time-table/class-wise?version=${v._id}`)}
             />
             <Button
               variant="tertiary"
@@ -640,10 +640,10 @@ const Generate: React.FC = () => {
           subtitle="Latest generation run"
           action={
             <div className="tg-actions">
-              <Button size="sm" iconRight={ArrowRight} onClick={() => navigate('/time-table/class-wise')}>
+              <Button size="sm" iconRight={ArrowRight} onClick={() => navigate(`/time-table/class-wise?version=${result.version._id}`)}>
                 View class grid
               </Button>
-              <Button size="sm" onClick={() => navigate('/time-table/teacher-wise')}>
+              <Button size="sm" onClick={() => navigate(`/time-table/teacher-wise?version=${result.version._id}`)}>
                 View teacher schedules
               </Button>
             </div>

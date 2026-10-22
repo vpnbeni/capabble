@@ -3,6 +3,7 @@ import { useTimetable, WEEKDAYS, EMPTY_CELL, type TimetableCell } from '@/contex
 import bellTimingsService, { type BellTimingRowPayload } from '@/services/bellTimingsService'
 import timetableService, { type TimetableVersionSummary, type TimetableGridState } from '@/services/timetableService'
 import toast from 'react-hot-toast'
+import { useSearchParams } from 'react-router-dom'
 import { CalendarDays, Eraser, FileSpreadsheet, FileText, Plus, Trash2, Wand2 } from 'lucide-react'
 import {
   Badge,
@@ -136,7 +137,9 @@ const ClassWise: React.FC = () => {
 
   // ── Version state ──
   const [versions, setVersions] = useState<TimetableVersionSummary[]>([])
-  const [selectedVersionId, setSelectedVersionId] = useState<string>('')
+  // Links from Generate and Versions open a version directly: ?version=<id>
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [selectedVersionId, setSelectedVersionId] = useState<string>(() => searchParams.get('version') || '')
   const [versionGrid, setVersionGrid] = useState<TimetableGridState | null>(null)
   const [exportingExcel, setExportingExcel] = useState(false)
   const [exportingPDF, setExportingPDF] = useState(false)
@@ -773,7 +776,10 @@ const ClassWise: React.FC = () => {
                   title="Select a generated timetable version to view"
                   size="sm"
                   value={selectedVersionId}
-                  onChange={(e) => setSelectedVersionId(e.target.value)}
+                  onChange={(e) => {
+                    setSelectedVersionId(e.target.value)
+                    setSearchParams(e.target.value ? { version: e.target.value } : {}, { replace: true })
+                  }}
                   placeholder="Manual (current grid)"
                   options={versionOptions}
                 />
@@ -850,22 +856,25 @@ const ClassWise: React.FC = () => {
                     : 'Select a period heading to assign subjects across weekdays, or turn on auto mode to fill the grid from the period distribution.'}
                 </p>
               </div>
-              <div className="tcw-head__actions">
-                <Switch label="Auto mode" checked={mode === 'auto'} onChange={() => handleModeToggle()} />
-                {mode === 'auto' ? (
-                  <Button
-                    size="sm"
-                    icon={Wand2}
-                    onClick={autoFillClassTimetable}
-                    disabled={selectedClass.subjects.length === 0}
-                  >
-                    Auto fill
+              {/* A generated version is read-only: these act on the manual grid, which isn't on screen. */}
+              {versionGrid ? null : (
+                <div className="tcw-head__actions">
+                  <Switch label="Auto mode" checked={mode === 'auto'} onChange={() => handleModeToggle()} />
+                  {mode === 'auto' ? (
+                    <Button
+                      size="sm"
+                      icon={Wand2}
+                      onClick={autoFillClassTimetable}
+                      disabled={selectedClass.subjects.length === 0}
+                    >
+                      Auto fill
+                    </Button>
+                  ) : null}
+                  <Button size="sm" icon={Trash2} onClick={() => setClearAllOpen(true)} disabled={stats.filled === 0}>
+                    Clear all
                   </Button>
-                ) : null}
-                <Button size="sm" icon={Trash2} onClick={() => setClearAllOpen(true)} disabled={stats.filled === 0}>
-                  Clear all
-                </Button>
-              </div>
+                </div>
+              )}
             </div>
 
             {!hasSubjects || selectedClassTeacherPool.length === 0 ? (
@@ -1140,7 +1149,7 @@ const ClassWise: React.FC = () => {
         tone="danger"
         size="sm"
         title={selectedClass ? `Clear the timetable for ${selectedClass.className}-${selectedClass.section}?` : 'Clear the timetable?'}
-        description={`This removes all ${stats.filled} filled ${stats.filled === 1 ? 'period' : 'periods'} for this class.`}
+        description={`This empties all ${stats.filled} filled ${stats.filled === 1 ? 'period' : 'periods'} of this class in the manual grid. Generated versions don't change. This can't be undone.`}
         footer={
           <>
             <Button onClick={() => setClearAllOpen(false)}>Cancel</Button>

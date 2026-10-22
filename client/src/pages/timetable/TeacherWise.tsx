@@ -3,7 +3,7 @@ import { useTimetable, WEEKDAYS, type TimetableClass } from '@/contexts/Timetabl
 import bellTimingsService, { type BellTimingRowPayload } from '@/services/bellTimingsService'
 import timetableService, { type TimetableVersionSummary, type TimetableGridState } from '@/services/timetableService'
 import toast from 'react-hot-toast'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { BookOpen, CalendarClock, FileDown, Search, UserCheck, Users } from 'lucide-react'
 import { Avatar, Badge, Button, Card, EmptyState, FilterBar, Page, Select, StatCard } from '@/components/ui'
 import '@/components/timetable/teacherwise.css'
@@ -111,7 +111,9 @@ const TeacherWise: React.FC = () => {
 
   // ── Version state ──
   const [versions, setVersions] = useState<TimetableVersionSummary[]>([])
-  const [selectedVersionId, setSelectedVersionId] = useState<string>('')
+  // Links from Generate and Versions open a version directly: ?version=<id>
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [selectedVersionId, setSelectedVersionId] = useState<string>(() => searchParams.get('version') || '')
   const [versionGrid, setVersionGrid] = useState<TimetableGridState | null>(null)
   const [exportingPDF, setExportingPDF] = useState(false)
 
@@ -297,7 +299,10 @@ const TeacherWise: React.FC = () => {
                   title="Select a generated timetable version to view"
                   size="sm"
                   value={selectedVersionId}
-                  onChange={(e) => setSelectedVersionId(e.target.value)}
+                  onChange={(e) => {
+                    setSelectedVersionId(e.target.value)
+                    setSearchParams(e.target.value ? { version: e.target.value } : {}, { replace: true })
+                  }}
                   options={versionOptions}
                   className="ttw-version"
                 />
