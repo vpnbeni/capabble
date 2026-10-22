@@ -23,3 +23,31 @@ export function initPwaManifest() {
   syncManifest()
   window.addEventListener('hashchange', syncManifest)
 }
+
+const CHUNK_RELOAD_KEY = 'capabble-chunk-reload'
+
+/**
+ * A page left open across a deploy can ask for a code chunk that no longer exists; without this
+ * the screen stays blank. Reload once to pick up the new version; the flag stops a reload loop.
+ */
+export function reloadOnStaleChunk() {
+  window.addEventListener('vite:preloadError', (event) => {
+    try {
+      if (sessionStorage.getItem(CHUNK_RELOAD_KEY)) return
+      sessionStorage.setItem(CHUNK_RELOAD_KEY, '1')
+    } catch {
+      return
+    }
+    event.preventDefault()
+    window.location.reload()
+  })
+  window.addEventListener('load', () => {
+    setTimeout(() => {
+      try {
+        sessionStorage.removeItem(CHUNK_RELOAD_KEY)
+      } catch {
+        /* storage blocked */
+      }
+    }, 10_000)
+  })
+}
