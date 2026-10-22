@@ -16,6 +16,7 @@ dependencies = [
   "pydantic-settings>=2.6.0",
   "typer>=0.15.0",
   "httpx>=0.28.0",
+  "certifi>=2026.10.19",
   "tenacity>=9.0.0",
   "rapidfuzz>=3.10.0",
   "python-dotenv>=1.0.1",

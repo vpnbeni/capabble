@@ -180,31 +180,10 @@ function buildRedirectUrl(tenantSlug: string, ticket: string): string {
   return `https://${tenantSlug}.${appDomain}/#/signup/complete?ticket=${encodeURIComponent(ticket)}`
 }
 
-export const SignupChat: React.FC = () => {
-  const initialState = useMemo<PersistedState>(() => {
-    try {
-      const raw = sessionStorage.getItem(CHAT_STORAGE_KEY)
-      if (!raw) {
-        return {
-          draft: emptyDraft,
-          currentStep: 0,
-          messages: [
-            {
-              id: messageId(),
-              role: "assistant",
-              text: "Hi, I am your Capabble onboarding assistant. I will create your centre in a few quick steps.",
-            },
-            {
-              id: messageId(),
-              role: "assistant",
-              text: STEPS[0].prompt,
-            },
-          ],
-        }
-      }
-
-      return JSON.parse(raw) as PersistedState
-    } catch {
+function loadInitialState(): PersistedState {
+  try {
+    const raw = sessionStorage.getItem(CHAT_STORAGE_KEY)
+    if (!raw) {
       return {
         draft: emptyDraft,
         currentStep: 0,
@@ -222,7 +201,30 @@ export const SignupChat: React.FC = () => {
         ],
       }
     }
-  }, [])
+
+    return JSON.parse(raw) as PersistedState
+  } catch {
+    return {
+      draft: emptyDraft,
+      currentStep: 0,
+      messages: [
+        {
+          id: messageId(),
+          role: "assistant",
+          text: "Hi, I am your Capabble onboarding assistant. I will create your centre in a few quick steps.",
+        },
+        {
+          id: messageId(),
+          role: "assistant",
+          text: STEPS[0].prompt,
+        },
+      ],
+    }
+  }
+}
+
+export const SignupChat: React.FC = () => {
+  const [initialState] = useState(loadInitialState)
 
   const [draft, setDraft] = useState<DraftState>(initialState.draft)
   const [currentStep, setCurrentStep] = useState(initialState.currentStep)
