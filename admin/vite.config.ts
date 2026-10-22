@@ -1,9 +1,41 @@
 import path from 'path'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    // Installable app; src/UpdatePrompt.tsx registers the service worker.
+    VitePWA({
+      registerType: 'prompt',
+      injectRegister: false,
+      includeAssets: ['favicon.svg', 'pwa/apple-touch-icon.png'],
+      manifest: {
+        id: '/',
+        name: 'Capabble Platform Admin',
+        short_name: 'Capabble Admin',
+        description: 'Manage Capabble workspaces, onboarding and billing.',
+        start_url: '/',
+        scope: '/',
+        display: 'standalone',
+        background_color: '#111314',
+        theme_color: '#111314',
+        icons: [
+          { src: '/pwa/icon-192.png', sizes: '192x192', type: 'image/png' },
+          { src: '/pwa/icon-512.png', sizes: '512x512', type: 'image/png' },
+          { src: '/pwa/maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+        ],
+      },
+      workbox: {
+        globPatterns: ['**/*.{js,css,html,svg,woff2}', 'pwa/*.png'],
+        maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
+        cleanupOutdatedCaches: true,
+        navigateFallback: '/index.html',
+        navigateFallbackDenylist: [/^\/api\//],
+      },
+    }),
+  ],
   resolve: {
     alias: {
       // The Capabble design system (tokens + kit styles) lives with the school app's UI kit.

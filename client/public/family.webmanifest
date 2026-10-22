@@ -1,0 +1,18 @@
+{
+  "id": "/?app=family",
+  "name": "Capabble Family",
+  "short_name": "Capabble Family",
+  "description": "Attendance, results, fees and school notices for parents and students.",
+  "start_url": "/?app=family#/portal",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
+  "categories": ["education"],
+  "icons": [
+    { "src": "/pwa/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/pwa/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/pwa/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
