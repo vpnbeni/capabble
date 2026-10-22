@@ -231,7 +231,6 @@ app.get('/api', (req, res) => {
       timetable: '/api/timetable',
       onboarding: '/api/onboarding',
       admin: '/api/admin'
-      // calendar: '/api/calendar' // Temporarily disabled for debugging
     },
     documentation: 'See README.md for detailed API documentation'
   });

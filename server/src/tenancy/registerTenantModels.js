@@ -12,7 +12,6 @@ const AnswerSheetDispatch = require('../models/AnswerSheetDispatch');
 const FolderMapping = require('../models/FolderMapping');
 const CBSEDatesheet = require('../models/CBSEDatesheet');
 const CBSECircular = require('../models/CBSECircular');
-const Calendar = require('../models/Calendar');
 const { Form66, Form66Upload } = require('../models/Form66');
 const Guideline = require('../models/Guideline');
 const Undertaking = require('../models/Undertaking');
@@ -127,7 +126,6 @@ const tenantModelExports = {
   FolderMapping,
   CBSEDatesheet,
   CBSECircular,
-  Calendar,
   Form66,
   Form66Upload,
   Guideline,

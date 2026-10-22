@@ -27,7 +27,6 @@ const MODULE_MODEL_KEYS = Object.freeze({
     'Room',
     'AcademicSession',
     'CBSEDatesheet',
-    'Calendar',
     'Feedback',
     'SupportTicket',
     'OnboardingSession',

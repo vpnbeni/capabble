@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const createContextModelProxy = require('../tenancy/createContextModelProxy');
+const { DEFAULT_TIME_ZONE, isValidTimeZone } = require('../utils/schoolDate');
 
 const schoolProfileSchema = new mongoose.Schema({
   schoolName: { type: String, default: '', trim: true },
@@ -13,6 +14,13 @@ const schoolProfileSchema = new mongoose.Schema({
   address: { type: String, default: '', trim: true },
   contact: { type: String, default: '', trim: true },
   email: { type: String, default: '', trim: true },
+  // IANA zone the school's calendar days are counted in (see utils/schoolDate.js).
+  timeZone: {
+    type: String,
+    default: DEFAULT_TIME_ZONE,
+    trim: true,
+    validate: { validator: isValidTimeZone, message: 'Unknown time zone' }
+  },
   awardListDesign: { type: mongoose.Schema.Types.Mixed, default: null },
   admitCardDesign: { type: mongoose.Schema.Types.Mixed, default: null },
   reportCardDesign: { type: mongoose.Schema.Types.Mixed, default: null },

@@ -1,5 +1,8 @@
 const mongoose = require('mongoose');
 const createContextModelProxy = require('../tenancy/createContextModelProxy');
+const schoolDate = require('../utils/schoolDate');
+
+const DATE_KEY = [/^\d{4}-\d{2}-\d{2}$/, 'Use YYYY-MM-DD'];
 
 const academicSessionSchema = new mongoose.Schema({
   label: {
@@ -17,6 +20,9 @@ const academicSessionSchema = new mongoose.Schema({
     type: Number,
     required: [true, 'End year is required']
   },
+  // First and last school day ('YYYY-MM-DD'). Filled from the label (1 April to 31 March) when not set.
+  startDate: { type: String, trim: true, match: DATE_KEY },
+  endDate: { type: String, trim: true, match: DATE_KEY },
   isCurrent: {
     type: Boolean,
     default: false
@@ -36,6 +42,18 @@ const academicSessionSchema = new mongoose.Schema({
   toObject: { virtuals: true }
 });
 
+academicSessionSchema.pre('validate', function fillDates(next) {
+  const dates = schoolDate.sessionDates(this.label);
+  if (dates) {
+    if (!this.startDate) this.startDate = dates.startDate;
+    if (!this.endDate) this.endDate = dates.endDate;
+  }
+  if (this.startDate && this.endDate && this.startDate > this.endDate) {
+    this.invalidate('endDate', 'The session must end after it starts');
+  }
+  next();
+});
+
 // Indexes
 academicSessionSchema.index({ label: 1 }, { unique: true });
 academicSessionSchema.index({ isCurrent: 1 });
@@ -43,17 +61,25 @@ academicSessionSchema.index({ status: 1 });
 academicSessionSchema.index({ startYear: -1 });
 
 /**
- * Derive the academic session label from a given date.
- * Indian academic year runs April (month index 3) to March.
- * A date in Jan-Mar belongs to session starting the previous calendar year.
+ * Derive the academic session label from a given date, using the school day in
+ * India time (the session runs April to March).
  */
 academicSessionSchema.statics.labelFromDate = function (dateValue) {
-  const date = dateValue ? new Date(dateValue) : new Date();
-  if (Number.isNaN(date.getTime())) return '';
-  const month = date.getMonth() + 1; // 1-indexed
-  const year = date.getFullYear();
-  const startYear = month <= 3 ? year - 1 : year;
-  return `${startYear}-${startYear + 1}`;
+  return schoolDate.sessionLabelFor(schoolDate.dateKey(dateValue || new Date()));
+};
+
+/**
+ * First and last school day of a session document or label. Sessions saved
+ * before these fields existed fall back to 1 April to 31 March.
+ */
+academicSessionSchema.statics.datesFor = function (sessionOrLabel) {
+  const label = typeof sessionOrLabel === 'string' ? sessionOrLabel : sessionOrLabel?.label;
+  const fallback = schoolDate.sessionDates(label);
+  if (!fallback) return null;
+  return {
+    startDate: (typeof sessionOrLabel === 'object' && sessionOrLabel?.startDate) || fallback.startDate,
+    endDate: (typeof sessionOrLabel === 'object' && sessionOrLabel?.endDate) || fallback.endDate
+  };
 };
 
 /**
@@ -93,10 +119,7 @@ academicSessionSchema.statics.ensureSession = async function (label, createdBy) 
  * You can override via ACADEMIC_SESSION_LAST_END_YEAR.
  */
 academicSessionSchema.statics.generateAvailableSessions = function () {
-  const now = new Date();
-  const month = now.getMonth() + 1;
-  const year = now.getFullYear();
-  const currentStartYear = month <= 3 ? year - 1 : year;
+  const currentStartYear = Number(this.currentLabel().slice(0, 4));
   const configuredLastEndYear = Number.parseInt(process.env.ACADEMIC_SESSION_LAST_END_YEAR || '2030', 10);
   const lastEndYear = Number.isFinite(configuredLastEndYear) && configuredLastEndYear >= currentStartYear + 1
     ? configuredLastEndYear
@@ -109,6 +132,7 @@ academicSessionSchema.statics.generateAvailableSessions = function () {
       label: `${sy}-${sy + 1}`,
       startYear: sy,
       endYear: sy + 1,
+      ...schoolDate.sessionDates(`${sy}-${sy + 1}`),
       isCurrent: sy === currentStartYear
     });
   }

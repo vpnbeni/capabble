@@ -16,7 +16,6 @@ const REQUIRED_TENANT_MODEL_KEYS = [
   'FolderMapping',
   'CBSEDatesheet',
   'CBSECircular',
-  'Calendar',
   'Form66',
   'Form66Upload',
   'Guideline',

@@ -14,7 +14,6 @@ module.exports = {
   Room: require('../../models/Room'),
   AcademicSession: require('../../models/AcademicSession'),
   CBSEDatesheet: require('../../models/CBSEDatesheet'),
-  Calendar: require('../../models/Calendar'),
   Feedback: require('../../models/Feedback'),
   SupportTicket: require('../../models/SupportTicket'),
   OnboardingSession: require('../../models/OnboardingSession'),

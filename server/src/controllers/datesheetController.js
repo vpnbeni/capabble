@@ -7,7 +7,7 @@ const asyncHandler = require('../middleware/asyncHandler')
 const { generateResponse, HTTP_STATUS } = require('../utils/constants')
 const CBSEDatesheetParser = require('../utils/cbseDatesheetParser')
 const CBSEDatesheet = require('../models/CBSEDatesheet')
-const { getDayNameForDate } = require('../utils/calendarSeeder')
+const schoolDate = require('../utils/schoolDate')
 const { getDayName, addDayNameToEntry } = require('../utils/dateHelper')
 const { calculateRoomsGroupedByDate } = require('../utils/roomCalculator')
 const { ensureTenantActiveDatesheet } = require('../services/cbseDatesheetRolloutService')
@@ -294,25 +294,10 @@ exports.importFromPdf = asyncHandler(async (req, res) => {
       console.log('✅ CBSE format detected and parsed successfully!')
       console.log(`📊 Found ${cbseResult.data.count} entries`)
       
-      // Get day names for all dates
-      console.log('📅 Fetching day names from calendar...')
-      const entriesWithDays = await Promise.all(
-        cbseResult.data.entries.map(async (entry) => {
-          try {
-            const dayName = await getDayNameForDate(entry.examDate)
-            return {
-              ...entry,
-              dayName: dayName || 'Unknown'
-            }
-          } catch (error) {
-            console.warn(`Failed to get day name for ${entry.examDate}:`, error.message)
-            return {
-              ...entry,
-              dayName: 'Unknown'
-            }
-          }
-        })
-      )
+      const entriesWithDays = cbseResult.data.entries.map((entry) => {
+        const key = schoolDate.dateKey(entry.examDate)
+        return { ...entry, dayName: key ? schoolDate.weekdayName(key) : 'Unknown' }
+      })
       
       // Determine academic year from dates
       const dates = cbseResult.data.entries.map(e => new Date(e.examDate))

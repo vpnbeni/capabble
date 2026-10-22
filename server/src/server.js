@@ -40,9 +40,6 @@ if (process.env.VERCEL) {
   return;
 }
 
-// Import calendar seeder (temporarily disabled for debugging)
-// const { initializeCurrentYearCalendar } = require('./utils/calendarSeeder');
-
 // Handle uncaught exceptions
 process.on('uncaughtException', (err) => {
   console.log('UNCAUGHT EXCEPTION! 💥 Shutting down...'.red.bold);
@@ -83,15 +80,6 @@ const initializeServer = async () => {
       console.warn('⚠️  Email is off (set SMTP_HOST, SMTP_USER, SMTP_PASS and SMTP_FROM to enable).'.yellow);
     }
 
-    // TODO: Re-enable calendar initialization after debugging
-    // setTimeout(async () => {
-    //   try {
-    //     await initializeCurrentYearCalendar();
-    //     console.log('✅ Calendar initialized successfully'.green.bold);
-    //   } catch (calendarError) {
-    //     console.warn('⚠️  Calendar initialization failed (server will continue):'.yellow.bold, calendarError.message);
-    //   }
-    // }, 2000);
     
     console.log('✅ Server initialization completed successfully'.green.bold);
   } catch (error) {
