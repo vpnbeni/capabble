@@ -71,6 +71,9 @@ const initializeServer = async () => {
     // Nightly backups and the daily workspace job (each off unless enabled; see server/docs/backups.md).
     require('./modules/dataLifecycle').startScheduler();
 
+    // Hourly reminders: fees due, meetings tomorrow, maintenance due (off with NOTIFICATION_SCHEDULER_ENABLED=false).
+    require('./notifications/scheduler').start();
+
     if (isMailConfigured()) {
       // Log in to the mail server once so a wrong password shows up at startup, not at the first signup.
       verifyMailer()
@@ -154,6 +157,7 @@ process.on('SIGTERM', () => {
   console.log('👋 SIGTERM RECEIVED. Shutting down gracefully');
   billing.stopScheduler();
   require('./modules/dataLifecycle').stopScheduler();
+  require('./notifications/scheduler').stop();
   if (isAttendanceQueueReady()) {
     const worker = require('./workers/attendanceWorker');
     worker.close().catch(() => {});
@@ -168,6 +172,7 @@ process.on('SIGINT', () => {
   console.log('\n👋 SIGINT RECEIVED. Shutting down gracefully');
   billing.stopScheduler();
   require('./modules/dataLifecycle').stopScheduler();
+  require('./notifications/scheduler').stop();
   if (isAttendanceQueueReady()) {
     const worker = require('./workers/attendanceWorker');
     worker.close().catch(() => {});

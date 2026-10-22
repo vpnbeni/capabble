@@ -141,10 +141,18 @@ const runOnce = async (now = new Date()) => {
 };
 
 let timer = null;
+let running = false;
 
 const start = ({ intervalMs = 60 * 60 * 1000, initialDelayMs = 60 * 1000 } = {}) => {
   if (timer || String(process.env.NOTIFICATION_SCHEDULER_ENABLED || 'true') !== 'true') return;
-  const tick = () => runOnce().catch((error) => console.error('[notifications] reminders failed', error.message));
+  // A slow run (many tenants) must not overlap the next tick.
+  const tick = () => {
+    if (running) return;
+    running = true;
+    runOnce()
+      .catch((error) => console.error('[notifications] reminders failed', error.message))
+      .finally(() => { running = false; });
+  };
   setTimeout(tick, initialDelayMs).unref();
   timer = setInterval(tick, intervalMs);
   timer.unref();
