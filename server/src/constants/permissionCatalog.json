@@ -143,6 +143,7 @@
     { "prefix": "/school-profile", "resource": "core.school" },
     { "prefix": "/support", "staff": true },
     { "prefix": "/notifications", "staff": true },
+    { "prefix": "/devices", "staff": true },
     { "prefix": "/calendar", "path": "^/(me|days|view)(/|$)", "methods": ["GET"], "staff": true },
     { "prefix": "/calendar", "path": "^/view/[^/]+/respond$", "methods": ["POST"], "staff": true },
     { "prefix": "/calendar", "path": "^/feed$", "staff": true },

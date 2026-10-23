@@ -6,6 +6,7 @@ const { AUDIENCE } = require('../rbac/session');
 const ctrl = require('../controllers/portalController');
 const appnt = require('../controllers/appntPortalController');
 const notifications = require('../controllers/notificationController');
+const devices = require('../push/controller');
 const calendar = require('../modules/clndr/portal');
 const calendarFeed = require('../modules/clndr/feed');
 const { portalRequestSchema } = require('../validations/appntValidation');
@@ -30,6 +31,10 @@ router.get('/notifications', notifications.listNotifications);
 router.get('/notifications/unread-count', notifications.unreadCount);
 router.post('/notifications/read-all', notifications.markAllRead);
 router.post('/notifications/:id/read', notifications.markRead);
+
+// This phone's push token (the Capabble app).
+router.post('/devices', devices.registerDevice);
+router.delete('/devices/:token', devices.unregisterDevice);
 
 // Meeting requests: at most 20 writes per account in 15 minutes.
 const appointmentWriteLimiter = rateLimit({

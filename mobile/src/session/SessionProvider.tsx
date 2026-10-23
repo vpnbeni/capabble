@@ -2,6 +2,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 
 import { setSessionEndedHandler, setTenantSlug } from '@/lib/api'
+import { unregisterFromPush } from '@/lib/push'
 import { storage } from '@/lib/storage'
 import { authService, type School, type User } from '@/services/authService'
 
@@ -72,13 +73,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(async () => {
     const school = state.school
+    // Stop pushes to this phone first, while the session can still say so.
+    if (state.user) await unregisterFromPush(state.user.kind)
     try {
       await authService.logout()
     } catch {
       // Signed out locally either way; the server session ends when it expires.
     }
     endSession(school)
-  }, [endSession, state.school])
+  }, [endSession, state.school, state.user])
 
   const forgetSchool = useCallback(async () => {
     await storage.remove(SCHOOL_KEY)

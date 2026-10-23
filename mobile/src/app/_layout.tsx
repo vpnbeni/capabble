@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 
 import { ApiError } from '@/lib/api'
+import { usePushNotifications } from '@/lib/usePushNotifications'
 import { SessionProvider, useSession } from '@/session/SessionProvider'
 import { ThemeProvider, useTheme } from '@/theme/ThemeProvider'
 
@@ -45,6 +46,8 @@ function RootStack() {
   const mustSetPassword = session.status === 'signedIn' && session.user.mustChangePassword
   const { scheme, colors, setSchoolColor } = useTheme()
   const schoolColor = session.status === 'signedIn' ? session.user.tenant?.brandColor || null : null
+
+  usePushNotifications(status === 'signedIn' && !mustSetPassword ? session.user : null, session.school?.slug ?? null)
 
   useEffect(() => {
     if (status !== 'loading') SplashScreen.hideAsync()

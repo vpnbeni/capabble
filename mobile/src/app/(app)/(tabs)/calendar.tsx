@@ -1,4 +1,5 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react-native'
+import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useMemo, useState } from 'react'
 import { View } from 'react-native'
 
@@ -13,7 +14,10 @@ import { AgendaList, Button, Card, Chips, EmptyState, IconButton, Screen, Skelet
 /** The family's calendar by day: holidays, school events with their own instructions, exams, fee dates, meetings. */
 export default function CalendarScreen() {
   const today = schoolToday()
-  const [month, setMonth] = useState(monthOf(today))
+  // A notification links here with ?event= (and sometimes ?date=), as on the website.
+  const linked = useLocalSearchParams<{ event?: string; date?: string }>()
+  const router = useRouter()
+  const [month, setMonth] = useState(monthOf(linked.date || today))
   const [child, setChild] = useState('all')
   const [open, setOpen] = useState<CalendarItem | null>(null)
   const from = `${month}-01`
@@ -27,8 +31,22 @@ export default function CalendarScreen() {
   // This month starts from today; other months from their first day.
   const groups = useMemo(() => groupByDay(items, isThisMonth ? schoolDay : from, to, data), [items, isThisMonth, schoolDay, from, to, data])
   const children = data?.children ?? []
+  // The linked event stays open until closed (closing drops the link).
+  const linkedItem = useMemo(() => {
+    if (!linked.event || !data) return null
+    return data.items.find((item) => item.eventId === linked.event && (!linked.date || item.occurrence === linked.date))
+      ?? data.items.find((item) => item.eventId === linked.event)
+      ?? null
+  }, [linked.event, linked.date, data])
+
+  const close = () => {
+    setOpen(null)
+    if (linked.event) router.setParams({ event: undefined, date: undefined })
+  }
+
   // The open item, refreshed when a reply changes the data under it.
-  const openItem = open ? (data?.items.find((item) => item.id === open.id) ?? open) : null
+  const shown = open ?? linkedItem
+  const openItem = shown ? (data?.items.find((item) => item.id === shown.id) ?? shown) : null
 
   return (
     <Screen title="Calendar" refreshing={calendar.isRefetching} onRefresh={calendar.refetch}>
@@ -80,7 +98,7 @@ export default function CalendarScreen() {
         )}
       </Card>
 
-      <CalendarItemSheet item={openItem} onClose={() => setOpen(null)} />
+      <CalendarItemSheet item={openItem} onClose={close} />
     </Screen>
   )
 }

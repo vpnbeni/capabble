@@ -24,6 +24,7 @@ const roleRoutes = require('../../routes/roleRoutes');
 const portalRoutes = require('../../routes/portalRoutes');
 const idCardRoutes = require('../../routes/idCardRoutes');
 const notificationRoutes = require('../../routes/notificationRoutes');
+const deviceRoutes = require('../../routes/deviceRoutes');
 const accountRoutes = require('../../routes/accountRoutes');
 
 const mountRoutes = (router) => {
@@ -33,6 +34,7 @@ const mountRoutes = (router) => {
   router.use('/roles', roleRoutes);
   router.use('/portal', portalRoutes);
   router.use('/notifications', notificationRoutes);
+  router.use('/devices', deviceRoutes);
   router.use('/teachers', requireTenantFeature('exam_functionaries'), teacherRoutes);
   router.use('/subjects', requireTenantFeature('subjects'), subjectRoutes);
   router.use('/rooms', requireTenantFeature('examrooms'), roomRoutes);

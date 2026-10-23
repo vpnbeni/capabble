@@ -38,6 +38,8 @@ const MODULE_MODEL_KEYS = Object.freeze({
     'SchoolMailSettings',
     'MailOutbox',
     'MailSuppression',
+    'Device',
+    'PushOutbox',
   ]),
   cntr: Object.freeze([
     'Student',
