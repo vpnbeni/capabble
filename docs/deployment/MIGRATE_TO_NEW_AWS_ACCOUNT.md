@@ -102,7 +102,7 @@ aws ec2 run-instances \
 
 ## 3. Install runtime on the new box
 
-Follow `docs/deployment/AWS_DEPLOYMENT.md` §2.1–2.2 verbatim (Node 20, PM2, Nginx, Puppeteer
+Follow `docs/deployment/AWS_DEPLOYMENT.md` §2.1–2.2 verbatim (Node 24, PM2, Nginx, Puppeteer
 system deps, `/var/www/capabble/server` app directory). Also create a directory for `capabble-stage`
 using whatever path you found in step 1.1.
 

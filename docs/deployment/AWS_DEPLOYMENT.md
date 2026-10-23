@@ -15,7 +15,7 @@ This guide is for deploying only the Capabble backend (`server`) on AWS EC2 behi
 
 ```bash
 sudo apt update && sudo apt install -y nginx git
-curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -
 sudo apt install -y nodejs
 sudo npm i -g pm2
 sudo apt install -y \
@@ -43,6 +43,11 @@ sudo apt install -y \
 # If Ubuntu 24 reports missing `libasound2` / `libcups2`, install:
 # sudo apt install -y libasound2t64 libcups2t64
 ```
+
+The server needs Node 24 (`server/.nvmrc`). To move an existing box from Node 20: run the
+NodeSource `setup_24.x` line and `sudo apt install -y nodejs` again, then in the app directory
+`npm ci --omit=dev`, `sudo npm i -g pm2`, `pm2 update` and `pm2 restart all --update-env`.
+Check with `node -v` and `pm2 logs`.
 
 ### 2.2 Create app directory
 
