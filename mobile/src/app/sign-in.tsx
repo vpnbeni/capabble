@@ -34,6 +34,10 @@ export default function SignInScreen() {
           setErrors({ identifier: "We couldn't find a school for this email. Check it, or ask your school office." })
           return null
         }
+        if (error instanceof ApiError && error.status === 400) {
+          setErrors({ identifier: 'Check the email address: it is not complete' })
+          return null
+        }
         throw error
       }
     }
@@ -84,7 +88,7 @@ export default function SignInScreen() {
                   <Text variant="caption" tone="muted">
                     School
                   </Text>
-                  <Text variant="body-lg" numberOfLines={1}>
+                  <Text variant="body-lg" numberOfLines={2}>
                     {session.school.name}
                   </Text>
                 </View>

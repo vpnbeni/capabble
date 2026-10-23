@@ -17,6 +17,8 @@ type Session = SessionState & {
   signOut: () => Promise<void>
   /** Forget the remembered school (sign in to a different one). */
   forgetSchool: () => Promise<void>
+  /** Replace the signed-in user with the server's latest copy (after a password change). */
+  updateUser: (user: User) => void
 }
 
 const SessionContext = createContext<Session | null>(null)
@@ -84,7 +86,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setState({ status: 'signedOut', user: null, school: null })
   }, [])
 
-  const value = useMemo(() => ({ ...state, signIn, signOut, forgetSchool }) as Session, [state, signIn, signOut, forgetSchool])
+  const updateUser = useCallback((user: User) => {
+    setState((current) => (current.status === 'signedIn' ? { ...current, user } : current))
+  }, [])
+
+  const value = useMemo(
+    () => ({ ...state, signIn, signOut, forgetSchool, updateUser }) as Session,
+    [state, signIn, signOut, forgetSchool, updateUser],
+  )
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>
 }

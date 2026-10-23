@@ -25,11 +25,6 @@ function FamilyHome() {
       refreshing={home.isRefetching}
       onRefresh={home.refetch}
     >
-      {session.status === 'signedIn' && session.user.mustChangePassword ? (
-        <Banner tone="warning" title="Change your password">
-          Your school set a temporary password. Change it on the website under Account.
-        </Banner>
-      ) : null}
 
       {home.isError ? (
         <Card>

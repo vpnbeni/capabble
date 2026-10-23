@@ -39,7 +39,10 @@ export default function RootLayout() {
 }
 
 function RootStack() {
-  const { status } = useSession()
+  const session = useSession()
+  const { status } = session
+  // A school-set temporary password must be replaced before the API serves anything else.
+  const mustSetPassword = session.status === 'signedIn' && session.user.mustChangePassword
   const { scheme, colors } = useTheme()
 
   useEffect(() => {
@@ -52,8 +55,11 @@ function RootStack() {
     <>
       <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
-        <Stack.Protected guard={status === 'signedIn'}>
+        <Stack.Protected guard={status === 'signedIn' && !mustSetPassword}>
           <Stack.Screen name="(app)" />
+        </Stack.Protected>
+        <Stack.Protected guard={mustSetPassword}>
+          <Stack.Screen name="set-password" />
         </Stack.Protected>
         <Stack.Protected guard={status !== 'signedIn'}>
           <Stack.Screen name="sign-in" />

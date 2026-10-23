@@ -58,4 +58,17 @@ export const authService = {
   me: () => api.get<User>('/auth/me'),
 
   logout: () => api.post<unknown>('/auth/logout', {}, { skipRefresh: true }),
+
+  /** Other devices are signed out; this one gets fresh session cookies. */
+  changePassword: (currentPassword: string, newPassword: string) =>
+    api.put<{ user: User }>('/auth/change-password', { currentPassword, newPassword, confirmNewPassword: newPassword }),
+}
+
+/** Same rule as the server (server/src/validations/authValidation.js); null when the password is fine. */
+export const passwordProblem = (password: string) => {
+  if (password.length < 8) return 'Use at least 8 characters'
+  if (!/[a-z]/.test(password) || !/[A-Z]/.test(password)) return 'Use both capital and small letters'
+  if (!/[0-9]/.test(password)) return 'Add a number'
+  if (!/[^A-Za-z0-9]/.test(password)) return 'Add a symbol, such as @ or #'
+  return null
 }

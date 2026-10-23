@@ -21,7 +21,9 @@ export default function NoticeScreen() {
 
   const html = useMemo(() => {
     if (!notice.data) return ''
-    const reference = [notice.data.referenceSeries, notice.data.referenceNumber].filter(Boolean).join('/')
+    const { referenceSeries: series = '', referenceNumber: number = '' } = notice.data
+    // The number is often stored with its series already in front ("CIR/2026-27/001").
+    const reference = number && series && !number.startsWith(series) ? `${series.replace(/\/+$/, '')}/${number}` : number || series
     return htmlDocument({
       title: notice.data.title,
       subtitle: [formatDate(notice.data.circularDate), reference ? `No. ${reference}` : ''].filter(Boolean).join(' · '),
