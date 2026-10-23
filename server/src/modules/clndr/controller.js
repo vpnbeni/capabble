@@ -15,7 +15,7 @@ const {
   PERMISSIONS, httpError, prepareSegments, diffEvents, newUid, assertCanTarget, needsApproval, viewForViewer,
   eventTargetKeys
 } = require('./events');
-const { viewerContext, resolveRecipients } = require('./audience');
+const { viewerContext, resolveRecipients, WIDE_KEY } = require('./audience');
 const { deliverLater, summary, tenantRefOf } = require('./delivery');
 const { summaryFor } = require('../../mail/outbox');
 const {
@@ -251,12 +251,16 @@ const createEvent = handle(async (req, res) => {
   res.status(201).json({ success: true, data: { id: String(event._id), ...outcome } });
 });
 
-/** Who hears about an edit: segment keys to notify as 'changed' and as 'added'. */
+/**
+ * Who hears about an edit: segment keys to notify as 'changed' and as 'added'.
+ * WIDE_KEY stands for everyone else a whole-school or all-staff event is shown to.
+ */
 const notifyPlan = (diff, mode, event) => {
   if (mode === 'none' || !diff.material) return { changed: [], added: [] };
   const all = event.segments.map((s) => s.key);
   if (mode === 'everyone' || diff.fields.length) {
-    return { changed: all.filter((key) => !diff.addedSegments.includes(key)), added: diff.addedSegments };
+    const wide = event.visibility === 'segments' ? [] : [WIDE_KEY];
+    return { changed: [...all.filter((key) => !diff.addedSegments.includes(key)), ...wide], added: diff.addedSegments };
   }
   return { changed: diff.changedSegments, added: diff.addedSegments };
 };
@@ -278,6 +282,8 @@ const updateEvent = handle(async (req, res) => {
       const outcome = await publish(req, event);
       return res.json({ success: true, data: { id: String(event._id), ...outcome, changed: diff } });
     }
+    // Without a publish time a scheduled event would never go out: it is a draft again.
+    if (event.status === 'scheduled' && !event.publishAt) event.status = 'draft';
     await event.save();
     return res.json({ success: true, data: { id: String(event._id), status: event.status, changed: diff } });
   }

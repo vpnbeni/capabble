@@ -291,7 +291,7 @@ See `.env.example` (root and `/server`) for required variables:
 
 **Cloudinary:** `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`
 
-**Calendar and school email:** `CALENDAR_JOBS_ENABLED` (scheduled publishing and event reminders, every 15 min), `MAIL_OUTBOX_ENABLED`, `MAIL_EVENTS_HOST` / `_PORT` / `_SECURE` / `_USER` / `_PASS` / `_FROM` (the events mailbox, e.g. `events@capabble.cloud`), `MAIL_EVENTS_DAILY_CAP_PER_TENANT` (300), `MAIL_CREDENTIALS_KEY` (32 bytes base64; encrypts schools' SMTP passwords, falls back to JWT_SECRET), `MAIL_LINK_SECRET` (unsubscribe links), `CLIENT_URL` (links in emails), `API_URL` (unsubscribe and calendar feed links)
+**Calendar and school email:** `CALENDAR_JOBS_ENABLED` (scheduled publishing every minute, event reminders every 15 min), `MAIL_OUTBOX_ENABLED`, `MAIL_EVENTS_HOST` / `_PORT` / `_SECURE` / `_USER` / `_PASS` / `_FROM` (the events mailbox, e.g. `events@capabble.cloud`), `MAIL_EVENTS_DAILY_CAP_PER_TENANT` (300), `MAIL_CREDENTIALS_KEY` (32 bytes base64; encrypts schools' SMTP passwords, falls back to JWT_SECRET), `MAIL_LINK_SECRET` (unsubscribe links), `CLIENT_URL` (links in emails), `API_URL` (unsubscribe and calendar feed links)
 
 **Backups and workspace data** (see `server/docs/backups.md`):
 - `BACKUP_ENABLED`, `WORKSPACE_LIFECYCLE_ENABLED` - turn on the nightly backup / daily workspace job (default off)

@@ -3,6 +3,7 @@
 .cb-app .cl-toolbar { padding: var(--space-3) var(--space-4); }
 .cb-app .cl-toolbar .cb-filterbar { margin: 0; }
 .cb-app .cl-toolbar__actions { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+.cb-app .cl-hidden-note { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; margin: var(--space-2) 0 0; }
 
 .cb-app .cl-sheet p { margin: 0; }
 .cb-app .cl-badges { display: flex; flex-wrap: wrap; gap: var(--space-2); }

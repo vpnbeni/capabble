@@ -56,17 +56,7 @@ const academicSessionPlugin = (schema, options = {}) => {
       const filter = this.getFilter?.() || this.getQuery?.() || {};
       if (filter.academicSession !== undefined) return;
 
-      // Include both the selected session AND legacy records that were created
-      // before the academic-session feature (where the field is null/missing).
-      // Once the backfill migration assigns sessions to all legacy records,
-      // the $or fallback becomes a no-op but is kept for safety.
-      this.where({
-        $or: [
-          { academicSession: session },
-          { academicSession: null },
-          { academicSession: { $exists: false } },
-        ],
-      });
+      this.where(sessionFilter(session));
     });
   }
 
@@ -114,18 +104,30 @@ const academicSessionPlugin = (schema, options = {}) => {
     const firstStage = pipeline[0];
     if (firstStage?.$match?.academicSession !== undefined) return;
 
-    // Include selected session + legacy records (null / missing field)
-    pipeline.unshift({
-      $match: {
-        $or: [
-          { academicSession: session },
-          { academicSession: null },
-          { academicSession: { $exists: false } },
-        ],
-      },
-    });
+    pipeline.unshift({ $match: sessionFilter(session) });
   });
 };
+
+/**
+ * Records saved before the academic-session feature have no `academicSession`.
+ * They belong to the tenant's first session only (`legacyAcademicSession`, set by
+ * the session middleware), so they don't carry over into every later session.
+ * When the first session isn't known, they're shown in every session as before.
+ */
+function sessionFilter(session) {
+  const ctx = getRequestContext();
+  const legacySession = ctx?.legacyAcademicSession;
+  if (legacySession && legacySession !== session) {
+    return { academicSession: session };
+  }
+  return {
+    $or: [
+      { academicSession: session },
+      { academicSession: null },
+      { academicSession: { $exists: false } },
+    ],
+  };
+}
 
 /** Read the current academic session from AsyncLocalStorage. */
 function getSessionFromContext() {

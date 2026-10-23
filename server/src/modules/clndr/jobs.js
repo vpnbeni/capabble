@@ -1,11 +1,12 @@
 /**
- * Calendar background work, every 15 minutes over every active school:
- *  - publish events whose scheduled time has come;
- *  - send the reminders segments asked for (6 pm the day before, 7 am on the day);
- *  - finish deliveries a restart left half-done.
+ * Calendar background work over every active school:
+ *  - every minute: publish events whose scheduled time has come;
+ *  - every 15 minutes: send the reminders segments asked for (6 pm the day
+ *    before, 7 am on the day), finish deliveries a restart left half-done,
+ *    and publish anything the minute pass missed.
  *
- * Runs under a lease so only one server does it; everything it sends is
- * deduplicated per person, so a repeat is harmless anyway. Off with
+ * Each pass runs under its own lease so only one server does it; everything it
+ * sends is deduplicated per person, so a repeat is harmless anyway. Off with
  * CALENDAR_JOBS_ENABLED=false.
  */
 const schoolDate = require('../../utils/schoolDate');
@@ -20,7 +21,9 @@ const { logRun, runLogged, resumeStale } = require('./delivery');
 const { REMINDER_PRESETS } = require('./constants');
 
 const LEASE = 'calendar-jobs';
+const PUBLISH_LEASE = 'calendar-publish';
 const INTERVAL_MS = 15 * 60 * 1000;
+const PUBLISH_INTERVAL_MS = 60 * 1000;
 
 const zonedHour = (now, timeZone) => Number(new Intl.DateTimeFormat('en-US', {
   timeZone, hour: '2-digit', hourCycle: 'h23'
@@ -96,11 +99,21 @@ const reminders = async (tenant, models, now, timeZone) => {
   return sent;
 };
 
-const runForTenant = async (tenantDoc, now = new Date()) => {
-  const tenant = { dbName: tenantDoc.dbName, slug: tenantDoc.slug, id: String(tenantDoc._id) };
+/** The tenant ref and models for a school with the calendar on, or null. */
+const openTenant = (tenantDoc) => {
   const toggles = normalizeTenantFeatureToggles(tenantDoc.featureToggles);
-  if (toggles.clndr_calendar === false) return {};
-  const models = modelsFor(tenant, getActiveModelKeys(toggles));
+  if (toggles.clndr_calendar === false) return null;
+  const tenant = { dbName: tenantDoc.dbName, slug: tenantDoc.slug, id: String(tenantDoc._id) };
+  return { tenant, models: modelsFor(tenant, getActiveModelKeys(toggles)) };
+};
+
+const activeTenants = () => getPlatformModels().Tenant.find({ status: TENANT_STATUS.ACTIVE })
+  .select('_id slug dbName featureToggles').lean();
+
+const runForTenant = async (tenantDoc, now = new Date()) => {
+  const opened = openTenant(tenantDoc);
+  if (!opened) return {};
+  const { tenant, models } = opened;
   const profile = await models.SchoolProfile.findOne({}).select('timeZone').lean();
   const timeZone = schoolDate.timeZoneOf(profile);
   const result = {};
@@ -118,8 +131,7 @@ const runForTenant = async (tenantDoc, now = new Date()) => {
 };
 
 const runOnce = async (now = new Date()) => {
-  const tenants = await getPlatformModels().Tenant.find({ status: TENANT_STATUS.ACTIVE })
-    .select('_id slug dbName featureToggles').lean();
+  const tenants = await activeTenants();
   const summary = {};
   // eslint-disable-next-line no-restricted-syntax
   for (const tenant of tenants) {
@@ -129,41 +141,64 @@ const runOnce = async (now = new Date()) => {
   return summary;
 };
 
-let timer = null;
-let running = false;
+/** The every-minute pass: only publishing, so a scheduled event goes out on time. */
+const publishOnce = async (now = new Date()) => {
+  const tenants = await activeTenants();
+  const summary = {};
+  // eslint-disable-next-line no-restricted-syntax
+  for (const tenantDoc of tenants) {
+    try {
+      const opened = openTenant(tenantDoc);
+      // eslint-disable-next-line no-await-in-loop
+      if (opened) summary[tenantDoc.slug] = await publishDue(opened.tenant, opened.models, now);
+    } catch (error) {
+      console.error(`[clndr] publishing failed for ${tenantDoc.slug}: ${error.message}`);
+    }
+  }
+  return summary;
+};
 
-const tick = async () => {
-  if (running) return;
-  running = true;
+let timers = [];
+const running = new Set();
+
+/** One pass under its lease; skipped while the last one is still going. */
+const leased = (lease, minutes, work) => async () => {
+  if (running.has(lease)) return;
+  running.add(lease);
   try {
     // eslint-disable-next-line global-require
     const { acquireLease, releaseLease } = require('../dataLifecycle/lease');
-    const lease = await acquireLease(LEASE, 14);
-    if (!lease) return;
+    const held = await acquireLease(lease, minutes);
+    if (!held) return;
     try {
-      await runOnce();
+      await work();
     } finally {
-      await releaseLease(LEASE);
+      await releaseLease(lease);
     }
   } catch (error) {
-    console.error('[clndr] calendar jobs failed', error.message);
+    console.error(`[clndr] ${lease} failed`, error.message);
   } finally {
-    running = false;
+    running.delete(lease);
   }
 };
 
-const start = ({ intervalMs = INTERVAL_MS, initialDelayMs = 90 * 1000 } = {}) => {
-  if (timer || String(process.env.CALENDAR_JOBS_ENABLED || 'true') !== 'true') return;
+const tick = leased(LEASE, 14, () => runOnce());
+const publishTick = leased(PUBLISH_LEASE, 5, () => publishOnce());
+
+const start = ({
+  intervalMs = INTERVAL_MS, publishIntervalMs = PUBLISH_INTERVAL_MS, initialDelayMs = 90 * 1000
+} = {}) => {
+  if (timers.length || String(process.env.CALENDAR_JOBS_ENABLED || 'true') !== 'true') return;
   setTimeout(tick, initialDelayMs).unref();
-  timer = setInterval(tick, intervalMs);
-  timer.unref();
+  timers = [setInterval(tick, intervalMs), setInterval(publishTick, publishIntervalMs)];
+  timers.forEach((timer) => timer.unref());
 };
 
 const stop = () => {
-  if (timer) clearInterval(timer);
-  timer = null;
+  timers.forEach((timer) => clearInterval(timer));
+  timers = [];
 };
 
 module.exports = {
-  start, stop, runOnce, runForTenant, publishDue, reminders, openSlots
+  start, stop, runOnce, publishOnce, runForTenant, publishDue, reminders, openSlots
 };

@@ -86,7 +86,8 @@ const CalendarPage: React.FC = () => {
   const [feedOpen, setFeedOpen] = useState(false)
 
   const range = useMemo(() => monthGrid(month), [month])
-  const { data, isLoading, isError, refetch } = useMyCalendar(range.from, range.to)
+  // Scheduled events go live in the background, so check again every minute while the page is open.
+  const { data, isLoading, isError, refetch } = useMyCalendar(range.from, range.to, { refetchInterval: 60_000 })
 
   useEffect(() => {
     try { window.localStorage.setItem(HIDDEN_KEY, JSON.stringify(hidden)) } catch { /* private mode */ }
@@ -138,6 +139,9 @@ const CalendarPage: React.FC = () => {
     current.includes(key as CalendarLayerKey) ? current.filter((k) => k !== key) : [...current, key as CalendarLayerKey]))
 
   const chips = layers.map((key) => ({ id: key, label: LAYER_LABELS[key], count: counts[key] || 0, active: !hidden.includes(key) }))
+  // Hidden layers are remembered in this browser, so say when they hide something this month.
+  const hiddenWithItems = layers.filter((key) => hidden.includes(key) && counts[key])
+  const hiddenCount = hiddenWithItems.reduce((sum, key) => sum + (counts[key] || 0), 0)
   const selectedDay = data?.days?.[selected]
 
   return (
@@ -167,6 +171,14 @@ const CalendarPage: React.FC = () => {
                 ) : null}
               </div>
             )} />
+            {hiddenCount ? (
+              <p className="cl-hidden-note cb-muted">
+                <span>
+                  {hiddenCount === 1 ? '1 item is' : `${hiddenCount} items are`} hidden this month: {hiddenWithItems.map((key) => LAYER_LABELS[key]).join(', ')}.
+                </span>
+                <Button size="sm" variant="tertiary" onClick={() => setHidden([])}>Show all</Button>
+              </p>
+            ) : null}
           </div>
         </Card>
 

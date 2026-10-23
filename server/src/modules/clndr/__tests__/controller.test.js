@@ -174,6 +174,17 @@ describe('changing a published event', () => {
     expect(deliverLater.mock.calls[0][2].changes).toEqual(expect.arrayContaining(['startDate']));
   });
 
+  it('also tells everyone else a whole-school event is shown to when the date moves', async () => {
+    const req = baseReq('principal');
+    const event = published(req.user._id);
+    event.visibility = 'whole_school';
+    req.params.id = String(event._id);
+    req.models.CalendarEvent = Object.assign(Object.create(CalendarEvent), { findById: async () => event });
+    req.body = { startDate: '2026-11-15', endDate: '2026-11-15' };
+    await run(ctrl.updateEvent, req, schemas.updateEvent);
+    expect(deliverLater.mock.calls[0][2]).toMatchObject({ change: 'changed', onlySegments: ['p', 's', '*'] });
+  });
+
   it('says nothing when asked to stay quiet', async () => {
     const req = baseReq('principal');
     const event = published(req.user._id);
@@ -269,6 +280,19 @@ describe('review fixes', () => {
     req.body = { description: 'Now with a different plan' };
     const res = await run(ctrl.updateEvent, req, schemas.updateEvent);
     expect(res.json.mock.calls[0][0].data.status).toBe('pending_approval');
+  });
+
+  it('turns a scheduled event back into a draft when its publish time is cleared', async () => {
+    const req = baseReq('principal');
+    const event = pending(req.user._id);
+    event.status = 'scheduled';
+    event.publishAt = new Date(Date.now() + 86400000);
+    req.params.id = String(event._id);
+    req.models.CalendarEvent = Object.assign(Object.create(CalendarEvent), { findById: async () => event });
+    req.body = { publishAt: null };
+    const res = await run(ctrl.updateEvent, req, schemas.updateEvent);
+    expect(res.json.mock.calls[0][0].data.status).toBe('draft');
+    expect(event.publishAt).toBeNull();
   });
 
   it('refuses mail servers on internal addresses', () => {

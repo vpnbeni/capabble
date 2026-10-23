@@ -269,6 +269,43 @@ describe('recipients', () => {
     expect(recipients.get(ID(1)).segments).toEqual([{ key: 'p', children: ['Riya'], childIds: [ID(12)] }]);
     expect(stats[0]).toMatchObject({ people: 1, students: 2, noLogin: 1, noEmail: 0 });
   });
+
+  it('adds everyone else a whole-school event is shown to, under its own key', async () => {
+    const event = {
+      visibility: 'whole_school',
+      segments: prepareSegments([{ key: 'p', personType: 'parent', scopes: [{ type: 'section', value: '7|B' }] }])
+    };
+    const everyone = [
+      { _id: ID(1), kind: 'parent', linkedStudents: [{ rollNumber: 'ADM2' }] },
+      { _id: ID(2), kind: 'staff', email: 't@x.in' },
+      { _id: ID(3), kind: 'student' }
+    ];
+    const models = {
+      Student: { find: () => query([{ _id: ID(12), name: 'Riya', rollNumber: 'ADM2' }]) },
+      User: { find: jest.fn((filter) => query(filter.kind?.$in ? everyone : [everyone[0]])) }
+    };
+    const { recipients, stats } = await resolveRecipients(models, event, { wide: true });
+    expect(recipients.get(ID(1)).segments.map((s) => s.key)).toEqual(['p']);
+    expect(recipients.get(ID(2)).segments.map((s) => s.key)).toEqual(['*']);
+    expect(recipients.get(ID(3)).segments.map((s) => s.key)).toEqual(['*']);
+    expect(stats[1]).toMatchObject({ key: '*', people: 2, noEmail: 1 });
+    const kinds = ['staff', 'parent', 'student'];
+    expect(models.User.find).toHaveBeenCalledWith(expect.objectContaining({ kind: { $in: kinds } }));
+  });
+
+  it('adds no one else for audience-only events, unasked, or in a run limited to other audiences', async () => {
+    const models = { User: { find: jest.fn(() => query([{ _id: ID(2), kind: 'staff' }])) } };
+    const audienceOnly = { visibility: 'segments', segments: [] };
+    const allStaff = { visibility: 'all_staff', segments: [] };
+    expect((await resolveRecipients(models, audienceOnly, { wide: true })).recipients.size).toBe(0);
+    expect((await resolveRecipients(models, allStaff)).recipients.size).toBe(0);
+    const limited = await resolveRecipients(models, allStaff, { wide: true, onlySegments: ['x'] });
+    expect(limited.recipients.size).toBe(0);
+    expect(models.User.find).not.toHaveBeenCalled();
+    const { recipients } = await resolveRecipients(models, allStaff, { wide: true, onlySegments: ['*'] });
+    expect([...recipients.keys()]).toEqual([ID(2)]);
+    expect(models.User.find).toHaveBeenCalledWith(expect.objectContaining({ kind: { $in: ['staff'] } }));
+  });
 });
 
 describe('delivery', () => {
@@ -312,6 +349,20 @@ describe('delivery', () => {
     expect(data.parts[ID(1)].map((p) => p.key)).toEqual(['p5']);
     expect(templates['calendar.event'].build(data, users[0]).title).toBe('Tomorrow: Annual Day');
     expect(templates['calendar.event'].dedupeKey(data)).toBe(`${ID(500)}:2026-11-14:day_before_18`);
+  });
+
+  it('tells everyone about a whole-school event with no audiences, in-app only, without reminders', async () => {
+    const everyone = [{ _id: ID(2), kind: 'staff', email: 't@x.in' }, { _id: ID(1), kind: 'parent' }];
+    const models = { User: { find: jest.fn(() => query(everyone)) } };
+    const event = { ...annualDay, revision: 1, visibility: 'whole_school', segments: [] };
+    const result = await deliver({ tenant: { dbName: 't' }, models, event, change: 'published' });
+    expect(result).toMatchObject({ recipients: 2, emailsQueued: 0 });
+    const [, users, , data] = send.mock.calls[0];
+    expect(templates['calendar.event'].build(data, users[0]).title).toBe('New: Annual Day');
+    send.mockClear();
+    const reminder = { change: 'reminder', occurrence: '2026-11-14', slot: 'day_before_18' };
+    await deliver({ tenant: { dbName: 't' }, models, event, ...reminder });
+    expect(send).not.toHaveBeenCalled();
   });
 
   it('includes the revision in change keys so a second change still arrives', () => {
