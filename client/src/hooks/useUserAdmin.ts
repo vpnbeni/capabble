@@ -17,7 +17,17 @@ export const userAdminKeys = {
   staffCandidates: (search: string) => [...userAdminKeys.all, 'staff-candidates', search] as const,
   studentCandidates: (params: Record<string, string>) => [...userAdminKeys.all, 'student-candidates', params] as const,
   classOptions: (kind: string) => [...userAdminKeys.all, 'class-options', kind] as const,
+  sectionOptions: () => [...userAdminKeys.all, 'section-options'] as const,
 }
+
+/** The school's classes and sections, for picking a staff login's own classes. */
+export const useSectionOptions = (enabled: boolean) =>
+  useQuery({
+    queryKey: userAdminKeys.sectionOptions(),
+    queryFn: userAdminService.sectionOptions,
+    enabled,
+    staleTime: 5 * 60 * 1000,
+  })
 
 /** Classes and sections with students, for the "Create for a class" pickers. */
 export const useBulkClassOptions = (kind: 'parent' | 'student', enabled: boolean) =>

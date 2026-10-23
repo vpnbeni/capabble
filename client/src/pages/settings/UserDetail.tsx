@@ -14,6 +14,7 @@ import {
   EmptyState,
   Menu,
   Page,
+  Select,
   Sheet,
   TextField,
   formatDate,
@@ -25,6 +26,7 @@ import {
   useManagedUser,
   useResetPassword,
   useRoles,
+  useSectionOptions,
   useSignOutEverywhere,
   useStudentCandidates,
   useUpdateUser,
@@ -54,6 +56,15 @@ const EVENT_LABEL: Record<string, string> = {
   user_reactivated: 'Reactivated',
   roles_changed: 'Roles changed',
   sessions_revoked: 'Signed out everywhere',
+}
+
+const ALL_SECTIONS = '*'
+
+/** Matches the server's own-class key: "Class 7th", "7" and "VII" are the same class. */
+const ROMAN: Record<string, string> = { i: '1', ii: '2', iii: '3', iv: '4', v: '5', vi: '6', vii: '7', viii: '8', ix: '9', x: '10', xi: '11', xii: '12' }
+const sectionKey = (className: string, section: string) => {
+  const text = className.trim().toLowerCase().replace(/^class\s*/, '').replace(/(\d+)\s*(st|nd|rd|th)$/, '$1').trim()
+  return `${ROMAN[text] || text}|${section.trim().toUpperCase()}`
 }
 
 const UserDetail: React.FC = () => {
@@ -86,6 +97,7 @@ const UserDetail: React.FC = () => {
   const [deactivateOpen, setDeactivateOpen] = useState(false)
   const [studentPick, setStudentPick] = useState('')
   const { data: studentOptions = [] } = useStudentCandidates({}, Boolean(user && user.kind === 'parent'))
+  const sectionOptions = useSectionOptions(Boolean(canManage && user && user.kind === 'staff'))
 
   useEffect(() => {
     if (!user) return
@@ -174,12 +186,16 @@ const UserDetail: React.FC = () => {
     { key: 'when', header: 'When', mobile: 'aside', render: (event) => `${formatDate(event.createdAt)} ${new Date(event.createdAt).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' })}` },
   ]
 
+  const classChoices = sectionOptions.data || []
+  const pickedClass = classChoices.find((option) => option.className === newClass)
+  const assignedKeys = new Set(sections.map((entry) => sectionKey(entry.className, entry.section)))
+  const openSections = (pickedClass?.sections || []).filter((section) => !assignedKeys.has(sectionKey(newClass, section)))
+
   const addSection = () => {
-    const className = newClass.trim()
-    const section = newSection.trim().toUpperCase()
-    if (!className || !section) return
-    if (sections.some((entry) => entry.className === className && entry.section === section)) return
-    setSections((prev) => [...prev, { className, section }])
+    if (!pickedClass || !newSection) return
+    const picked = newSection === ALL_SECTIONS ? openSections : openSections.filter((section) => section === newSection)
+    if (!picked.length) return
+    setSections((prev) => [...prev, ...picked.map((section) => ({ className: pickedClass.className, section }))])
     setNewClass('')
     setNewSection('')
   }
@@ -267,11 +283,37 @@ const UserDetail: React.FC = () => {
                   <p className="cb-muted">No classes added by hand. The timetable decides.</p>
                 )}
                 {canManage ? (
-                  <div className="ua-inline">
-                    <TextField label="Class" placeholder="e.g. 7" value={newClass} onChange={(event) => setNewClass(event.target.value)} size="sm" />
-                    <TextField label="Section" placeholder="A" value={newSection} onChange={(event) => setNewSection(event.target.value)} size="sm" />
-                    <Button size="sm" variant="secondary" icon={Plus} onClick={addSection}>Add</Button>
-                  </div>
+                  sectionOptions.isSuccess && classChoices.length === 0 ? (
+                    <p className="cb-muted">No classes set up yet. Add them in the timetable’s class matrix or enrol students first.</p>
+                  ) : (
+                    <div className="ua-inline">
+                      <Select
+                        label="Class"
+                        size="sm"
+                        placeholder={sectionOptions.isLoading ? 'Loading classes…' : 'Choose class'}
+                        disabled={sectionOptions.isLoading}
+                        options={classChoices.map((option) => ({ value: option.className, label: classLabel(option.className) }))}
+                        value={newClass}
+                        onChange={(event) => {
+                          setNewClass(event.target.value)
+                          setNewSection('')
+                        }}
+                      />
+                      <Select
+                        label="Section"
+                        size="sm"
+                        placeholder={pickedClass && !openSections.length ? 'All added' : 'Choose section'}
+                        disabled={!openSections.length}
+                        options={[
+                          ...(openSections.length > 1 ? [{ value: ALL_SECTIONS, label: 'All sections' }] : []),
+                          ...openSections.map((section) => ({ value: section, label: section })),
+                        ]}
+                        value={newSection}
+                        onChange={(event) => setNewSection(event.target.value)}
+                      />
+                      <Button size="sm" variant="secondary" icon={Plus} disabled={!newSection} onClick={addSection}>Add</Button>
+                    </div>
+                  )
                 ) : null}
               </div>
             </Card>

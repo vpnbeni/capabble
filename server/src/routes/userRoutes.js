@@ -15,6 +15,7 @@ router.post('/bulk-portal', ctrl.bulkCreatePortalLogins);
 router.get('/candidates/staff', ctrl.listStaffCandidates);
 router.get('/candidates/students', ctrl.listStudentCandidates);
 router.get('/candidates/classes', ctrl.listClassCandidates);
+router.get('/candidates/sections', ctrl.listSectionOptions);
 router.get('/audit', ctrl.listAuditLog);
 router.get('/:id', ctrl.getUser);
 router.patch('/:id', ctrl.updateUser);

@@ -118,6 +118,12 @@ export interface BulkClassOption extends BulkClassCounts {
   sections: Array<BulkClassCounts & { section: string }>
 }
 
+/** A class and its sections, as set up in the timetable or enrolled by students. */
+export interface SectionOption {
+  className: string
+  sections: string[]
+}
+
 export interface BulkPortalResult {
   created: Array<{
     userId: string
@@ -213,6 +219,10 @@ const userAdminService = {
   },
   async classOptions(kind: 'parent' | 'student'): Promise<BulkClassOption[]> {
     const response = await api.get('/users/candidates/classes', { params: { kind } })
+    return response.data.data.classOptions
+  },
+  async sectionOptions(): Promise<SectionOption[]> {
+    const response = await api.get('/users/candidates/sections')
     return response.data.data.classOptions
   },
   async auditLog(params: { userId?: string; page?: number }): Promise<{ events: AuditEvent[]; pagination: Pagination }> {

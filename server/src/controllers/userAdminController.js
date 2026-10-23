@@ -38,6 +38,8 @@ const {
 const eventBus = require('../events/eventBus');
 const EVENTS = require('../events/eventNames');
 const { openSections } = require('../rbac/portalSections');
+const { sectionKey: scopeSectionKey } = require('../rbac/scope');
+const { buildClassSectionOptions, normalizeClassValue } = require('../utils/classSectionMatrix');
 
 /** Tell the person about a change to their own login (welcome, access, security). */
 const announce = (req, user, change, details = {}) => {
@@ -829,6 +831,49 @@ const listClassCandidates = handle(async (req, res) => {
   res.json({ success: true, data: { classOptions } });
 });
 
+// GET /api/users/candidates/sections
+// The school's classes and sections, for picking a staff login's own classes:
+// the timetable's class matrix for this session plus every class and section
+// that has active students.
+const listSectionOptions = handle(async (req, res) => {
+  const { Student, TimetableState } = req.models || {};
+  const [state, students] = await Promise.all([
+    TimetableState
+      ? TimetableState
+        .findOne(req.academicSession ? { academicSession: req.academicSession } : {})
+        .sort({ updatedAt: -1 })
+        .select('matrixClasses matrixSections matrixSelection')
+        .lean()
+      : null,
+    Student ? Student.find({ isActive: { $ne: false } }).select('class section').lean() : []
+  ]);
+
+  // Keyed the way own-class grants are matched, so "VII", "7" and "7th" are one class.
+  const classes = new Map();
+  const add = (className, section) => {
+    const name = String(className || '').trim();
+    const sec = String(section || '').trim().toUpperCase();
+    if (!name || !sec) return;
+    const classKey = scopeSectionKey(name, '');
+    if (!classes.has(classKey)) classes.set(classKey, { className: name, sections: new Map() });
+    const entry = classes.get(classKey);
+    if (!entry.sections.has(sec)) entry.sections.set(sec, sec);
+  };
+  if (state) {
+    buildClassSectionOptions(state).forEach((item) => item.sections.forEach((sec) => add(item.className, sec)));
+  }
+  students.forEach((student) => add(normalizeClassValue(student.class), student.section));
+
+  const classOptions = Array.from(classes.values())
+    .sort((a, b) => sortClassNames(a.className, b.className))
+    .map((entry) => ({
+      className: entry.className,
+      sections: Array.from(entry.sections.values())
+        .sort((a, b) => sortSectionNames(a, b, entry.className))
+    }));
+  res.json({ success: true, data: { classOptions } });
+});
+
 // GET /api/users/audit?userId=&page=
 const listAuditLog = handle(async (req, res) => {
   const { AuthAuditLog } = getModels(req);
@@ -857,6 +902,7 @@ module.exports = {
   listStaffCandidates,
   listStudentCandidates,
   listClassCandidates,
+  listSectionOptions,
   listAuditLog,
   // exported for tests
   ADMIN_FILTER,
