@@ -18,6 +18,7 @@ Each module is fully functional as a standalone product and supports integration
 | **STDNT** | Student Management | Manage students | Near-complete |
 | **EXMCL** | Internal Exams | Manage internal/class exams | Near-complete |
 | **ASETS** | Asset Management | School physical asset lifecycle: ownership, locations, allocations, stock, maintenance, audits, disposal | Done |
+| **CLNDR** | Calendar | A calendar on every dashboard (staff Home, crew screen, family portal) showing only what concerns the viewer: school days (weekly offs, holidays, vacations, half days, closures for some classes), school events with audience segments (each with its own instructions, part, notify level, email, reminders and replies: acknowledge / RSVP / consent per child), and dated items from active modules (exams, duties, fee dues, meetings, activities). Teacher events to families need the principal's approval. School days drive attendance, timetable busy periods, appointment slots, fee due dates (optional), payroll LOP and library due dates. Private phone-calendar feed per login. Features `clndr_calendar` / `clndr_events` are billed as core. Code in `server/src/modules/clndr`, plan in `docs/requirements/calendar-plan.md` | Done |
 | **APPNT** | Appointments | Parent, visitor and staff meetings: opt-in hosts with weekly hours, front-desk booking and walk-ins, check-in, private notes, family-portal requests; uses timetable (teaching periods busy), attendance (absent hosts) and students (guardian prefill) when active. Off by default per tenant (`appnt_desk`); hosts get the `appointment_host` role | Done |
 
 #### Planned
@@ -200,12 +201,12 @@ The system uses a **database-per-tenant** isolation strategy:
 
 ### Server Architecture
 - **Entry**: `server.js` (startup) → `app.js` (Express config)
-- **Models**: 13 tenant-scoped Mongoose schemas in `/server/src/models/` (User, Teacher, Student, Candidate, Subject, DateSheet, CBSEDatesheet, Room, AnswerSheet, AnswerSheetDispatch, Form66, Calendar, FolderMapping) + 4 platform models in `/server/src/models/platform/` (PlatformAdmin, Tenant, TenantOnboardingTicket, TenantUserDirectory)
+- **Models**: 13 tenant-scoped Mongoose schemas in `/server/src/models/` (User, Teacher, Student, Candidate, Subject, DateSheet, CBSEDatesheet, Room, AnswerSheet, AnswerSheetDispatch, Form66, CalendarEvent, SchoolDayRule, FolderMapping) + 4 platform models in `/server/src/models/platform/` (PlatformAdmin, Tenant, TenantOnboardingTicket, TenantUserDirectory)
 - **Routes**: 17 route files — 1 platform route (`adminRoutes`) + 16 tenant-scoped routes mounted via `tenantScopedRouter`
 - **Validation**: Joi schemas in `/server/src/validations/`
 - **File Processing**: Parsers in `/server/src/utils/` for CBSE PDFs, Form66, Excel files
 - **PDF Generation**: Puppeteer (v24)
-- **Email**: every email is sent from `no-reply@capabble.cloud` (Hostinger SMTP) by `/server/src/utils/mailer.js`. Build new emails as templates in `/server/src/mail/templates.js` (shared branded layout, logo attached inline, HTML + text) and add a sample to `samples.js`; never write inline HTML in a controller. `npm run mail:preview` / `mail:test` in `/server`
+- **Email**: login, reset, invite and billing emails are sent from `no-reply@capabble.cloud` (Hostinger SMTP) by `/server/src/utils/mailer.js`. School emails (calendar events, and any future bulk school mail) never use it: they go through the school's mail outbox (`/server/src/mail/outbox.js`, leased worker, dedupe keys, retries, suppression list), sent from the school's own SMTP account (Settings → School email) or the events mailbox (`MAIL_EVENTS_*`) with a daily share per school. Build new emails as templates in `/server/src/mail/templates.js` (shared branded layout, logo attached inline, HTML + text) and add a sample to `samples.js`; never write inline HTML in a controller. `npm run mail:preview` / `mail:test` in `/server`
 
 ### API Endpoints
 
@@ -289,6 +290,8 @@ See `.env.example` (root and `/server`) for required variables:
 **Email:** `SMTP_HOST` (smtp.hostinger.com), `SMTP_PORT` (465), `SMTP_SECURE` (true), `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` (`Capabble <no-reply@capabble.cloud>`), optional `MAIL_REPLY_TO`, `MAIL_SITE_URL`
 
 **Cloudinary:** `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`
+
+**Calendar and school email:** `CALENDAR_JOBS_ENABLED` (scheduled publishing and event reminders, every 15 min), `MAIL_OUTBOX_ENABLED`, `MAIL_EVENTS_HOST` / `_PORT` / `_SECURE` / `_USER` / `_PASS` / `_FROM` (the events mailbox, e.g. `events@capabble.cloud`), `MAIL_EVENTS_DAILY_CAP_PER_TENANT` (300), `MAIL_CREDENTIALS_KEY` (32 bytes base64; encrypts schools' SMTP passwords, falls back to JWT_SECRET), `MAIL_LINK_SECRET` (unsubscribe links), `CLIENT_URL` (links in emails), `API_URL` (unsubscribe and calendar feed links)
 
 **Backups and workspace data** (see `server/docs/backups.md`):
 - `BACKUP_ENABLED`, `WORKSPACE_LIFECYCLE_ENABLED` - turn on the nightly backup / daily workspace job (default off)

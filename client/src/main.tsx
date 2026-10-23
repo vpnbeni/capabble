@@ -9,7 +9,7 @@ import { store, persistor } from './redux/store'
 import { setStoreDispatch } from './services/api'
 import { AcademicSessionProvider } from './contexts/AcademicSessionContext'
 import { initTheme } from './utils/theme'
-import { initPwaManifest } from './pwa'
+import { initPwaManifest, reloadOnStaleChunk } from './pwa'
 import UpdatePrompt from './components/common/UpdatePrompt'
 import './styles/globals.css'
 import './styles/capabble/tokens.css'
@@ -21,6 +21,7 @@ import './styles/capabble/shell.css'
 setStoreDispatch(store.dispatch)
 initTheme()
 initPwaManifest()
+reloadOnStaleChunk()
 
 const queryClient = new QueryClient({
   defaultOptions: {

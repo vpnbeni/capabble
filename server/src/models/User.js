@@ -96,6 +96,17 @@ const userSchema = new mongoose.Schema({
     type: [linkedStudentSchema],
     default: undefined
   },
+  // Email categories this person turned off (e.g. 'calendar'); in-app notices still arrive.
+  emailOptOut: {
+    type: [String],
+    default: undefined
+  },
+  // SHA-256 of this person's private calendar feed token (modules/clndr/feed.js); reset makes a new one.
+  calendarFeedTokenHash: {
+    type: String,
+    default: undefined,
+    select: false
+  },
   mustChangePassword: {
     type: Boolean,
     default: false
@@ -208,6 +219,7 @@ userSchema.index(
 userSchema.index({ kind: 1, isActive: 1 });
 userSchema.index({ 'linkedStudents.rollNumber': 1 });
 userSchema.index({ teacher: 1 }, { sparse: true });
+userSchema.index({ calendarFeedTokenHash: 1 }, { sparse: true });
 userSchema.index({ role: 1 });
 userSchema.index({ isActive: 1 });
 userSchema.index({ createdAt: -1 });

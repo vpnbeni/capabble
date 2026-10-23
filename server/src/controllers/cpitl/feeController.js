@@ -344,7 +344,9 @@ const getSettingsHandler = asyncHandler(async (req, res) => ok(res, await getSet
 
 const updateSettings = asyncHandler(async (req, res) => {
   const settings = await getSettings(req.models);
-  const fields = ['receiptPrefix', 'gstin', 'pan', 'slipFooterNote', 'bankDetails', 'defaultDueDay', 'defaultLateFee', 'concessionPresets'];
+  const fields = [
+    'receiptPrefix', 'gstin', 'pan', 'slipFooterNote', 'bankDetails', 'defaultDueDay', 'defaultLateFee', 'concessionPresets', 'holidayDueDates'
+  ];
   settings.set({ ...pick(req.body, fields), updatedBy: auditUser(req) });
   await settings.save();
   return ok(res, settings, { message: 'Settings saved.' });

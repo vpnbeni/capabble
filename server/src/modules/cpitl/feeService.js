@@ -11,6 +11,7 @@ const {
   parseSessionStartYear,
   diffComponents,
 } = require('./feeSchedule');
+const { withEffectiveDueDates } = require('./dueDates');
 const { DEFAULT_FEE_HEADS, DEFAULT_CONCESSION_PRESETS } = require('./constants');
 const { numberToIndianWords } = require('../../utils/numberToIndianWords');
 
@@ -326,6 +327,7 @@ const recordPayment = async (models, account, payload, sessionLabel, user) => {
   if (amount + lateFee <= 0) throw httpError('Enter an amount to collect.');
 
   const openDemands = await FeeDemand.find({ accountId: account._id, status: { $in: ['due', 'partial'] } }).sort({ dueDate: 1 });
+  const effectiveDemands = await withEffectiveDueDates(models, openDemands.map((d) => d.toObject()));
   const outstanding = round2(openDemands.reduce((s, d) => s + d.balance, 0));
   if (amount > outstanding) {
     throw httpError(`Amount exceeds outstanding dues (₹${outstanding.toLocaleString('en-IN')}).`);
@@ -340,7 +342,7 @@ const recordPayment = async (models, account, payload, sessionLabel, user) => {
 
   const structure = account.structureId ? await getModel(models, 'FeeStructure').findById(account.structureId).select('lateFee').lean() : null;
   const lateFeeAllocations = lateFee > 0
-    ? allocateLateFee(openDemands.map((d) => d.toObject()), structure?.lateFee, lateFee, payload.date ? new Date(payload.date) : new Date())
+    ? allocateLateFee(effectiveDemands, structure?.lateFee, lateFee, payload.date ? new Date(payload.date) : new Date())
     : [];
 
   const settings = await getSettings(models);

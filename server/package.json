@@ -18,6 +18,7 @@
     "backfill:tenant-user-directory": "node scripts/tenants/backfill-tenant-user-directory.js",
     "backfill:academic-session": "node scripts/migrations/backfill-academic-session.js",
     "migrate:rbac": "node scripts/migrations/migrate-rbac.js",
+    "migrate:calendar": "node scripts/migrations/migrate-legacy-calendar.js",
     "migrate:placeholder-emails": "node scripts/migrations/migrate-placeholder-emails.js",
     "migrate:oasis-id": "node scripts/migrations/migrate-teacher-oasis-id.js",
     "billing:grandfather": "node scripts/tenants/grandfather-billing.js",

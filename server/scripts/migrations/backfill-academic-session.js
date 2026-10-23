@@ -50,7 +50,6 @@ const SESSION_SCOPED_MODELS = [
   'FolderMapping',
   'CBSEDatesheet',
   'CBSECircular',
-  'Calendar',
   'Form66',
   'Form66Upload',
   'Guideline',

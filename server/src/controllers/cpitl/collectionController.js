@@ -18,6 +18,7 @@ const {
   cancelPayment,
 } = require('../../modules/cpitl/feeService');
 const { outstandingLateFee, round2, dueThroughMonthCutoff } = require('../../modules/cpitl/feeSchedule');
+const { withEffectiveDueDates, dueDateOf } = require('../../modules/cpitl/dueDates');
 
 const ok = (res, data, extra = {}) => res.json({ success: true, data, ...extra });
 
@@ -35,7 +36,7 @@ const MODE_LABELS = { cash: 'Cash', upi: 'UPI', cheque: 'Cheque', dd: 'Demand Dr
 const withLateFee = (demands, lateFeeRule, asOf = new Date()) => demands.map((d) => ({
   ...d,
   lateFeeDue: outstandingLateFee(d, lateFeeRule, asOf),
-  isOverdue: round2(d.balance) > 0 && new Date(d.dueDate) < asOf,
+  isOverdue: round2(d.balance) > 0 && new Date(dueDateOf(d)) < asOf,
 }));
 
 // ── Student search & ledger ─────────────────────────────────────────
@@ -112,7 +113,8 @@ const getStudentAccount = asyncHandler(async (req, res) => {
   if (!account) return ok(res, { student, account: null, structure: null, demands: [], payments: [] });
 
   const structure = account.structureId ? await FeeStructure.findById(account.structureId).lean() : null;
-  const demands = await FeeDemand.find({ accountId: account._id }).sort({ dueDate: 1 }).lean();
+  const stored = await FeeDemand.find({ accountId: account._id }).sort({ dueDate: 1 }).lean();
+  const demands = await withEffectiveDueDates(req.models, stored);
   const payments = await FeePayment.find({ accountId: account._id }).sort({ date: -1, createdAt: -1 }).lean();
   const lateFeeRule = structure?.lateFee;
 
@@ -393,7 +395,7 @@ const buildSlipForAccount = (account, demands, structure, uptoDate) => {
     const lateFee = outstandingLateFee(d, structure?.lateFee, asOf);
     return {
       label: d.label,
-      dueDate: formatDate(d.dueDate),
+      dueDate: formatDate(dueDateOf(d)),
       lines: d.lines
         .filter((l) => round2(l.net - l.paid) > 0)
         .map((l) => ({ name: l.name, amount: formatINR(round2(l.net - l.paid)) })),
@@ -445,7 +447,8 @@ const studentFeeSlipPdf = asyncHandler(async (req, res) => {
   const FeeStructure = getModel(req.models, 'FeeStructure');
   const account = await loadAccountForStudent(req.models, req.params.studentId);
   if (!account) throw httpError('No fee account found for this student.', 404);
-  const demands = await FeeDemand.find({ accountId: account._id }).sort({ dueDate: 1 }).lean();
+  const stored = await FeeDemand.find({ accountId: account._id }).sort({ dueDate: 1 }).lean();
+  const demands = await withEffectiveDueDates(req.models, stored);
   const structure = account.structureId ? await FeeStructure.findById(account.structureId).lean() : null;
   const slip = buildSlipForAccount(account, demands, structure, parseUpto(req.query.upto));
   return renderSlips(req, res, slip ? [slip] : [], `fee-slip_${account.studentSnapshot?.rollNumber || account._id}.pdf`);
@@ -461,7 +464,10 @@ const bulkFeeSlipsPdf = asyncHandler(async (req, res) => {
   if (section) filter['studentSnapshot.section'] = section;
   const accounts = await StudentFeeAccount.find(filter).sort({ 'studentSnapshot.section': 1, 'studentSnapshot.name': 1 }).lean();
   if (accounts.length > 400) throw httpError('Too many students in one batch. Pick a section.');
-  const demands = await FeeDemand.find({ accountId: { $in: accounts.map((a) => a._id) } }).sort({ dueDate: 1 }).lean();
+  const demands = await withEffectiveDueDates(
+    req.models,
+    await FeeDemand.find({ accountId: { $in: accounts.map((a) => a._id) } }).sort({ dueDate: 1 }).lean()
+  );
   const structures = await FeeStructure.find({ _id: { $in: [...new Set(accounts.map((a) => String(a.structureId)).filter((id) => id !== 'null'))] } }).lean();
   const structureById = new Map(structures.map((s) => [String(s._id), s]));
   const demandsByAccount = demands.reduce((map, d) => {
@@ -494,7 +500,10 @@ const studentSlipsPdf = asyncHandler(async (req, res) => {
     .sort({ 'studentSnapshot.class': 1, 'studentSnapshot.section': 1, 'studentSnapshot.name': 1 })
     .lean();
   if (!accounts.length) throw httpError('None of the selected students has a fee account yet.', 422);
-  const demands = await FeeDemand.find({ accountId: { $in: accounts.map((a) => a._id) } }).sort({ dueDate: 1 }).lean();
+  const demands = await withEffectiveDueDates(
+    req.models,
+    await FeeDemand.find({ accountId: { $in: accounts.map((a) => a._id) } }).sort({ dueDate: 1 }).lean()
+  );
   const structures = await FeeStructure.find({ _id: { $in: [...new Set(accounts.map((a) => String(a.structureId)).filter((id) => id !== 'null'))] } }).lean();
   const structureById = new Map(structures.map((s) => [String(s._id), s]));
   const demandsByAccount = demands.reduce((map, d) => {

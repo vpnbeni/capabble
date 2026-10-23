@@ -19,10 +19,21 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,svg,woff2}', 'pwa/*.png', '*.webmanifest'],
         maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
         cleanupOutdatedCaches: true,
-        navigateFallback: '/index.html',
-        // The API, and real files in public/ (PDFs, Excel samples, standalone HTML), never get the app shell.
-        navigateFallbackDenylist: [/^\/api\//, /\/[^/?]+\.[^/?]+$/],
+        // Page loads ask the server first, so a plain reload gets the latest deploy (same as a hard
+        // reload) instead of the shell this worker cached. The cached shell is only the offline fallback.
+        navigateFallback: null,
+        directoryIndex: null,
         runtimeCaching: [
+          {
+            urlPattern: ({ request, sameOrigin }) => sameOrigin && request.mode === 'navigate',
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'pages',
+              networkTimeoutSeconds: 5,
+              expiration: { maxEntries: 10 },
+              precacheFallback: { fallbackURL: 'index.html' }
+            }
+          },
           {
             urlPattern: ({ request, sameOrigin }) => sameOrigin && request.destination === 'image',
             handler: 'StaleWhileRevalidate',

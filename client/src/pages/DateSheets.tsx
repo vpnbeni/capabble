@@ -27,7 +27,7 @@ import DatesheetImportModal from '../components/datesheets/ImportModal'
 import CreateDatesheetModal, { DatesheetFormData } from '../components/datesheets/CreateModal'
 import ScheduleModal, { ScheduleRow } from '../components/datesheets/ScheduleModal'
 import './DateSheets.css'
-import calendarService from '../services/calendarService'
+import { weekdayName } from '@/utils/schoolDate'
 import datesheetService from '../services/datesheetService'
 import {
   useDatesheets,
@@ -651,12 +651,7 @@ const DateSheets: React.FC = () => {
     setPage(1)
   }
 
-  // Helper function to get day name (with fallback to calendar service)
-  const getDayName = (dateString: string) => {
-    // Use calendar service for client-side calculation as fallback
-    // In production, this could be enhanced to use the backend calendar API
-    return calendarService.getDayNameFromDate(dateString)
-  }
+  const getDayName = (dateString: string) => weekdayName(dateString)
 
   // Helper function to format duration
   const formatDuration = (duration: number) => {

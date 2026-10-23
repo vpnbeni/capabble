@@ -6,6 +6,7 @@
  * dispatch, guidelines, undertakings, CBSE circulars, and remuneration.
  */
 const { mountRoutes } = require('./routes');
+const calendar = require('./calendar');
 const models = require('./models');
 const listeners = require('./listeners');
 
@@ -15,4 +16,5 @@ module.exports = {
   mountRoutes,
   models,
   listeners,
+  calendar,
 };

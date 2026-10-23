@@ -3,7 +3,7 @@ import { classLabel } from '@/utils/classLabel'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useDispatch } from 'react-redux'
 import type { LucideIcon } from 'lucide-react'
-import { Bell, Bus, CalendarCheck, CalendarClock, CalendarDays, GraduationCap, Home, IndianRupee, KeyRound, LogOut, Menu as MenuIcon, Monitor, Moon, Sun, UserRound } from 'lucide-react'
+import { Bell, Bus, CalendarCheck, CalendarClock, CalendarDays, CalendarRange, GraduationCap, Home, IndianRupee, KeyRound, LogOut, Menu as MenuIcon, Monitor, Moon, Sun, UserRound } from 'lucide-react'
 import { Avatar, Menu, Select, type MenuItem } from '@/components/ui'
 import { logout } from '@/redux/slices/authSlice'
 import type { AppDispatch } from '@/redux/store'
@@ -22,6 +22,7 @@ interface NavEntry {
 
 const NAV: NavEntry[] = [
   { to: '/portal', label: 'Home', icon: Home },
+  { to: '/portal/calendar', label: 'Calendar', icon: CalendarRange, section: 'calendar' },
   { to: '/portal/attendance', label: 'Attendance', icon: CalendarCheck, section: 'attendance' },
   { to: '/portal/timetable', label: 'Timetable', icon: CalendarDays, section: 'timetable' },
   { to: '/portal/results', label: 'Results', icon: GraduationCap, section: 'results' },

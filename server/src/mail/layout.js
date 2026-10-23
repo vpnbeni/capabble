@@ -171,11 +171,13 @@ const footerLine = () => (process.env.MAIL_REPLY_TO
  * @param {object} [content.moduleGrid]  { title, items: [{ name, blurb, tag, planned }] }
  * @param {Array}  [content.lists]       [{ title, items: [string], tone: 'muted'? }]
  * @param {object} [content.link]        A quieter second action: { label, url }.
+ * @param {object} [content.unsubscribe] { label, url } — a footer link that turns these emails off.
+ * @param {string} [content.replyHint]   Replaces the footer's reply line (e.g. replies go to the school).
  */
 const renderEmail = (content) => {
   const {
     subject, preheader, context, heading, intro = [], code, button, details, notice, outro = [], footnote,
-    timeline, moduleGrid, lists, link
+    timeline, moduleGrid, lists, link, unsubscribe, replyHint
   } = content;
   const site = process.env.MAIL_SITE_URL || 'https://capabble.cloud';
   const siteLabel = site.replace(/^https?:\/\//, '').replace(/\/$/, '');
@@ -225,7 +227,8 @@ const renderEmail = (content) => {
         <tr>
           <td style="padding:20px 4px 0;font-family:${FONT};font-size:12px;line-height:18px;color:${C.subtle};">
             ${footnote ? `<p style="margin:0 0 8px;">${escapeHtml(footnote)}</p>` : ''}
-            <p style="margin:0 0 8px;">${escapeHtml(footerLine())}</p>
+            <p style="margin:0 0 8px;">${escapeHtml(replyHint || footerLine())}</p>
+            ${unsubscribe ? `<p style="margin:0 0 8px;"><a href="${escapeHtml(unsubscribe.url)}" style="color:${C.subtle};">${escapeHtml(unsubscribe.label)}</a></p>` : ''}
             <p style="margin:0;">Capabble · School management, one module at a time · <a href="${escapeHtml(site)}" style="color:${C.subtle};">${escapeHtml(siteLabel)}</a></p>
           </td>
         </tr>
@@ -256,7 +259,8 @@ const renderEmail = (content) => {
     ...outro.map(paragraphText).flatMap((line) => [line, '']),
     '—',
     ...(footnote ? [footnote] : []),
-    footerLine(),
+    replyHint || footerLine(),
+    ...(unsubscribe ? [`${unsubscribe.label}: ${unsubscribe.url}`] : []),
     `Capabble · ${siteLabel}`
   ].filter((line) => line !== undefined && line !== null).join('\n');
 

@@ -8,7 +8,7 @@ import { useCentreDetails } from '@/hooks/useCentreDetails'
 import { useOnboardingStatus } from '@/hooks/useOnboarding'
 import { useSchoolProfile } from '@/hooks/useSchoolProfile'
 import { AttndModeSwitch } from '@/components/attnd/AttndModeSwitch'
-import { CalendarDays, PanelLeft, Search } from 'lucide-react'
+import { CalendarDays, Menu, PanelLeft, Search } from 'lucide-react'
 import { Button } from '@/components/ui'
 import { isMacPlatform, useCommandPalette } from '@/components/commandPalette/CommandPaletteProvider'
 import NotificationBell from '@/components/notifications/NotificationBell'
@@ -22,10 +22,12 @@ const formatSessionLabel = (session: string) => {
 
 type HeaderProps = {
   isSidebarCollapsed: boolean
+  /** Phones: the button opens the sidebar drawer instead of collapsing a rail. */
+  isMobileNav?: boolean
   onToggleSidebar: () => void
 }
 
-const Header: React.FC<HeaderProps> = ({ isSidebarCollapsed, onToggleSidebar }) => {
+const Header: React.FC<HeaderProps> = ({ isSidebarCollapsed, isMobileNav = false, onToggleSidebar }) => {
   const { openPalette } = useCommandPalette()
   const shortcutLabel = useMemo(() => (isMacPlatform() ? '⌘K' : 'Ctrl K'), [])
   const location = useLocation()
@@ -205,6 +207,20 @@ const Header: React.FC<HeaderProps> = ({ isSidebarCollapsed, onToggleSidebar }) 
           showBackButton: isDetailRoute,
           backTo: backToPath,
         }
+      case 'calendar':
+        return segments[1] === 'events'
+          ? {
+            pageTitle: 'Calendar events',
+            pageSubtitle: 'Events you created, drafts, and events waiting for approval.',
+            showBackButton: true,
+            backTo: '/calendar',
+          }
+          : {
+            pageTitle: 'Calendar',
+            pageSubtitle: 'What is on for you: school events, holidays, exams, duties and more.',
+            showBackButton: false,
+            backTo: null,
+          }
       case 'notifications':
         return {
           pageTitle: 'Notifications',
@@ -612,6 +628,8 @@ const Header: React.FC<HeaderProps> = ({ isSidebarCollapsed, onToggleSidebar }) 
           roles: isDetail
             ? { title: segments[2] === 'new' ? 'New role' : 'Role', subtitle: 'What people with this role can see and change.' }
             : { title: 'Roles', subtitle: 'Bundles of access you give to staff logins.' },
+          'school-days': { title: 'School days', subtitle: 'Weekly offs, holidays, vacations, half days and closures.' },
+          email: { title: 'School email', subtitle: 'Send calendar emails from your school’s own address.' },
         }
         const info = titleMap[subPage] || { title: 'Settings', subtitle: '' }
         return {
@@ -741,12 +759,13 @@ const Header: React.FC<HeaderProps> = ({ isSidebarCollapsed, onToggleSidebar }) 
             <Button
               variant="tertiary"
               size="sm"
-              icon={PanelLeft}
+              icon={isMobileNav ? Menu : PanelLeft}
               onClick={onToggleSidebar}
-              aria-label={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-              title={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              aria-label={isMobileNav ? 'Open menu' : isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              title={isMobileNav ? 'Menu' : isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              aria-expanded={isMobileNav ? !isSidebarCollapsed : undefined}
             />
-            <span className="cb-shellhead__divider" aria-hidden="true" />
+            {!isMobileNav ? <span className="cb-shellhead__divider" aria-hidden="true" /> : null}
             {showBackButton && backTo && (
               <button
                 type="button"

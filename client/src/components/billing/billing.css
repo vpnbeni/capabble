@@ -31,3 +31,13 @@
 
 /* The shell banner sits outside <Page>, between the header and the page. */
 .cb-app.bl-shell-banner { background: transparent; padding: var(--space-3) var(--space-4) 0; }
+.cb-app.bl-shell-banner .bl-shell-banner__short { display: none; }
+/* Phones: one short line with the link beside it, so the page keeps its room. */
+@media (max-width: 767px) {
+  .cb-app.bl-shell-banner { padding: var(--space-2) var(--space-3) 0; }
+  .cb-app.bl-shell-banner .cb-banner { gap: var(--space-2); padding: var(--space-2) var(--space-3); font-size: 13px; line-height: 18px; }
+  .cb-app.bl-shell-banner .cb-banner__icon { margin-top: 1px; }
+  .cb-app.bl-shell-banner .cb-banner__text { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: var(--space-2); }
+  .cb-app.bl-shell-banner .bl-shell-banner__full { display: none; }
+  .cb-app.bl-shell-banner .bl-shell-banner__short { display: inline; }
+}

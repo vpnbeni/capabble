@@ -1,6 +1,7 @@
 const asyncHandler = require('../middleware/asyncHandler');
 const { getRequestContext } = require('../tenancy/requestContext');
 const { syncClass12Alumni } = require('../services/almniSyncService');
+const schoolDate = require('../utils/schoolDate');
 
 /**
  * Helper: resolve the AcademicSession model from request context.
@@ -11,17 +12,8 @@ const getSessionModel = (req) => {
   return ctx?.models?.AcademicSession || null;
 };
 
-/**
- * Derive current academic session label from today's date.
- * Indian academic year: April (month 4) → March (month 3).
- */
-const currentSessionLabel = () => {
-  const now = new Date();
-  const month = now.getMonth() + 1;
-  const year = now.getFullYear();
-  const startYear = month <= 3 ? year - 1 : year;
-  return `${startYear}-${startYear + 1}`;
-};
+/** Current academic session label from today's school day (April to March, India time). */
+const currentSessionLabel = () => schoolDate.sessionLabelFor(schoolDate.today());
 
 /**
  * @route   GET /api/sessions

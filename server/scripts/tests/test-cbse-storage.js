@@ -5,7 +5,6 @@ require('dotenv').config()
 
 const CBSEDatesheet = require('./src/models/CBSEDatesheet')
 const CBSEDatesheetParser = require('./src/utils/cbseDatesheetParser')
-const { getDayNameForDate } = require('./src/utils/calendarSeeder')
 
 const testCBSEStorage = async () => {
   try {

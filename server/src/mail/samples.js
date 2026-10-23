@@ -107,6 +107,30 @@ const samples = {
     body: 'Your meeting with Ms Rao is confirmed for Tue, 20 Oct 2026 at 11:30 am. Venue: Staff room. '
       + 'Please carry this reference number: APT-0142.'
   }),
+  'calendar-event': () => templates.calendarEvent({
+    schoolName: SCHOOL,
+    change: 'published',
+    title: 'Annual Day',
+    when: 'Fri 14 Nov, 9:00 am',
+    venue: 'School auditorium',
+    description: 'Families are welcome from 9 am. Seating is first come, first served.',
+    parts: [
+      { forWhom: 'For Riya', instructions: 'Send Riya in white uniform by 8 am for the rehearsal.' },
+      { forWhom: 'For Aarav', instructions: 'Pick Aarav up at 12:30 pm from the main gate.' }
+    ],
+    url: 'https://school.capabble.cloud/?tenant=demo#/portal/calendar',
+    unsubscribeUrl: 'https://api.capabble.cloud/api/mail/unsubscribe/sample',
+    replyToSchool: true
+  }),
+  'calendar-cancelled': () => templates.calendarEvent({
+    schoolName: SCHOOL,
+    change: 'cancelled',
+    title: 'Sports Day',
+    when: 'Sat 22 Nov',
+    reason: 'Rain is forecast. A new date will follow.',
+    url: 'https://school.capabble.cloud/?tenant=demo#/portal/calendar'
+  }),
+  'mail-settings-test': () => templates.mailSettingsTest({ schoolName: SCHOOL, fromEmail: 'office@greenfield.edu.in' }),
   'invoice-issued': () => templates.invoiceEmail({
     variant: 'issued', ...INVOICE
   }),

@@ -226,6 +226,8 @@ const capitalSettingsSchema = new mongoose.Schema({
   },
   bankDetails: { type: String, trim: true, default: '' },
   defaultDueDay: { type: Number, min: 1, max: 28, default: 10 },
+  // 'next_working_day': a due date on a school holiday counts from the next working day (modules/cpitl/dueDates.js).
+  holidayDueDates: { type: String, enum: ['keep', 'next_working_day'], default: 'keep' },
   defaultLateFee: { type: lateFeeSchema, default: () => ({}) },
   payroll: {
     pfRate: { type: Number, default: 12 },

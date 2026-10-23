@@ -180,6 +180,8 @@ export type CapitalSettings = {
   slipFooterNote: string
   bankDetails: string
   defaultDueDay: number
+  /** 'next_working_day': a due date on a school holiday counts from the next working day. */
+  holidayDueDates?: 'keep' | 'next_working_day'
   defaultLateFee: LateFeeRule
   concessionPresets: Array<{ _id?: string; name: string; type: 'percent' | 'flat'; value: number; feeHeadCode: string }>
 }

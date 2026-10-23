@@ -31,6 +31,8 @@ if (process.env.VERCEL) {
       await runTenantModelStartupSanityCheck();
       require('./events/registerAllListeners')();
     require('./notifications/scheduler').start();
+    require('./modules/clndr/jobs').start();
+    require('./mail/outbox').start();
     } catch (error) {
       console.error('❌ Server initialization failed (Vercel):'.red.bold, error.message);
     }
@@ -39,9 +41,6 @@ if (process.env.VERCEL) {
   module.exports = app;
   return;
 }
-
-// Import calendar seeder (temporarily disabled for debugging)
-// const { initializeCurrentYearCalendar } = require('./utils/calendarSeeder');
 
 // Handle uncaught exceptions
 process.on('uncaughtException', (err) => {
@@ -71,6 +70,11 @@ const initializeServer = async () => {
     // Nightly backups and the daily workspace job (each off unless enabled; see server/docs/backups.md).
     require('./modules/dataLifecycle').startScheduler();
 
+    // Hourly reminders: fees due, meetings tomorrow, maintenance due (off with NOTIFICATION_SCHEDULER_ENABLED=false).
+    require('./notifications/scheduler').start();
+    require('./modules/clndr/jobs').start();
+    require('./mail/outbox').start();
+
     if (isMailConfigured()) {
       // Log in to the mail server once so a wrong password shows up at startup, not at the first signup.
       verifyMailer()
@@ -80,15 +84,6 @@ const initializeServer = async () => {
       console.warn('⚠️  Email is off (set SMTP_HOST, SMTP_USER, SMTP_PASS and SMTP_FROM to enable).'.yellow);
     }
 
-    // TODO: Re-enable calendar initialization after debugging
-    // setTimeout(async () => {
-    //   try {
-    //     await initializeCurrentYearCalendar();
-    //     console.log('✅ Calendar initialized successfully'.green.bold);
-    //   } catch (calendarError) {
-    //     console.warn('⚠️  Calendar initialization failed (server will continue):'.yellow.bold, calendarError.message);
-    //   }
-    // }, 2000);
     
     console.log('✅ Server initialization completed successfully'.green.bold);
   } catch (error) {
@@ -154,6 +149,9 @@ process.on('SIGTERM', () => {
   console.log('👋 SIGTERM RECEIVED. Shutting down gracefully');
   billing.stopScheduler();
   require('./modules/dataLifecycle').stopScheduler();
+  require('./notifications/scheduler').stop();
+  require('./modules/clndr/jobs').stop();
+  require('./mail/outbox').stop();
   if (isAttendanceQueueReady()) {
     const worker = require('./workers/attendanceWorker');
     worker.close().catch(() => {});
@@ -168,6 +166,9 @@ process.on('SIGINT', () => {
   console.log('\n👋 SIGINT RECEIVED. Shutting down gracefully');
   billing.stopScheduler();
   require('./modules/dataLifecycle').stopScheduler();
+  require('./notifications/scheduler').stop();
+  require('./modules/clndr/jobs').stop();
+  require('./mail/outbox').stop();
   if (isAttendanceQueueReady()) {
     const worker = require('./workers/attendanceWorker');
     worker.close().catch(() => {});

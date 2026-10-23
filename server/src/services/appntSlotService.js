@@ -2,12 +2,14 @@
  * Slot availability for APPNT, with optional integrations:
  *   TMTBL — the host's teaching periods show as busy
  *   ATTND — a host marked absent for the day is flagged
+ *   School days (calendar) — closed days have no slots; half days end early
  * Each integration is used only when its module is active and fails soft.
  */
 const { normalizeTenantFeatureToggles } = require('../constants/tenantFeatures');
 const { isModuleActive } = require('../constants/moduleModelKeys');
 const { getTeacherBusyPeriods } = require('../modules/timetable/teacherSchedule');
 const { ACTIVE_STATUSES, buildSlots } = require('../modules/appnt/lifecycle');
+const schoolDays = require('../modules/clndr/schoolDays');
 
 const moduleOn = (req, key) => isModuleActive(key, normalizeTenantFeatureToggles(req.tenant?.featureToggles));
 
@@ -58,18 +60,28 @@ const getSlots = async (req, host, date, { forPortal = false, ignoreAppointmentI
   const settings = await getSettings(req);
   const filter = { host: host._id, date, status: { $in: ACTIVE_STATUSES } };
   if (ignoreAppointmentId) filter._id = { $ne: ignoreAppointmentId };
-  const [appointments, busyPeriods, hostAbsent] = await Promise.all([
+  const [appointments, busyPeriods, hostAbsent, day] = await Promise.all([
     req.models.Appointment.find(filter).select('startTime endTime status').lean(),
     teachingPeriods(req, host, date),
-    isHostAbsent(req, host, date)
+    isHostAbsent(req, host, date),
+    schoolDays.dayInfo(req.models, date).catch(() => null)
   ]);
+  // The implicit Sunday-off default never overrides a host's own hours; anything the school set does.
+  const explicitlyClosed = day && !day.working && !day.rules.every((rule) => rule.implicit);
+  if (explicitlyClosed) {
+    const reason = `School closed: ${day.label}`;
+    return {
+      slots: [], closed: true, reason, busyPeriods: [], hostAbsent, timetableLinked: false
+    };
+  }
   const result = buildSlots({
     host,
     date,
     appointments,
     busyPeriods,
     minNoticeHours: forPortal ? settings.minNoticeHours : 0,
-    maxAdvanceDays: forPortal ? settings.maxAdvanceDays : 365
+    maxAdvanceDays: forPortal ? settings.maxAdvanceDays : 365,
+    latestEnd: day?.halfDayEndTime || null
   });
   return { ...result, busyPeriods, hostAbsent, timetableLinked: moduleOn(req, 'timetable') && Boolean(host.teacher) };
 };

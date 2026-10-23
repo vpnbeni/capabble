@@ -64,7 +64,12 @@ const SECTION_LABELS = {
   appointments: 'meetings with teachers'
 };
 
+const { helpers: _calendarHelpers, ...calendarTemplates } = require('../modules/clndr/notificationTemplates');
+
 module.exports = {
+  // ── Calendar (modules/clndr) ────────────────────────────────────────────
+  ...calendarTemplates,
+
   // ── Logins and access ───────────────────────────────────────────────────
   'user.welcome': {
     module: 'core',

@@ -168,9 +168,22 @@
 /* School OS (Home) link above the module switcher. */
 .cb-app .cb-shellnav__homewrap { display: flex; align-items: center; gap: var(--space-1); padding-bottom: var(--space-3); border-bottom: 1px solid var(--border); }
 .cb-app.cb-shellnav .cb-shellnav__home { font-weight: 600; }
+.cb-app .cb-shellnav__homewrap.has-next { padding-bottom: var(--space-1); border-bottom: 0; }
+.cb-app .cb-shellnav__calendarwrap { margin-top: 0; }
 .cb-app .cb-shellnav__homewrap .cb-shellnav__home { flex: 1; min-width: 0; }
 .cb-app .cb-shellnav__customize { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; padding: 0; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--ink-muted); cursor: pointer; }
 .cb-app .cb-shellnav__customize:hover { background: var(--surface-hover); color: var(--ink); }
 .cb-app .cb-shellnav__customize:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
 .cb-app .cb-sidenav.is-collapsed .cb-shellnav__homewrap { justify-content: center; }
 .cb-app .cb-sidenav.is-collapsed .cb-shellnav__homewrap .cb-shellnav__home { flex: none; }
+
+/* ---------- Phones: sidebar as a drawer, panels that fit the screen ---------- */
+.cb-app .cb-overlay.cb-overlay--drawer { justify-content: flex-start; align-items: stretch; padding: 0; }
+.cb-app .cb-navdrawer { position: relative; display: flex; height: 100%; animation: cb-navdrawer-in .2s ease-out; }
+.cb-app .cb-navdrawer .cb-shellnav { height: 100dvh; max-width: calc(100vw - 56px); box-shadow: var(--shadow-overlay); padding-bottom: env(safe-area-inset-bottom, 0px); }
+@keyframes cb-navdrawer-in { from { transform: translateX(-100%); } to { transform: none; } }
+@media (prefers-reduced-motion: reduce) { .cb-app .cb-navdrawer { animation: none; } }
+
+@media (max-width: 767px) {
+  .cb-app .cb-shellhead__notifications { position: fixed; top: 72px; left: 12px; right: 12px; width: auto; }
+}

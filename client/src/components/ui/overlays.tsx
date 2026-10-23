@@ -13,7 +13,7 @@ import { Button, Icon } from './primitives'
 export const OverlayShell: React.FC<{
   open: boolean
   onClose?: () => void
-  variant: 'dialog' | 'sheet' | 'command'
+  variant: 'dialog' | 'sheet' | 'command' | 'drawer'
   children: (trapRef: React.RefObject<HTMLDivElement>) => React.ReactNode
 }> = ({ open, onClose, variant, children }) => {
   useEscape(open, onClose)
@@ -149,7 +149,7 @@ export const Menu: React.FC<{
   trigger?: (props: { onClick: () => void; 'aria-haspopup': 'menu'; 'aria-expanded': boolean }) => React.ReactNode
 }> = ({ items, label = 'More actions', align = 'end', trigger }) => {
   const [open, setOpen] = useState(false)
-  const [pos, setPos] = useState<{ top: number; left?: number; right?: number; up: boolean } | null>(null)
+  const [pos, setPos] = useState<{ top: number; left: number; up: boolean } | null>(null)
   const ref = useRef<HTMLDivElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
 
@@ -159,10 +159,13 @@ export const Menu: React.FC<{
     const trigger = ref.current?.getBoundingClientRect()
     if (!trigger) return
     const panelHeight = panelRef.current?.offsetHeight || 240
+    const panelWidth = panelRef.current?.offsetWidth || 200
     const up = trigger.bottom + 4 + panelHeight > window.innerHeight - 8 && trigger.top - 4 - panelHeight > 8
+    // Keep the whole panel on screen: on a phone an end-aligned menu near the middle would run off the left edge.
+    const preferred = align === 'end' ? trigger.right - panelWidth : trigger.left
     setPos({
       top: up ? trigger.top - 4 - panelHeight : trigger.bottom + 4,
-      ...(align === 'end' ? { right: Math.max(8, window.innerWidth - trigger.right) } : { left: Math.max(8, trigger.left) }),
+      left: Math.max(8, Math.min(preferred, window.innerWidth - 8 - panelWidth)),
       up,
     })
   }
@@ -235,7 +238,7 @@ export const Menu: React.FC<{
         <div
           ref={panelRef}
           className={cx('cb-menu__panel', 'cb-menu__panel--floating')}
-          style={{ top: pos?.top ?? -9999, left: pos?.left, right: pos?.right, visibility: pos ? 'visible' : 'hidden' }}
+          style={{ top: pos?.top ?? -9999, left: pos?.left ?? 0, visibility: pos ? 'visible' : 'hidden' }}
           role="menu"
           aria-label={label}
           onKeyDown={onListKey}

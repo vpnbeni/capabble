@@ -10,6 +10,7 @@ import { usePermissions } from '@/hooks/usePermissions'
 import { deskTitle } from '@/utils/deskTitle'
 import { MODULE_REGISTRY, type ModuleId } from '../../constants/moduleRegistry'
 import {
+  CalendarDays,
   CalendarRange,
   Check,
   ChevronRight,
@@ -17,6 +18,7 @@ import {
   CreditCard,
   LifeBuoy,
   LogOut,
+  Mail,
   PartyPopper,
   Settings,
   SlidersHorizontal,
@@ -82,6 +84,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   const { access } = usePermissions()
   // A page shows when the school has it turned on and the user's role allows it.
   const isPathAllowed = (href: string) => isFeatureEnabledForPath(href, access)
+  const showCalendarLink = isPathAllowed('/calendar')
   const canAccessCentreDetails = isPathAllowed('/centre-details')
 
   const sidebarCountsAccess = useMemo(
@@ -1767,6 +1770,8 @@ const Sidebar: React.FC<SidebarProps> = ({
   const canAccessAccountSettings = isPathAllowed('/account-settings')
   const canAccessHelpSupport = isPathAllowed('/help-support')
   const canManageUsers = isPathAllowed('/settings/users')
+  const canManageSchoolDays = isPathAllowed('/settings/school-days')
+  const canManageSchoolEmail = isPathAllowed('/settings/email')
   const currentSidebarWidth = isCollapsed ? collapsedWidth : expandedWidth
 
   useLayoutEffect(() => {
@@ -1909,7 +1914,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     >
       <nav className={`cb-sidenav${isCollapsed ? ' is-collapsed' : ''}`} aria-label="Main">
         {/* Role desk (e.g. Principal Desk): the main Home dashboard, above every module */}
-        <div className="cb-shellnav__homewrap">
+        <div className={`cb-shellnav__homewrap${showCalendarLink ? ' has-next' : ''}`}>
           <NavLink
             to="/home"
             className={navItemClass(location.pathname === '/home', 'cb-shellnav__home')}
@@ -1931,6 +1936,19 @@ const Sidebar: React.FC<SidebarProps> = ({
             </button>
           ) : null}
         </div>
+        {showCalendarLink ? (
+          <div className="cb-shellnav__homewrap cb-shellnav__calendarwrap">
+            <NavLink
+              to="/calendar"
+              className={navItemClass(location.pathname === '/calendar' || location.pathname.startsWith('/calendar/'), 'cb-shellnav__home')}
+              aria-current={location.pathname === '/calendar' ? 'page' : undefined}
+              title={isCollapsed ? 'Calendar' : undefined}
+            >
+              {renderIcon('Calendar', '/calendar', null)}
+              {!isCollapsed ? <span className="cb-navitem__label truncate">Calendar</span> : null}
+            </NavLink>
+          </div>
+        ) : null}
 
         {/* Module switcher */}
         <div className="cb-shellnav__modulewrap" data-sidebar-fit ref={moduleMenuRef}>
@@ -2139,6 +2157,26 @@ const Sidebar: React.FC<SidebarProps> = ({
                     >
                       <UsersRound size={16} strokeWidth={1.75} aria-hidden />
                       Users and access
+                    </NavLink>
+                  )}
+                  {canManageSchoolDays && (
+                    <NavLink
+                      to="/settings/school-days"
+                      role="menuitem"
+                      className={({ isActive }) => `cb-shellnav__schoolitem${isActive ? ' is-current' : ''}`}
+                    >
+                      <CalendarDays size={16} strokeWidth={1.75} aria-hidden />
+                      School days
+                    </NavLink>
+                  )}
+                  {canManageSchoolEmail && (
+                    <NavLink
+                      to="/settings/email"
+                      role="menuitem"
+                      className={({ isActive }) => `cb-shellnav__schoolitem${isActive ? ' is-current' : ''}`}
+                    >
+                      <Mail size={16} strokeWidth={1.75} aria-hidden />
+                      School email
                     </NavLink>
                   )}
                   {canAccessBilling && (
