@@ -1,9 +1,8 @@
-import { useQuery } from '@tanstack/react-query'
 import { Users } from 'lucide-react-native'
 import { View } from 'react-native'
 
 import { classLabel } from '@/lib/format'
-import { portalService } from '@/services/portalService'
+import { usePortal } from '@/portal/PortalProvider'
 import { useSession } from '@/session/SessionProvider'
 import { space } from '@/theme/tokens'
 import { Avatar, Banner, Button, Card, EmptyState, ListRow, Screen, Skeleton, Text } from '@/ui'
@@ -16,7 +15,7 @@ export default function HomeScreen() {
 
 function FamilyHome() {
   const session = useSession()
-  const home = useQuery({ queryKey: ['portal', 'home'], queryFn: portalService.home })
+  const { homeQuery: home } = usePortal()
   const school = home.data?.school
 
   return (

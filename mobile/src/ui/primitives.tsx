@@ -149,7 +149,44 @@ export function Card({ title, subtitle, action, children, flush }: CardProps) {
   )
 }
 
+/** A headline amount with its label and a caption: "Still due ₹42,000". Put a Progress under it. */
+export function Figure({ label, value, caption }: { label: string; value: string; caption?: string }) {
+  return (
+    <View style={{ gap: space['space-1'] }}>
+      <Text variant="label" tone="muted">
+        {label}
+      </Text>
+      <Text variant="stat" numeric>
+        {value}
+      </Text>
+      {caption ? (
+        <Text variant="small" tone="muted">
+          {caption}
+        </Text>
+      ) : null}
+    </View>
+  )
+}
+
+/** How far something has got (fees paid). The tone is a judgement; default accent. */
+export function Progress({ value, max, label, tone }: { value: number; max: number; label: string; tone?: Tone }) {
+  const { colors } = useTheme()
+  const share = max > 0 ? Math.min(1, Math.max(0, value / max)) : 0
+  return (
+    <View
+      accessibilityRole="progressbar"
+      accessibilityLabel={label}
+      accessibilityValue={{ min: 0, max: 100, now: Math.round(share * 100) }}
+      style={[styles.track, { backgroundColor: colors['surface-sunken'] }]}
+    >
+      <View style={[styles.fill, { width: `${share * 100}%`, backgroundColor: tone ? colors[`${tone}-solid`] : colors.accent }]} />
+    </View>
+  )
+}
+
 const styles = StyleSheet.create({
+  track: { height: 8, borderRadius: radius['radius-full'], overflow: 'hidden' },
+  fill: { height: '100%', borderRadius: radius['radius-full'] },
   button: {
     minHeight: size['control-lg'],
     paddingHorizontal: space['space-4'],

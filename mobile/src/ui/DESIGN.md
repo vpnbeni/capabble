@@ -32,9 +32,20 @@ control, rejected patterns). This file only lists what is different on the phone
 | `Banner` | `tone, title, children` | Inline message on a screen |
 | `EmptyState` | `icon, title, body, action` | Empty lists and load errors inside a card |
 | `Skeleton` | `width, height, round` | Sketch the real layout while loading, never a lone spinner |
-| `BottomNav` | `items[{key,label,icon,active,onPress,badge}]` | The tab bar, used by `app/(app)/_layout.tsx` |
+| `BottomNav` | `items[{key,label,icon,active,onPress,badge}]` | The tab bar, used by `app/(app)/(tabs)/_layout.tsx` |
 | `Icon` | `icon, size, color` | Lucide (`lucide-react-native`) at 1.75 stroke; 22px in the tab bar, 16px inline |
+| `IconButton` | `icon, label, onPress, disabled` | Icon-only, 44px target; `label` is what screen readers say (back, month arrows, close) |
+| `SegmentedControl` | `label, options[{value,label}], value, onChange` | One of 2–4 short options that applies at once (an RSVP answer). Not for switching screens |
+| `Chips` | `label, options, value, onChange` | Quick filter above a list (whose dates). Scrolls sideways |
+| `Figure` + `Progress` | `label, value, caption`; `value, max, label, tone` | A headline amount with how far it has got (fees still due, paid so far). Phones fit one headline number, not a row of tiles |
+| `Sheet` | `open, onClose, title, description, footer` | Bottom sheet for a record's details or a short form. One primary button inside; "Done" is secondary when the body has its own action |
+| `ToastProvider` / `useToast()` | `toast(message, tone)` | Brief confirmation above the tab bar. Never from inside a Sheet (it would sit under it): show the result or the error in the sheet |
+| `AgendaList` | `groups[{date,off,dayLabel,entries}], today, onEntryPress, empty` | Items by day with Today / Tomorrow headings, time, a chart-colour dot and the item's words. The calendar's phone view |
+
+Screens put the school's HTML (a circular) in `components/HtmlView` (WebView, JavaScript off,
+links open in the browser), never in `Text`. The Sheet backdrop is the one place with a raw
+rgba value: the design system has no scrim token yet.
 
 Missing a piece? Add it here in the system's style, document it in this table, then use it.
-Next to port: `Sheet` (bottom sheet), `Dialog`, `Tabs`, `SegmentedControl`, `AgendaList`,
-`AttendanceGrid` (roll call), `TimetableGrid` (day list), toasts.
+Next to port: `Dialog` (confirmations), `Tabs`, `MiniCalendar`, `AttendanceGrid` (roll call),
+`TimetableGrid` (day list).

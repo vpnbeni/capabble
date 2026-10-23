@@ -60,9 +60,21 @@ TanStack Query (as on the web) over a small `fetch` client (`mobile/src/lib/api.
 - Checks: `npm run type-check`, `npm run lint`, `npx expo-doctor` all pass.
 
 ## Phase 1 — family app, release 1
-1. Port the remaining kit pieces it needs (Sheet, Dialog, Tabs, AgendaList, toasts) and `applySchoolTheme`.
-2. Screens, one per portal page: Calendar, Fees (+ receipt PDF via `expo-sharing`), Attendance, Results, Timetable, Notices, Appointments, Transport (live bus map), Profile, Account (change password, appearance).
-   Tabs for parents: Home · Calendar · Fees · Notices · More.
+Done so far (23 Oct 2026): tabs Home · Calendar · Fees · Notices · More, shown by the sections the
+school turned on for the login (`home.sections`); kit pieces `Sheet`, `SegmentedControl`, `Chips`,
+`IconButton`, `AgendaList`, `Figure`, `Progress`, toasts; a child switcher for parents with more than
+one child (remembered on the device).
+- Calendar: the month by day from today, earlier and later months, a filter per child, an item sheet
+  with the family's parts and their reply (acknowledge, RSVP with headcount, consent per child).
+- Fees: still due with paid so far, the fee schedule with status and a breakdown sheet, payments
+  with the receipt PDF to share or save (`expo-file-system` + `expo-sharing`).
+- Notices: the list and each circular in a WebView with JavaScript off; links open in the browser.
+- Checked in the web preview with sample data. Not yet checked on a phone: the receipt share sheet
+  and the WebView (both native-only).
+
+Still to do:
+1. Port `Dialog`, `Tabs`, `MiniCalendar` and `applySchoolTheme`.
+2. Screens: Attendance, Results, Timetable, Appointments, Transport (live bus map), Profile, Account (change password, appearance), all under More.
 3. Move pure helpers both apps need (`format.ts`, `classLabel`, portal types) into `packages/shared`.
 4. Push notifications: `expo-notifications`; server stores device tokens per login (new `devices` collection, route rule in `permissionCatalog.json`), sends through Expo's push service from the calendar outbox and notification events. Needs an APNs key and Firebase (FCM) project.
 5. Deep links: `capabble://` now; universal links on `school.capabble.cloud` (`apple-app-site-association` and `assetlinks.json` served by the client's Vercel project) so a notice email opens the app.

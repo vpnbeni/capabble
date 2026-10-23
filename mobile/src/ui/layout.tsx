@@ -1,4 +1,4 @@
-import { ChevronRight } from 'lucide-react-native'
+import { ChevronLeft, ChevronRight } from 'lucide-react-native'
 import type { ReactNode } from 'react'
 import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { useTheme } from '@/theme/ThemeProvider'
 import { size, space } from '@/theme/tokens'
 
+import { IconButton } from './controls'
 import { Icon } from './primitives'
 import { Text } from './Text'
 
@@ -14,19 +15,24 @@ type ScreenProps = {
   title?: string
   /** Leading header content, e.g. the school's logo. */
   leading?: ReactNode
+  /** A back button before the title, for screens pushed on top of the tabs. */
+  onBack?: () => void
   headerAction?: ReactNode
   children: ReactNode
   refreshing?: boolean
   onRefresh?: () => void
+  /** false when the body scrolls by itself (a WebView): children fill the screen instead. */
+  scroll?: boolean
 }
 
 /** Root of every screen: bg ground, 56px header, a scrolling stack with 16px gutters and 24px between cards. */
-export function Screen({ title, leading, headerAction, children, refreshing, onRefresh }: ScreenProps) {
+export function Screen({ title, leading, onBack, headerAction, children, refreshing, onRefresh, scroll = true }: ScreenProps) {
   const { colors } = useTheme()
   return (
     <SafeAreaView edges={['top']} style={[styles.root, { backgroundColor: colors.bg }]}>
       {title ? (
-        <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+        <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }, onBack && { paddingLeft: space['space-1'] }]}>
+          {onBack ? <IconButton icon={ChevronLeft} label="Back" onPress={onBack} /> : null}
           {leading}
           <Text variant="section-title" accessibilityRole="header" numberOfLines={1} style={{ flex: 1 }}>
             {title}
@@ -34,6 +40,7 @@ export function Screen({ title, leading, headerAction, children, refreshing, onR
           {headerAction}
         </View>
       ) : null}
+      {!scroll ? <View style={styles.root}>{children}</View> : (
       <ScrollView
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
@@ -45,6 +52,7 @@ export function Screen({ title, leading, headerAction, children, refreshing, onR
       >
         {children}
       </ScrollView>
+      )}
     </SafeAreaView>
   )
 }
@@ -58,10 +66,12 @@ type ListRowProps = {
   /** Draw the hairline under the row (all but the last row in a card). */
   divider?: boolean
   tone?: 'default' | 'danger'
+  /** Lines the primary text may take before it is cut (default 1; 3 for titles like a notice's). */
+  lines?: number
 }
 
 /** A 52px list row (row-comfortable). The whole row is the touch target; rows that open something get a chevron. */
-export function ListRow({ primary, secondary, leading, trailing, onPress, divider, tone = 'default' }: ListRowProps) {
+export function ListRow({ primary, secondary, leading, trailing, onPress, divider, tone = 'default', lines = 1 }: ListRowProps) {
   const { colors } = useTheme()
   return (
     <Pressable
@@ -76,7 +86,7 @@ export function ListRow({ primary, secondary, leading, trailing, onPress, divide
     >
       {leading}
       <View style={{ flex: 1 }}>
-        <Text variant="body-lg" tone={tone === 'danger' ? 'danger' : 'ink'} numberOfLines={1}>
+        <Text variant="body-lg" tone={tone === 'danger' ? 'danger' : 'ink'} numberOfLines={lines}>
           {primary}
         </Text>
         {secondary ? (
