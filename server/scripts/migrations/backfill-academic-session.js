@@ -16,8 +16,9 @@
  *   node server/scripts/migrations/backfill-academic-session.js [YYYY-YYYY]
  *
  * If a session label is passed as an argument, that label is used.
- * Otherwise the script derives the current session from today's date
- * (Indian academic year: Apr–Mar).
+ * Otherwise each tenant's first academic session is used (the session the
+ * untagged records already show in), falling back to the session for today's
+ * date (Indian academic year: Apr–Mar) when the tenant has none.
  *
  * Safe to re-run — only touches documents that lack `academicSession`.
  */
@@ -64,8 +65,8 @@ const SESSION_SCOPED_MODELS = [
 ];
 
 const backfill = async () => {
-  const sessionLabel = process.argv[2] || currentSessionLabel();
-  console.log(`\n=== Backfill academic session: ${sessionLabel} ===\n`);
+  const sessionArg = process.argv[2] || null;
+  console.log(`\n=== Backfill academic session: ${sessionArg || "each tenant's first session"} ===\n`);
 
   await connectPlatformDB();
   const { Tenant } = getPlatformModels();
@@ -88,6 +89,19 @@ const backfill = async () => {
       console.warn(`  [SKIP] Could not connect/register models: ${err.message}`);
       continue;
     }
+
+    let sessionLabel = sessionArg;
+    if (!sessionLabel) {
+      try {
+        const { AcademicSession } = getTenantConnectionAndModels(tenant.dbName, ['AcademicSession']).models;
+        const first = await AcademicSession.findOne({}).sort({ startYear: 1 }).select('label').lean();
+        sessionLabel = first?.label || currentSessionLabel();
+      } catch (err) {
+        console.warn(`  [SKIP] Could not read academic sessions: ${err.message}`);
+        continue;
+      }
+    }
+    console.log(`  Session: ${sessionLabel}`);
 
     let tenantTotal = 0;
 
