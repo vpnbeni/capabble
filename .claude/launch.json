@@ -102,6 +102,7 @@
       "runtimeArgs": [
         "expo",
         "start",
+        "--go",
         "--ios",
         "--port",
         "8082"

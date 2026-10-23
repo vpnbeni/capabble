@@ -87,7 +87,7 @@ Still to do:
 3. Move pure helpers both apps need (`format.ts`, `classLabel`, portal types) into `packages/shared`.
 4. Push notifications: `expo-notifications`; server stores device tokens per login (new `devices` collection, route rule in `permissionCatalog.json`), sends through Expo's push service from the calendar outbox and notification events. Needs an APNs key and Firebase (FCM) project.
 5. Deep links: `capabble://` now; universal links on `school.capabble.cloud` (`apple-app-site-association` and `assetlinks.json` served by the client's Vercel project) so a notice email opens the app.
-6. EAS: `eas.json` with `development` (local API), `preview` (stage) and `production` profiles and channels; EAS Update on.
+6. EAS: `mobile/eas.json` is in (23 Oct): `development` (dev client, internal, API on the machine running Metro), `development-simulator` (same, iOS simulator build), `preview` (stage API, internal, Android APK, channel `preview`), `production` (production API, store, channel `production`, build numbers kept by EAS); `submit.production` puts Android on the internal track. `expo-dev-client` is installed, so `npm run ios` / the `mobile-ios` launch entry pass `--go` to keep using Expo Go. Still to do once the Expo account exists: `eas init` (writes the project ID into `app.json`), then `eas update:configure` (adds `expo-updates` and the update URL) and `ascAppId` for iOS submit.
 7. Store: privacy policy and data-safety answers (children's data: we collect for the school, no ads, no tracking), screenshots, review account for Apple and Google.
 8. Crash reporting (Sentry for React Native) before the first public build.
 
