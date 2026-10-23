@@ -168,6 +168,7 @@ npm run workspace:lifecycle [-- --now=<date>] # Daily workspace job; --now needs
 - `/admin` - React 18 + TypeScript + Vite admin portal (port 5174)
 - `/schol` + `/school-intelligence` - SCHOL UI + Python API
 - `/capabble-landing` - Next.js marketing site (capabble.cloud)
+- `/mobile` - Expo (SDK 58) iOS/Android app for families and staff, the design system's Companion surface. Not a workspace (React 19 vs the web's 18): `cd mobile && npm install` with Node 22.13+. Reads `packages/shared` through Metro. Plan: `docs/requirements/mobile-app-plan.md`; rules: `mobile/AGENTS.md`
 - `/packages/shared` - `@capabble/shared`: code/data used by more than one app (e.g. `tenantFeatureCatalog.json`)
 
 **npm workspaces + Turborepo**: `client`, `admin`, `schol`, `capabble-landing` and `packages/*` are workspaces sharing one root `package-lock.json` — run `npm install` from the root, never inside an app. `npm run build:all` / `npm run type-check` run through Turborepo.
