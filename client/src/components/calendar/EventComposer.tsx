@@ -73,6 +73,13 @@ const SCOPE_TYPE_LABELS: Partial<Record<ScopeType, string>> = {
 }
 const STAFF_SECTION_LABEL = 'Teachers of these sections'
 
+/** Who is told when the event is published, for each "who can see it" choice. */
+const VISIBILITY_HINTS: Record<Form['visibility'], string> = {
+  segments: 'Only the audiences below see it and are told.',
+  all_staff: 'All staff get an app notice when it is published. Add an audience below to give a group instructions, a reply or an email.',
+  whole_school: 'Staff, parents and students all get an app notice when it is published. Add an audience below to give a group instructions, a reply or an email.',
+}
+
 /** A stored instant as the browser-local 'YYYY-MM-DDTHH:MM' a datetime-local field expects. */
 const toLocalInput = (value: string) => {
   const d = new Date(value)
@@ -455,9 +462,12 @@ const EventComposer: React.FC<{ open: boolean; eventId: string | null; defaultDa
         }[result.status as string] || 'Saved')
       } else {
         const result = await update.mutateAsync({ id: eventId as string, input: { ...input, notify: notifyMode } })
+        // A scheduled event switched to "Publish now" comes back as a draft, so it is published here.
         if (publish && result.status === 'draft') {
           const done = (await action.mutateAsync({ type: 'publish', id: eventId as string, publishAt: input.publishAt })) as { status?: string }
           toast.success(done.status === 'pending_approval' ? 'Sent to the principal for approval' : done.status === 'scheduled' ? 'Event scheduled' : 'Event published')
+        } else if (publish && result.status === 'scheduled') {
+          toast.success('Event scheduled')
         } else {
           toast.success(result.status === 'pending_approval' ? 'Changes sent to the principal for approval' : 'Changes saved')
         }
@@ -585,6 +595,7 @@ const EventComposer: React.FC<{ open: boolean; eventId: string | null; defaultDa
                     { value: 'all_staff', label: 'All staff, plus the audiences below' },
                     { value: 'whole_school', label: 'Everyone in the school' },
                   ]}
+                  hint={VISIBILITY_HINTS[form.visibility]}
                 />
               ) : null}
               {needsApproval && !editing ? (
@@ -650,7 +661,7 @@ const EventComposer: React.FC<{ open: boolean; eventId: string | null; defaultDa
                   />
                 )}
                 {form.when === 'later' && !isPublished ? (
-                  <TextField label="Publish on" type="datetime-local" value={form.publishAt} error={errors.publishAt} onChange={(e) => set({ publishAt: e.target.value })} />
+                  <TextField label="Publish on" type="datetime-local" value={form.publishAt} error={errors.publishAt} hint="It goes out within a minute of this time." onChange={(e) => set({ publishAt: e.target.value })} />
                 ) : <span />}
                 <TextField label="Circular no. (optional)" value={form.circularNo} maxLength={60} onChange={(e) => set({ circularNo: e.target.value })} />
                 <Switch

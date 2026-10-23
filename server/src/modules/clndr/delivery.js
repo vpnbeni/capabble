@@ -4,8 +4,9 @@
  * deliver() resolves who a change reaches (audience.resolveRecipients), builds
  * each person's parts (the segments that reach them, per child) and writes one
  * in-app notification each through notifications/send.js. Segments marked
- * `silent` are shown on the calendar but never ping. Emails for segments that
- * ask for them go to the mail outbox (see ./mail.js).
+ * `silent` are shown on the calendar but never ping. A whole-school or
+ * all-staff event also pings everyone else it is shown to, in-app only. Emails
+ * for segments that ask for them go to the mail outbox (see ./mail.js).
  *
  * Runs are logged on the event (`sendLog`). deliverLater() answers the request
  * first and sends in the background; the scheduler re-runs any run left queued
@@ -55,9 +56,11 @@ const summary = (event) => ({
  */
 const deliver = async ({ tenant, models, event, ...opts }) => {
   const { change } = opts;
+  // Whole-school and all-staff events also reach everyone outside their audiences (in-app only),
+  // except for reminders, which only the audiences that asked for them get.
   const { recipients, stats } = opts.extraUsers
     ? { recipients: new Map(opts.extraUsers.map((entry) => [String(entry.user._id), entry])), stats: [] }
-    : await resolveRecipients(models, event, { onlySegments: opts.onlySegments || null });
+    : await resolveRecipients(models, event, { onlySegments: opts.onlySegments || null, wide: change !== 'reminder' });
   const segments = new Map((event.segments || []).map((segment) => [segment.key, segment]));
 
   const parts = {};

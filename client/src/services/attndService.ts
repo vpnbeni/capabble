@@ -139,7 +139,7 @@ const saveStaffAttendance = async (payload: {
   staffIds: string[]
   absences: StaffAttendanceRecord[]
 }) => {
-  return api.put('/attnd/staff', payload)
+  return api.put('/attnd/staff', payload, { _silent: true } as any)
 }
 
 const getStudentAttendance = async (
@@ -182,7 +182,7 @@ const saveStudentAttendance = async (
     daySettings?: Array<{ attendanceDate: string; category: 'academic' | 'non-academic' }>
   }
 ) => {
-  return api.put('/attnd/students', { className, section, ...payload })
+  return api.put('/attnd/students', { className, section, ...payload }, { _silent: true } as any)
 }
 
 const getStudentAttendanceByDate = async (date: string): Promise<{
@@ -207,7 +207,7 @@ const saveStudentAttendanceByDate = async (
     daySettings: Array<{ attendanceDate: string; className: string; section: string; category: 'academic' | 'non-academic' }>
   }
 ) => {
-  return api.put('/attnd/students', { date, ...payload })
+  return api.put('/attnd/students', { date, ...payload }, { _silent: true } as any)
 }
 
 const getDashboard = async (month: string, date?: string): Promise<AttndDashboardData> => {

@@ -17,7 +17,8 @@ export const calendarKeys = {
   schoolDays: (from?: string, to?: string, all?: boolean) => [...calendarKeys.all, 'school-days', from || '', to || '', Boolean(all)] as const,
 }
 
-export const useMyCalendar = (from: string, to: string, options: { layers?: string[]; enabled?: boolean } = {}) =>
+/** `refetchInterval` (ms) keeps an open calendar current, e.g. when a scheduled event goes live. */
+export const useMyCalendar = (from: string, to: string, options: { layers?: string[]; enabled?: boolean; refetchInterval?: number } = {}) =>
   useQuery({
     queryKey: calendarKeys.mine(from, to, options.layers),
     queryFn: () => calendarService.mine({ from, to, layers: options.layers }),
@@ -25,6 +26,7 @@ export const useMyCalendar = (from: string, to: string, options: { layers?: stri
     placeholderData: keepPreviousData,
     staleTime: 60_000,
     refetchOnWindowFocus: true,
+    refetchInterval: options.refetchInterval || false,
   })
 
 export const useEventView = (id?: string | null) =>

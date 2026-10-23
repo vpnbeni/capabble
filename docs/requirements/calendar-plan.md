@@ -50,7 +50,9 @@ allDay, startDate/endDate (all-day) | startAt/endAt (timed), venue
 recurrence: { freq: daily|weekly|monthly, interval, byDay [], until, exDates [] }   (supported subset only; until defaults to session end)
 status: draft | pending_approval | scheduled | published | cancelled
 publishAt, approvedBy, circularNo, attachments []
-visibility: segments | all_staff | whole_school   (who can see it at all)
+visibility: segments | all_staff | whole_school   (who can see it at all; all_staff / whole_school also
+                                                   give everyone outside the segments an in-app notice on
+                                                   publish, change and cancel: no email, no reminders)
 segments: [{
   id, label,
   personType: parent | student | staff,

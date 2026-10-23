@@ -26,6 +26,12 @@ const { SCOPE_TYPES } = require('./constants');
 const USER_FIELDS = 'name email username kind roles role teacher linkedStudents assignedSections emailOptOut isActive';
 const STUDENT_FIELDS = 'name rollNumber class section houseId isActive';
 const FAMILY_TYPES = new Set(['parent', 'student']);
+// Everyone a whole-school or all-staff event reaches outside its own audiences.
+const WIDE_KEY = '*';
+const WIDE_KINDS = Object.freeze({
+  whole_school: [USER_KINDS.STAFF, USER_KINDS.PARENT, USER_KINDS.STUDENT],
+  all_staff: [USER_KINDS.STAFF]
+});
 
 const escapeRegex = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const isObjectId = (value) => mongoose.Types.ObjectId.isValid(String(value || '')) && String(value).length === 24;
@@ -363,8 +369,11 @@ const hasEmail = (user) => Boolean(user.email) && !/\.local$/i.test(user.email);
  *   stats: [{ key, label, personType, people, noLogin, noEmail }]
  * }
  * `onlySegments` limits the work to some segment keys (e.g. those an edit touched).
+ * `wide` adds, for a whole-school or all-staff event, every other login it is
+ * shown to, under the audience key WIDE_KEY (include WIDE_KEY in `onlySegments`
+ * to keep them in a limited run).
  */
-const resolveRecipients = async (models, event, { onlySegments = null } = {}) => {
+const resolveRecipients = async (models, event, { onlySegments = null, wide = false } = {}) => {
   const recipients = new Map();
   const stats = [];
   const cache = {};
@@ -440,6 +449,22 @@ const resolveRecipients = async (models, event, { onlySegments = null } = {}) =>
     }
     stats.push(stat);
   }
+
+  const wideKinds = wide ? WIDE_KINDS[event.visibility] : null;
+  if (wideKinds && (!onlySegments || onlySegments.includes(WIDE_KEY))) {
+    // People already in an audience hear through it (or stay quiet if it is silent).
+    const others = (await activeUsers(User, { kind: { $in: wideKinds } }))
+      .filter((user) => !recipients.has(String(user._id)));
+    others.forEach((user) => addRecipient(user, WIDE_KEY));
+    stats.push({
+      key: WIDE_KEY,
+      label: event.visibility === 'all_staff' ? 'All staff' : 'Everyone in the school',
+      personType: 'everyone',
+      people: others.length,
+      noLogin: 0,
+      noEmail: others.filter((user) => !hasEmail(user)).length
+    });
+  }
   return { recipients, stats };
 };
 
@@ -453,6 +478,7 @@ module.exports = {
   allViewerKeys,
   matchEvent,
   resolveRecipients,
+  WIDE_KEY,
   classTeacherSections,
   timetableTeacherIds,
   hasEmail
