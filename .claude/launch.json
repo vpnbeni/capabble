@@ -85,6 +85,19 @@
       "port": 8081
     },
     {
+      "name": "mobile-ios",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "expo",
+        "start",
+        "--ios",
+        "--port",
+        "8082"
+      ],
+      "cwd": "mobile",
+      "port": 8082
+    },
+    {
       "name": "client-pwa",
       "runtimeExecutable": "npx",
       "runtimeArgs": [

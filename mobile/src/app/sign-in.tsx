@@ -97,7 +97,10 @@ export default function SignInScreen() {
             <TextField
               label="Email or login ID"
               value={identifier}
-              onChangeText={setIdentifier}
+              onChangeText={(value) => {
+                setIdentifier(value)
+                setErrors(({ identifier: _fixed, ...rest }) => rest)
+              }}
               error={errors.identifier}
               autoCapitalize="none"
               autoCorrect={false}
@@ -113,7 +116,10 @@ export default function SignInScreen() {
                 label="School code"
                 hint="Your school office can tell you this."
                 value={schoolCode}
-                onChangeText={setSchoolCode}
+                onChangeText={(value) => {
+                  setSchoolCode(value)
+                  setErrors(({ schoolCode: _fixed, ...rest }) => rest)
+                }}
                 error={errors.schoolCode}
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -124,7 +130,10 @@ export default function SignInScreen() {
               ref={passwordRef}
               label="Password"
               value={password}
-              onChangeText={setPassword}
+              onChangeText={(value) => {
+                setPassword(value)
+                setErrors(({ password: _fixed, ...rest }) => rest)
+              }}
               error={errors.password}
               secureTextEntry
               autoComplete="current-password"
