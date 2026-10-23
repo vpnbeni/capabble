@@ -43,11 +43,15 @@ function RootStack() {
   const { status } = session
   // A school-set temporary password must be replaced before the API serves anything else.
   const mustSetPassword = session.status === 'signedIn' && session.user.mustChangePassword
-  const { scheme, colors } = useTheme()
+  const { scheme, colors, setSchoolColor } = useTheme()
+  const schoolColor = session.status === 'signedIn' ? session.user.tenant?.brandColor || null : null
 
   useEffect(() => {
     if (status !== 'loading') SplashScreen.hideAsync()
   }, [status])
+
+  // The school's colour as the accent while signed in; Capabble blue on the sign-in screen.
+  useEffect(() => setSchoolColor(schoolColor), [schoolColor, setSchoolColor])
 
   if (status === 'loading') return null
 

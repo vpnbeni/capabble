@@ -78,6 +78,39 @@ export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(function T
   )
 })
 
+export interface ColorFieldProps extends FieldChrome {
+  id?: string
+  /** `#rrggbb`, or empty for none. */
+  value: string
+  onChange: (value: string) => void
+  placeholder?: string
+  disabled?: boolean
+}
+
+/** A colour as a hex code with a swatch that opens the system colour picker. */
+export const ColorField: React.FC<ColorFieldProps> = ({ value, onChange, placeholder = '#2458AA', disabled, ...field }) => (
+  <TextField
+    {...field}
+    value={value}
+    placeholder={placeholder}
+    disabled={disabled}
+    autoComplete="off"
+    spellCheck={false}
+    maxLength={7}
+    onChange={(event) => onChange(event.target.value)}
+    prefix={
+      <input
+        type="color"
+        className="cb-color-swatch"
+        aria-label={`Pick ${typeof field.label === 'string' ? field.label.toLowerCase() : 'colour'}`}
+        value={/^#[0-9a-f]{6}$/i.test(value) ? value : '#ffffff'}
+        disabled={disabled}
+        onChange={(event) => onChange(event.target.value.toUpperCase())}
+      />
+    }
+  />
+)
+
 export interface TextAreaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement>, FieldChrome {}
 
 export const TextArea = forwardRef<HTMLTextAreaElement, TextAreaProps>(function TextArea(

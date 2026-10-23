@@ -10,6 +10,8 @@ const schoolProfileSchema = new mongoose.Schema({
   affiliationTill: { type: Date, default: null },
   logoUrl: { type: String, default: '' },
   logoPublicId: { type: String, default: '' },
+  // The school's colour (#rrggbb). The apps derive the accent tokens from it (packages/shared/src/schoolAccent.ts).
+  brandColor: { type: String, default: '', trim: true },
   tagline: { type: String, default: '', trim: true },
   address: { type: String, default: '', trim: true },
   contact: { type: String, default: '', trim: true },

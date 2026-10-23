@@ -60,6 +60,11 @@
 .cb-app .cb-input input::placeholder { color: var(--ink-subtle); }
 .cb-app .cb-input__icon { color: var(--ink-subtle); }
 .cb-app .cb-input__affix { color: var(--ink-muted); font-size: 13px; }
+.cb-app .cb-color-swatch { display: block; width: 24px; height: 24px; padding: 0; border: 1px solid var(--border-control); border-radius: var(--radius-sm); background: none; cursor: pointer; }
+.cb-app .cb-color-swatch::-webkit-color-swatch-wrapper { padding: 0; }
+.cb-app .cb-color-swatch::-webkit-color-swatch { border: none; border-radius: 3px; }
+.cb-app .cb-color-swatch::-moz-color-swatch { border: none; border-radius: 3px; }
+.cb-app .cb-color-swatch:disabled { cursor: not-allowed; }
 .cb-app .cb-input.is-disabled { background: var(--surface-sunken); color: var(--ink-disabled); border-color: var(--border); }
 .cb-app .cb-field.is-invalid .cb-input { border-color: var(--danger-ink); }
 /* FileField: one file to upload, with drop zone */

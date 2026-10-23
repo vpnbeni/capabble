@@ -5,6 +5,7 @@ import { getCurrentUser, selectAuth } from './redux/slices/authSlice'
 import { useAcademicSession } from './contexts/AcademicSessionContext'
 import { hasSessionHint } from './utils/authStorage'
 import { landingPathFor } from './utils/landing'
+import { applySchoolTheme } from './utils/schoolTheme'
 import type { AppDispatch } from './redux/store'
 import ChangePasswordRequired from './pages/ChangePasswordRequired'
 import AcceptInvite from './pages/AcceptInvite'
@@ -214,6 +215,10 @@ function App() {
   const isPortalUser = user?.kind === 'parent' || user?.kind === 'student'
   // Where a signed-in person goes from public pages.
   const landing = landingPathFor(user, hasSession)
+
+  // The school's colour as the accent once we know who is signed in; Capabble blue otherwise.
+  const schoolColor = isAuthenticated ? user?.tenant?.brandColor : null
+  useEffect(() => applySchoolTheme(schoolColor), [schoolColor])
 
   useEffect(() => {
     // The session cookie is invisible to JS; if this browser was signed in, ask

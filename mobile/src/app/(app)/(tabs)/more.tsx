@@ -58,7 +58,7 @@ export default function MoreScreen() {
           divider
         />
         {user.kind !== 'staff' ? (
-          <ListRow primary="Change password" leading={<Icon icon={KeyRound} size={20} />} divider onPress={() => router.push('/account')} />
+          <ListRow primary="Password and appearance" leading={<Icon icon={KeyRound} size={20} />} divider onPress={() => router.push('/account')} />
         ) : null}
         <ListRow primary={school.name} secondary="School" lines={2} />
       </Card>

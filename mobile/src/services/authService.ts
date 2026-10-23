@@ -26,7 +26,8 @@ export interface User {
   permissions: { key: string; scope: 'all' | 'assigned' }[]
   linkedStudents: LinkedStudent[]
   mustChangePassword: boolean
-  tenant?: { slug: string; name: string } | null
+  /** brandColor: the school's colour (#rrggbb), empty for Capabble blue. */
+  tenant?: { slug: string; name: string; brandColor?: string } | null
 }
 
 export interface School {

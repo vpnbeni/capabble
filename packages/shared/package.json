@@ -6,6 +6,7 @@
   "exports": {
     "./tenantFeatureCatalog.json": "./src/tenantFeatureCatalog.json",
     "./permissionCatalog.json": "./src/permissionCatalog.json",
-    "./designTokens.json": "./src/designTokens.json"
+    "./designTokens.json": "./src/designTokens.json",
+    "./schoolAccent": "./src/schoolAccent.ts"
   }
 }

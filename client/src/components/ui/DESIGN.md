@@ -34,6 +34,7 @@ When the artifact changes, resync this file and bump the version line.
 - Grounds: page `bg`; cards, tables, sidebar, header `surface`; menus/dialogs `surface-raised`; table headers, tracks, read-only fields `surface-sunken`.
 - Lines: `border` for hairlines; every input/select/secondary button uses `border-control`.
 - Text: `ink` primary, `ink-muted` secondary, `ink-subtle` only for timestamps, placeholders, column headers.
+- The school's colour (Settings → School profile, `brandColor`) becomes the accent through `applySchoolTheme` (`utils/schoolTheme.ts`, algorithm in `packages/shared/src/schoolAccent.ts`), applied in `App.tsx` after sign-in. Never set accent colours by hand.
 - Accent = the school's colour, one per screen: `accent-strong` (primary button, links), `accent-soft` + `accent-soft-ink` (selected item), `accent` (marks only: icons, tab underline, progress). `highlight` is decorative only.
 - Status tones are fixed; always pair colour with a word or icon:
 
@@ -109,6 +110,7 @@ Lucide (`lucide-react`), passed as components: `icon={Plus}`. 1.75 stroke is app
 | `Avatar` | `name, src, size, square` | People; school logo is `square` |
 | `Icon` | `icon, size, label` | Lucide glyph at system stroke |
 | `TextField` / `TextArea` | `label, hint, error, required` + input props; TextField `prefix, suffix, icon, size` | Every field has a visible label |
+| `ColorField` | `label, hint, error, value, onChange(hex)` | A colour as a hex code with a swatch that opens the system picker (the school's colour). Not in the artifact yet: added to our kit |
 | `FileField` | `label, hint, error, required, file, onChange(File \| null), accept, placeholder, disabled` | One file to upload (imports). Dashed drop zone; shows the chosen file's name and size with Replace. Several files = several FileFields, each labelled. Not in the artifact yet: added to our kit |
 | `Select` | `label, options (string \| {value,label,disabled}), placeholder, size` | Native dropdown |
 | `Combobox` | `options[{value,label,meta,keywords}], value, onChange, selectedLabel, clearable, placeholder` | Searchable picker; no free text |

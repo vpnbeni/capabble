@@ -39,7 +39,8 @@ Expo SDK 58 requires Node 22.13+ (`mobile/.nvmrc` says 24). The rest of the repo
 - Source of truth: the design system artifact (claude.ai/artifact/LyYegFLHJxi1rNpnkaqHjH). Its `tokens.json` is copied to `packages/shared/src/designTokens.json`; the app builds its light and dark palettes, type scale, spacing, radius and sizes from it at runtime (`mobile/src/theme/tokens.ts`). No hex in screens.
 - The native kit is `mobile/src/ui` (see `mobile/src/ui/DESIGN.md`). Same names and props as the web kit where they make sense (`Button`, `Card`, `Badge`, `TextField`, `EmptyState`, `Banner`, `Skeleton`, `Avatar`), plus the Companion pieces: `Screen`, `ListRow`, `BottomNav`.
 - Companion rules applied: `body-lg` 16px default text, 44px controls (`control-lg`), 52px rows (`row-comfortable`), `BottomNav` with 4–5 tabs at 64px plus the safe area, Inter 400/500/600, Lucide icons at 1.75 stroke, light and dark from the device setting.
-- Still to port: `applySchoolTheme` (the school's accent colour; needs the colour in the API's school profile), `Sheet` as a bottom sheet, `Dialog`, `Tabs`, `SegmentedControl`, `Calendar`/`AgendaList`, `AttendanceGrid` (roll call), `TimetableGrid` (day list), toasts.
+- The school's colour: `brandColor` on the school profile (web: Settings → School profile), sent as `user.tenant.brandColor`; both apps turn it into the accent tokens with `packages/shared/src/schoolAccent.ts`.
+- Still to port: `Sheet` as a bottom sheet, `Dialog`, `Tabs`, `SegmentedControl`, `Calendar`/`AgendaList`, `AttendanceGrid` (roll call), `TimetableGrid` (day list), toasts.
 
 ### Sign-in and sessions: reuse the web's cookie session
 - The API already issues httpOnly cookies (`cb_at` 15 min, `cb_rt` rotated). On iOS and Android, `fetch` keeps cookies in the app's own cookie store, so the app signs in with **no server change** and never holds a token.
@@ -81,7 +82,7 @@ Checked on the iOS simulator against stage data, except Meetings (stage school h
 off; checked in the web preview with sample data).
 
 Still to do:
-1. Port `Tabs`, `MiniCalendar` and `applySchoolTheme`; appearance (system / light / dark) under Your login.
+1. Port `Tabs` and `MiniCalendar`. (Done 23 Oct: the school's colour on web and mobile, appearance under Your login; the school colour is not yet seen on a phone against stage, which needs the server deployed.)
 2. Live bus map on Transport (needs `react-native-maps`, so a development build, not Expo Go).
 3. Move pure helpers both apps need (`format.ts`, `classLabel`, portal types) into `packages/shared`.
 4. Push notifications: `expo-notifications`; server stores device tokens per login (new `devices` collection, route rule in `permissionCatalog.json`), sends through Expo's push service from the calendar outbox and notification events. Needs an APNs key and Firebase (FCM) project.

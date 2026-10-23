@@ -16,6 +16,7 @@ const ALLOWED_UPDATE_FIELDS = [
   'address',
   'contact',
   'email',
+  'brandColor',
 ];
 
 const buildProfileResponse = (tenant, profile) => ({
@@ -29,6 +30,7 @@ const buildProfileResponse = (tenant, profile) => ({
     : '',
   logoUrl: profile?.logoUrl || '',
   logoPublicId: profile?.logoPublicId || '',
+  brandColor: profile?.brandColor || '',
   tagline: profile?.tagline || '',
   address: profile?.address || '',
   contact: profile?.contact || '',
@@ -79,6 +81,14 @@ exports.updateProfile = asyncHandler(async (req, res) => {
       message: 'UDISE+ code must be 11 digits.'
     });
   }
+
+  if (updates.brandColor && !/^#[0-9a-f]{6}$/i.test(updates.brandColor)) {
+    return res.status(HTTP_STATUS.BAD_REQUEST).json({
+      success: false,
+      message: 'Use a colour like #2458AA for the school colour.'
+    });
+  }
+  if (updates.brandColor) updates.brandColor = updates.brandColor.toUpperCase();
 
   if (req.body.affiliationTill !== undefined) {
     const raw = String(req.body.affiliationTill || '').trim();

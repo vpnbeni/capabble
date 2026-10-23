@@ -8,7 +8,10 @@ control, rejected patterns). This file only lists what is different on the phone
 - From `packages/shared/src/designTokens.json` (a copy of the design system's `tokens.json`) via
   `src/theme/tokens.ts`. Take colours from `useTheme().colors`, sizes from `space`, `radius`, `size`.
   No hex, no inline magic numbers in screens.
-- Light and dark follow the device. The school accent (`applySchoolTheme`) is not ported yet.
+- Light and dark follow the device, or the login's choice under Your login → Appearance (kept on the
+  phone). The school's colour (`user.tenant.brandColor`, set in the web app's Settings → School profile)
+  replaces the seven accent tokens while signed in (`ThemeProvider`, maths in
+  `packages/shared/src/schoolAccent.ts`, the design system's SchoolTheme). Status colours never change.
 - Text is always `<Text variant tone>`. React Native picks a font by family, so weights come from
   the variant (`Inter_400Regular`, `Inter_500Medium`, `Inter_600SemiBold`), never `fontWeight`.
 

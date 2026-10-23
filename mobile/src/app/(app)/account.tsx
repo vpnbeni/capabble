@@ -3,13 +3,15 @@ import { KeyboardAvoidingView, Platform } from 'react-native'
 
 import { PasswordForm } from '@/components/PasswordForm'
 import { useSession } from '@/session/SessionProvider'
-import { Card, DetailList, Screen, useToast } from '@/ui'
+import { useTheme, type AppearancePreference } from '@/theme/ThemeProvider'
+import { Card, DetailList, Screen, SegmentedControl, useToast } from '@/ui'
 
 /** The signed-in parent's or student's own login: details and password. */
 export default function AccountScreen() {
   const router = useRouter()
   const session = useSession()
   const toast = useToast()
+  const { appearance, setAppearance } = useTheme()
   if (session.status !== 'signedIn') return null
   const { user, school } = session
 
@@ -21,6 +23,18 @@ export default function AccountScreen() {
             items={[
               { label: 'Name', value: user.displayName || user.name },
               { label: 'Signs in with', value: user.username ? `${user.username}@${school.slug}` : user.email },
+            ]}
+          />
+        </Card>
+        <Card title="Appearance" subtitle="Only on this phone.">
+          <SegmentedControl<AppearancePreference>
+            label="Theme"
+            value={appearance}
+            onChange={setAppearance}
+            options={[
+              { value: 'system', label: 'System' },
+              { value: 'light', label: 'Light' },
+              { value: 'dark', label: 'Dark' },
             ]}
           />
         </Card>
