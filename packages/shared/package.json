@@ -5,6 +5,7 @@
   "description": "Code and data shared across CAPABBLE apps (client, admin, schol, server)",
   "exports": {
     "./tenantFeatureCatalog.json": "./src/tenantFeatureCatalog.json",
-    "./permissionCatalog.json": "./src/permissionCatalog.json"
+    "./permissionCatalog.json": "./src/permissionCatalog.json",
+    "./designTokens.json": "./src/designTokens.json"
   }
 }

@@ -5,11 +5,23 @@ Single source of truth for data and code used by more than one app.
 | Export | Used by |
 |---|---|
 | `@capabble/shared/tenantFeatureCatalog.json` | `client` (import), `server` (synced copy) |
+| `@capabble/shared/permissionCatalog.json` | `client` (import), `server` (synced copy) |
+| `@capabble/shared/designTokens.json` | `mobile` (import through Metro) |
+
+`designTokens.json` is a copy of `project/tokens.json` from the Capabble design system
+artifact (claude.ai/artifact/LyYegFLHJxi1rNpnkaqHjH). Update it whenever the design
+system's tokens change, together with `client/src/styles/capabble/tokens.css`.
 
 ## Frontend apps (npm workspaces)
 
 `client`, `admin`, `schol` and `capabble-landing` are npm workspaces, so they can
 add `"@capabble/shared": "*"` to their dependencies and import from it directly.
+
+## Mobile
+
+`mobile` is not a workspace (it runs React 19, the web apps run React 18). Its Metro
+config watches `packages/shared` and maps `@capabble/shared/*` to `packages/shared/src/*`,
+so it imports these files directly, with no copy.
 
 ## Server
 

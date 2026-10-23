@@ -1,0 +1,664 @@
+{
+ "name": "Capabble",
+ "version": 1,
+ "color": {
+  "themes": [
+   {
+    "id": "light",
+    "name": "Light"
+   },
+   {
+    "id": "dark",
+    "name": "Dark"
+   }
+  ],
+  "tokens": [
+   {
+    "name": "bg",
+    "value": {
+     "light": "#F4F5F6",
+     "dark": "#111314"
+    },
+    "usage": "Page background behind cards in the workspace; app background in the companion app."
+   },
+   {
+    "name": "surface",
+    "value": {
+     "light": "#FFFFFF",
+     "dark": "#191B1C"
+    },
+    "usage": "Cards, tables, the sidebar, the header, bottom nav. The default ground for text."
+   },
+   {
+    "name": "surface-raised",
+    "value": {
+     "light": "#FFFFFF",
+     "dark": "#222527"
+    },
+    "usage": "Menus, popovers, dialogs and sheets — anything that floats above surface."
+   },
+   {
+    "name": "surface-sunken",
+    "value": {
+     "light": "#EDEFF0",
+     "dark": "#0C0D0E"
+    },
+    "usage": "Table header rows, segmented-control tracks, read-only fields, progress tracks."
+   },
+   {
+    "name": "surface-hover",
+    "value": {
+     "light": "#F7F8F9",
+     "dark": "#202324"
+    },
+    "usage": "Row and nav-item hover on surface. Never used as a resting fill."
+   },
+   {
+    "name": "border",
+    "value": {
+     "light": "#E3E6E8",
+     "dark": "#2E3133"
+    },
+    "usage": "Hairlines: card outlines, table row dividers, header and sidebar edges. Decorative only — never the sole outline of a control."
+   },
+   {
+    "name": "border-strong",
+    "value": {
+     "light": "#C2C9CC",
+     "dark": "#383B3D"
+    },
+    "usage": "Section dividers that must read clearly, the outline of a dashed empty-state box."
+   },
+   {
+    "name": "border-control",
+    "value": {
+     "light": "#868E92",
+     "dark": "#6B7275"
+    },
+    "usage": "Outline of inputs, selects, checkboxes and secondary buttons (3:1 on surface and bg in both themes)."
+   },
+   {
+    "name": "ink",
+    "value": {
+     "light": "#191B1C",
+     "dark": "#EDEFF0"
+    },
+    "usage": "Primary text and headings on surface, surface-raised, surface-sunken and bg."
+   },
+   {
+    "name": "ink-muted",
+    "value": {
+     "light": "#595F61",
+     "dark": "#9BA3A8"
+    },
+    "usage": "Secondary text: subtitles, table meta, field hints, inactive nav labels. On surface, raised, sunken and bg."
+   },
+   {
+    "name": "ink-subtle",
+    "value": {
+     "light": "#666D70",
+     "dark": "#8F979B"
+    },
+    "usage": "Tertiary text: timestamps, placeholders, column headers. On surface, sunken and bg (4.5:1+). Not for anything a user must read to act."
+   },
+   {
+    "name": "ink-disabled",
+    "value": {
+     "light": "#9BA3A8",
+     "dark": "#5C6366"
+    },
+    "usage": "Disabled labels and icons only (exempt from contrast rules)."
+   },
+   {
+    "name": "ink-inverse",
+    "value": {
+     "light": "#FFFFFF",
+     "dark": "#191B1C"
+    },
+    "usage": "Text on an ink-coloured fill such as a tooltip."
+   },
+   {
+    "name": "accent",
+    "value": {
+     "light": "#3A7AE1",
+     "dark": "#729FE9"
+    },
+    "usage": "Capabble blue from the logo — the school-themeable brand hue. Icons, selected indicators, chart series 1, the active tab underline. Not for small text on white (4.2:1); use accent-strong for text."
+   },
+   {
+    "name": "accent-strong",
+    "value": {
+     "light": "#2458AA",
+     "dark": "#89B4F0"
+    },
+    "usage": "Primary button fill, links and selected text on surface or bg. School-themeable: generated so on-accent passes 4.5:1."
+   },
+   {
+    "name": "accent-strong-hover",
+    "value": {
+     "light": "#1D4890",
+     "dark": "#ABC6F1"
+    },
+    "usage": "Hover and pressed state of accent-strong fills and links."
+   },
+   {
+    "name": "on-accent",
+    "value": {
+     "light": "#FFFFFF",
+     "dark": "#051736"
+    },
+    "usage": "Text and icons on accent-strong and accent-strong-hover fills. Never hard-code white."
+   },
+   {
+    "name": "accent-soft",
+    "value": {
+     "light": "#E4ECFA",
+     "dark": "#1A2E4F"
+    },
+    "usage": "Selected nav row, selected filter chip, today's cell in a calendar, the current period in a timetable."
+   },
+   {
+    "name": "accent-soft-ink",
+    "value": {
+     "light": "#1D4890",
+     "dark": "#ABC6F1"
+    },
+    "usage": "Text and icons on accent-soft."
+   },
+   {
+    "name": "focus-ring",
+    "value": {
+     "light": "#2458AA",
+     "dark": "#89B4F0"
+    },
+    "usage": "Keyboard focus: a solid 2px ring, 2px offset, on every interactive element. 3:1+ on surface and bg in both themes."
+   },
+   {
+    "name": "highlight",
+    "value": {
+     "light": "#2DB3E7",
+     "dark": "#73D5F3"
+    },
+    "usage": "Capabble's cyan from the logo highlight. Charts and empty-state illustration only; never text, never a status. Not school-themed."
+   },
+   {
+    "name": "success-ink",
+    "value": {
+     "light": "#047857",
+     "dark": "#6EE7B7"
+    },
+    "usage": "Success text and icons on success-soft, surface and bg. Meaning: paid, present, active, published, completed, approved."
+   },
+   {
+    "name": "success-soft",
+    "value": {
+     "light": "#ECFDF5",
+     "dark": "#0E2A22"
+    },
+    "usage": "Badge and banner background for success."
+   },
+   {
+    "name": "success-border",
+    "value": {
+     "light": "#A7F3D0",
+     "dark": "#1F5140"
+    },
+    "usage": "Outline of a success banner or callout."
+   },
+   {
+    "name": "success-solid",
+    "value": {
+     "light": "#059669",
+     "dark": "#34D399"
+    },
+    "usage": "Dots, progress fills and chart marks meaning success. Never a text background."
+   },
+   {
+    "name": "warning-ink",
+    "value": {
+     "light": "#B45309",
+     "dark": "#FCD34D"
+    },
+    "usage": "Warning text and icons on warning-soft, surface and bg. Meaning: pending, partial, on leave, due soon, on hold, needs review."
+   },
+   {
+    "name": "warning-soft",
+    "value": {
+     "light": "#FFFBEB",
+     "dark": "#2E2410"
+    },
+    "usage": "Badge and banner background for warning."
+   },
+   {
+    "name": "warning-border",
+    "value": {
+     "light": "#FDE68A",
+     "dark": "#5C4515"
+    },
+    "usage": "Outline of a warning banner or callout."
+   },
+   {
+    "name": "warning-solid",
+    "value": {
+     "light": "#D97706",
+     "dark": "#FBBF24"
+    },
+    "usage": "Dots, progress fills and chart marks meaning warning. Never a text background."
+   },
+   {
+    "name": "danger-ink",
+    "value": {
+     "light": "#BE123C",
+     "dark": "#FDA4AF"
+    },
+    "usage": "Danger text and icons on danger-soft, surface and bg. Meaning: overdue, absent, rejected, cancelled, failed, error."
+   },
+   {
+    "name": "danger-soft",
+    "value": {
+     "light": "#FFF1F2",
+     "dark": "#331820"
+    },
+    "usage": "Badge and banner background for danger."
+   },
+   {
+    "name": "danger-border",
+    "value": {
+     "light": "#FECDD3",
+     "dark": "#5E2433"
+    },
+    "usage": "Outline of a danger banner or callout."
+   },
+   {
+    "name": "danger-solid",
+    "value": {
+     "light": "#E11D48",
+     "dark": "#FB7185"
+    },
+    "usage": "Dots, progress fills and chart marks meaning danger. Never a text background."
+   },
+   {
+    "name": "info-ink",
+    "value": {
+     "light": "#166989",
+     "dark": "#89D6FB"
+    },
+    "usage": "Info text and icons on info-soft, surface and bg. Meaning: due, scheduled, in progress, upcoming, new."
+   },
+   {
+    "name": "info-soft",
+    "value": {
+     "light": "#E3F5FE",
+     "dark": "#0B2633"
+    },
+    "usage": "Badge and banner background for info."
+   },
+   {
+    "name": "info-border",
+    "value": {
+     "light": "#89D6FB",
+     "dark": "#144A5E"
+    },
+    "usage": "Outline of a info banner or callout."
+   },
+   {
+    "name": "info-solid",
+    "value": {
+     "light": "#2DB3E7",
+     "dark": "#73D5F3"
+    },
+    "usage": "Dots, progress fills and chart marks meaning info. Never a text background."
+   },
+   {
+    "name": "neutral-ink",
+    "value": {
+     "light": "#383B3D",
+     "dark": "#C2C9CC"
+    },
+    "usage": "Neutral text and icons on neutral-soft, surface and bg. Meaning: draft, archived, holiday, inactive, not started."
+   },
+   {
+    "name": "neutral-soft",
+    "value": {
+     "light": "#EDEFF0",
+     "dark": "#2A2D2F"
+    },
+    "usage": "Badge and banner background for neutral."
+   },
+   {
+    "name": "neutral-border",
+    "value": {
+     "light": "#C2C9CC",
+     "dark": "#3A3E40"
+    },
+    "usage": "Outline of a neutral banner or callout."
+   },
+   {
+    "name": "neutral-solid",
+    "value": {
+     "light": "#7B8285",
+     "dark": "#80888C"
+    },
+    "usage": "Dots, progress fills and chart marks meaning neutral. Never a text background."
+   },
+   {
+    "name": "danger-strong",
+    "value": {
+     "light": "#BE123C",
+     "dark": "#FB7185"
+    },
+    "usage": "Fill of a destructive button (delete, void, reject)."
+   },
+   {
+    "name": "on-danger",
+    "value": {
+     "light": "#FFFFFF",
+     "dark": "#1A0509"
+    },
+    "usage": "Text on danger-strong."
+   },
+   {
+    "name": "chart-1",
+    "value": {
+     "light": "#3A7AE1",
+     "dark": "#729FE9"
+    },
+    "usage": "Series 1 — the default series. Fixed categorical palette; pair with labels, never colour alone."
+   },
+   {
+    "name": "chart-2",
+    "value": {
+     "light": "#2DB3E7",
+     "dark": "#73D5F3"
+    },
+    "usage": "Series 2. Fixed categorical palette; pair with labels, never colour alone."
+   },
+   {
+    "name": "chart-3",
+    "value": {
+     "light": "#D9A12B",
+     "dark": "#F2C14E"
+    },
+    "usage": "Series 3. Fixed categorical palette; pair with labels, never colour alone."
+   },
+   {
+    "name": "chart-4",
+    "value": {
+     "light": "#8B6FD6",
+     "dark": "#B3A0EE"
+    },
+    "usage": "Series 4. Fixed categorical palette; pair with labels, never colour alone."
+   },
+   {
+    "name": "chart-5",
+    "value": {
+     "light": "#2F9E77",
+     "dark": "#5CC9A0"
+    },
+    "usage": "Series 5. Fixed categorical palette; pair with labels, never colour alone."
+   },
+   {
+    "name": "chart-6",
+    "value": {
+     "light": "#D9577A",
+     "dark": "#F08AA6"
+    },
+    "usage": "Series 6. Fixed categorical palette; pair with labels, never colour alone."
+   }
+  ]
+ },
+ "type": {
+  "fonts": [],
+  "families": {
+   "sans": "Inter, ui-sans-serif, system-ui, -apple-system, \"Segoe UI\", Roboto, \"Noto Sans\", sans-serif"
+  },
+  "groups": [
+   {
+    "name": "Headings",
+    "family": "sans",
+    "styles": [
+     {
+      "name": "page-title",
+      "fontSize": "24px",
+      "lineHeight": "32px",
+      "fontWeight": 600,
+      "letterSpacing": "-0.01em",
+      "usage": "One per page, in PageHeader. 20px/28px on mobile.",
+      "sample": "Fee collection"
+     },
+     {
+      "name": "section-title",
+      "fontSize": "18px",
+      "lineHeight": "26px",
+      "fontWeight": 600,
+      "letterSpacing": "-0.005em",
+      "usage": "Group headings inside a page; companion-app screen titles.",
+      "sample": "Class 7 · sections"
+     },
+     {
+      "name": "card-title",
+      "fontSize": "15px",
+      "lineHeight": "22px",
+      "fontWeight": 600,
+      "usage": "Card and dialog titles.",
+      "sample": "Leave requests"
+     }
+    ]
+   },
+   {
+    "name": "Text",
+    "family": "sans",
+    "styles": [
+     {
+      "name": "body",
+      "fontSize": "14px",
+      "lineHeight": "20px",
+      "fontWeight": 400,
+      "usage": "Default text in the workspace.",
+      "sample": "Collected from 412 of 540 students this term."
+     },
+     {
+      "name": "body-lg",
+      "fontSize": "16px",
+      "lineHeight": "24px",
+      "fontWeight": 400,
+      "usage": "Default text in the companion app (parents, students) and on mobile.",
+      "sample": "Aarav's fees for Term 2 are due on 15 Oct."
+     },
+     {
+      "name": "small",
+      "fontSize": "13px",
+      "lineHeight": "18px",
+      "fontWeight": 400,
+      "usage": "Table cells, dense lists, secondary lines in cards.",
+      "sample": "Class 7-A · Roll 12"
+     },
+     {
+      "name": "label",
+      "fontSize": "13px",
+      "lineHeight": "18px",
+      "fontWeight": 500,
+      "usage": "Form labels, button text (size sm, md), nav items, tab labels.",
+      "sample": "Admission number"
+     },
+     {
+      "name": "caption",
+      "fontSize": "12px",
+      "lineHeight": "16px",
+      "fontWeight": 500,
+      "usage": "The smallest text allowed: badges, table column headers, timestamps. Nothing below 12px.",
+      "sample": "Updated 2 min ago"
+     }
+    ]
+   },
+   {
+    "name": "Data",
+    "family": "sans",
+    "styles": [
+     {
+      "name": "stat",
+      "fontSize": "28px",
+      "lineHeight": "34px",
+      "fontWeight": 600,
+      "letterSpacing": "-0.02em",
+      "usage": "The main number in a StatCard. Always tabular numerals.",
+      "sample": "₹18,42,500"
+     },
+     {
+      "name": "stat-sm",
+      "fontSize": "20px",
+      "lineHeight": "28px",
+      "fontWeight": 600,
+      "letterSpacing": "-0.01em",
+      "usage": "Secondary numbers, mobile stat cards.",
+      "sample": "94.2%"
+     }
+    ]
+   }
+  ]
+ },
+ "spacing": {
+  "tokens": [
+   {
+    "name": "space-1",
+    "value": "4px",
+    "usage": "Icon-to-label gap, badge padding."
+   },
+   {
+    "name": "space-2",
+    "value": "8px",
+    "usage": "Gap between related controls; table cell vertical padding (compact)."
+   },
+   {
+    "name": "space-3",
+    "value": "12px",
+    "usage": "Table cell horizontal padding; gap inside a card's header."
+   },
+   {
+    "name": "space-4",
+    "value": "16px",
+    "usage": "Card padding on mobile; page gutter on mobile; default stack gap."
+   },
+   {
+    "name": "space-5",
+    "value": "20px",
+    "usage": "Card padding on desktop."
+   },
+   {
+    "name": "space-6",
+    "value": "24px",
+    "usage": "Gap between cards; page gutter on desktop."
+   },
+   {
+    "name": "space-8",
+    "value": "32px",
+    "usage": "Gap between page sections."
+   },
+   {
+    "name": "space-12",
+    "value": "48px",
+    "usage": "Top/bottom breathing room on empty states."
+   }
+  ]
+ },
+ "radius": {
+  "tokens": [
+   {
+    "name": "radius-sm",
+    "value": "6px",
+    "usage": "Buttons, inputs, badges, nav items, chips."
+   },
+   {
+    "name": "radius-md",
+    "value": "8px",
+    "usage": "Menus, popovers, segmented controls, tooltips."
+   },
+   {
+    "name": "radius-lg",
+    "value": "12px",
+    "usage": "Cards, dialogs, sheets, mobile list groups."
+   },
+   {
+    "name": "radius-full",
+    "value": "9999px",
+    "usage": "Avatars, status dots, progress bars, pills."
+   }
+  ]
+ },
+ "shadow": {
+  "note": "Borders separate; shadows only lift things that float.",
+  "tokens": [
+   {
+    "name": "shadow-xs",
+    "value": {
+     "light": "0 1px 2px rgba(25,27,28,0.05)",
+     "dark": "0 1px 2px rgba(0,0,0,0.4)"
+    },
+    "usage": "Cards (with a border), buttons."
+   },
+   {
+    "name": "shadow-overlay",
+    "value": {
+     "light": "0 12px 32px rgba(25,27,28,0.14), 0 2px 6px rgba(25,27,28,0.08)",
+     "dark": "0 12px 32px rgba(0,0,0,0.55), 0 2px 6px rgba(0,0,0,0.4)"
+    },
+    "usage": "Menus, popovers, dialogs, sheets."
+   }
+  ]
+ },
+ "size": {
+  "note": "Fixed dimensions of controls and the app shell.",
+  "tokens": [
+   {
+    "name": "control-sm",
+    "value": "32px",
+    "usage": "Height of small buttons and inputs in toolbars and table rows."
+   },
+   {
+    "name": "control-md",
+    "value": "36px",
+    "usage": "Default height of buttons, inputs and selects in the workspace."
+   },
+   {
+    "name": "control-lg",
+    "value": "44px",
+    "usage": "Buttons and inputs in the companion app and on touch; the minimum touch target."
+   },
+   {
+    "name": "row-compact",
+    "value": "40px",
+    "usage": "Workspace table row height (13px text)."
+   },
+   {
+    "name": "row-comfortable",
+    "value": "52px",
+    "usage": "Companion-app list rows and mobile table cards' minimum height."
+   },
+   {
+    "name": "header-height",
+    "value": "56px",
+    "usage": "Top bar in the workspace and companion app."
+   },
+   {
+    "name": "sidebar-width",
+    "value": "240px",
+    "usage": "Expanded workspace sidebar."
+   },
+   {
+    "name": "sidebar-collapsed",
+    "value": "64px",
+    "usage": "Icon-only workspace sidebar."
+   },
+   {
+    "name": "bottom-nav-height",
+    "value": "64px",
+    "usage": "Companion-app bottom tab bar (plus the device safe area)."
+   },
+   {
+    "name": "content-max",
+    "value": "1280px",
+    "usage": "Max width of workspace page content."
+   }
+  ]
+ }
+}
