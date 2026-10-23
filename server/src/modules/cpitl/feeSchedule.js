@@ -42,7 +42,10 @@ const parseSessionStartYear = (sessionLabel) => {
 };
 
 const normalizePlan = (plan = {}) => {
-  const merged = { ...DEFAULT_INSTALLMENT_PLAN, ...(plan || {}) };
+  // A saved structure's plan is a Mongoose subdocument: spreading it copies Mongoose's
+  // internals, not the fields, and every school's own months and due day were lost.
+  const fields = plan && typeof plan.toObject === 'function' ? plan.toObject() : (plan || {});
+  const merged = { ...DEFAULT_INSTALLMENT_PLAN, ...fields };
   const clampMonth = (m, fallback) => {
     const n = Number(m);
     return Number.isInteger(n) && n >= 1 && n <= 12 ? n : fallback;

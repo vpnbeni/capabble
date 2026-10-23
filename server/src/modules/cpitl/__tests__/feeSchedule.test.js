@@ -178,3 +178,25 @@ describe('CPITL late fee allocation', () => {
     ]);
   });
 });
+
+describe('normalizePlan', () => {
+  const mongoose = require('mongoose');
+  const { normalizePlan } = require('../feeSchedule');
+
+  it("keeps a saved structure's own months and due day (Mongoose subdocument)", () => {
+    const Plan = new mongoose.Schema({ dueDay: Number, quarterlyMonths: [Number] }, { _id: false });
+    const Structure = mongoose.model('NormalizePlanTestStructure', new mongoose.Schema({ installmentPlan: Plan }));
+    const doc = new Structure({ installmentPlan: { dueDay: 15, quarterlyMonths: [4, 10, 1] } });
+
+    const plan = normalizePlan(doc.installmentPlan);
+
+    expect(plan.dueDay).toBe(15);
+    expect(plan.quarterlyMonths).toEqual([4, 10, 1]);
+  });
+
+  it('fills what a plain plan leaves out from the defaults', () => {
+    const plan = normalizePlan({ dueDay: 5 });
+    expect(plan.dueDay).toBe(5);
+    expect(plan.quarterlyMonths.length).toBeGreaterThan(0);
+  });
+});
