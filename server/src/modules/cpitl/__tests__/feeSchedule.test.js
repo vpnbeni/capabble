@@ -8,7 +8,9 @@ const {
   demandStatus,
   diffComponents,
   parseSessionStartYear,
+  normalizePlan,
 } = require('../feeSchedule');
+const mongoose = require('mongoose');
 const { roleHasPermission, CPITL_PERMISSIONS } = require('../constants');
 
 const TUITION = 'h-tuition';
@@ -180,10 +182,7 @@ describe('CPITL late fee allocation', () => {
 });
 
 describe('normalizePlan', () => {
-  const mongoose = require('mongoose');
-  const { normalizePlan } = require('../feeSchedule');
-
-  it("keeps a saved structure's own months and due day (Mongoose subdocument)", () => {
+  it('keeps the months and due day a saved structure chose (Mongoose subdocument)', () => {
     const Plan = new mongoose.Schema({ dueDay: Number, quarterlyMonths: [Number] }, { _id: false });
     const Structure = mongoose.model('NormalizePlanTestStructure', new mongoose.Schema({ installmentPlan: Plan }));
     const doc = new Structure({ installmentPlan: { dueDay: 15, quarterlyMonths: [4, 10, 1] } });
