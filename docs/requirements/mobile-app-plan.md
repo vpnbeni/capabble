@@ -72,9 +72,17 @@ one child (remembered on the device).
 - Checked in the web preview with sample data. Not yet checked on a phone: the receipt share sheet
   and the WebView (both native-only).
 
+Also done: the rest of the family portal under More, each shown only when the school has the
+section on: Attendance (month grid and summary), Timetable (one day at a time), Results,
+Transport (crew to call, stops, whether the bus is on the road), Meetings (list, request with
+free slots, cancel), Profile, Your login (change password). First sign-in with a temporary
+password goes through "Set your own password" (the API refuses everything else until then).
+Checked on the iOS simulator against stage data, except Meetings (stage school has `appnt_desk`
+off; checked in the web preview with sample data).
+
 Still to do:
-1. Port `Dialog`, `Tabs`, `MiniCalendar` and `applySchoolTheme`.
-2. Screens: Attendance, Results, Timetable, Appointments, Transport (live bus map), Profile, Account (change password, appearance), all under More.
+1. Port `Tabs`, `MiniCalendar` and `applySchoolTheme`; appearance (system / light / dark) under Your login.
+2. Live bus map on Transport (needs `react-native-maps`, so a development build, not Expo Go).
 3. Move pure helpers both apps need (`format.ts`, `classLabel`, portal types) into `packages/shared`.
 4. Push notifications: `expo-notifications`; server stores device tokens per login (new `devices` collection, route rule in `permissionCatalog.json`), sends through Expo's push service from the calendar outbox and notification events. Needs an APNs key and Firebase (FCM) project.
 5. Deep links: `capabble://` now; universal links on `school.capabble.cloud` (`apple-app-site-association` and `assetlinks.json` served by the client's Vercel project) so a notice email opens the app.

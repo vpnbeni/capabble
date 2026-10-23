@@ -1,7 +1,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import type { ReplyInput } from '@/services/calendarTypes'
-import { portalService } from '@/services/portalService'
+import { portalService, type PortalAppointmentRequest } from '@/services/portalService'
 
 // React Query hooks for the family portal. Keys match the web (client/src/portal/usePortal.ts).
 
@@ -45,6 +45,68 @@ export const usePortalCalendar = (from: string, to: string) =>
 /** An event's full view (description, attachments, parts) when the list item doesn't carry its parts. */
 export const usePortalEvent = (id?: string | null) =>
   useQuery({ queryKey: portalKeys.event(id ?? ''), queryFn: () => portalService.calendarEvent(id as string), enabled: Boolean(id) })
+
+const studentKey = (id: string | undefined, part: string, extra = '') => [...portalKeys.all, 'student', id ?? '', part, extra] as const
+
+export const usePortalProfile = (id?: string) =>
+  useQuery({ queryKey: studentKey(id, 'profile'), queryFn: () => portalService.profile(id as string), enabled: Boolean(id), staleTime: STALE })
+
+export const usePortalAttendance = (id: string | undefined, month: string) =>
+  useQuery({
+    queryKey: studentKey(id, 'attendance', month),
+    queryFn: () => portalService.attendance(id as string, month),
+    enabled: Boolean(id),
+    placeholderData: keepPreviousData,
+    staleTime: STALE,
+  })
+
+export const usePortalTimetable = (id?: string) =>
+  useQuery({ queryKey: studentKey(id, 'timetable'), queryFn: () => portalService.timetable(id as string), enabled: Boolean(id), staleTime: STALE })
+
+export const usePortalResults = (id?: string) =>
+  useQuery({ queryKey: studentKey(id, 'results'), queryFn: () => portalService.results(id as string), enabled: Boolean(id), staleTime: STALE })
+
+export const usePortalTransport = (id?: string) =>
+  useQuery({ queryKey: studentKey(id, 'transport'), queryFn: () => portalService.transport(id as string), enabled: Boolean(id), staleTime: STALE })
+
+/** Every 10 s while the bus is on a trip, every minute otherwise. */
+export const usePortalBusLive = (id: string | undefined, enabled: boolean) =>
+  useQuery({
+    queryKey: studentKey(id, 'transport', 'live'),
+    queryFn: () => portalService.busLive(id as string),
+    enabled: Boolean(id) && enabled,
+    refetchInterval: (query) => (query.state.data?.active ? 10_000 : 60_000),
+  })
+
+export const usePortalAppointments = () =>
+  useQuery({ queryKey: [...portalKeys.all, 'appointments'], queryFn: portalService.appointments })
+
+export const usePortalAppointmentHosts = (id?: string) =>
+  useQuery({ queryKey: studentKey(id, 'appointment-hosts'), queryFn: () => portalService.appointmentHosts(id as string), enabled: Boolean(id), staleTime: STALE })
+
+export const usePortalAppointmentSlots = (id: string | undefined, hostId: string, date: string) =>
+  useQuery({
+    queryKey: studentKey(id, 'appointment-slots', `${hostId}|${date}`),
+    queryFn: () => portalService.appointmentSlots(id as string, hostId, date),
+    enabled: Boolean(id && hostId && date),
+  })
+
+export const useRequestAppointment = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ studentId, payload }: { studentId: string; payload: PortalAppointmentRequest }) =>
+      portalService.requestAppointment(studentId, payload),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: portalKeys.all }),
+  })
+}
+
+export const useCancelAppointment = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason?: string }) => portalService.cancelAppointment(id, reason),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: portalKeys.all }),
+  })
+}
 
 export const useRespondToEvent = () => {
   const queryClient = useQueryClient()

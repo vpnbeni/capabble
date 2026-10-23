@@ -90,7 +90,7 @@ export function ListRow({ primary, secondary, leading, trailing, onPress, divide
           {primary}
         </Text>
         {secondary ? (
-          <Text variant="small" tone="muted" numberOfLines={1}>
+          <Text variant="small" tone="muted" numberOfLines={lines > 1 ? 2 : 1}>
             {secondary}
           </Text>
         ) : null}

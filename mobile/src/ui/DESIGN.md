@@ -41,11 +41,17 @@ control, rejected patterns). This file only lists what is different on the phone
 | `Sheet` | `open, onClose, title, description, footer` | Bottom sheet for a record's details or a short form. One primary button inside; "Done" is secondary when the body has its own action |
 | `ToastProvider` / `useToast()` | `toast(message, tone)` | Brief confirmation above the tab bar. Never from inside a Sheet (it would sit under it): show the result or the error in the sheet |
 | `AgendaList` | `groups[{date,off,dayLabel,entries}], today, onEntryPress, empty` | Items by day with Today / Tomorrow headings, time, a chart-colour dot and the item's words. The calendar's phone view |
+| `Dialog` | `open, onClose, title, description, tone, footer, children` | A decision in the middle of the screen (cancel a meeting), ≤4 fields. Destructive: `Button variant="danger"` last in the footer |
+| `DetailList` | `items[{label,value,wide}], columns: 1 \| 2` | Record details, label above value; `columns={2}` pairs short values, `wide` gives a long one its own row |
+| `DayGrid` | `days[{date,tone,label,muted}], today, label` | A Monday-first month (attendance). Only days that differ from normal get a tone, always with a word |
+| `SelectField` | `label, options[{value,label,meta}], value, onChange, placeholder, hint, error` | The phone's Select: a field that opens a sheet of options |
+| `SlotPicker` | `label, slots[{start,end,open}], value, onChange, emptyText, hint` | Times from a fixed set; taken ones stay visible, struck through |
+| `TextField multiline` | same as TextField | Longer free text (a reason, an agenda), 96px tall |
 
 Screens put the school's HTML (a circular) in `components/HtmlView` (WebView, JavaScript off,
 links open in the browser), never in `Text`. The Sheet backdrop is the one place with a raw
 rgba value: the design system has no scrim token yet.
 
 Missing a piece? Add it here in the system's style, document it in this table, then use it.
-Next to port: `Dialog` (confirmations), `Tabs`, `MiniCalendar`, `AttendanceGrid` (roll call),
-`TimetableGrid` (day list).
+Next to port: `Tabs`, `MiniCalendar`, `AttendanceGrid` (the teacher's roll call).
+Screens with a form longer than a sheet (request a meeting) are their own stack screen, not a Sheet.

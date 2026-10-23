@@ -64,6 +64,48 @@ export function Sheet({ open, onClose, title, description, children, footer }: S
   )
 }
 
+type DialogProps = {
+  open: boolean
+  onClose: () => void
+  title: string
+  description?: string
+  /** 'danger' for a destructive decision; its confirm button is the danger variant. */
+  tone?: 'default' | 'danger'
+  children?: ReactNode
+  /** Buttons, the confirming one last. */
+  footer: ReactNode
+}
+
+/** A decision in the middle of the screen (cancel a meeting). Up to 4 fields; anything bigger is a Sheet or a screen. */
+export function Dialog({ open, onClose, title, description, children, footer }: DialogProps) {
+  const { colors, scheme } = useTheme()
+  return (
+    <Modal visible={open} transparent animationType={Platform.OS === 'web' ? 'none' : 'fade'} onRequestClose={onClose} statusBarTranslucent>
+      <View style={styles.center}>
+        <Pressable
+          accessibilityLabel="Close"
+          onPress={onClose}
+          style={[StyleSheet.absoluteFill, { backgroundColor: scheme === 'dark' ? 'rgba(0,0,0,0.6)' : 'rgba(25,27,28,0.4)' }]}
+        />
+        <View accessibilityViewIsModal style={[styles.dialog, { backgroundColor: colors['surface-raised'] }]}>
+          <View style={{ gap: space['space-1'] }}>
+            <Text variant="card-title" accessibilityRole="header">
+              {title}
+            </Text>
+            {description ? (
+              <Text variant="body" tone="muted">
+                {description}
+              </Text>
+            ) : null}
+          </View>
+          {children}
+          <View style={styles.dialogFooter}>{footer}</View>
+        </View>
+      </View>
+    </Modal>
+  )
+}
+
 type Toast = { id: number; message: string; tone: Tone }
 const ToastContext = createContext<(message: string, tone?: Tone) => void>(() => {})
 
@@ -135,6 +177,16 @@ const styles = StyleSheet.create({
     paddingTop: space['space-3'],
     borderTopWidth: StyleSheet.hairlineWidth,
   },
+  center: { flex: 1, justifyContent: 'center', padding: space['space-4'] },
+  dialog: {
+    width: '100%',
+    maxWidth: 440,
+    alignSelf: 'center',
+    borderRadius: radius['radius-lg'],
+    padding: space['space-5'],
+    gap: space['space-4'],
+  },
+  dialogFooter: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', gap: space['space-2'] },
   toastWrap: { position: 'absolute', left: space['space-4'], right: space['space-4'], alignItems: 'center' },
   toast: {
     flexDirection: 'row',

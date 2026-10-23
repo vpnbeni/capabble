@@ -85,6 +85,18 @@
       "port": 8081
     },
     {
+      "name": "server-dev",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "NODE_ENV=development",
+        "npm",
+        "run",
+        "dev"
+      ],
+      "cwd": "server",
+      "port": 5001
+    },
+    {
       "name": "mobile-ios",
       "runtimeExecutable": "npx",
       "runtimeArgs": [

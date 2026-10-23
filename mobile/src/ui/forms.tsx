@@ -41,6 +41,7 @@ export function TextField({ ref, label, hint, error, style, onFocus, onBlur, ...
         }}
         style={[
           styles.input,
+          props.multiline && styles.multiline,
           {
             color: colors.ink,
             backgroundColor: props.editable === false ? colors['surface-sunken'] : colors.surface,
@@ -71,5 +72,11 @@ const styles = StyleSheet.create({
     borderRadius: radius['radius-sm'],
     fontFamily: fontFamily[400],
     fontSize: 16,
+  },
+  multiline: {
+    minHeight: 96,
+    paddingTop: space['space-3'],
+    paddingBottom: space['space-3'],
+    textAlignVertical: 'top',
   },
 })
