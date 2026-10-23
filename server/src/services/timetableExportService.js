@@ -41,27 +41,39 @@ const minutesToTime = (total) => {
 
 /**
  * Compute computed period schedule from bell timings.
- * Returns an array of { id, type, label, duration, startTime, endTime }.
+ * Returns an array of { id, slot, type, label, duration, startTime, endTime }.
+ * `slot` is the teachable-period index ("0", "1", …; null for breaks), the key
+ * the generator and the web timetable use for grid cells.
  */
 const computePeriodSchedule = (bellTimings) => {
   const rows = (bellTimings && bellTimings.rows) ? bellTimings.rows : [];
   const startMinutes = timeToMinutes(bellTimings && bellTimings.startTime ? bellTimings.startTime : '08:00');
 
   let cursor = startMinutes;
+  let teachable = 0;
   return rows.map((row) => {
+    const isBreak = row.type === 'break';
     const entry = {
       id: row.id,
+      slot: isBreak ? null : String(teachable++),
       type: row.type,
       label: row.label,
       duration: row.duration,
       startTime: minutesToTime(cursor),
       endTime: minutesToTime(cursor + row.duration),
-      isBreak: row.type === 'break',
+      isBreak,
     };
     cursor += row.duration;
     return entry;
   });
 };
+
+/**
+ * The grid cell for a period: by slot index, falling back to the bell row id
+ * (grids saved before slot keys were the rule).
+ */
+const cellFor = (daySlots, period) =>
+  (daySlots || {})[period.slot] || (daySlots || {})[period.id];
 
 /** Get only the teachable (non-break) period entries. */
 const getTeachablePeriods = (schedule) => schedule.filter((p) => !p.isBreak);
@@ -89,7 +101,7 @@ const buildClassRows = (cls, grid, schedule) => {
       if (period.isBreak) {
         return { subject: '', teacher: '', isBreak: true };
       }
-      const cell = daySlots[period.id] || {};
+      const cell = cellFor(daySlots, period) || {};
       return { subject: cell.subject || '', teacher: cell.teacher || '', isBreak: false };
     });
     return { day, slots };
@@ -357,7 +369,7 @@ const buildClassPDFContext = (classes, grid, state) => {
       const daySlots = classGrid[day] || {};
       const slots = schedule.map((period) => {
         if (period.isBreak) return { isBreak: true };
-        const cell = daySlots[period.id] || {};
+        const cell = cellFor(daySlots, period) || {};
         return {
           isBreak: false,
           subject: cell.subject || '',
@@ -417,7 +429,7 @@ const buildTeacherPDFContext = (teachers, grid, state) => {
     const periodsWithDays = schedule.map((period) => {
       const daySlots = DAYS.map((day) => {
         if (period.isBreak) return { isBreak: true };
-        const slot = (tg[day] || {})[period.id];
+        const slot = cellFor(tg[day], period);
         if (slot) totalPeriods++;
         return slot
           ? { isBreak: false, className: slot.className, subject: slot.subject }
@@ -499,4 +511,5 @@ module.exports = {
   generateTeacherPDF,
   computePeriodSchedule,
   buildClassPDFContext,
+  buildTeacherPDFContext,
 };

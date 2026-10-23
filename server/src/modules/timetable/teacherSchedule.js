@@ -37,7 +37,13 @@ const periodTimes = (bellTimings) => {
  */
 const busyPeriodsFromGrid = ({ grid, bellTimings, teacherName, dayName, classes = [] }) => {
   if (!teacherName || !grid) return [];
-  const periods = new Map(periodTimes(bellTimings).filter((row) => row.type !== 'break').map((row) => [row.id, row]));
+  // Cells are keyed by teachable-period index ("0", "1", …), as the generator
+  // and the web timetable write them; older grids may use the bell row id.
+  const teachable = periodTimes(bellTimings).filter((row) => row.type !== 'break');
+  const periods = new Map([
+    ...teachable.map((row) => [row.id, row]),
+    ...teachable.map((row, index) => [String(index), row])
+  ]);
   const busy = [];
   Object.entries(grid).forEach(([classId, days]) => {
     const cell = (days || {})[dayName] || {};
