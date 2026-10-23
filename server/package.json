@@ -139,5 +139,12 @@
     },
     "ws": "8.21.3",
     "proxy-addr": "2.0.8"
+  },
+  "allowScripts": {
+    "puppeteer": true,
+    "msgpackr-extract": true,
+    "esbuild": true,
+    "fsevents": true,
+    "tesseract.js": false
   }
 }
