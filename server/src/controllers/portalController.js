@@ -189,7 +189,9 @@ const getAttendance = asyncHandler(async (req, res) => {
   });
 
   const count = (status) => days.filter((day) => day.status === status).length;
-  const schoolDays = count('present') + count('absent') + count('half_day');
+  // Not `schoolDays`: that name is the calendar module used above, and shadowing it made
+  // every request fail before the calendar was read.
+  const schoolDayCount = count('present') + count('absent') + count('half_day');
   const attended = count('present') + count('half_day') * 0.5;
 
   return res.json({
@@ -198,12 +200,12 @@ const getAttendance = asyncHandler(async (req, res) => {
       month,
       days,
       summary: {
-        schoolDays,
+        schoolDays: schoolDayCount,
         present: count('present'),
         absent: count('absent'),
         halfDays: count('half_day'),
         holidays: count('holiday'),
-        percentage: schoolDays > 0 ? Math.round((attended / schoolDays) * 1000) / 10 : null
+        percentage: schoolDayCount > 0 ? Math.round((attended / schoolDayCount) * 1000) / 10 : null
       }
     }
   });
