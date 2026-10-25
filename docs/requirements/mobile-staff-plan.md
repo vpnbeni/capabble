@@ -1,6 +1,7 @@
 # Capabble mobile app — staff side plan
 
-Status: proposal, waiting for approval. Written 25 Oct 2026. Extends Phase 2 (teacher) and Phase 3
+Status: approved 25 Oct 2026; slices 1–8 and the notifications list are built and live on the `preview`
+channel (see "Done" at the end). Leave stays out until a leave feature exists. Extends Phase 2 (teacher) and Phase 3
 (principal glance) of `mobile-app-plan.md`. References: design system `ScreensStaff`, `MobileScreens`
 (roll call) and the "Mobile coverage" page.
 
@@ -112,11 +113,35 @@ Each needs a stage deploy before its slice works on the phone. Tests in `server/
 8. **Classes**: my sections → roster → student with guardian call buttons.
 9. Then the "Later" rows, starting with notifications list polish, homework, staff directory.
 
-## Decisions for you
+## Decisions (25 Oct 2026)
 
-1. **Leave**: build a leave feature end to end (server + web page for the approver + phone form), or
-   leave it out for now? It is a new module, not a phone screen.
-2. **Messages**: OK to replace the tab with Calendar and keep notifications behind the bell?
-3. **Roll call marks**: Present / Absent only (what the server stores), or add Leave and Half day
-   to student attendance on the server and web first?
-4. **Server endpoints 1 and 2** above: OK to add them?
+1. **Leave**: left out for now. There is no leave feature on the web or server; it comes back as a module of its own.
+2. **Messages**: the tab is Calendar; notifications sit behind the bell on Today.
+3. **Roll call marks**: Present / Absent only, what the server stores.
+4. **Server endpoints 1 and 2**: added.
+5. **Tab rule**: the Approvals tab only goes to logins that can approve events (not every whole-school
+   attendance reader), so office staff don't get a tab they can't act on.
+
+## Done (25 Oct 2026)
+
+| Slice | What | Code | Server |
+|---|---|---|---|
+| 1 | `usePermissions` (`lib/permissions.ts`), staff tab sets by permission (`staff/access.ts`), More with "On the website" | `app/(app)/(tabs)/_layout.tsx`, `more.tsx` | — |
+| 2 | Teacher Today: next class `Hero`, unmarked registers `Callout`, your periods `Timeline` | `staff/TeacherToday.tsx` | `GET /timetable/me`, `GET /attnd/student-registers` |
+| 3 | Attendance tab and roll call, offline queue (written to the phone first, sent at launch, on return and every 30 s); class lists kept on the phone | `(tabs)/registers.tsx`, `roll-call.tsx`, `staff/attendanceQueue.ts`, `lib/fileStore.ts` | Single-day save of one class no longer wipes the month's day settings; "marked" = saved on or after the day |
+| 4 | Your timetable by week | `staff/MyTimetable.tsx` (route `timetable`) | — |
+| 5 | Staff calendar (shared with families through `calendar/source.ts`), reply to events, create event for approval | `(tabs)/calendar.tsx`, `event-new.tsx` | — |
+| 6 | Meetings for hosts: today, requests, upcoming, the meeting sheet, your hours and days off | `staff/HostMeetings.tsx`, `MeetingSheet.tsx`, `MyHours.tsx` | — |
+| 7 | Principal glance (`StatTiles`), Approvals tab (`SwipeRow`s), attendance today, fee collection | `staff/PrincipalToday.tsx`, `staff/approvals.tsx`, `school-attendance.tsx`, `fee-collection.tsx` | — |
+| 8 | Classes / Students: class list, search, roster, student with guardian to call | `staff/StudentsBrowser.tsx`, `class-roster.tsx`, `student/[id].tsx` | — |
+| + | Notifications bell (unread dot) on every staff Today and the list; links open the app screen or the website page | `notifications.tsx`, `staff/useBell.ts`, `lib/notificationLinks.ts` | — |
+
+Kit added on the way: `useFixedColumn`, `MonthPicker` (documented in `mobile/src/ui/DESIGN.md`).
+
+Checked against stage data (R.E.D. School, Jhajjar) through the API calls each screen makes, and by the
+user on an Android phone for slices 1–6. Not yet checked: answering a family's meeting request (no parent
+login on stage), the "own classes only" limit with a teacher who doesn't teach every class.
+
+Next, from the "Later" rows: staff attendance, posting homework, the staff directory, marks for one class,
+"my invigilation duty today", the clinic visit log. Needing a new EAS build: the transport crew app, the
+live bus map, scanning for assets and library books.
