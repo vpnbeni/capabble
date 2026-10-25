@@ -1,8 +1,6 @@
 const fs = require('fs')
 const pdf = require('pdf-parse')
-const { fromPath: pdfToPic } = require('pdf2pic')
 const Tesseract = require('tesseract.js')
-const os = require('os')
 const asyncHandler = require('../middleware/asyncHandler')
 const { generateResponse, HTTP_STATUS } = require('../utils/constants')
 const CBSEDatesheetParser = require('../utils/cbseDatesheetParser')
@@ -228,34 +226,31 @@ exports.importFromPdf = asyncHandler(async (req, res) => {
     console.log('PDF has little or no text. Attempting OCR...')
     ocrAttempted = true
     try {
-      const convert = pdfToPic(file.tempFilePath, {
-        density: 200,
-        format: 'png',
-        width: 1600,
-        height: 2260,
-        saveFilename: `ds_${Date.now()}`,
-        savePath: os.tmpdir(),
-      })
+      // pdf-to-img is ESM-only; it renders pages with pdf.js, so no GraphicsMagick or Ghostscript is needed.
+      // Scale 200/72 renders at 200 DPI.
+      // eslint-disable-next-line import/no-unresolved -- package only has an ESM "exports" entry
+      const { pdf: pdfToImages } = await import('pdf-to-img')
+      const doc = await pdfToImages(file.tempFilePath, { scale: 200 / 72 })
 
       // Convert first 5-10 pages max to keep time in check
       const ocrPages = []
-      for (let page = 1; page <= 10; page++) {
-        try {
-          console.log(`Processing page ${page} with OCR...`)
-          const result = await convert(page, { responseType: 'image' })
-          if (!result || !result.path) {
-            console.log(`No more pages to process (stopped at page ${page})`)
+      try {
+        for (let page = 1; page <= Math.min(doc.length, 10); page++) {
+          try {
+            console.log(`Processing page ${page} with OCR...`)
+            const image = await doc.getPage(page)
+            const { data: ocr } = await Tesseract.recognize(image, 'eng', { logger: () => {} })
+            if (ocr && ocr.text) {
+              ocrPages.push(ocr.text)
+              console.log(`Page ${page} OCR completed, text length: ${ocr.text.length}`)
+            }
+          } catch (e) {
+            console.error(`OCR failed for page ${page}:`, e.message)
             break
           }
-          const { data: ocr } = await Tesseract.recognize(result.path, 'eng', { logger: () => {} })
-          if (ocr && ocr.text) {
-            ocrPages.push(ocr.text)
-            console.log(`Page ${page} OCR completed, text length: ${ocr.text.length}`)
-          }
-        } catch (e) {
-          console.error(`OCR failed for page ${page}:`, e.message)
-          break
         }
+      } finally {
+        await doc.destroy()
       }
       text = ocrPages.join('\n')
       console.log(`OCR completed. Total text length: ${text.length}`)
@@ -275,7 +270,7 @@ exports.importFromPdf = asyncHandler(async (req, res) => {
       console.error('OCR error:', e.message)
       return res.status(HTTP_STATUS.BAD_REQUEST).json({
         success: false,
-        message: 'PDF has no selectable text and OCR is unavailable. Please use a text-based PDF or install OCR prerequisites (Ghostscript & GraphicsMagick).',
+        message: 'PDF has no selectable text and OCR is unavailable. Please use a text-based PDF.',
         debug: {
           ocrAttempted: true,
           ocrError: e.message
