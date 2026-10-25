@@ -1,5 +1,6 @@
 const { StaffAttendanceDaily, StudentAttendanceDaily, StudentAttendanceDay } = require('../models/AttndDailyRecord');
 const schoolDays = require('../modules/clndr/schoolDays');
+const schoolDate = require('../utils/schoolDate');
 const { isAssignedScope, getAssignedSections, sectionKey } = require('../rbac/scope');
 const Teacher = require('../models/Teacher');
 const Student = require('../models/Student');
@@ -403,7 +404,19 @@ const saveStudentAttendance = async (req, res) => {
       if (docs.length > 0) await StudentAttendanceModel.insertMany(docs, { ordered: false });
     }
 
-    const monthPrefix = month || (date ? date.slice(0, 7) : '');
+    // One class on one day (the phone's roll call): only that day's register record changes;
+    // the month's other day settings stay as they are.
+    if (date) {
+      const isHoliday = holidayDates.has(date);
+      await DayModel.updateOne(
+        { attendanceDate: date, className, section },
+        { $set: { category: isHoliday ? 'non-academic' : 'academic' } },
+        { upsert: true }
+      );
+      return res.json({ success: true, message: 'Student attendance saved successfully.' });
+    }
+
+    const monthPrefix = month;
     if (monthPrefix) {
       await DayModel.deleteMany({
         className,
@@ -517,7 +530,7 @@ const summarizeRecords = (records, dateKey) => {
  */
 const getStudentRegisters = async (req, res) => {
   try {
-    const date = normalizeDateKey(req.query.date) || localDateKey();
+    const date = normalizeDateKey(req.query.date) || schoolDate.today();
     const StudentModel = req.models?.Student || Student;
     const StudentAttendanceModel = req.models?.StudentAttendanceDaily || StudentAttendanceDaily;
     const DayModel = req.models?.StudentAttendanceDay || StudentAttendanceDay;
@@ -542,7 +555,11 @@ const getStudentRegisters = async (req, res) => {
       map.set(key, (map.get(key) || 0) + value(row));
       return map;
     }, new Map());
-    const takenAt = new Map(taken.map((row) => [sectionKey(row.className, row.section), row.updatedAt]));
+    // A month saved on the website writes a record for every day of that month, so a record
+    // only means "taken" when it was saved on or after the day itself.
+    const takenAt = new Map(taken
+      .filter((row) => row.updatedAt && schoolDate.dateKey(new Date(row.updatedAt)) >= date)
+      .map((row) => [sectionKey(row.className, row.section), row.updatedAt]));
     const absentCount = countBy(absences, () => 1);
     const studentCount = countBy(strength, (row) => row.count);
 

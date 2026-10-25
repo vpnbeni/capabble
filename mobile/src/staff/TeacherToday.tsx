@@ -22,7 +22,9 @@ function useSchoolNow() {
   return now
 }
 
-const periodName = (label: string) => (/^[0-9IVXivx]{1,4}$/.test(label) ? `Period ${label}` : label)
+// "I" or "3" → "Period I"; "1st" → "1st period"; anything longer is the school's own name for it.
+const periodName = (label: string) =>
+  /^[0-9IVXivx]{1,4}$/.test(label) ? `Period ${label}` : /^\d+(st|nd|rd|th)$/i.test(label) ? `${label} period` : label
 const classTitle = (period: MyPeriod) => [classLabel(period.className, period.section), period.subject].filter(Boolean).join(' · ')
 const sameSection = (register: ClassRegister, period: MyPeriod) =>
   classLabel(register.className, register.section) === classLabel(period.className, period.section)
@@ -53,7 +55,7 @@ export function TeacherToday() {
   const toMark = (registers.data?.registers ?? []).filter((register) => register.mine && register.canMark && !register.marked)
   const unmarkedFor = (period?: MyPeriod) => (period ? toMark.find((register) => sameSection(register, period)) : undefined)
   const openRollCall = (register?: Pick<ClassRegister, 'className' | 'section'>) =>
-    router.push(register ? { pathname: '/registers', params: { className: register.className, section: register.section } } : '/registers')
+    router.push(register ? { pathname: '/roll-call', params: { className: register.className, section: register.section, date: today } } : '/registers')
 
   const timelineItems: TimelineItem[] = periods
     .filter((period) => period.kind !== 'break')

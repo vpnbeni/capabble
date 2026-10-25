@@ -56,7 +56,40 @@ export interface RegisterDay {
   registers: ClassRegister[]
 }
 
+export interface RosterStudent {
+  _id: string
+  name: string
+  rollNumber?: string | number | null
+}
+
+export interface RegisterRecords {
+  /** Only absences are stored: everyone else in the class was present. */
+  records: { studentId: string; status: 'P' | 'A' }[]
+}
+
+export interface RegisterSave {
+  date: string
+  className: string
+  section: string
+  /** Every student in the register with their mark. */
+  records: { studentId: string; status: 'P' | 'A' }[]
+}
+
 export const staffService = {
   myTimetable: (from: string, to: string) => api.get<MyTimetable>('/timetable/me', { from, to }),
   registers: (date: string) => api.get<RegisterDay>('/attnd/student-registers', { date }),
+  /** The active students of a class-section (own sections only for "own classes" logins). */
+  roster: (className: string, section: string) => api.get<RosterStudent[]>('/attnd/student-directory', { className, section }),
+  /** A class's marks for one day. */
+  register: (date: string, className: string, section: string) =>
+    api.get<RegisterRecords>('/attnd/students', { date, className, section }),
+  /** Saves one class's register for one day (replaces that day's marks; last save wins, as on the website). */
+  saveRegister: ({ date, className, section, records }: RegisterSave) =>
+    api.put<unknown>('/attnd/students', {
+      date,
+      className,
+      section,
+      records,
+      daySettings: [{ attendanceDate: date, category: 'academic' }],
+    }),
 }

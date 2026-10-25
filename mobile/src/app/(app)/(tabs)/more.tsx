@@ -7,6 +7,7 @@ import { PORTAL_MODULES } from '@/portal/modules'
 import { usePortal } from '@/portal/PortalProvider'
 import { useSession } from '@/session/SessionProvider'
 import { WEB_MODULES, webModulePath } from '@/staff/access'
+import { clearAttendanceQueue, useAttendanceQueue } from '@/staff/attendanceQueue'
 import { openWebsite, useStaff } from '@/staff/useStaff'
 import { ActionSheet, Avatar, ListGroup, MobileScreen, NavBar, ShortcutGrid } from '@/ui'
 
@@ -17,6 +18,7 @@ export default function MoreScreen() {
   const session = useSession()
   const { has, home } = usePortal()
   const staff = useStaff()
+  const unsent = useAttendanceQueue().length
   const [confirmSignOut, setConfirmSignOut] = useState(false)
   const [signingOut, setSigningOut] = useState(false)
   if (session.status !== 'signedIn') return null
@@ -44,12 +46,18 @@ export default function MoreScreen() {
           open={confirmSignOut}
           onClose={() => setConfirmSignOut(false)}
           title="Sign out of Capabble on this phone?"
+          message={
+            unsent
+              ? `${unsent === 1 ? '1 register' : `${unsent} registers`} saved on this phone ${unsent === 1 ? "hasn't" : "haven't"} reached school yet. Signing out deletes ${unsent === 1 ? 'it' : 'them'}.`
+              : undefined
+          }
           actions={[
             {
               label: 'Sign out',
               tone: 'danger',
               onSelect: async () => {
                 setSigningOut(true)
+                await clearAttendanceQueue()
                 await session.signOut()
               },
             },

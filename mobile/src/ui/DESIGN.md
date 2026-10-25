@@ -108,7 +108,8 @@ call `onChange(value)` and are controlled (no `defaultValue`).
 | `Badge`, `Avatar`, `Icon`, `Text` | as before | |
 
 Helpers: `haptic.selection / light / medium / success / error` (no-op on web), `PressScale` (0.97 press + spring),
-`useReduceMotion`, `useReduceTransparency`, `Tile`, `MODULE_TILE`.
+`useReduceMotion`, `useReduceTransparency`, `Tile`, `MODULE_TILE`, `useFixedColumn(base)` (a fixed column's width
+that grows with the text size up to 1.3×: wrap a row's `SegmentedControl` accessory in a `View` that wide).
 
 ### Older pieces
 

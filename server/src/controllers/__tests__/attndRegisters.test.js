@@ -79,3 +79,58 @@ describe('GET /attnd/student-registers', () => {
     expect(body.data.registers.every((register) => !register.canMark)).toBe(true);
   });
 });
+
+describe('register taken on the website for the whole month', () => {
+  it('is not marked for days after the month was saved', async () => {
+    const res = createRes();
+    await getStudentRegisters({
+      query: { date: '2026-10-19' },
+      models: {
+        ...models,
+        StudentAttendanceDay: {
+          find: jest.fn(() => query([{ className: '7', section: 'A', updatedAt: new Date('2026-10-10T06:00:00Z') }]))
+        }
+      },
+      user: { assignedSections: [] },
+      rbac: new PermissionSet([{ key: 'attnd.students.read', scope: 'all' }])
+    }, res);
+    const [sevenA] = res.json.mock.calls[0][0].data.registers;
+    expect(sevenA).toMatchObject({ section: 'A', marked: false });
+  });
+});
+
+describe('PUT /attnd/students for one class on one day', () => {
+  it('replaces that day only and keeps the rest of the month', async () => {
+    const { saveStudentAttendance } = require('../attndController');
+    const Daily = { deleteMany: jest.fn(async () => ({})), insertMany: jest.fn(async () => []) };
+    const Day = {
+      deleteMany: jest.fn(async () => ({})),
+      insertMany: jest.fn(async () => []),
+      updateOne: jest.fn(async () => ({}))
+    };
+    const res = createRes();
+    await saveStudentAttendance({
+      body: {
+        className: '7',
+        section: 'A',
+        date: '2026-10-19',
+        records: [{ studentId: 's1', status: 'A' }, { studentId: 's2', status: 'P' }],
+        daySettings: [{ attendanceDate: '2026-10-19', category: 'academic' }]
+      },
+      models: { StudentAttendanceDaily: Daily, StudentAttendanceDay: Day },
+      user: {},
+      tenant: null
+    }, res);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
+    expect(Daily.deleteMany).toHaveBeenCalledWith({ attendanceDate: '2026-10-19', className: '7', section: 'A' });
+    expect(Daily.insertMany.mock.calls[0][0]).toEqual([
+      expect.objectContaining({ studentId: 's1', status: 'A', attendanceDate: '2026-10-19' })
+    ]);
+    expect(Day.deleteMany).not.toHaveBeenCalled();
+    expect(Day.updateOne).toHaveBeenCalledWith(
+      { attendanceDate: '2026-10-19', className: '7', section: 'A' },
+      { $set: { category: 'academic' } },
+      { upsert: true }
+    );
+  });
+});

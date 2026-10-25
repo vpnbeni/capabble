@@ -12,14 +12,16 @@ import { Badge } from './primitives'
 import { Text } from './Text'
 
 /**
- * Times sit in fixed columns so rows line up. The columns grow with the phone's text size (capped
- * at 1.3×, like the times themselves) so "12:00 pm" never wraps onto two lines.
+ * Fixed columns (times in `Agenda` and `Timeline`, a row's `SegmentedControl`) keep rows lined up.
+ * They grow with the phone's text size, capped at 1.3× like chrome labels, so "12:00 pm" or
+ * "Present" never wraps onto two lines.
  */
 const TIME_SCALE_CAP = 1.3
-const useTimeColumn = (base: number) => {
+export const useFixedColumn = (base: number) => {
   const { fontScale } = useWindowDimensions()
   return Math.ceil(base * Math.min(Math.max(fontScale, 1), TIME_SCALE_CAP))
 }
+const useTimeColumn = useFixedColumn
 
 export type WeekDay = {
   /** 'YYYY-MM-DD' */
