@@ -294,6 +294,8 @@ See `.env.example` (root and `/server`) for required variables:
 
 **Calendar and school email:** `CALENDAR_JOBS_ENABLED` (scheduled publishing every minute, event reminders every 15 min), `MAIL_OUTBOX_ENABLED`, `MAIL_EVENTS_HOST` / `_PORT` / `_SECURE` / `_USER` / `_PASS` / `_FROM` (the events mailbox, e.g. `events@capabble.cloud`), `MAIL_EVENTS_DAILY_CAP_PER_TENANT` (300), `MAIL_CREDENTIALS_KEY` (32 bytes base64; encrypts schools' SMTP passwords, falls back to JWT_SECRET), `MAIL_LINK_SECRET` (unsubscribe links), `CLIENT_URL` (links in emails), `API_URL` (unsubscribe and calendar feed links)
 
+**Online fee payments** (each school's own Razorpay account, Settings → Payments; code in `server/src/modules/cpitl/onlinePayments.js` + `publicPayments.js`, never the billing module): keys encrypted with `MAIL_CREDENTIALS_KEY`, `PAYMENT_LINK_SECRET` (signs the app's checkout links, falls back to JWT_SECRET), `API_URL` (webhook URL `/api/school-payments/webhook/<slug>` and the checkout page)
+
 **Push notifications** (the Capabble app, `server/src/push`): `PUSH_OUTBOX_ENABLED` (default true; sends every in-app notification to the recipient's phones through Expo every 30 s), optional `EXPO_ACCESS_TOKEN` (only when enhanced push security is on in Expo)
 
 **Backups and workspace data** (see `server/docs/backups.md`):

@@ -1,4 +1,6 @@
-import { Receipt } from 'lucide-react-native'
+import { useRouter } from 'expo-router'
+import * as Linking from 'expo-linking'
+import { CreditCard, Receipt } from 'lucide-react-native'
 import { useState } from 'react'
 
 import { formatDate, formatINR } from '@/lib/format'
@@ -9,7 +11,7 @@ import { usePortalFees } from '@/portal/queries'
 import { CardSkeleton, LoadFailed, NoChild } from '@/portal/states'
 import { portalService, type PortalFees } from '@/services/portalService'
 import { radius, type Tone } from '@/theme/tokens'
-import { Badge, BottomSheet, DetailList, Hero, ListGroup, MobileButton, MobileScreen, NavBar, Skeleton, StatusView, Surface, useToast } from '@/ui'
+import { ActionBar, Badge, BottomSheet, Callout, DetailList, Hero, ListGroup, MobileButton, MobileScreen, NavBar, OptionList, Skeleton, StatusView, Surface, useToast } from '@/ui'
 
 type Demand = PortalFees['demands'][number]
 type Payment = PortalFees['payments'][number]
@@ -26,7 +28,14 @@ const feeStatus = (demand: Demand) => STATUS[demand.isOverdue && demand.status !
 const isOwing = (demand: Demand) => demand.balance > 0 && demand.status !== 'paid' && demand.status !== 'waived'
 
 const MODE_LABEL: Record<string, string> = {
-  cash: 'Cash', upi: 'UPI', cheque: 'Cheque', dd: 'Demand draft', bank_transfer: 'Bank transfer', card: 'Card',
+  cash: 'Cash', upi: 'UPI', cheque: 'Cheque', dd: 'Demand draft', bank_transfer: 'Bank transfer', card: 'Card', online: 'Online',
+}
+
+/** Overdue installments and the next one due: what most parents came to pay. */
+const defaultChoice = (owing: Demand[]) => {
+  const overdue = owing.filter((demand) => demand.isOverdue)
+  const next = owing.find((demand) => !demand.isOverdue)
+  return [...overdue, ...(next ? [next] : [])].map((demand) => demand._id)
 }
 
 /** Parents only: what is due, what has been paid, and receipts to share or save. */
@@ -36,6 +45,11 @@ export default function FeesScreen() {
   const toast = useToast()
   const [open, setOpen] = useState<Demand | null>(null)
   const [downloading, setDownloading] = useState<string | null>(null)
+  const router = useRouter()
+  const [paySheet, setPaySheet] = useState(false)
+  const [chosen, setChosen] = useState<string[]>([])
+  const [starting, setStarting] = useState(false)
+  const [payError, setPayError] = useState('')
 
   const shareReceipt = async (payment: Payment) => {
     if (!child || downloading) return
@@ -53,7 +67,34 @@ export default function FeesScreen() {
   const data = fees.data
   const owing = data?.demands.filter(isOwing) ?? []
   const overdue = owing.some((demand) => demand.isOverdue)
-  const next = [...owing].sort((a, b) => a.dueDate.localeCompare(b.dueDate))[0]
+  const byDue = [...owing].sort((a, b) => a.dueDate.localeCompare(b.dueDate))
+  const next = byDue[0]
+  // Pay now shows only when the school takes fees online and something is owed.
+  const canPay = Boolean(data?.onlinePayment?.enabled && byDue.length)
+  const chosenTotal = byDue.filter((demand) => chosen.includes(demand._id)).reduce((sum, demand) => sum + demand.balance, 0)
+
+  const openPay = () => {
+    setChosen(defaultChoice(byDue))
+    setPayError('')
+    setPaySheet(true)
+  }
+
+  // Razorpay Checkout runs on a page in the browser (no native SDK in this build); the page sends the parent back here.
+  const startPayment = async () => {
+    if (!child || !chosen.length || starting) return
+    setStarting(true)
+    setPayError('')
+    try {
+      const order = await portalService.startPayment(child.studentId, chosen)
+      setPaySheet(false)
+      router.push({ pathname: '/fee-payment/[orderId]', params: { orderId: order.orderId, student: child.studentId, url: order.checkoutUrl } })
+      await Linking.openURL(order.checkoutUrl)
+    } catch (error) {
+      setPayError(error instanceof Error ? error.message : "Couldn't start the payment. Try again.")
+    } finally {
+      setStarting(false)
+    }
+  }
   const paidShare = data && data.totals.demanded > 0 ? Math.round((data.totals.paid / data.totals.demanded) * 100) : 0
 
   return (
@@ -62,7 +103,57 @@ export default function FeesScreen() {
       refreshing={fees.isRefetching}
       onRefresh={child ? fees.refetch : undefined}
       nav={<NavBar large title="Fees" accessory={<ChildSwitcher />} />}
+      actionBar={
+        canPay && data ? (
+          <ActionBar
+            icon={CreditCard}
+            summary={formatINR(data.totals.balance)}
+            detail={overdue ? 'Overdue' : next ? `Due ${formatDate(next.dueDate)}` : 'Still due'}
+            label="Pay now"
+            onPress={openPay}
+          />
+        ) : undefined
+      }
       overlay={
+        <>
+        <BottomSheet
+          open={paySheet}
+          onClose={() => (starting ? undefined : setPaySheet(false))}
+          title="Pay fees"
+          description={child ? `For ${child.name}. Payments go straight to the school.` : undefined}
+          detent="large"
+          footer={
+            <>
+              <MobileButton size="large" fullWidth loading={starting} disabled={!chosen.length} onPress={startPayment}>
+                {chosen.length ? `Pay ${formatINR(chosenTotal)}` : 'Choose what to pay'}
+              </MobileButton>
+              <MobileButton variant="gray" size="large" fullWidth disabled={starting} onPress={() => setPaySheet(false)}>
+                Cancel
+              </MobileButton>
+            </>
+          }
+        >
+          {data?.onlinePayment?.mode === 'test' ? (
+            <Callout tone="warning" title="Test mode">
+              The school is testing online payments. Use Razorpay test details; no real money moves.
+            </Callout>
+          ) : null}
+          {payError ? <Callout tone="danger" title="The payment didn't start">
+              {payError}
+            </Callout> : null}
+          <OptionList
+            multiple
+            header="Fees to pay"
+            footer="Pay by UPI, card or net banking on Razorpay's page. You come back here for the receipt."
+            value={chosen}
+            onChange={setChosen}
+            options={byDue.map((demand) => ({
+              value: demand._id,
+              label: `${demand.label} · ${formatINR(demand.balance)}`,
+              meta: `${demand.isOverdue ? 'Overdue since' : 'Due'} ${formatDate(demand.dueDate)}${demand.lines.length ? ` · ${demand.lines.map((line) => line.name).join(', ')}` : ''}`,
+            }))}
+          />
+        </BottomSheet>
         <BottomSheet
           open={Boolean(open)}
           onClose={() => setOpen(null)}
@@ -76,6 +167,7 @@ export default function FeesScreen() {
         >
           {open ? <DemandBreakdown demand={open} /> : null}
         </BottomSheet>
+        </>
       }
     >
       {!child ? (

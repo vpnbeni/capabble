@@ -13,6 +13,7 @@ export default function AppLayout() {
         <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="notice/[id]" />
+          <Stack.Screen name="fee-payment/[orderId]" />
         </Stack>
       </ToastProvider>
     </PortalProvider>

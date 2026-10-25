@@ -101,6 +101,41 @@ export interface PortalFees {
     lines: Array<{ name: string; amount: number }>
   }>
   payments: Array<{ _id: string; receiptNo: string; date: string; mode: string; amount: number }>
+  /** Whether the school takes fees online (its own Razorpay account). */
+  onlinePayment?: { enabled: boolean; mode?: 'test' | 'live' | null }
+}
+
+/** A started online payment: what Razorpay Checkout needs. */
+export interface PortalPaymentOrder {
+  orderId: string
+  razorpayOrderId: string
+  keyId: string
+  amount: number
+  amountPaise: number
+  currency: 'INR'
+  schoolName: string
+  description: string
+  installments: Array<{ _id: string; label: string; amount: number }>
+  prefill: { name: string; email: string; contact: string }
+  checkoutUrl: string
+}
+
+export interface PortalPaymentResult {
+  orderId: string
+  status: 'created' | 'processing' | 'paid' | 'review'
+  amount: number
+  receiptNo: string | null
+  feePaymentId: string | null
+  paidAt: string | null
+  method: string
+  paymentId: string | null
+  message: string
+}
+
+export interface PortalCheckoutResponse {
+  razorpay_payment_id: string
+  razorpay_order_id: string
+  razorpay_signature: string
 }
 
 export interface PortalNotice {
@@ -236,6 +271,12 @@ const portalService = {
   calendarFeedOff: async (): Promise<FeedStatus> => (await baseApi.delete('/portal/calendar/feed', silent())).data.data,
   respondToEvent: async (id: string, input: ReplyInput): Promise<ReplyInput> =>
     (await post(`/portal/calendar/events/${encodeURIComponent(id)}/respond`, input)).data.data,
+  startPayment: async (studentId: string, demandIds: string[]): Promise<PortalPaymentOrder> =>
+    (await post(`${student(studentId)}/fees/pay`, { demandIds, source: 'web' })).data.data,
+  verifyPayment: async (studentId: string, orderId: string, response: PortalCheckoutResponse): Promise<PortalPaymentResult> =>
+    (await post(`${student(studentId)}/fees/pay/${encodeURIComponent(orderId)}/verify`, response)).data.data,
+  payment: async (studentId: string, orderId: string): Promise<PortalPaymentResult> =>
+    (await get(`${student(studentId)}/fees/pay/${encodeURIComponent(orderId)}`)).data.data,
   receiptPdf: async (studentId: string, paymentId: string): Promise<Blob> =>
     (await get(`${student(studentId)}/fees/receipts/${encodeURIComponent(paymentId)}`, { responseType: 'blob' })).data,
 }

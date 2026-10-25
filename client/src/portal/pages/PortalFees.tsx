@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import toast from 'react-hot-toast'
-import { Download, IndianRupee } from 'lucide-react'
+import { CreditCard, Download, IndianRupee } from 'lucide-react'
 import {
   Button,
   Card,
@@ -18,12 +18,13 @@ import { usePortal } from '../PortalContext'
 import { usePortalFees } from '../usePortal'
 import portalService, { type PortalFees as Fees } from '../portalService'
 import { FeeStatusBadge, LoadFailed, NoChild } from './shared'
+import PortalPaySheet, { isOwing } from './PortalPaySheet'
 
 type Demand = Fees['demands'][number]
 type Payment = Fees['payments'][number]
 
 const MODE_LABEL: Record<string, string> = {
-  cash: 'Cash', upi: 'UPI', cheque: 'Cheque', dd: 'Demand draft', bank_transfer: 'Bank transfer', card: 'Card',
+  cash: 'Cash', upi: 'UPI', cheque: 'Cheque', dd: 'Demand draft', bank_transfer: 'Bank transfer', card: 'Card', online: 'Online',
 }
 
 /** Parents only: what is due, what has been paid, and receipts to download. */
@@ -31,10 +32,11 @@ const PortalFees: React.FC = () => {
   const { child } = usePortal()
   const { data, isLoading, isError } = usePortalFees(child?.studentId)
   const [downloading, setDownloading] = useState<string | null>(null)
+  const [paying, setPaying] = useState(false)
 
   if (!child) return <Page><NoChild /></Page>
 
-  const downloadReceipt = async (payment: Payment) => {
+  const downloadReceipt = async (payment: Pick<Payment, '_id' | 'receiptNo'>) => {
     setDownloading(payment._id)
     try {
       const blob = await portalService.receiptPdf(child.studentId, payment._id)
@@ -50,6 +52,9 @@ const PortalFees: React.FC = () => {
       setDownloading(null)
     }
   }
+
+  // Only when the school takes fees online and something is still owed.
+  const canPay = Boolean(data?.onlinePayment?.enabled && data.demands.some(isOwing))
 
   const demandColumns: DataTableColumn<Demand>[] = [
     { key: 'label', header: 'For', mobile: 'title', render: (row) => row.label },
@@ -87,7 +92,13 @@ const PortalFees: React.FC = () => {
       ) : null}
       {data ? (
         <>
-          <Card>
+          <Card
+            action={canPay ? (
+              <Button variant="primary" icon={CreditCard} onClick={() => setPaying(true)}>
+                Pay {formatINR(data.totals.balance)}
+              </Button>
+            ) : undefined}
+          >
             <MetricTiles>
               <MetricTile label="Fees this session" value={formatINR(data.totals.demanded)} />
               <MetricTile label="Paid" value={formatINR(data.totals.paid)} tone="success" />
@@ -110,6 +121,15 @@ const PortalFees: React.FC = () => {
               empty={<EmptyState title="No payments yet" compact />}
             />
           </Card>
+          <PortalPaySheet
+            open={paying}
+            onClose={() => setPaying(false)}
+            studentId={child.studentId}
+            childName={child.name}
+            demands={data.demands}
+            testMode={data.onlinePayment?.mode === 'test'}
+            onReceipt={downloadReceipt}
+          />
         </>
       ) : null}
     </Page>
