@@ -12,6 +12,7 @@ import { usePortalCalendar, usePortalFees, usePortalNotices } from '@/portal/que
 import { LoadFailed } from '@/portal/states'
 import type { CalendarItem } from '@/services/calendarTypes'
 import { useSession } from '@/session/SessionProvider'
+import { useStaff } from '@/staff/useStaff'
 import { radius, size, space } from '@/theme/tokens'
 import { Avatar, Callout, Hero, ListGroup, MobileScreen, NavBar, Rail, RailCard, Section, ShortcutGrid, Skeleton } from '@/ui'
 
@@ -174,15 +175,24 @@ function HomeSkeleton() {
 
 function StaffHome() {
   const session = useSession()
+  const { mode } = useStaff()
   if (session.status !== 'signedIn') return null
-  const roles = session.user.roles.map((role) => role.name).join(', ') || 'Staff'
+  const today = formatDayKey(schoolToday(), { weekday: 'short' })
 
   return (
-    <MobileScreen tabs nav={<NavBar large eyebrow={session.school.name} title={`Hi, ${firstName(session.user.displayName || session.user.name)}`} />}>
-      <Callout tone="info" title="The staff app is being built">
-        Attendance, your timetable and the calendar come to the app next. Use the website for everything else until then.
+    <MobileScreen tabs nav={<NavBar large eyebrow={today} title={`Hi, ${firstName(session.user.displayName || session.user.name)}`} />}>
+      <Callout tone="info" title={mode === 'glance' ? 'Your school at a glance comes next' : 'Your day comes in the next update'}>
+        {mode === 'glance'
+          ? "Today's attendance, fees this month and what is waiting for your approval will show here."
+          : mode === 'teacher'
+            ? 'Your next class, registers still to mark and your periods will show here.'
+            : "Your calendar and today's meetings will show here."}
       </Callout>
-      <ListGroup header="Signed in as" items={[{ title: session.user.displayName || session.user.name || 'Staff', subtitle: roles }]} />
+      <ListGroup
+        header="Signed in to"
+        footer="Everything else is under More, on the website."
+        items={[{ title: session.school.name, subtitle: session.user.roles.map((role) => role.name).join(', ') || 'Staff' }]}
+      />
     </MobileScreen>
   )
 }

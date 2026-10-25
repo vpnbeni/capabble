@@ -25,6 +25,10 @@ export interface User {
   isAdmin: boolean
   permissions: { key: string; scope: 'all' | 'assigned' }[]
   linkedStudents: LinkedStudent[]
+  /** Staff: the staff record linked to this login (their timetable and classes come from it). */
+  teacher?: string | null
+  /** The modules the school has on; a missing key means on (see lib/permissions.ts). */
+  featureToggles?: Record<string, boolean> | null
   mustChangePassword: boolean
   /** brandColor: the school's colour (#rrggbb), empty for Capabble blue. */
   tenant?: { slug: string; name: string; brandColor?: string } | null

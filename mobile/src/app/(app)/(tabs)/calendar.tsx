@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import { CalendarCheck } from 'lucide-react-native'
+import { CalendarCheck, CalendarDays } from 'lucide-react-native'
 import { useMemo, useState } from 'react'
 
 import { dayKeyAdd, formatDayKey, formatMonth, monthOf, schoolToday } from '@/lib/format'
@@ -8,6 +8,8 @@ import { LAYER_CATEGORY, agendaDays, isForChild, itemsByDay } from '@/portal/cal
 import { usePortalCalendar } from '@/portal/queries'
 import { CardSkeleton, LoadFailed } from '@/portal/states'
 import type { CalendarItem } from '@/services/calendarTypes'
+import { useSession } from '@/session/SessionProvider'
+import { ComingSoon } from '@/staff/ComingSoon'
 import { useTheme } from '@/theme/ThemeProvider'
 import { Agenda, ChipRail, MobileScreen, NavBar, StatusView, Surface, WeekStrip, type WeekDay } from '@/ui'
 
@@ -16,8 +18,27 @@ const weekdayOf = (key: string) => new Date(`${key}T00:00:00.000Z`).getUTCDay()
 /** The Monday of the week a day falls in. */
 const weekStart = (key: string) => dayKeyAdd(key, -((weekdayOf(key) + 6) % 7))
 
-/** The family's calendar by day: holidays, school events with their own instructions, exams, fee dates, meetings. */
 export default function CalendarScreen() {
+  const session = useSession()
+  if (session.status !== 'signedIn') return null
+  return session.user.kind === 'staff' ? <StaffCalendar /> : <FamilyCalendar />
+}
+
+function StaffCalendar() {
+  return (
+    <MobileScreen tabs nav={<NavBar large title="Calendar" />}>
+      <ComingSoon
+        icon={CalendarDays}
+        title="Your calendar comes in a later update"
+        body="School days, events for you and your classes, and sending an event for approval. Use the website until then."
+        webPath="/calendar"
+      />
+    </MobileScreen>
+  )
+}
+
+/** The family's calendar by day: holidays, school events with their own instructions, exams, fee dates, meetings. */
+function FamilyCalendar() {
   const { colors } = useTheme()
   const today = schoolToday()
   // A notification links here with ?event= (and sometimes ?date=), as on the website.
