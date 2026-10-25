@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Copy, CreditCard, ShieldCheck } from 'lucide-react'
+import { Copy, CreditCard, KeyRound, ShieldCheck } from 'lucide-react'
 import {
   Badge, Banner, Button, Card, DataTable, EmptyState, Entity, Page, Skeleton, Switch, TextField,
   formatDate, formatINR, formatRelative, type DataTableColumn, type Tone,
@@ -69,6 +69,21 @@ const SchoolPayments: React.FC = () => {
       toast.success('The keys work. Razorpay answered.')
     } catch (error) {
       toast.error(await errorMessage(error, 'Razorpay did not accept the keys.'))
+    }
+  }
+  // Razorpay takes any webhook secret you type, so we offer a strong random one to paste there.
+  const [generated, setGenerated] = useState(false)
+  const generateSecret = () => {
+    const bytes = crypto.getRandomValues(new Uint8Array(16))
+    set({ webhookSecret: Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('') })
+    setGenerated(true)
+  }
+  const copySecret = async () => {
+    try {
+      await navigator.clipboard.writeText(form.webhookSecret || '')
+      toast.success('Webhook secret copied. Paste it in Razorpay, then save here.')
+    } catch {
+      toast.error('Could not copy. Select the secret and copy it.')
     }
   }
   const copyWebhook = async () => {
@@ -173,14 +188,32 @@ const SchoolPayments: React.FC = () => {
               />
               <TextField
                 label="Webhook secret"
-                type="password"
+                type={generated && form.webhookSecret ? 'text' : 'password'}
                 value={form.webhookSecret || ''}
                 error={errors.webhookSecret}
                 disabled={!canEdit}
                 autoComplete="new-password"
                 placeholder={data.hasWebhookSecret ? 'Saved. Type to replace it.' : ''}
-                hint={data.lastWebhookAt ? `The same secret you typed in Razorpay. Last webhook ${formatRelative(data.lastWebhookAt)}.` : 'The same secret you typed in Razorpay when adding the webhook.'}
-                onChange={(e) => set({ webhookSecret: e.target.value })}
+                hint={
+                  generated && form.webhookSecret
+                    ? 'Copy this into Razorpay when adding the webhook, then save here. It won\'t be shown again after saving.'
+                    : data.lastWebhookAt
+                      ? `The same secret you typed in Razorpay. Last webhook ${formatRelative(data.lastWebhookAt)}.`
+                      : 'The same secret you typed in Razorpay when adding the webhook, or generate one here.'
+                }
+                onChange={(e) => {
+                  setGenerated(false)
+                  set({ webhookSecret: e.target.value })
+                }}
+                suffix={
+                  canEdit ? (
+                    generated && form.webhookSecret ? (
+                      <Button size="sm" variant="tertiary" icon={Copy} onClick={copySecret}>Copy</Button>
+                    ) : (
+                      <Button size="sm" variant="tertiary" icon={KeyRound} onClick={generateSecret}>Generate</Button>
+                    )
+                  ) : undefined
+                }
               />
             </div>
             {canEdit ? (
