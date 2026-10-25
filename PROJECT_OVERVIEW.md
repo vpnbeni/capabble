@@ -50,7 +50,7 @@ CAPABBLE is a **modular school/institution ERP** built on the principle that ins
 | Multi-tenancy | Database-per-tenant isolation (separate MongoDB DB per school) |
 | Auth | JWT (access + refresh tokens), bcryptjs, HttpOnly cookies |
 | File Handling | express-fileupload + Cloudinary (storage), Multer-compatible |
-| PDF | Puppeteer 24 (render HTML → PDF), pdf-parse (import), pdf-lib (merge/stamp), pdf2pic + Tesseract.js (OCR on imports) |
+| PDF | Puppeteer 24 (render HTML → PDF), pdf-parse (import), pdf-lib (merge/stamp), pdf-to-img + Tesseract.js (OCR on imports) |
 | Excel | ExcelJS |
 | Email | Nodemailer (SMTP) |
 | Queue | BullMQ + ioredis (attendance async processing) |
