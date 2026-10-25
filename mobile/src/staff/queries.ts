@@ -173,3 +173,35 @@ export const useSaveMyHours = () => {
     onSuccess: (host) => queryClient.setQueryData(meetingKeys.host(), host),
   })
 }
+
+// Principal's glance and approvals.
+const glanceKeys = {
+  approvals: [...staffKeys.all, 'approvals'] as const,
+  event: (id: string) => [...staffKeys.all, 'approvals', 'event', id] as const,
+  attendance: (date: string) => [...staffKeys.all, 'glance', 'attendance', date] as const,
+  fees: [...staffKeys.all, 'glance', 'fees'] as const,
+}
+
+export const usePendingEvents = (enabled = true) =>
+  useQuery({ queryKey: glanceKeys.approvals, queryFn: staffService.pendingEvents, staleTime: 30_000, enabled })
+
+export const useEventRecord = (id?: string | null) =>
+  useQuery({ queryKey: glanceKeys.event(id ?? ''), queryFn: () => staffService.eventRecord(id as string), enabled: Boolean(id) })
+
+export const useEventDecision = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, decision, note }: { id: string; decision: 'approve' | 'reject'; note?: string }) =>
+      decision === 'approve' ? staffService.approveEvent(id) : staffService.rejectEvent(id, note ?? ''),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: glanceKeys.approvals })
+      queryClient.invalidateQueries({ queryKey: [...staffKeys.all, 'calendar'] })
+    },
+  })
+}
+
+export const useAttendanceGlance = (date: string, enabled = true) =>
+  useQuery({ queryKey: glanceKeys.attendance(date), queryFn: () => staffService.attendanceGlance(date), staleTime: 60_000, enabled })
+
+export const useFeesGlance = (enabled = true) =>
+  useQuery({ queryKey: glanceKeys.fees, queryFn: staffService.feesGlance, staleTime: 5 * 60 * 1000, enabled })

@@ -21,7 +21,7 @@ export function TodayMeetings() {
   const open = () => router.push('/meetings')
 
   return (
-    <Section title="Your meetings today" action={{ label: 'See all', onPress: open }}>
+    <Section title={day.data.isHostView ? 'Your meetings today' : 'Meetings today'} action={{ label: 'See all', onPress: open }}>
       {pending ? (
         <Callout tone="warning" title={pending === 1 ? '1 request to answer' : `${pending} requests to answer`} action={{ label: 'Answer', onPress: open }} />
       ) : null}

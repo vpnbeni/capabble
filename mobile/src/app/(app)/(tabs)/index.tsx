@@ -12,6 +12,7 @@ import { usePortalCalendar, usePortalFees, usePortalNotices } from '@/portal/que
 import { LoadFailed } from '@/portal/states'
 import type { CalendarItem } from '@/services/calendarTypes'
 import { useSession } from '@/session/SessionProvider'
+import { PrincipalToday } from '@/staff/PrincipalToday'
 import { TeacherToday } from '@/staff/TeacherToday'
 import { TodayMeetings } from '@/staff/TodayMeetings'
 import { useStaff } from '@/staff/useStaff'
@@ -180,15 +181,11 @@ function StaffHome() {
   const { mode } = useStaff()
   if (session.status !== 'signedIn') return null
   if (mode === 'teacher') return <TeacherToday />
+  if (mode === 'glance') return <PrincipalToday />
   const today = formatDayKey(schoolToday(), { weekday: 'short' })
 
   return (
     <MobileScreen tabs nav={<NavBar large eyebrow={today} title={`Hi, ${firstName(session.user.displayName || session.user.name)}`} />}>
-      {mode === 'glance' ? (
-        <Callout tone="info" title="Your school at a glance comes next">
-          {"Today's attendance, fees this month and what is waiting for your approval will show here."}
-        </Callout>
-      ) : null}
       <TodayMeetings />
       <ListGroup
         header="Signed in to"

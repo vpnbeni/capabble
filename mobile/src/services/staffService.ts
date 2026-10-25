@@ -130,6 +130,41 @@ export interface NewEvent {
   publish: true
 }
 
+/** GET /attnd/dashboard: the parts the principal's glance reads. */
+export interface AttendanceGlance {
+  date: string
+  today: { working: boolean; label: string }
+  staff: { strength: number; todayPresent: number; todayAbsent: number; todayHalfDay: number }
+  students: { strength: number; todayPresent: number; todayAbsent: number; attendancePercent: number }
+  classMatrix: { className: string; sections: { section: string; strength: number; todayAbsent: number }[] }[]
+}
+
+/** GET /cpitl/dashboard: the parts the principal's glance reads (money in rupees). */
+export interface FeesGlance {
+  totals: { expected: number; collected: number; pending: number; overdue: number; collectionRate: number; dueSoFar: number }
+  payments: { total: number; today: number; todayCount: number }
+  byMonth: { month: string; amount: number; count: number }[]
+  byClass: {
+    class: string
+    expected: number
+    collected: number
+    pending: number
+    overdue: number
+    students: number
+    defaulters: number
+    collectionRate: number
+  }[]
+}
+
+/** One event as its creator and approvers see it (GET /calendar/events/:id). */
+export interface EventRecord extends MyEvent {
+  description?: string
+  venue?: string
+  endTime?: string | null
+  createdByName?: string
+  segments: { key: string; label: string; personType: string; instructions?: string; response?: ResponseType }[]
+}
+
 export const staffService = {
   myTimetable: (from: string, to: string) => api.get<MyTimetable>('/timetable/me', { from, to }),
   registers: (date: string) => api.get<RegisterDay>('/attnd/student-registers', { date }),
@@ -158,4 +193,13 @@ export const staffService = {
   myEvents: () => api.get<MyEvent[]>('/calendar/events', { mine: '1' }),
   /** Creates and publishes an event; families' events from a teacher wait for the principal. */
   createEvent: (event: NewEvent) => api.post<{ id: string; status: EventStatus }>('/calendar/events', event),
+
+  /** Events teachers sent that wait for the principal (approvers see everyone's). */
+  pendingEvents: () => api.get<(MyEvent & { createdByName?: string })[]>('/calendar/events', { status: 'pending_approval' }),
+  eventRecord: (id: string) => api.get<EventRecord>(`/calendar/events/${encodeURIComponent(id)}`),
+  approveEvent: (id: string) => api.post<unknown>(`/calendar/events/${encodeURIComponent(id)}/approve`),
+  rejectEvent: (id: string, note: string) => api.post<unknown>(`/calendar/events/${encodeURIComponent(id)}/reject`, { note }),
+
+  attendanceGlance: (date: string) => api.get<AttendanceGlance>('/attnd/dashboard', { date, month: date.slice(0, 7) }),
+  feesGlance: () => api.get<FeesGlance>('/cpitl/dashboard'),
 }
