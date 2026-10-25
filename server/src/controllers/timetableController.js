@@ -7,6 +7,8 @@ const { SUCCESS_MESSAGES, HTTP_STATUS, ERROR_MESSAGES } = require('../utils/cons
 const { generate: runGenerator } = require('../services/timetableGeneratorService');
 const exportService = require('../services/timetableExportService');
 const eventBus = require('../events/eventBus');
+const schoolDate = require('../utils/schoolDate');
+const { getTeacherDays } = require('../modules/timetable/teacherSchedule');
 const EVENTS = require('../events/eventNames');
 
 const DEFAULT_BELL_TIMINGS = Object.freeze({
@@ -1170,7 +1172,32 @@ const exportVersionTeacherPDF = asyncHandler(async (req, res) => {
   res.send(buffer);
 });
 
+/**
+ * GET /api/timetable/me?from=&to= — the signed-in teacher's own periods, day by
+ * day (the phone's "Your periods" and "My timetable"). Any staff login may ask;
+ * it only ever returns the timetable of the staff record linked to that login.
+ * Defaults to today; at most 14 days.
+ */
+const getMyTimetable = asyncHandler(async (req, res) => {
+  const from = String(req.query.from || schoolDate.today());
+  const to = String(req.query.to || from);
+  if (!schoolDate.isDateKey(from) || !schoolDate.isDateKey(to)) {
+    return res.status(HTTP_STATUS.BAD_REQUEST).json(generateResponse(false, 'Dates must be YYYY-MM-DD'));
+  }
+  if (to < from) {
+    return res.status(HTTP_STATUS.BAD_REQUEST).json(generateResponse(false, 'The end date must be on or after the start date'));
+  }
+  if (schoolDate.daysBetween(from, to) > 13) {
+    return res.status(HTTP_STATUS.BAD_REQUEST).json(generateResponse(false, 'Ask for at most 14 days at a time'));
+  }
+  const data = await getTeacherDays(req.models || { TimetableState, TimetableVersion }, req.user?.teacher, {
+    from, to, filter: getSessionScopedFilter(req)
+  });
+  return res.status(HTTP_STATUS.OK).json(generateResponse(true, SUCCESS_MESSAGES.FETCHED, data));
+});
+
 module.exports = {
+  getMyTimetable,
   getTimetableState,
   upsertTimetableState,
   getBellTimings,

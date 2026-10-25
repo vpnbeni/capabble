@@ -169,6 +169,7 @@
     { "prefix": "/attnd", "path": "^/staff", "resource": "attnd.staff" },
     { "prefix": "/attnd", "path": "^/student", "resource": "attnd.students" },
 
+    { "prefix": "/timetable", "path": "^/me/?$", "methods": ["GET"], "staff": true },
     { "prefix": "/timetable", "resource": "timetable.timetable" },
 
     { "prefix": "/acdmc", "path": "^/(options|overview)", "methods": ["GET"], "permission": ["acdmc.curriculum.read", "acdmc.classwork.read"] },

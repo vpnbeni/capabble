@@ -71,7 +71,20 @@ const utc = (key: string) => new Date(`${key}T00:00:00.000Z`)
 /** Today in the school's time zone, as a day key. */
 export const schoolToday = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date())
 
-export const dayKeyAdd = (key: string, days: number) => new Date(utc(key).getTime() + days * 86400000).toISOString().slice(0, 10)
+/** The school's clock now, as 'HH:MM' (compare with period times). */
+export const schoolTimeNow = () =>
+  new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date())
+
+/** Minutes from 'HH:MM' a to b. */
+export const minutesBetween = (a: string, b: string) => {
+  const toMin = (t: string) => {
+    const [h, m] = t.split(':').map(Number)
+    return h * 60 + m
+  }
+  return toMin(b) - toMin(a)
+}
+
+export const dayKeyAdd =(key: string, days: number) => new Date(utc(key).getTime() + days * 86400000).toISOString().slice(0, 10)
 export const monthOf = (key: string) => key.slice(0, 7)
 export const monthAdd = (month: string, delta: number) => {
   const [y, m] = month.split('-').map(Number)

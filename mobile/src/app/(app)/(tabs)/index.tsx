@@ -12,6 +12,7 @@ import { usePortalCalendar, usePortalFees, usePortalNotices } from '@/portal/que
 import { LoadFailed } from '@/portal/states'
 import type { CalendarItem } from '@/services/calendarTypes'
 import { useSession } from '@/session/SessionProvider'
+import { TeacherToday } from '@/staff/TeacherToday'
 import { useStaff } from '@/staff/useStaff'
 import { radius, size, space } from '@/theme/tokens'
 import { Avatar, Callout, Hero, ListGroup, MobileScreen, NavBar, Rail, RailCard, Section, ShortcutGrid, Skeleton } from '@/ui'
@@ -177,6 +178,7 @@ function StaffHome() {
   const session = useSession()
   const { mode } = useStaff()
   if (session.status !== 'signedIn') return null
+  if (mode === 'teacher') return <TeacherToday />
   const today = formatDayKey(schoolToday(), { weekday: 'short' })
 
   return (
@@ -184,9 +186,7 @@ function StaffHome() {
       <Callout tone="info" title={mode === 'glance' ? 'Your school at a glance comes next' : 'Your day comes in the next update'}>
         {mode === 'glance'
           ? "Today's attendance, fees this month and what is waiting for your approval will show here."
-          : mode === 'teacher'
-            ? 'Your next class, registers still to mark and your periods will show here.'
-            : "Your calendar and today's meetings will show here."}
+          : "Your calendar and today's meetings will show here."}
       </Callout>
       <ListGroup
         header="Signed in to"

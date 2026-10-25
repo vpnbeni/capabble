@@ -73,51 +73,62 @@ const getStudentDirectory = async (req, res) => {
   }
 };
 
-const getStudentFilters = async (req, res) => {
-  try {
-    const TimetableStateModel = req.models?.TimetableState || TimetableState;
-    const StudentModel = req.models?.Student || Student;
-    const latest = await TimetableStateModel.findOne({}).sort({ updatedAt: -1 }).lean();
+/**
+ * Every class and its sections, from the timetable's class matrix, or from the
+ * active students when the timetable has none. Not scoped to the login.
+ * @returns {Promise<Map<string, string[]>>} className → sections
+ */
+const loadClassSections = async (req) => {
+  const TimetableStateModel = req.models?.TimetableState || TimetableState;
+  const StudentModel = req.models?.Student || Student;
+  const latest = await TimetableStateModel.findOne({}).sort({ updatedAt: -1 }).lean();
 
-    const classSectionPairs = [];
-    const classMap = new Map();
+  const classSectionPairs = [];
+  const classMap = new Map();
 
-    if (latest?.matrixSelection && Array.isArray(latest?.matrixClasses) && Array.isArray(latest?.matrixSections)) {
-      latest.matrixClasses.forEach((classItem) => {
-        const className = normalizeString(classItem?.name);
-        if (!className) return;
-        const sectionList = [];
-        latest.matrixSections.forEach((sectionItem) => {
-          const sectionName = normalizeString(sectionItem?.name);
-          if (!sectionName) return;
-          if (latest.matrixSelection?.[classItem.id]?.[sectionItem.id]) {
-            sectionList.push(sectionName);
-            classSectionPairs.push({ className, section: sectionName });
-          }
-        });
-        if (sectionList.length > 0) {
-          classMap.set(className, sectionList.sort((a, b) => sortSectionNames(a, b, className)));
+  if (latest?.matrixSelection && Array.isArray(latest?.matrixClasses) && Array.isArray(latest?.matrixSections)) {
+    latest.matrixClasses.forEach((classItem) => {
+      const className = normalizeString(classItem?.name);
+      if (!className) return;
+      const sectionList = [];
+      latest.matrixSections.forEach((sectionItem) => {
+        const sectionName = normalizeString(sectionItem?.name);
+        if (!sectionName) return;
+        if (latest.matrixSelection?.[classItem.id]?.[sectionItem.id]) {
+          sectionList.push(sectionName);
+          classSectionPairs.push({ className, section: sectionName });
         }
       });
-    }
+      if (sectionList.length > 0) {
+        classMap.set(className, sectionList.sort((a, b) => sortSectionNames(a, b, className)));
+      }
+    });
+  }
 
-    if (classSectionPairs.length === 0) {
-      const rows = await StudentModel.aggregate([
-        { $match: { isActive: true } },
-        { $group: { _id: { className: '$class', section: '$section' } } },
-        { $project: { _id: 0, className: '$_id.className', section: '$_id.section' } },
-      ]);
+  if (classSectionPairs.length === 0) {
+    const rows = await StudentModel.aggregate([
+      { $match: { isActive: true } },
+      { $group: { _id: { className: '$class', section: '$section' } } },
+      { $project: { _id: 0, className: '$_id.className', section: '$_id.section' } },
+    ]);
 
-      rows.forEach((row) => {
-        const className = normalizeString(row.className);
-        const section = normalizeString(row.section);
-        if (!className || !section) return;
-        classSectionPairs.push({ className, section });
-        const current = classMap.get(className) || [];
-        if (!current.includes(section)) current.push(section);
-        classMap.set(className, current);
-      });
-    }
+    rows.forEach((row) => {
+      const className = normalizeString(row.className);
+      const section = normalizeString(row.section);
+      if (!className || !section) return;
+      classSectionPairs.push({ className, section });
+      const current = classMap.get(className) || [];
+      if (!current.includes(section)) current.push(section);
+      classMap.set(className, current);
+    });
+  }
+
+  return classMap;
+};
+
+const getStudentFilters = async (req, res) => {
+  try {
+    const classMap = await loadClassSections(req);
 
     // Teachers limited to their own sections only see those sections.
     if (isAssignedScope(req, 'attnd.students.read')) {
@@ -497,6 +508,77 @@ const summarizeRecords = (records, dateKey) => {
   };
 };
 
+/**
+ * GET /api/attnd/student-registers?date= — the class registers this login may see
+ * for a day (default today), each with whether it was taken and how many are
+ * absent. Feeds the phone's Today and Attendance tabs and the principal's
+ * "not marked" list. `mine` marks the sections the login teaches or is in charge
+ * of; `canMark` says whether it may save them (same scope rules as PUT /students).
+ */
+const getStudentRegisters = async (req, res) => {
+  try {
+    const date = normalizeDateKey(req.query.date) || localDateKey();
+    const StudentModel = req.models?.Student || Student;
+    const StudentAttendanceModel = req.models?.StudentAttendanceDaily || StudentAttendanceDaily;
+    const DayModel = req.models?.StudentAttendanceDay || StudentAttendanceDay;
+
+    const [classMap, assigned, taken, absences, strength, day] = await Promise.all([
+      loadClassSections(req),
+      getAssignedSections(req),
+      DayModel.find({ attendanceDate: date }).select('className section updatedAt').lean(),
+      StudentAttendanceModel.find({ attendanceDate: date, status: 'A' }).select('className section').lean(),
+      StudentModel.aggregate([
+        { $match: { isActive: true } },
+        { $group: { _id: { className: '$class', section: '$section' }, count: { $sum: 1 } } },
+      ]),
+      schoolDays.dayInfo(req.models || {}, date).catch(() => null),
+    ]);
+
+    const mine = new Set(assigned.map((entry) => entry.key));
+    const readScope = req.rbac?.scopeOf('attnd.students.read') || null;
+    const writeScope = req.rbac?.scopeOf('attnd.students.write') || null;
+    const countBy = (rows, value) => rows.reduce((map, row) => {
+      const key = sectionKey(row.className ?? row._id?.className, row.section ?? row._id?.section);
+      map.set(key, (map.get(key) || 0) + value(row));
+      return map;
+    }, new Map());
+    const takenAt = new Map(taken.map((row) => [sectionKey(row.className, row.section), row.updatedAt]));
+    const absentCount = countBy(absences, () => 1);
+    const studentCount = countBy(strength, (row) => row.count);
+
+    const registers = [];
+    Array.from(classMap.entries())
+      .sort((a, b) => a[0].localeCompare(b[0], undefined, { numeric: true }))
+      .forEach(([className, sections]) => {
+        sections.forEach((section) => {
+          const key = sectionKey(className, section);
+          if (readScope !== 'all' && !mine.has(key)) return;
+          registers.push({
+            className,
+            section,
+            mine: mine.has(key),
+            canMark: writeScope === 'all' || (writeScope === 'assigned' && mine.has(key)),
+            marked: takenAt.has(key),
+            markedAt: takenAt.get(key) || null,
+            absent: absentCount.get(key) || 0,
+            students: studentCount.get(key) || 0,
+          });
+        });
+      });
+
+    return res.json({
+      success: true,
+      data: {
+        date,
+        day: day ? { working: day.working, kind: day.kind, label: day.label } : null,
+        registers,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Failed to fetch class registers', error: error.message });
+  }
+};
+
 const getDashboard = async (req, res) => {
   try {
     const month = normalizeMonthKey(req.query.month) || localMonthKey();
@@ -699,4 +781,5 @@ module.exports = {
   getStudentAttendance,
   saveStudentAttendance,
   getDashboard,
+  getStudentRegisters,
 };
