@@ -1,10 +1,11 @@
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { ApiError } from '@/lib/api'
 import { fileStore } from '@/lib/fileStore'
 import { shortClass } from '@/lib/format'
 import { appntService, type AppointmentAction } from '@/services/appntService'
 import type { ReplyInput } from '@/services/calendarTypes'
+import { notificationService } from '@/services/notificationService'
 import { studentService } from '@/services/studentService'
 import { staffService, type NewEvent, type RosterStudent } from '@/services/staffService'
 
@@ -274,3 +275,29 @@ export const useStudentSearch = (q: string) =>
 
 export const useStudentRecord = (id?: string) =>
   useQuery({ queryKey: studentKeys.one(id ?? ''), queryFn: () => studentService.get(id as string), enabled: Boolean(id), staleTime: 5 * 60 * 1000 })
+
+// Notifications (the bell on Today).
+const notificationKeys = {
+  all: [...staffKeys.all, 'notifications'] as const,
+  count: [...staffKeys.all, 'notifications', 'count'] as const,
+}
+
+/** Unread count for the bell: refreshed every minute while the app is open. */
+export const useUnreadCount = (enabled = true) =>
+  useQuery({ queryKey: notificationKeys.count, queryFn: notificationService.unreadCount, refetchInterval: 60_000, staleTime: 30_000, enabled })
+
+export const useNotifications = () =>
+  useInfiniteQuery({
+    queryKey: notificationKeys.all,
+    queryFn: ({ pageParam }) => notificationService.list(pageParam || undefined),
+    initialPageParam: '',
+    getNextPageParam: (last) => last.nextBefore ?? undefined,
+  })
+
+export const useMarkNotificationRead = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string | 'all') => (id === 'all' ? notificationService.markAllRead() : notificationService.markRead(id)),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: notificationKeys.all }),
+  })
+}

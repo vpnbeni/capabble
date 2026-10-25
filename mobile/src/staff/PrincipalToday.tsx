@@ -10,6 +10,7 @@ import { MobileScreen, NavBar, Section, Skeleton, StatTiles, StatusView, Surface
 import { ApprovalList, useApprovals } from './approvals'
 import { useAttendanceGlance, useFeesGlance, useRegisters } from './queries'
 import { TodayMeetings } from './TodayMeetings'
+import { useBell } from './useBell'
 import { openWebsite, useStaff } from './useStaff'
 
 /**
@@ -21,6 +22,7 @@ export function PrincipalToday() {
   const toast = useToast()
   const session = useSession()
   const staff = useStaff()
+  const bell = useBell()
   const today = schoolToday()
   const seesStudents = staff.canUse('attnd_student_attendance')
   const seesStaff = staff.canUse('attnd_staff_attendance')
@@ -94,7 +96,7 @@ export function PrincipalToday() {
         if (seesFees) fees.refetch()
         approvals.refetch()
       }}
-      nav={<NavBar large eyebrow={formatDayKey(today, { weekday: 'short' })} title={session.status === 'signedIn' ? session.school.name : 'Today'} />}
+      nav={<NavBar large eyebrow={formatDayKey(today, { weekday: 'short' })} title={session.status === 'signedIn' ? session.school.name : 'Today'} actions={[bell]} />}
     >
       {loading ? (
         <Skeleton height={220} radius={radius['radius-xl']} />

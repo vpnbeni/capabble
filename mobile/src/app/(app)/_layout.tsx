@@ -25,6 +25,7 @@ export default function AppLayout() {
           <Stack.Screen name="fee-collection" />
           <Stack.Screen name="class-roster" />
           <Stack.Screen name="student/[id]" />
+          <Stack.Screen name="notifications" />
         </Stack>
       </ToastProvider>
     </PortalProvider>

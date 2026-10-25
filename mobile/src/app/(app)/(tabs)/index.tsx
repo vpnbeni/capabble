@@ -15,6 +15,7 @@ import { useSession } from '@/session/SessionProvider'
 import { PrincipalToday } from '@/staff/PrincipalToday'
 import { TeacherToday } from '@/staff/TeacherToday'
 import { TodayMeetings } from '@/staff/TodayMeetings'
+import { useBell } from '@/staff/useBell'
 import { useStaff } from '@/staff/useStaff'
 import { radius, size, space } from '@/theme/tokens'
 import { Avatar, Callout, Hero, ListGroup, MobileScreen, NavBar, Rail, RailCard, Section, ShortcutGrid, Skeleton } from '@/ui'
@@ -177,15 +178,21 @@ function HomeSkeleton() {
 }
 
 function StaffHome() {
-  const session = useSession()
   const { mode } = useStaff()
-  if (session.status !== 'signedIn') return null
   if (mode === 'teacher') return <TeacherToday />
   if (mode === 'glance') return <PrincipalToday />
+  return <OtherStaffToday />
+}
+
+/** Office, accounts, library, clinic and other staff: today's meetings, and the way to the rest. */
+function OtherStaffToday() {
+  const session = useSession()
+  const bell = useBell()
+  if (session.status !== 'signedIn') return null
   const today = formatDayKey(schoolToday(), { weekday: 'short' })
 
   return (
-    <MobileScreen tabs nav={<NavBar large eyebrow={today} title={`Hi, ${firstName(session.user.displayName || session.user.name)}`} />}>
+    <MobileScreen tabs nav={<NavBar large eyebrow={today} title={`Hi, ${firstName(session.user.displayName || session.user.name)}`} actions={[bell]} />}>
       <TodayMeetings />
       <ListGroup
         header="Signed in to"
