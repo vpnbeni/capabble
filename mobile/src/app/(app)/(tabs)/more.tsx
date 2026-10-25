@@ -1,6 +1,6 @@
 import Constants from 'expo-constants'
 import { useRouter } from 'expo-router'
-import { CalendarClock, KeyRound, UserCheck, Users } from 'lucide-react-native'
+import { CalendarClock, KeyRound, NotebookPen, UserCheck, Users } from 'lucide-react-native'
 import { useState } from 'react'
 
 import { PORTAL_MODULES } from '@/portal/modules'
@@ -36,6 +36,9 @@ export default function MoreScreen() {
   const staffShortcuts = [
     ...(isStaff && user.teacher ? [{ label: 'Timetable', icon: CalendarClock, tile: 4 as const, onPress: () => router.push('/timetable') }] : []),
     ...(isStaff && isMeetingHost(staff) ? [{ label: 'Meetings', icon: Users, tile: 2 as const, onPress: () => router.push('/meetings') }] : []),
+    ...(isStaff && staff.canUse('acdmc_academics') && staff.can('acdmc.classwork.write')
+      ? [{ label: 'Homework', icon: NotebookPen, tile: 4 as const, onPress: () => router.push('/homework') }]
+      : []),
     ...(isStaff && staff.canUse('attnd_staff_attendance')
       ? [{ label: 'Staff attendance', icon: UserCheck, tile: 5 as const, onPress: () => router.push('/staff-attendance') }]
       : []),

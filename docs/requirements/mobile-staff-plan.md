@@ -47,7 +47,7 @@ desk work; More → "Open on the website" row links to the page.
 | Students · records | `StudentInfo`, imports, ID cards, stickers, alumni | Web only | Data entry and printing |
 | Staff | `StaafStaffMembers`, `StaafStaffProfile` | Later: directory to call a colleague (principal) | Read-only look-up |
 | Staff · setup | Org structure, recruitment, staff groups | Web only | |
-| Academics | Homework, assignments | Later: post homework for my class | Short, phone-friendly, but not in the first slices |
+| Academics | Homework, assignments | **Done**: homework. Assignments later | Short, phone-friendly |
 | Academics · planning | Curriculum, lesson plans, quizzes, overview | Web only | Long forms |
 | Exams | Marks entry (`ExmclResult`, award list) | Later: marks for one class and one exam | A grid of marks is borderline on a phone |
 | Exams · setup | Exams, subjects, datesheets, admit cards, report cards and formats, question papers, syllabus, CBSE registration, circulars | Web only | Printing and formats |
@@ -136,6 +136,7 @@ Each needs a stage deploy before its slice works on the phone. Tests in `server/
 | 8 | Classes / Students: class list, search, roster, student with guardian to call | `staff/StudentsBrowser.tsx`, `class-roster.tsx`, `student/[id].tsx` | — |
 | + | Notifications bell (unread dot) on every staff Today and the list; links open the app screen or the website page | `notifications.tsx`, `staff/useBell.ts`, `lib/notificationLinks.ts` | — |
 | + | Staff attendance for one day: everyone present, tap the absent, staff groups, any past day; from the principal's "Staff absent" tile, office Today and More | `staff-attendance.tsx` | — (staff groups moved to `packages/shared/src/staffTypes.ts`, used by the website too) |
+| + | Homework: due / drafts / past for the teacher's classes or one class, post and edit (published at once), publish a draft, close; from a class roster and More. Families don't see homework yet (no portal section) | `homework/index.tsx`, `homework/new.tsx` | — |
 
 Kit added on the way: `useFixedColumn`, `MonthPicker` (documented in `mobile/src/ui/DESIGN.md`).
 
@@ -143,6 +144,6 @@ Checked against stage data (R.E.D. School, Jhajjar) through the API calls each s
 user on an Android phone for slices 1–6. Not yet checked: answering a family's meeting request (no parent
 login on stage), the "own classes only" limit with a teacher who doesn't teach every class.
 
-Next, from the "Later" rows: posting homework, the staff directory, marks for one class,
+Next, from the "Later" rows: the staff directory, marks for one class,
 "my invigilation duty today", the clinic visit log. Needing a new EAS build: the transport crew app, the
 live bus map, scanning for assets and library books.

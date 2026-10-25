@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import { ClipboardCheck, Users } from 'lucide-react-native'
+import { ClipboardCheck, NotebookPen, Users } from 'lucide-react-native'
 import { useState } from 'react'
 
 import { classLabel, schoolToday } from '@/lib/format'
@@ -22,12 +22,19 @@ export default function ClassRosterScreen() {
     (student) => !q || student.name.toLowerCase().includes(q) || String(student.rollNumber).toLowerCase().includes(q),
   )
   const canMark = staff.canUse('attnd_student_attendance') && staff.can('attnd.students.write')
+  const canSetHomework = staff.canUse('acdmc_academics') && staff.can('acdmc.classwork.write')
 
   return (
     <MobileScreen
       refreshing={roster.isRefetching}
       onRefresh={roster.refetch}
-      nav={<NavBar title={title} back={{ label: 'Back', onPress: router.back }} />}
+      nav={
+        <NavBar
+          title={title}
+          back={{ label: 'Back', onPress: router.back }}
+          actions={canSetHomework ? [{ icon: NotebookPen, label: 'Homework', onPress: () => router.push({ pathname: '/homework', params: { className, section } }) }] : []}
+        />
+      }
       actionBar={
         canMark && roster.data?.length ? (
           <ActionBar

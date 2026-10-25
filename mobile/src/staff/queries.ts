@@ -5,6 +5,7 @@ import { fileStore } from '@/lib/fileStore'
 import { shortClass } from '@/lib/format'
 import { appntService, type AppointmentAction } from '@/services/appntService'
 import type { ReplyInput } from '@/services/calendarTypes'
+import { homeworkService, type HomeworkInput, type HomeworkStatus } from '@/services/homeworkService'
 import { notificationService } from '@/services/notificationService'
 import { studentService } from '@/services/studentService'
 import { staffService, type NewEvent, type RosterStudent } from '@/services/staffService'
@@ -323,5 +324,43 @@ export const useSaveStaffAttendance = () => {
       queryClient.invalidateQueries({ queryKey: staffAttendanceKeys.day(date) })
       queryClient.invalidateQueries({ queryKey: [...staffKeys.all, 'glance'] })
     },
+  })
+}
+
+// Homework.
+const homeworkKeys = {
+  all: [...staffKeys.all, 'homework'] as const,
+  options: [...staffKeys.all, 'homework', 'options'] as const,
+  list: (className: string, section: string) => [...staffKeys.all, 'homework', 'list', className, section] as const,
+  one: (id: string) => [...staffKeys.all, 'homework', 'one', id] as const,
+}
+
+export const useAcademicOptions = () =>
+  useQuery({ queryKey: homeworkKeys.options, queryFn: homeworkService.options, staleTime: 10 * 60 * 1000 })
+
+/** Homework due from a week ago on, for one class or every class this login may see. */
+export const useHomeworkList = (className = '', section = '', from = '') =>
+  useQuery({
+    queryKey: homeworkKeys.list(className, section),
+    queryFn: async () => (await homeworkService.list({ className: className || undefined, section: section || undefined, from: from || undefined })).items,
+    staleTime: 60_000,
+  })
+
+export const useHomework = (id?: string) =>
+  useQuery({ queryKey: homeworkKeys.one(id ?? ''), queryFn: () => homeworkService.get(id as string), enabled: Boolean(id) })
+
+export const useSaveHomework = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, input }: { id?: string; input: HomeworkInput }) => (id ? homeworkService.update(id, input) : homeworkService.create(input)),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: homeworkKeys.all }),
+  })
+}
+
+export const useHomeworkStatus = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, status }: { id: string; status: HomeworkStatus }) => homeworkService.setStatus(id, status),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: homeworkKeys.all }),
   })
 }
