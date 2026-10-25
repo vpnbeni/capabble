@@ -2,6 +2,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 
 import { setSessionEndedHandler, setTenantSlug } from '@/lib/api'
+import { unregisterFromPush } from '@/lib/push'
 import { storage } from '@/lib/storage'
 import { authService, type School, type User } from '@/services/authService'
 
@@ -17,6 +18,8 @@ type Session = SessionState & {
   signOut: () => Promise<void>
   /** Forget the remembered school (sign in to a different one). */
   forgetSchool: () => Promise<void>
+  /** Replace the signed-in user with the server's latest copy (after a password change). */
+  updateUser: (user: User) => void
 }
 
 const SessionContext = createContext<Session | null>(null)
@@ -70,13 +73,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(async () => {
     const school = state.school
+    // Stop pushes to this phone first, while the session can still say so.
+    if (state.user) await unregisterFromPush(state.user.kind)
     try {
       await authService.logout()
     } catch {
       // Signed out locally either way; the server session ends when it expires.
     }
     endSession(school)
-  }, [endSession, state.school])
+  }, [endSession, state.school, state.user])
 
   const forgetSchool = useCallback(async () => {
     await storage.remove(SCHOOL_KEY)
@@ -84,7 +89,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setState({ status: 'signedOut', user: null, school: null })
   }, [])
 
-  const value = useMemo(() => ({ ...state, signIn, signOut, forgetSchool }) as Session, [state, signIn, signOut, forgetSchool])
+  const updateUser = useCallback((user: User) => {
+    setState((current) => (current.status === 'signedIn' ? { ...current, user } : current))
+  }, [])
+
+  const value = useMemo(
+    () => ({ ...state, signIn, signOut, forgetSchool, updateUser }) as Session,
+    [state, signIn, signOut, forgetSchool, updateUser],
+  )
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>
 }

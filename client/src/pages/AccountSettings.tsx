@@ -5,9 +5,10 @@ import toast from 'react-hot-toast'
 import { getStoredUser } from '@/utils/authStorage'
 import schoolProfileService, { type SchoolProfile } from '@/services/schoolProfileService'
 import { schoolProfileKeys } from '@/hooks/useSchoolProfile'
-import { Button, Card, DetailList, Icon, Page, TextField } from '@/components/ui'
+import { Button, Card, ColorField, DetailList, Icon, Page, TextField } from '@/components/ui'
 import CloseWorkspaceCard from '@/components/account/CloseWorkspaceCard'
 import { usePermissions } from '@/hooks/usePermissions'
+import { applySchoolTheme } from '@/utils/schoolTheme'
 
 type FormData = {
   name: string
@@ -19,6 +20,7 @@ type FormData = {
   address: string
   contact: string
   email: string
+  brandColor: string
 }
 type Errors = Partial<Record<keyof FormData, string>>
 
@@ -32,6 +34,7 @@ const toForm = (data: Partial<SchoolProfile>): FormData => ({
   address: data.address || '',
   contact: data.contact || '',
   email: data.email || '',
+  brandColor: data.brandColor || '',
 })
 
 const apiMessage = (error: unknown, fallback: string) => {
@@ -45,6 +48,9 @@ const validate = (form: FormData): Errors => {
   if (form.udiseCode && !/^\d{11}$/.test(form.udiseCode)) errors.udiseCode = 'UDISE+ code must be 11 digits'
   if (form.email.trim() && !/^\S+@\S+\.\S+$/.test(form.email.trim())) {
     errors.email = 'Enter an email address like office@yourschool.in'
+  }
+  if (form.brandColor.trim() && !/^#[0-9a-f]{6}$/i.test(form.brandColor.trim())) {
+    errors.brandColor = 'Use a colour like #2458AA, or leave it empty'
   }
   return errors
 }
@@ -104,6 +110,8 @@ const AccountSettings: React.FC = () => {
       const updated = await schoolProfileService.updateProfile(form)
       setProfile(updated)
       setForm(toForm(updated))
+      // Re-brand now; other signed-in devices pick it up at their next sign-in or reload.
+      applySchoolTheme(updated.brandColor)
       toast.success('School profile saved')
       void queryClient.invalidateQueries({ queryKey: schoolProfileKeys.all })
     } catch (error) {
@@ -218,6 +226,17 @@ const AccountSettings: React.FC = () => {
                       {...field('udiseCode')}
                     />
                     <TextField label="Tagline" hint="Optional. Shown under the name on documents." {...field('tagline')} />
+                    <ColorField
+                      id="school-brandColor"
+                      label="School colour"
+                      hint="Buttons, links and selected items use it, on the website and in the app. Leave empty for Capabble blue."
+                      value={form.brandColor}
+                      onChange={(value) => {
+                        setForm((current) => ({ ...current, brandColor: value }))
+                        if (errors.brandColor) setErrors((current) => ({ ...current, brandColor: undefined }))
+                      }}
+                      error={errors.brandColor}
+                    />
                   </div>
                 </div>
 

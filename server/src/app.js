@@ -4,7 +4,6 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
 const mongoSanitize = require('express-mongo-sanitize');
-const xss = require('xss-clean');
 const hpp = require('hpp');
 const compression = require('compression');
 const cookieParser = require('cookie-parser');
@@ -14,6 +13,7 @@ const os = require('os');
 
 // Import custom middleware
 const errorHandler = require('./middleware/errorHandler');
+const { xssClean } = require('./middleware/xssClean');
 const { billingEntitlementMiddleware } = require('./middleware/billingEntitlement');
 const { tenantAccessGate } = require('./rbac/gate');
 const { requestContextMiddleware } = require('./tenancy/requestContext');
@@ -140,6 +140,8 @@ if (rateLimitEnabled) {
 
 // Razorpay webhooks are signed over the raw body, so they mount before the parsers and sanitizers.
 app.use('/api/webhooks', billing.webhookRouter);
+// School fee payments (each school's own Razorpay): its webhooks and the app's checkout page. No sign-in.
+app.use('/api/school-payments', require('./modules/cpitl/publicPayments').router);
 
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
@@ -172,7 +174,7 @@ app.use(mongoSanitize({
 }));
 
 // Data sanitization against XSS (keep HTML on exam circulars so formatting can be saved)
-const xssSanitize = xss();
+const xssSanitize = xssClean();
 app.use((req, res, next) => {
   if (String(req.originalUrl || '').includes('/exam-circulars')) return next();
   return xssSanitize(req, res, next);

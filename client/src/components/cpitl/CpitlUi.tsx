@@ -37,6 +37,7 @@ export const MODE_LABELS: Record<string, string> = {
   dd: 'Demand Draft',
   bank_transfer: 'Bank Transfer',
   card: 'Card',
+  online: 'Online',
 }
 
 export const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']

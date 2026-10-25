@@ -38,6 +38,8 @@ const MODULE_MODEL_KEYS = Object.freeze({
     'SchoolMailSettings',
     'MailOutbox',
     'MailSuppression',
+    'Device',
+    'PushOutbox',
   ]),
   cntr: Object.freeze([
     'Student',
@@ -194,6 +196,8 @@ const MODULE_MODEL_KEYS = Object.freeze({
     'StudentFeeAccount',
     'FeeDemand',
     'FeePayment',
+    'SchoolPaymentSettings',
+    'FeeOnlineOrder',
     'CapitalSettings',
     'CapitalCounter',
     'CapitalExpense',

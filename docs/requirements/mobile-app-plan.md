@@ -39,7 +39,8 @@ Expo SDK 58 requires Node 22.13+ (`mobile/.nvmrc` says 24). The rest of the repo
 - Source of truth: the design system artifact (claude.ai/artifact/LyYegFLHJxi1rNpnkaqHjH). Its `tokens.json` is copied to `packages/shared/src/designTokens.json`; the app builds its light and dark palettes, type scale, spacing, radius and sizes from it at runtime (`mobile/src/theme/tokens.ts`). No hex in screens.
 - The native kit is `mobile/src/ui` (see `mobile/src/ui/DESIGN.md`). Same names and props as the web kit where they make sense (`Button`, `Card`, `Badge`, `TextField`, `EmptyState`, `Banner`, `Skeleton`, `Avatar`), plus the Companion pieces: `Screen`, `ListRow`, `BottomNav`.
 - Companion rules applied: `body-lg` 16px default text, 44px controls (`control-lg`), 52px rows (`row-comfortable`), `BottomNav` with 4–5 tabs at 64px plus the safe area, Inter 400/500/600, Lucide icons at 1.75 stroke, light and dark from the device setting.
-- Still to port: `applySchoolTheme` (the school's accent colour; needs the colour in the API's school profile), `Sheet` as a bottom sheet, `Dialog`, `Tabs`, `SegmentedControl`, `Calendar`/`AgendaList`, `AttendanceGrid` (roll call), `TimetableGrid` (day list), toasts.
+- The school's colour: `brandColor` on the school profile (web: Settings → School profile), sent as `user.tenant.brandColor`; both apps turn it into the accent tokens with `packages/shared/src/schoolAccent.ts`.
+- Still to port: `Sheet` as a bottom sheet, `Dialog`, `Tabs`, `SegmentedControl`, `Calendar`/`AgendaList`, `AttendanceGrid` (roll call), `TimetableGrid` (day list), toasts.
 
 ### Sign-in and sessions: reuse the web's cookie session
 - The API already issues httpOnly cookies (`cb_at` 15 min, `cb_rt` rotated). On iOS and Android, `fetch` keeps cookies in the app's own cookie store, so the app signs in with **no server change** and never holds a token.
@@ -60,13 +61,36 @@ TanStack Query (as on the web) over a small `fetch` client (`mobile/src/lib/api.
 - Checks: `npm run type-check`, `npm run lint`, `npx expo-doctor` all pass.
 
 ## Phase 1 — family app, release 1
-1. Port the remaining kit pieces it needs (Sheet, Dialog, Tabs, AgendaList, toasts) and `applySchoolTheme`.
-2. Screens, one per portal page: Calendar, Fees (+ receipt PDF via `expo-sharing`), Attendance, Results, Timetable, Notices, Appointments, Transport (live bus map), Profile, Account (change password, appearance).
-   Tabs for parents: Home · Calendar · Fees · Notices · More.
+Done so far (23 Oct 2026): tabs Home · Calendar · Fees · Notices · More, shown by the sections the
+school turned on for the login (`home.sections`); kit pieces `Sheet`, `SegmentedControl`, `Chips`,
+`IconButton`, `AgendaList`, `Figure`, `Progress`, toasts; a child switcher for parents with more than
+one child (remembered on the device).
+- Calendar: the month by day from today, earlier and later months, a filter per child, an item sheet
+  with the family's parts and their reply (acknowledge, RSVP with headcount, consent per child).
+- Fees: still due with paid so far, the fee schedule with status and a breakdown sheet, payments
+  with the receipt PDF to share or save (`expo-file-system` + `expo-sharing`).
+- Notices: the list and each circular in a WebView with JavaScript off; links open in the browser.
+- Checked in the web preview with sample data. Not yet checked on a phone: the receipt share sheet
+  and the WebView (both native-only).
+
+Also done: the rest of the family portal under More, each shown only when the school has the
+section on: Attendance (month grid and summary), Timetable (one day at a time), Results,
+Transport (crew to call, stops, whether the bus is on the road), Meetings (list, request with
+free slots, cancel), Profile, Your login (change password). First sign-in with a temporary
+password goes through "Set your own password" (the API refuses everything else until then).
+Checked on the iOS simulator against stage data, except Meetings (stage school has `appnt_desk`
+off; checked in the web preview with sample data).
+
+Still to do:
+1. Port `Tabs` and `MiniCalendar`. (Done 23 Oct: the school's colour on web and mobile, appearance under Your login; the school colour is not yet seen on a phone against stage, which needs the server deployed.)
+2. Live bus map on Transport (needs `react-native-maps`, so a development build, not Expo Go).
 3. Move pure helpers both apps need (`format.ts`, `classLabel`, portal types) into `packages/shared`.
-4. Push notifications: `expo-notifications`; server stores device tokens per login (new `devices` collection, route rule in `permissionCatalog.json`), sends through Expo's push service from the calendar outbox and notification events. Needs an APNs key and Firebase (FCM) project.
+4. Push notifications. Built (23 Oct), waiting for the Expo account:
+   - Server (`server/src/push`): every in-app notification (`notifications/send.js`, so calendar events, fees, notices, attendance, transport…) is also queued in `push_outbox` for each phone of its recipient, and a leased worker sends it through Expo's push service (100 per request, retries on 429/5xx, receipts after 15 minutes, phones Expo calls `DeviceNotRegistered` switched off). A template can opt out with `push: false`. Phones are in `devices`, registered at `POST /api/devices` (staff, rule in the catalog) or `POST /api/portal/devices` (families), removed with `DELETE …/devices/:token` on sign-out. A phone remembers the login's `tokenVersion`, so "sign out everywhere" also stops its pushes. `PUSH_OUTBOX_ENABLED` (default on), `EXPO_ACCESS_TOKEN` only with enhanced push security.
+   - App (`src/lib/push.ts`, `usePushNotifications`): after sign-in asks for permission, gets the Expo push token and registers it (again when the login or token changes); sign-out removes it first. A tap opens the screen the notification is about (`notificationLinks.ts` maps the website's links; calendar pushes open the event's sheet) and marks it read. Checked on the simulator with local notifications: banner while open, tap opens Fees, tap opens the calendar event.
+   - Still to do: `eas init` (the project ID; until then the app skips registration), APNs key and Firebase (FCM V1) credentials in EAS, a development build (Expo Go can't receive remote pushes on Android), then a real push end to end.
 5. Deep links: `capabble://` now; universal links on `school.capabble.cloud` (`apple-app-site-association` and `assetlinks.json` served by the client's Vercel project) so a notice email opens the app.
-6. EAS: `eas.json` with `development` (local API), `preview` (stage) and `production` profiles and channels; EAS Update on.
+6. EAS: `mobile/eas.json` is in (23 Oct): `development` (dev client, internal, API on the machine running Metro), `development-simulator` (same, iOS simulator build), `preview` (stage API, internal, Android APK, channel `preview`), `production` (production API, store, channel `production`, build numbers kept by EAS); `submit.production` puts Android on the internal track. `expo-dev-client` is installed, so `npm run ios` / the `mobile-ios` launch entry pass `--go` to keep using Expo Go. Still to do once the Expo account exists: `eas init` (writes the project ID into `app.json`), then `eas update:configure` (adds `expo-updates` and the update URL) and `ascAppId` for iOS submit.
 7. Store: privacy policy and data-safety answers (children's data: we collect for the school, no ads, no tracking), screenshots, review account for Apple and Google.
 8. Crash reporting (Sentry for React Native) before the first public build.
 

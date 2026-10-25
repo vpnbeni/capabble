@@ -5,6 +5,7 @@ import { getCurrentUser, selectAuth } from './redux/slices/authSlice'
 import { useAcademicSession } from './contexts/AcademicSessionContext'
 import { hasSessionHint } from './utils/authStorage'
 import { landingPathFor } from './utils/landing'
+import { applySchoolTheme } from './utils/schoolTheme'
 import type { AppDispatch } from './redux/store'
 import ChangePasswordRequired from './pages/ChangePasswordRequired'
 import AcceptInvite from './pages/AcceptInvite'
@@ -13,6 +14,7 @@ import UserDetail from './pages/settings/UserDetail'
 import RolesPage from './pages/settings/Roles'
 import SchoolDays from './pages/settings/SchoolDays'
 import SchoolEmail from './pages/settings/SchoolEmail'
+import SchoolPayments from './pages/settings/SchoolPayments'
 import CalendarPage from './pages/calendar/CalendarPage'
 import CalendarEvents from './pages/calendar/CalendarEvents'
 import RoleEditor from './pages/settings/RoleEditor'
@@ -214,6 +216,10 @@ function App() {
   const isPortalUser = user?.kind === 'parent' || user?.kind === 'student'
   // Where a signed-in person goes from public pages.
   const landing = landingPathFor(user, hasSession)
+
+  // The school's colour as the accent once we know who is signed in; Capabble blue otherwise.
+  const schoolColor = isAuthenticated ? user?.tenant?.brandColor : null
+  useEffect(() => applySchoolTheme(schoolColor), [schoolColor])
 
   useEffect(() => {
     // The session cookie is invisible to JS; if this browser was signed in, ask
@@ -569,6 +575,7 @@ function App() {
               <Route path="settings/roles" element={<RolesPage />} />
               <Route path="settings/school-days" element={<SchoolDays />} />
               <Route path="settings/email" element={<SchoolEmail />} />
+              <Route path="settings/payments" element={<SchoolPayments />} />
               <Route path="settings/roles/new" element={<RoleEditor />} />
               <Route path="settings/roles/:roleKey" element={<RoleEditor />} />
               <Route path="help-support" element={<HelpSupport />} />

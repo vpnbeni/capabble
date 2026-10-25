@@ -70,13 +70,15 @@ const send = async (path: string, options: RequestOptions) => {
 }
 
 const readError = async (response: Response) => {
-  let body: { error?: string; message?: string; errorCode?: string } = {}
+  let body: { error?: string; message?: string; errorCode?: string; details?: { message?: string }[] } = {}
   try {
     body = await response.json()
   } catch {
     // Not JSON (proxy error page): fall through to the generic message.
   }
-  const message = body.error || body.message || "Couldn't reach the school's server. Check your connection and try again."
+  // Joi failures arrive as "Validation failed" plus one message per field; the field's message says what to fix.
+  const fieldMessage = body.error === 'Validation failed' ? body.details?.[0]?.message?.replace(/"/g, '') : undefined
+  const message = fieldMessage || body.error || body.message || "Couldn't reach the school's server. Check your connection and try again."
   return new ApiError(message, response.status, body.errorCode)
 }
 
@@ -118,4 +120,6 @@ export const api = {
   get: <T>(path: string, params?: RequestOptions['params']) => request<T>(path, { params }),
   post: <T>(path: string, body?: unknown, options?: Omit<RequestOptions, 'method' | 'body'>) =>
     request<T>(path, { ...options, method: 'POST', body: body ?? {} }),
+  put: <T>(path: string, body?: unknown, options?: Omit<RequestOptions, 'method' | 'body'>) =>
+    request<T>(path, { ...options, method: 'PUT', body: body ?? {} }),
 }

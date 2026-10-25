@@ -16,6 +16,7 @@ const SchoolDayRule = require('../models/SchoolDayRule');
 const CalendarEvent = require('../models/CalendarEvent');
 const CalendarResponse = require('../models/CalendarResponse');
 const { SchoolMailSettings, MailOutbox, MailSuppression } = require('../models/MailRecords');
+const { Device, PushOutbox } = require('../models/PushRecords');
 const { Form66, Form66Upload } = require('../models/Form66');
 const Guideline = require('../models/Guideline');
 const Undertaking = require('../models/Undertaking');
@@ -114,6 +115,7 @@ const {
   ElectricityBill,
   InfraProject,
 } = require('../models/CapitalRecords');
+const { SchoolPaymentSettings, FeeOnlineOrder } = require('../models/FeeOnlineRecords');
 
 const tenantModelExports = {
   User,
@@ -136,6 +138,8 @@ const tenantModelExports = {
   SchoolMailSettings,
   MailOutbox,
   MailSuppression,
+  Device,
+  PushOutbox,
   Form66,
   Form66Upload,
   Guideline,
@@ -235,6 +239,8 @@ const tenantModelExports = {
   StudentFeeAccount,
   FeeDemand,
   FeePayment,
+  SchoolPaymentSettings,
+  FeeOnlineOrder,
   CapitalSettings,
   CapitalCounter,
   CapitalExpense,

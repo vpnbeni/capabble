@@ -31,7 +31,7 @@ const formatDate = (value) => {
   return new Date(value).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 };
 
-const MODE_LABELS = { cash: 'Cash', upi: 'UPI', cheque: 'Cheque', dd: 'Demand Draft', bank_transfer: 'Bank Transfer', card: 'Card' };
+const MODE_LABELS = { cash: 'Cash', upi: 'UPI', cheque: 'Cheque', dd: 'Demand Draft', bank_transfer: 'Bank Transfer', card: 'Card', online: 'Online' };
 
 const withLateFee = (demands, lateFeeRule, asOf = new Date()) => demands.map((d) => ({
   ...d,

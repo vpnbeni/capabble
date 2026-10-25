@@ -13,6 +13,7 @@ const { featureOn, portalSections, openSections } = require('../rbac/portalSecti
 const { buildClassPDFContext } = require('../services/timetableExportService');
 const { buildCardData } = require('./reportCardController');
 const { receiptPdf } = require('./cpitl/collectionController');
+const { onlinePaymentStatus } = require('./portalPaymentController');
 const { sectionKey } = require('../rbac/scope');
 const schoolDays = require('../modules/clndr/schoolDays');
 const { withEffectiveDueDates, dueDateOf } = require('../modules/cpitl/dueDates');
@@ -189,7 +190,9 @@ const getAttendance = asyncHandler(async (req, res) => {
   });
 
   const count = (status) => days.filter((day) => day.status === status).length;
-  const schoolDays = count('present') + count('absent') + count('half_day');
+  // Not `schoolDays`: that name is the calendar module used above, and shadowing it made
+  // every request fail before the calendar was read.
+  const schoolDayCount = count('present') + count('absent') + count('half_day');
   const attended = count('present') + count('half_day') * 0.5;
 
   return res.json({
@@ -198,12 +201,12 @@ const getAttendance = asyncHandler(async (req, res) => {
       month,
       days,
       summary: {
-        schoolDays,
+        schoolDays: schoolDayCount,
         present: count('present'),
         absent: count('absent'),
         halfDays: count('half_day'),
         holidays: count('holiday'),
-        percentage: schoolDays > 0 ? Math.round((attended / schoolDays) * 1000) / 10 : null
+        percentage: schoolDayCount > 0 ? Math.round((attended / schoolDayCount) * 1000) / 10 : null
       }
     }
   });
@@ -309,7 +312,7 @@ const getFees = asyncHandler(async (req, res) => {
       .sort({ date: -1 }).lean()
   ]);
   const now = new Date();
-  const demands = await withEffectiveDueDates(req.models, storedDemands);
+  const [demands, onlinePayment] = await Promise.all([withEffectiveDueDates(req.models, storedDemands), onlinePaymentStatus(req)]);
 
   return res.json({
     success: true,
@@ -337,7 +340,9 @@ const getFees = asyncHandler(async (req, res) => {
         date: payment.date,
         mode: payment.mode,
         amount: payment.total ?? (Number(payment.feeAmount || 0) + Number(payment.lateFeeCollected || 0))
-      }))
+      })),
+      // Whether the school takes fees online (its own Razorpay account).
+      onlinePayment
     }
   });
 });

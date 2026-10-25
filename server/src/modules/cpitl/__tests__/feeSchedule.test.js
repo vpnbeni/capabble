@@ -8,7 +8,9 @@ const {
   demandStatus,
   diffComponents,
   parseSessionStartYear,
+  normalizePlan,
 } = require('../feeSchedule');
+const mongoose = require('mongoose');
 const { roleHasPermission, CPITL_PERMISSIONS } = require('../constants');
 
 const TUITION = 'h-tuition';
@@ -176,5 +178,24 @@ describe('CPITL late fee allocation', () => {
       { demandId: 'apr', amount: 150 },
       { demandId: 'may', amount: 100 },
     ]);
+  });
+});
+
+describe('normalizePlan', () => {
+  it('keeps the months and due day a saved structure chose (Mongoose subdocument)', () => {
+    const Plan = new mongoose.Schema({ dueDay: Number, quarterlyMonths: [Number] }, { _id: false });
+    const Structure = mongoose.model('NormalizePlanTestStructure', new mongoose.Schema({ installmentPlan: Plan }));
+    const doc = new Structure({ installmentPlan: { dueDay: 15, quarterlyMonths: [4, 10, 1] } });
+
+    const plan = normalizePlan(doc.installmentPlan);
+
+    expect(plan.dueDay).toBe(15);
+    expect(plan.quarterlyMonths).toEqual([4, 10, 1]);
+  });
+
+  it('fills what a plain plan leaves out from the defaults', () => {
+    const plan = normalizePlan({ dueDay: 5 });
+    expect(plan.dueDay).toBe(5);
+    expect(plan.quarterlyMonths.length).toBeGreaterThan(0);
   });
 });

@@ -8,6 +8,8 @@ export interface SchoolProfile {
   affiliationTill: string
   logoUrl: string
   logoPublicId: string
+  /** The school's colour (#rrggbb), empty for Capabble blue. */
+  brandColor: string
   tagline: string
   address: string
   contact: string
@@ -24,7 +26,7 @@ export interface SchoolProfile {
 
 type SchoolProfileUpdatePayload = Pick<
   SchoolProfile,
-  'name' | 'schoolCode' | 'affiliationNo' | 'udiseCode' | 'affiliationTill' | 'tagline' | 'address' | 'contact' | 'email'
+  'name' | 'schoolCode' | 'affiliationNo' | 'udiseCode' | 'affiliationTill' | 'tagline' | 'address' | 'contact' | 'email' | 'brandColor'
 >
 
 const getProfile = async (): Promise<SchoolProfile> => {
@@ -43,6 +45,7 @@ const updateProfile = async (payload: SchoolProfileUpdatePayload): Promise<Schoo
     address: payload.address,
     contact: payload.contact,
     email: payload.email,
+    brandColor: payload.brandColor,
   })
   return (response?.data?.data || {}) as SchoolProfile
 }

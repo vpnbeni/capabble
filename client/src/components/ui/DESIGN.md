@@ -1,6 +1,6 @@
 # Capabble design system — working copy
 
-Synced from the design system artifact (claude.ai/artifact/LyYegFLHJxi1rNpnkaqHjH, version `1791963230-61be`, 2026-10-15).
+Synced from the design system artifact (claude.ai/artifact/LyYegFLHJxi1rNpnkaqHjH, version `1792780669-579c`, 2026-10-23).
 The artifact is the source of truth. This file is the condensed version **mapped to our kit**
 (`@/components/ui`, styles in `client/src/styles/capabble/`). The artifact's own component
 API (`window.Capabble`, icon name strings, `rowKey`, …) does not match our kit; use the props below.
@@ -34,6 +34,7 @@ When the artifact changes, resync this file and bump the version line.
 - Grounds: page `bg`; cards, tables, sidebar, header `surface`; menus/dialogs `surface-raised`; table headers, tracks, read-only fields `surface-sunken`.
 - Lines: `border` for hairlines; every input/select/secondary button uses `border-control`.
 - Text: `ink` primary, `ink-muted` secondary, `ink-subtle` only for timestamps, placeholders, column headers.
+- The school's colour (Settings → School profile, `brandColor`) becomes the accent through `applySchoolTheme` (`utils/schoolTheme.ts`, algorithm in `packages/shared/src/schoolAccent.ts`), applied in `App.tsx` after sign-in. Never set accent colours by hand.
 - Accent = the school's colour, one per screen: `accent-strong` (primary button, links), `accent-soft` + `accent-soft-ink` (selected item), `accent` (marks only: icons, tab underline, progress). `highlight` is decorative only.
 - Status tones are fixed; always pair colour with a word or icon:
 
@@ -55,6 +56,7 @@ When the artifact changes, resync this file and bump the version line.
 - 4px grid (`--space-1` … `--space-12`). Card padding `space-5` (phones `space-4`), gaps between cards `space-6`.
 - Radius: `--radius-sm` 6 (controls, badges), `--radius-md` 8 (menus), `--radius-lg` 12 (cards, dialogs).
 - Elevation: borders separate things; only floating layers get `--shadow-overlay`.
+- Mobile-only tokens (`--radius-xl/2xl/tile`, `--shadow-card-m/bar/float`, `--fill-*`, `--scrim`, `--material-chrome`, `--tile-1…6(-ink)`, `--touch-min`, `--nav-bar-height`, `--tab-bar-height`, `--row-m`, `--tile-size`, `--action-bar-height`, the `m-*` type styles) are for the native app (`mobile/src/ui/DESIGN.md`). The web workspace doesn't use them.
 - Workspace density: 40px table rows, 13px cells, 36px controls.
 
 ## Formats (`@/components/ui` → `format.ts`)
@@ -109,6 +111,7 @@ Lucide (`lucide-react`), passed as components: `icon={Plus}`. 1.75 stroke is app
 | `Avatar` | `name, src, size, square` | People; school logo is `square` |
 | `Icon` | `icon, size, label` | Lucide glyph at system stroke |
 | `TextField` / `TextArea` | `label, hint, error, required` + input props; TextField `prefix, suffix, icon, size` | Every field has a visible label |
+| `ColorField` | `label, hint, error, value, onChange(hex)` | A colour as a hex code with a swatch that opens the system picker (the school's colour). Not in the artifact yet: added to our kit |
 | `FileField` | `label, hint, error, required, file, onChange(File \| null), accept, placeholder, disabled` | One file to upload (imports). Dashed drop zone; shows the chosen file's name and size with Replace. Several files = several FileFields, each labelled. Not in the artifact yet: added to our kit |
 | `Select` | `label, options (string \| {value,label,disabled}), placeholder, size` | Native dropdown |
 | `Combobox` | `options[{value,label,meta,keywords}], value, onChange, selectedLabel, clearable, placeholder` | Searchable picker; no free text |
@@ -145,3 +148,5 @@ text: `.cb-muted` `.cb-subtle` `.cb-strong` `.cb-subhead` `.cb-section-title` `.
 ## Mobile
 
 Touch targets ≥44px in the companion app. Nothing hover-only (row actions in a `Menu`). Tables turn into cards under 600px by themselves; only timetable and attendance grids may scroll sideways. Dialogs/Sheets become bottom sheets. Under 768px the app shell drops the sidebar rail: the header's menu button opens the full sidebar as a left drawer (`OverlayShell variant="drawer"`), and the billing banner shrinks to one short line. Check every new screen at 375px.
+
+The native app (`/mobile`) follows the design system's **Mobile app** section instead of this one where they differ (large titles, `TabBar`, `ListGroup`, bottom sheets, `ActionBar`, `MobileButton`): see `mobile/src/ui/DESIGN.md`.

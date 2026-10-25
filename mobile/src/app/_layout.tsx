@@ -1,4 +1,4 @@
-import { Inter_400Regular, Inter_500Medium, Inter_600SemiBold, useFonts } from '@expo-google-fonts/inter'
+import { Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold, useFonts } from '@expo-google-fonts/inter'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Stack } from 'expo-router'
 import * as SplashScreen from 'expo-splash-screen'
@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 
 import { ApiError } from '@/lib/api'
+import { usePushNotifications } from '@/lib/usePushNotifications'
 import { SessionProvider, useSession } from '@/session/SessionProvider'
 import { ThemeProvider, useTheme } from '@/theme/ThemeProvider'
 
@@ -25,7 +26,7 @@ const createQueryClient = () =>
 
 export default function RootLayout() {
   const [queryClient] = useState(createQueryClient)
-  const [fontsLoaded] = useFonts({ Inter_400Regular, Inter_500Medium, Inter_600SemiBold })
+  const [fontsLoaded] = useFonts({ Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold })
 
   return (
     <SafeAreaProvider>
@@ -39,12 +40,21 @@ export default function RootLayout() {
 }
 
 function RootStack() {
-  const { status } = useSession()
-  const { scheme, colors } = useTheme()
+  const session = useSession()
+  const { status } = session
+  // A school-set temporary password must be replaced before the API serves anything else.
+  const mustSetPassword = session.status === 'signedIn' && session.user.mustChangePassword
+  const { scheme, colors, setSchoolColor } = useTheme()
+  const schoolColor = session.status === 'signedIn' ? session.user.tenant?.brandColor || null : null
+
+  usePushNotifications(status === 'signedIn' && !mustSetPassword ? session.user : null, session.school?.slug ?? null)
 
   useEffect(() => {
     if (status !== 'loading') SplashScreen.hideAsync()
   }, [status])
+
+  // The school's colour as the accent while signed in; Capabble blue on the sign-in screen.
+  useEffect(() => setSchoolColor(schoolColor), [schoolColor, setSchoolColor])
 
   if (status === 'loading') return null
 
@@ -52,8 +62,11 @@ function RootStack() {
     <>
       <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
-        <Stack.Protected guard={status === 'signedIn'}>
+        <Stack.Protected guard={status === 'signedIn' && !mustSetPassword}>
           <Stack.Screen name="(app)" />
+        </Stack.Protected>
+        <Stack.Protected guard={mustSetPassword}>
+          <Stack.Screen name="set-password" />
         </Stack.Protected>
         <Stack.Protected guard={status !== 'signedIn'}>
           <Stack.Screen name="sign-in" />

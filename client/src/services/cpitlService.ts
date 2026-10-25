@@ -13,7 +13,42 @@ const api = {
 }
 
 export type FeeFrequency = 'one_time' | 'monthly' | 'quarterly' | 'half_yearly' | 'annual'
-export type PaymentMode = 'cash' | 'upi' | 'cheque' | 'dd' | 'bank_transfer' | 'card'
+// 'online' is recorded by the system when a parent pays through the school's Razorpay account.
+export type PaymentMode = 'cash' | 'upi' | 'cheque' | 'dd' | 'bank_transfer' | 'card' | 'online'
+
+export type OnlinePaymentStatus = 'processing' | 'paid' | 'review'
+
+export type PaymentSettings = {
+  enabled: boolean
+  provider: 'razorpay'
+  keyId: string
+  mode: 'test' | 'live' | null
+  hasKeySecret: boolean
+  hasWebhookSecret: boolean
+  connected: boolean
+  webhookUrl: string
+  lastTestAt: string | null
+  lastTestOk: boolean | null
+  lastError: string
+  lastWebhookAt: string | null
+  needsReview?: number
+  recent?: Array<{
+    _id: string
+    status: OnlinePaymentStatus
+    amount: number
+    student: string
+    admissionNo: string
+    className: string
+    paidBy: string
+    receiptNo: string
+    paymentId: string
+    method: string
+    paidAt: string
+    reviewReason: string
+  }>
+}
+
+export type PaymentSettingsInput = { enabled: boolean; keyId: string; keySecret?: string; webhookSecret?: string }
 
 export type FeeHead = {
   _id: string
@@ -561,6 +596,10 @@ const cpitlService = {
 
   getSettings: async () => (await api.get('/cpitl/settings')).data.data as CapitalSettings,
   updateSettings: async (payload: Partial<CapitalSettings>) => (await api.put('/cpitl/settings', payload)).data,
+  // Settings → Payments: the school's own Razorpay account
+  getPaymentSettings: async () => (await api.get('/cpitl/payment-settings')).data.data as PaymentSettings,
+  savePaymentSettings: async (payload: PaymentSettingsInput) => (await api.put('/cpitl/payment-settings', payload)).data.data as PaymentSettings,
+  testPaymentSettings: async () => (await api.post('/cpitl/payment-settings/test')).data.data as PaymentSettings,
   // Phase 2 — expenses
   uploadAttachment: async (file: File) => {
     const body = new FormData()

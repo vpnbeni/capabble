@@ -7,6 +7,7 @@ This is an Expo/React Native mobile application. Prioritize mobile-first pattern
 - Not an npm workspace: run npm inside `mobile/` with Node 22.13+ (`.nvmrc`). Shared files come from `../packages/shared` through Metro (`@capabble/shared/*`); edit them there.
 - API calls go through `src/lib/api.ts` (cookie session, `x-tenant-slug`, refresh on 401) from a service in `src/services/`. Never store tokens or passwords on the device.
 - Copy follows the voice rules: sentence case, buttons start with a verb, errors say what to fix, never module codes.
+- The keyboard must never cover the field being typed in. Forms live in `MobileScreen` or `BottomSheet` with `MobileTextField`; never add `KeyboardAvoidingView` or your own keyboard padding (see "Forms" in `src/ui/DESIGN.md`). Test forms on Android.
 
 ## Expo has changed — do not trust your training data
 

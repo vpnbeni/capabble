@@ -49,7 +49,10 @@ const describeLinkedStudents = async (user, StudentModel) => {
  */
 const buildAuthUserPayload = async (user, { models = {}, tenant = null, rbac = null } = {}) => {
   const portal = isPortalUser(user);
-  const permissionSet = portal ? null : rbac || await resolvePermissionSet(user, models.Role);
+  const [permissionSet, schoolProfile] = await Promise.all([
+    portal ? null : rbac || resolvePermissionSet(user, models.Role),
+    tenant && models.SchoolProfile ? models.SchoolProfile.findOne({}).select('brandColor').lean() : null
+  ]);
 
   return {
     _id: user._id,
@@ -69,7 +72,8 @@ const buildAuthUserPayload = async (user, { models = {}, tenant = null, rbac = n
     linkedStudents: portal ? await describeLinkedStudents(user, models.Student) : [],
     teacher: user.teacher || null,
     featureToggles: tenant?.featureToggles || null,
-    tenant: tenant ? { slug: tenant.slug, name: tenant.name || '' } : null
+    // brandColor: the school's colour, which the apps turn into their accent (empty: Capabble blue).
+    tenant: tenant ? { slug: tenant.slug, name: tenant.name || '', brandColor: schoolProfile?.brandColor || '' } : null
   };
 };
 

@@ -8,6 +8,7 @@
  * Keep in sync with MODULE_MODEL_KEYS.core in constants/moduleModelKeys.js.
  */
 const mailRecords = require('../../models/MailRecords');
+const pushRecords = require('../../models/PushRecords');
 
 module.exports = {
   User: require('../../models/User'),
@@ -25,4 +26,6 @@ module.exports = {
   SchoolMailSettings: mailRecords.SchoolMailSettings,
   MailOutbox: mailRecords.MailOutbox,
   MailSuppression: mailRecords.MailSuppression,
+  Device: pushRecords.Device,
+  PushOutbox: pushRecords.PushOutbox,
 };

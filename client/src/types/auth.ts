@@ -57,7 +57,8 @@ export interface User {
   lastLogin?: string | null
   billing?: BillingSnapshot | null
   featureToggles?: Record<string, boolean> | null
-  tenant?: { slug: string; name: string } | null
+  /** brandColor: the school's colour (#rrggbb), empty for Capabble blue. */
+  tenant?: { slug: string; name: string; brandColor?: string } | null
 }
 
 // Login credentials interface

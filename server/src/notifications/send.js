@@ -7,6 +7,9 @@
  * User documents (or ids). The template for `kind` (templates.js) writes the
  * text per recipient and may skip someone by returning null. Never throws:
  * a notification failing must not break the action that caused it.
+ *
+ * Each row stored for the first time is also pushed to the recipient's phones
+ * (push/outbox.js), unless the template says `push: false`.
  */
 const { getTenantConnectionAndModels } = require('../tenancy/tenantConnectionManager');
 const { catalog } = require('../rbac/catalog');
@@ -14,7 +17,7 @@ const { isPortalUser } = require('../rbac/permissions');
 const templates = require('./templates');
 const { byIds } = require('./recipients');
 
-const MODEL_KEYS = ['Notification', 'User', 'Role', 'SchoolProfile'];
+const MODEL_KEYS = ['Notification', 'User', 'Role', 'SchoolProfile', 'Device', 'PushOutbox'];
 
 const modelsFor = (tenant, extraKeys = []) => {
   if (!tenant?.dbName) throw new Error('tenant.dbName is required');
@@ -70,18 +73,24 @@ const build = (template, kind, data, user, context) => {
   };
 };
 
-/** Insert, ignoring rows whose dedupeKey already exists for that recipient. */
-const insertRows = async (Notification, rows) => {
-  if (!rows.length) return 0;
+/** Insert, ignoring rows whose dedupeKey already exists for that recipient. Returns the rows stored now. */
+const insertNew = async (Notification, rows) => {
+  if (!rows.length) return [];
   try {
-    const inserted = await Notification.insertMany(rows, { ordered: false });
-    return inserted.length;
+    return await Notification.insertMany(rows, { ordered: false });
   } catch (error) {
     const duplicatesOnly = error?.writeErrors?.length && error.writeErrors.every((e) => (e.code ?? e.err?.code) === 11000);
-    if (error?.code === 11000 || duplicatesOnly) return error.insertedDocs?.length ?? (rows.length - (error.writeErrors?.length || 0));
+    if (error?.code === 11000 || duplicatesOnly) {
+      if (error.insertedDocs) return error.insertedDocs;
+      // Count only: nothing to push for rows we can't name.
+      return Array.from({ length: rows.length - (error.writeErrors?.length || 0) }, () => null);
+    }
     throw error;
   }
 };
+
+/** Insert, ignoring rows whose dedupeKey already exists for that recipient. Returns how many were stored. */
+const insertRows = async (Notification, rows) => (await insertNew(Notification, rows)).length;
 
 const send = async (tenant, recipients, kind, data = {}) => {
   try {
@@ -92,7 +101,12 @@ const send = async (tenant, recipients, kind, data = {}) => {
     if (!users.length) return 0;
     const context = { schoolName: await schoolNameFor(models, tenant) };
     const rows = users.map((user) => build(template, kind, data, user, context)).filter(Boolean);
-    return await insertRows(models.Notification, rows);
+    const stored = await insertNew(models.Notification, rows);
+    if (template.push !== false) {
+      // eslint-disable-next-line global-require
+      await require('../push/outbox').queueForNotifications(models, tenant, stored.filter((row) => row?._id));
+    }
+    return stored.length;
   } catch (error) {
     console.error(`[notifications] ${kind} not sent: ${error.message}`);
     return 0;
