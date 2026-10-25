@@ -14,8 +14,9 @@ const { buildClassPDFContext } = require('../services/timetableExportService');
 const { buildCardData } = require('./reportCardController');
 const { receiptPdf } = require('./cpitl/collectionController');
 const { onlinePaymentStatus } = require('./portalPaymentController');
-const { sectionKey } = require('../rbac/scope');
+const { sectionKey, classNameRegex, normalizeClassName } = require('../rbac/scope');
 const schoolDays = require('../modules/clndr/schoolDays');
+const schoolDate = require('../utils/schoolDate');
 const { withEffectiveDueDates, dueDateOf } = require('../modules/cpitl/dueDates');
 const {
   closeStaleTrips, serviceDate, sortedStops, publicStop, staleSeconds
@@ -243,6 +244,54 @@ const getTimetable = asyncHandler(async (req, res) => {
       periods: context.periods,
       days: context.classes[0]?.days || []
     }
+  });
+});
+
+const escapeRegex = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+// GET /api/portal/students/:studentId/homework — the class's published homework, due in the last
+// two weeks or later, with this student's own submission mark when the teacher has recorded one.
+const HOMEWORK_FIELDS = 'title subjectName subject teacherName assignedDate date dueDate '
+  + 'instructions description status submissions';
+
+const getHomework = asyncHandler(async (req, res) => {
+  const Homework = req.models?.AcademicHomework;
+  if (!canOpen(req, 'homework') || !featureOn(req, 'acdmc_academics') || !Homework) {
+    return unavailable(res, 'Homework is not available.');
+  }
+  const student = req.portalStudent;
+  if (!student.class || !student.section) return res.json({ success: true, data: [] });
+  const from = schoolDate.addDays(schoolDate.today(), -14);
+  const rows = await Homework.find({
+    $and: [
+      { isActive: { $ne: false } },
+      { status: { $in: ['published', 'closed'] } },
+      { className: classNameRegex(normalizeClassName(student.class)) },
+      { section: new RegExp(`^\\s*${escapeRegex(String(student.section).trim())}\\s*$`, 'i') },
+      { $or: [{ dueDate: { $gte: from } }, { date: { $gte: from } }] }
+    ]
+  })
+    .select(HOMEWORK_FIELDS)
+    .sort({ dueDate: 1 })
+    .limit(100)
+    .lean();
+  const own = String(student._id);
+  res.json({
+    success: true,
+    data: rows.map((row) => {
+      const mine = (row.submissions || []).find((entry) => String(entry.studentId) === own);
+      return {
+        id: String(row._id),
+        title: row.title,
+        subjectName: row.subjectName || row.subject || '',
+        teacherName: row.teacherName || '',
+        assignedDate: row.assignedDate || row.date || '',
+        dueDate: row.dueDate || row.date || '',
+        instructions: row.instructions || row.description || '',
+        status: row.status,
+        submission: mine && mine.status !== 'pending' ? { status: mine.status, remark: mine.remark || '' } : null
+      };
+    })
   });
 });
 
@@ -520,6 +569,7 @@ module.exports = {
   getProfile,
   getAttendance,
   getTimetable,
+  getHomework,
   getResults,
   getFees,
   getReceiptPdf,

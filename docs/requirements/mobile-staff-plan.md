@@ -136,7 +136,7 @@ Each needs a stage deploy before its slice works on the phone. Tests in `server/
 | 8 | Classes / Students: class list, search, roster, student with guardian to call | `staff/StudentsBrowser.tsx`, `class-roster.tsx`, `student/[id].tsx` | — |
 | + | Notifications bell (unread dot) on every staff Today and the list; links open the app screen or the website page | `notifications.tsx`, `staff/useBell.ts`, `lib/notificationLinks.ts` | — |
 | + | Staff attendance for one day: everyone present, tap the absent, staff groups, any past day; from the principal's "Staff absent" tile, office Today and More | `staff-attendance.tsx` | — (staff groups moved to `packages/shared/src/staffTypes.ts`, used by the website too) |
-| + | Homework: due / drafts / past for the teacher's classes or one class, post and edit (published at once), publish a draft, close; from a class roster and More. Families don't see homework yet (no portal section) | `homework/index.tsx`, `homework/new.tsx` | — |
+| + | Homework: due / drafts / past for the teacher's classes or one class, post and edit (published at once), publish a draft, close; from a class roster and More. Families see it in the app and on the web portal (portal section `homework`) | `homework/index.tsx`, `homework/new.tsx` | `GET /portal/students/:id/homework` for families |
 
 Kit added on the way: `useFixedColumn`, `MonthPicker` (documented in `mobile/src/ui/DESIGN.md`).
 

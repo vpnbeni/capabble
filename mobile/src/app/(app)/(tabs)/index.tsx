@@ -54,7 +54,8 @@ function FamilyHome() {
   const openItem = (item: CalendarItem) =>
     router.push(item.eventId ? { pathname: '/calendar', params: { event: item.eventId, date: item.occurrence ?? item.startDate } } : '/calendar')
 
-  const shortcuts = PORTAL_MODULES.filter((module) => has(module.section)).map((module) => ({
+  // The grid holds eight; Profile (last) is also under More.
+  const shortcuts = PORTAL_MODULES.filter((module) => has(module.section)).slice(0, 8).map((module) => ({
     label: module.label,
     icon: module.icon,
     tile: module.tile,

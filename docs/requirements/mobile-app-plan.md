@@ -74,7 +74,8 @@ one child (remembered on the device).
   and the WebView (both native-only).
 
 Also done: the rest of the family portal under More, each shown only when the school has the
-section on: Attendance (month grid and summary), Timetable (one day at a time), Results,
+section on: Attendance (month grid and summary), Timetable (one day at a time), Homework (25 Oct:
+due and the last two weeks, with the child's own mark; also on the web portal), Results,
 Transport (crew to call, stops, whether the bus is on the road), Meetings (list, request with
 free slots, cancel), Profile, Your login (change password). First sign-in with a temporary
 password goes through "Set your own password" (the API refuses everything else until then).

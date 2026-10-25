@@ -44,6 +44,7 @@ export function appRouteFor(link: string, kind: UserKind): string {
     case 'attendance':
     case 'results':
     case 'timetable':
+    case 'homework':
     case 'transport':
     case 'profile':
       return `/${section}`

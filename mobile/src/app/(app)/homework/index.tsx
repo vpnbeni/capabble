@@ -3,8 +3,10 @@ import { NotebookPen } from 'lucide-react-native'
 import { useState } from 'react'
 
 import { classLabel, dayKeyAdd, formatDayKey, schoolToday } from '@/lib/format'
+import { FamilyHomework } from '@/portal/FamilyHomework'
 import { CardSkeleton, LoadFailed } from '@/portal/states'
 import type { Homework, HomeworkStatus } from '@/services/homeworkService'
+import { useSession } from '@/session/SessionProvider'
 import { useHomeworkList, useHomeworkStatus } from '@/staff/queries'
 import { type Tone } from '@/theme/tokens'
 import { ActionBar, ActionSheet, ListGroup, MobileScreen, NavBar, SegmentedControl, StatusView, Surface, haptic, useToast } from '@/ui'
@@ -18,8 +20,14 @@ const STATUS: Record<HomeworkStatus, { label: string; tone: Tone }> = {
 
 type View = 'due' | 'drafts' | 'past'
 
-/** Homework for the teacher's classes (or one class): what is due, drafts, and what has passed. */
 export default function HomeworkScreen() {
+  const session = useSession()
+  if (session.status !== 'signedIn') return null
+  return session.user.kind === 'staff' ? <StaffHomework /> : <FamilyHomework />
+}
+
+/** Homework for the teacher's classes (or one class): what is due, drafts, and what has passed. */
+function StaffHomework() {
   const router = useRouter()
   const toast = useToast()
   const { className = '', section = '' } = useLocalSearchParams<{ className?: string; section?: string }>()

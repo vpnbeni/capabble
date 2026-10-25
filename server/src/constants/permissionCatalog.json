@@ -471,7 +471,7 @@
     }
   ],
   "portal": {
-    "parent": ["profile", "calendar", "attendance", "timetable", "results", "fees", "notices", "transport", "appointments"],
-    "student": ["profile", "calendar", "attendance", "timetable", "results", "notices", "transport"]
+    "parent": ["profile", "calendar", "attendance", "timetable", "homework", "results", "fees", "notices", "transport", "appointments"],
+    "student": ["profile", "calendar", "attendance", "timetable", "homework", "results", "notices", "transport"]
   }
 }

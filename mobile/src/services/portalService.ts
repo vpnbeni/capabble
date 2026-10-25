@@ -10,11 +10,25 @@ export type PortalSection =
   | 'calendar'
   | 'attendance'
   | 'timetable'
+  | 'homework'
   | 'results'
   | 'fees'
   | 'notices'
   | 'transport'
   | 'appointments'
+
+/** Homework set for the child's class, with the child's own mark once the teacher records it. */
+export interface PortalHomework {
+  id: string
+  title: string
+  subjectName: string
+  teacherName: string
+  assignedDate: string
+  dueDate: string
+  instructions: string
+  status: 'published' | 'closed'
+  submission: { status: 'submitted' | 'late' | 'missing' | 'excused'; remark: string } | null
+}
 
 export interface PortalChild {
   studentId: string
@@ -230,6 +244,7 @@ export const portalService = {
   results: (studentId: string) => api.get<PortalResult[]>(`${student(studentId)}/results`),
   transport: (studentId: string) => api.get<PortalTransport>(`${student(studentId)}/transport`),
   busLive: (studentId: string) => api.get<PortalBusLive>(`${student(studentId)}/transport/live`),
+  homework: (studentId: string) => api.get<PortalHomework[]>(`${student(studentId)}/homework`),
   appointments: () => api.get<PortalAppointments>('/portal/appointments'),
   appointmentHosts: (studentId: string) => api.get<PortalAppointmentHost[]>(`${student(studentId)}/appointment-hosts`),
   appointmentSlots: (studentId: string, hostId: string, date: string) =>

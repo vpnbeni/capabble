@@ -7,7 +7,7 @@ const silent = (config?: AxiosRequestConfig): AxiosRequestConfig => ({ ...(confi
 const get = (url: string, config?: AxiosRequestConfig) => baseApi.get(url, silent(config))
 const post = (url: string, data?: unknown) => baseApi.post(url, data, silent())
 
-export type PortalSection = 'profile' | 'calendar' | 'attendance' | 'timetable' | 'results' | 'fees' | 'notices' | 'transport' | 'appointments'
+export type PortalSection = 'profile' | 'calendar' | 'attendance' | 'timetable' | 'homework' | 'results' | 'fees' | 'notices' | 'transport' | 'appointments'
 
 export interface PortalChild {
   studentId: string
@@ -63,6 +63,19 @@ export interface PortalAttendance {
     holidays: number
     percentage: number | null
   }
+}
+
+/** Homework set for the child's class, with the child's own mark once the teacher records it. */
+export interface PortalHomework {
+  id: string
+  title: string
+  subjectName: string
+  teacherName: string
+  assignedDate: string
+  dueDate: string
+  instructions: string
+  status: 'published' | 'closed'
+  submission: { status: 'submitted' | 'late' | 'missing' | 'excused'; remark: string } | null
 }
 
 export interface PortalTimetable {
@@ -250,6 +263,7 @@ const portalService = {
   attendance: async (id: string, month: string): Promise<PortalAttendance> =>
     (await get(`${student(id)}/attendance`, { params: { month } })).data.data,
   timetable: async (id: string): Promise<PortalTimetable | null> => (await get(`${student(id)}/timetable`)).data.data,
+  homework: async (id: string): Promise<PortalHomework[]> => (await get(`${student(id)}/homework`)).data.data,
   results: async (id: string): Promise<PortalResult[]> => (await get(`${student(id)}/results`)).data.data,
   fees: async (id: string): Promise<PortalFees | null> => (await get(`${student(id)}/fees`)).data.data,
   transport: async (id: string): Promise<PortalTransport> => (await get(`${student(id)}/transport`)).data.data,
