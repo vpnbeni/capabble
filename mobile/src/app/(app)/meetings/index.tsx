@@ -1,7 +1,6 @@
 import { useRouter } from 'expo-router'
-import { CalendarClock, CalendarPlus } from 'lucide-react-native'
+import { CalendarPlus } from 'lucide-react-native'
 import { useState } from 'react'
-import { View } from 'react-native'
 
 import { ApiError } from '@/lib/api'
 import { formatDayKey, formatTime, schoolToday } from '@/lib/format'
@@ -9,8 +8,26 @@ import { usePortal } from '@/portal/PortalProvider'
 import { useCancelAppointment, usePortalAppointments } from '@/portal/queries'
 import { CardSkeleton, LoadFailed, NoChild } from '@/portal/states'
 import type { PortalAppointment, PortalAppointmentStatus } from '@/services/portalService'
-import { space, type Tone } from '@/theme/tokens'
-import { Badge, Banner, Button, Card, Dialog, EmptyState, ListRow, Screen, Sheet, Text, TextField, useToast } from '@/ui'
+import { type Tone } from '@/theme/tokens'
+import {
+  ActionBar,
+  Badge,
+  BottomSheet,
+  Callout,
+  DetailList,
+  Dialog,
+  haptic,
+  ListGroup,
+  MobileButton,
+  MobileScreen,
+  MobileTextField,
+  NavBar,
+  SegmentedControl,
+  StatusView,
+  Surface,
+  Text,
+  useToast,
+} from '@/ui'
 
 const MEETING_STATUS: Record<PortalAppointmentStatus, { label: string; tone: Tone }> = {
   requested: { label: 'Waiting for the school', tone: 'warning' },
@@ -34,6 +51,7 @@ export default function MeetingsScreen() {
   const { child, isParent } = usePortal()
   const list = usePortalAppointments()
   const cancel = useCancelAppointment()
+  const [view, setView] = useState<'upcoming' | 'past'>('upcoming')
   const [open, setOpen] = useState<PortalAppointment | null>(null)
   const [cancelling, setCancelling] = useState<PortalAppointment | null>(null)
   const [reason, setReason] = useState('')
@@ -43,24 +61,110 @@ export default function MeetingsScreen() {
   const items = data?.items ?? []
   const upcoming = items.filter(isUpcoming)
   const past = items.filter((a) => !isUpcoming(a))
+  const shown = view === 'upcoming' ? upcoming : past
   const canRequest = Boolean(isParent && data?.allowRequests)
-  const request = canRequest ? () => router.push('/meetings/new') : undefined
-
-  const rows = (list: PortalAppointment[]) =>
-    list.map((a, index) => (
-      <ListRow
-        key={a._id}
-        primary={a.hostName}
-        secondary={`${when(a)} · ${[a.purpose, a.studentSnapshot?.name?.split(' ')[0]].filter(Boolean).join(' · ')}`}
-        lines={2}
-        divider={index < list.length - 1}
-        trailing={<Badge label={MEETING_STATUS[a.status].label} tone={MEETING_STATUS[a.status].tone} />}
-        onPress={() => setOpen(a)}
-      />
-    ))
 
   return (
-    <Screen title="Meetings" onBack={router.back} refreshing={list.isRefetching} onRefresh={list.refetch}>
+    <MobileScreen
+      refreshing={list.isRefetching}
+      onRefresh={list.refetch}
+      nav={<NavBar title="Meetings" back={{ label: 'Back', onPress: router.back }} />}
+      actionBar={
+        canRequest && child ? (
+          <ActionBar
+            icon={CalendarPlus}
+            summary={upcoming.length ? `${upcoming.length} coming up` : 'No meetings booked'}
+            detail={`About ${child.name}`}
+            label="Request"
+            onPress={() => router.push('/meetings/new')}
+          />
+        ) : undefined
+      }
+      overlay={
+        <>
+          <BottomSheet
+            open={Boolean(open)}
+            onClose={() => setOpen(null)}
+            title={open ? `Meeting with ${open.hostName}` : ''}
+            description={open ? when(open) : undefined}
+            footer={
+              <>
+                {open && isUpcoming(open) ? (
+                  <MobileButton
+                    variant="destructive"
+                    fullWidth
+                    onPress={() => {
+                      setReason('')
+                      setCancelError(null)
+                      setCancelling(open)
+                      setOpen(null)
+                    }}
+                  >
+                    Cancel meeting
+                  </MobileButton>
+                ) : null}
+                <MobileButton variant="gray" fullWidth onPress={() => setOpen(null)}>
+                  Done
+                </MobileButton>
+              </>
+            }
+          >
+            {open ? (
+              <>
+                <Badge label={MEETING_STATUS[open.status].label} tone={MEETING_STATUS[open.status].tone} />
+                <DetailList
+                  columns={2}
+                  items={[
+                    { label: 'How', value: MODE_LABEL[open.mode] },
+                    { label: 'Where', value: open.location },
+                    { label: 'About', value: open.purpose },
+                    { label: 'For', value: open.studentSnapshot?.name },
+                    { label: 'Reference', value: open.refNo },
+                    ...(open.agenda ? [{ label: 'Your note', value: open.agenda, wide: true }] : []),
+                    ...(open.cancelReason ? [{ label: 'Reason', value: open.cancelReason, wide: true }] : []),
+                  ]}
+                />
+              </>
+            ) : null}
+          </BottomSheet>
+          <Dialog
+            open={Boolean(cancelling)}
+            onClose={() => setCancelling(null)}
+            tone="danger"
+            title="Cancel this meeting?"
+            description={cancelling ? `${cancelling.hostName}, ${when(cancelling)}` : undefined}
+            footer={
+              <>
+                <MobileButton variant="gray" size="medium" onPress={() => setCancelling(null)}>
+                  Keep meeting
+                </MobileButton>
+                <MobileButton
+                  variant="destructive"
+                  size="medium"
+                  loading={cancel.isPending}
+                  onPress={async () => {
+                    if (!cancelling) return
+                    try {
+                      await cancel.mutateAsync({ id: cancelling._id, reason })
+                      haptic.medium()
+                      setCancelling(null)
+                      toast('Meeting cancelled.')
+                    } catch (error) {
+                      setCancelError(error instanceof ApiError ? error.message : "Couldn't cancel. Try again.")
+                    }
+                  }}
+                >
+                  Cancel meeting
+                </MobileButton>
+              </>
+            }
+          >
+            {cancelError ? <Callout tone="danger" title={cancelError} /> : null}
+            <MobileTextField label="Reason" hint="Optional. Shared with the school." value={reason} onChangeText={setReason} multiline />
+          </Dialog>
+        </>
+      }
+    >
       {!child ? (
         <NoChild />
       ) : list.isPending ? (
@@ -70,111 +174,47 @@ export default function MeetingsScreen() {
       ) : (
         <>
           {isParent && !data?.allowRequests ? (
-            <Banner tone="info" title="The school isn't taking meeting requests in the app">
-              Call the school office to set up a meeting. Meetings the school books with you appear here.
-            </Banner>
+            <Callout tone="info" title="The school isn't taking meeting requests in the app">
+              Call the school office to set up a meeting. Meetings the school books with you show here.
+            </Callout>
           ) : null}
-          {request && items.length ? <Button label="Request a meeting" icon={CalendarPlus} onPress={request} fullWidth /> : null}
-
-          {items.length === 0 ? (
-            <Card>
-              <EmptyState
-                icon={CalendarClock}
-                title="No meetings yet"
-                body={canRequest ? 'Request a meeting with a teacher or the principal.' : 'Meetings the school books with you will appear here.'}
-                action={request ? <Button label="Request a meeting" icon={CalendarPlus} onPress={request} /> : undefined}
+          {items.length ? (
+            <SegmentedControl
+              label="Show"
+              value={view}
+              onChange={setView}
+              options={[
+                { value: 'upcoming', label: `Upcoming ${upcoming.length}` },
+                { value: 'past', label: `Past ${past.length}` },
+              ]}
+            />
+          ) : null}
+          {shown.length ? (
+            <ListGroup
+              items={shown.map((a) => ({
+                title: a.hostName,
+                subtitle: `${when(a)} · ${[a.purpose, a.studentSnapshot?.name?.split(' ')[0]].filter(Boolean).join(' · ')}`,
+                badge: MEETING_STATUS[a.status],
+                onPress: () => setOpen(a),
+              }))}
+            />
+          ) : (
+            <Surface padded={false}>
+              <StatusView
+                compact
+                kind="empty"
+                title={items.length ? (view === 'upcoming' ? 'Nothing coming up' : 'No earlier meetings') : 'No meetings yet'}
+                body={canRequest ? 'Request a meeting with a teacher or the principal.' : 'Meetings the school books with you show here.'}
               />
-            </Card>
-          ) : null}
-          {upcoming.length ? (
-            <Card title="Coming up" flush>
-              {rows(upcoming)}
-            </Card>
-          ) : null}
-          {past.length ? (
-            <Card title="Earlier" flush>
-              {rows(past)}
-            </Card>
+            </Surface>
+          )}
+          {canRequest ? (
+            <Text variant="m-subhead" tone="muted" style={{ textAlign: 'center' }}>
+              Requests go to the school, which confirms the time.
+            </Text>
           ) : null}
         </>
       )}
-
-      <Sheet
-        open={Boolean(open)}
-        onClose={() => setOpen(null)}
-        title={open ? `Meeting with ${open.hostName}` : ''}
-        description={open ? when(open) : undefined}
-        footer={
-          open && isUpcoming(open) ? (
-            <>
-              <Button
-                label="Cancel meeting"
-                variant="tertiary"
-                onPress={() => {
-                  setReason('')
-                  setCancelError(null)
-                  setCancelling(open)
-                  setOpen(null)
-                }}
-              />
-              <Button label="Done" variant="secondary" onPress={() => setOpen(null)} />
-            </>
-          ) : (
-            <Button label="Done" variant="secondary" onPress={() => setOpen(null)} />
-          )
-        }
-      >
-        {open ? (
-          <View style={{ gap: space['space-3'] }}>
-            <Badge label={MEETING_STATUS[open.status].label} tone={MEETING_STATUS[open.status].tone} />
-            <Text variant="body-lg">
-              {MODE_LABEL[open.mode]}
-              {open.location ? ` · ${open.location}` : ''}
-            </Text>
-            <Text variant="body" tone="muted">
-              About {open.purpose}
-              {open.studentSnapshot?.name ? ` for ${open.studentSnapshot.name}` : ''} · Ref. {open.refNo}
-            </Text>
-            {open.agenda ? <Text variant="body-lg">{open.agenda}</Text> : null}
-            {open.cancelReason ? (
-              <Text variant="body" tone="muted">
-                Reason: {open.cancelReason}
-              </Text>
-            ) : null}
-          </View>
-        ) : null}
-      </Sheet>
-
-      <Dialog
-        open={Boolean(cancelling)}
-        onClose={() => setCancelling(null)}
-        tone="danger"
-        title="Cancel this meeting?"
-        description={cancelling ? `${cancelling.hostName}, ${when(cancelling)}` : undefined}
-        footer={
-          <>
-            <Button label="Keep meeting" variant="secondary" onPress={() => setCancelling(null)} />
-            <Button
-              label="Cancel meeting"
-              variant="danger"
-              loading={cancel.isPending}
-              onPress={async () => {
-                if (!cancelling) return
-                try {
-                  await cancel.mutateAsync({ id: cancelling._id, reason })
-                  setCancelling(null)
-                  toast('Meeting cancelled.')
-                } catch (error) {
-                  setCancelError(error instanceof ApiError ? error.message : "Couldn't cancel. Try again.")
-                }
-              }}
-            />
-          </>
-        }
-      >
-        {cancelError ? <Banner tone="danger" title={cancelError} /> : null}
-        <TextField label="Reason" hint="Optional. Shared with the school." value={reason} onChangeText={setReason} multiline />
-      </Dialog>
-    </Screen>
+    </MobileScreen>
   )
 }

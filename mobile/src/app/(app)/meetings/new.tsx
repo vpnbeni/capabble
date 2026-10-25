@@ -1,15 +1,31 @@
 import { useRouter } from 'expo-router'
 import { useMemo, useState } from 'react'
-import { KeyboardAvoidingView, Platform, View } from 'react-native'
+import { View } from 'react-native'
 
 import { ApiError } from '@/lib/api'
-import { dayKeyAdd, formatDayKey, schoolToday } from '@/lib/format'
+import { dayKeyAdd, formatDayKey, formatTime, schoolToday } from '@/lib/format'
 import { ChildSwitcher } from '@/portal/ChildSwitcher'
 import { usePortal } from '@/portal/PortalProvider'
 import { usePortalAppointmentHosts, usePortalAppointments, usePortalAppointmentSlots, useRequestAppointment } from '@/portal/queries'
 import { CardSkeleton, LoadFailed, NoChild } from '@/portal/states'
 import { space } from '@/theme/tokens'
-import { Banner, Button, Card, Chips, SegmentedControl, SelectField, Screen, SlotPicker, Text, TextField, useToast } from '@/ui'
+import {
+  ActionBar,
+  Avatar,
+  BottomSheet,
+  Callout,
+  ChipRail,
+  haptic,
+  ListGroup,
+  MobileScreen,
+  MobileTextField,
+  NavBar,
+  OptionList,
+  SegmentedControl,
+  SlotPicker,
+  Text,
+  useToast,
+} from '@/ui'
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const weekday = (key: string) => new Date(`${key}T00:00:00.000Z`).getUTCDay()
@@ -31,6 +47,7 @@ export default function NewMeetingScreen() {
   const [agenda, setAgenda] = useState('')
   const [phone, setPhone] = useState('')
   const [errors, setErrors] = useState<{ host?: string; time?: string; purpose?: string; form?: string }>({})
+  const [picking, setPicking] = useState<'host' | 'purpose' | null>(null)
   const request = useRequestAppointment()
 
   const host = hosts.data?.find((row) => row._id === hostId)
@@ -59,9 +76,11 @@ export default function NewMeetingScreen() {
         studentId: child.studentId,
         payload: { hostId, date: day, startTime, purpose, agenda: agenda.trim(), mode, phone: phone.trim() },
       })
+      haptic.success()
       toast(meeting.status === 'confirmed' ? 'Your meeting is confirmed.' : 'Request sent. The school will confirm it.')
       router.back()
     } catch (error) {
+      haptic.error()
       setErrors({ form: error instanceof ApiError ? error.message : "Couldn't send the request. Try again." })
       slots.refetch()
     }
@@ -69,114 +88,153 @@ export default function NewMeetingScreen() {
 
   const noHosts = hosts.isSuccess && hosts.data.length === 0
 
+  const hostDays = host?.days.length ? [...host.days].sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7)).map((d) => WEEKDAYS[d]).join(', ') : ''
+  const slotList = slots.isPending || slots.data?.closed ? [] : (slots.data?.slots ?? [])
+
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-      <Screen title="Request a meeting" onBack={router.back} headerAction={<ChildSwitcher />}>
-        {!child ? (
-          <NoChild />
-        ) : hosts.isPending || settings.isPending ? (
-          <CardSkeleton rows={4} />
-        ) : hosts.isError ? (
-          <LoadFailed what="The people you can meet" error={hosts.error} onRetry={hosts.refetch} />
-        ) : noHosts ? (
-          <Banner tone="info" title="No one is taking requests in the app for this class">
-            Call the school office to set up a meeting.
-          </Banner>
-        ) : (
-          <>
-            <Text variant="body" tone="muted">
-              About {child.name}.
-            </Text>
-            {errors.form ? <Banner tone="danger" title={errors.form} /> : null}
-            <Card>
-              <View style={{ gap: space['space-4'] }}>
-                <SelectField
-                  label="Meet with"
-                  placeholder="Choose a person"
-                  options={(hosts.data ?? []).map((row) => ({ value: row._id, label: row.displayName, meta: [row.title, row.location].filter(Boolean).join(' · ') || undefined }))}
-                  value={hostId}
+    <MobileScreen
+      nav={<NavBar title="Request a meeting" back={{ label: 'Meetings', onPress: router.back }} trailing={<ChildSwitcher />} />}
+      actionBar={
+        host && child ? (
+          <ActionBar
+            summary={startTime ? `${formatDayKey(day, { weekday: 'short' })} · ${formatTime(startTime)}` : 'Choose a time'}
+            detail={host.displayName}
+            label={request.isPending ? 'Sending…' : 'Send'}
+            onPress={request.isPending ? () => {} : submit}
+          />
+        ) : undefined
+      }
+      overlay={
+        <>
+          <BottomSheet open={picking === 'host'} onClose={() => setPicking(null)} title="Meet with">
+            <OptionList
+              label="Meet with"
+              value={hostId || null}
+              onChange={(value) => {
+                setHostId(value)
+                setDate('')
+                setStartTime('')
+                setErrors({})
+                setPicking(null)
+              }}
+              options={(hosts.data ?? []).map((row) => ({
+                value: row._id,
+                label: row.displayName,
+                meta: [row.title, row.location].filter(Boolean).join(' · ') || undefined,
+                avatar: <Avatar name={row.displayName} size={32} />,
+              }))}
+            />
+          </BottomSheet>
+          <BottomSheet open={picking === 'purpose'} onClose={() => setPicking(null)} title="About">
+            <OptionList
+              label="About"
+              value={purpose || null}
+              onChange={(value) => {
+                setPurpose(value)
+                setErrors(({ purpose: _fixed, ...rest }) => rest)
+                setPicking(null)
+              }}
+              options={(settings.data?.purposes ?? []).map((value) => ({ value, label: value }))}
+            />
+          </BottomSheet>
+        </>
+      }
+    >
+      {!child ? (
+        <NoChild />
+      ) : hosts.isPending || settings.isPending ? (
+        <CardSkeleton rows={4} />
+      ) : hosts.isError ? (
+        <LoadFailed what="The people you can meet" error={hosts.error} onRetry={hosts.refetch} />
+      ) : noHosts ? (
+        <Callout tone="info" title="No one is taking requests in the app for this class">
+          Call the school office to set up a meeting.
+        </Callout>
+      ) : (
+        <>
+          {errors.form ? <Callout tone="danger" title={errors.form} /> : null}
+          <ListGroup
+            header={`About ${child.name}`}
+            footer={errors.host ?? (hostDays ? `Meets on ${hostDays}` : undefined)}
+            items={[
+              host
+                ? {
+                    title: host.displayName,
+                    subtitle: [host.title, host.location].filter(Boolean).join(' · ') || undefined,
+                    avatar: <Avatar name={host.displayName} size={36} />,
+                    onPress: () => setPicking('host'),
+                  }
+                : { title: 'Choose who to meet', tone: errors.host ? 'danger' : 'default', onPress: () => setPicking('host') },
+            ]}
+          />
+
+          {host ? (
+            <View style={{ gap: space['space-3'] }}>
+              <Text variant="label" style={{ fontSize: 14, lineHeight: 20 }}>
+                Date
+              </Text>
+              {dates.length ? (
+                <ChipRail
+                  label="Date"
+                  value={day}
                   onChange={(value) => {
-                    setHostId(value)
-                    setDate('')
+                    setDate(value)
                     setStartTime('')
-                    setErrors({})
                   }}
-                  error={errors.host}
-                  hint={host?.days.length ? `Meets on ${[...host.days].sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7)).map((d) => WEEKDAYS[d]).join(', ')}` : undefined}
+                  items={dates.map((key) => ({ id: key, label: formatDayKey(key, { weekday: 'short' }) }))}
                 />
-                {host ? (
-                  <View style={{ gap: space['space-1'] + 2 }}>
-                    <Text variant="label">Date</Text>
-                    {dates.length ? (
-                      <Chips
-                        label="Date"
-                        value={day}
-                        onChange={(value) => {
-                          setDate(value)
-                          setStartTime('')
-                        }}
-                        options={dates.map((key) => ({ value: key, label: formatDayKey(key, { weekday: 'short' }) }))}
-                      />
-                    ) : (
-                      <Text variant="body" tone="muted">
-                        No days open in the next {maxDays} days.
-                      </Text>
-                    )}
-                  </View>
-                ) : null}
-                {host && day ? (
-                  <SlotPicker
-                    label="Time"
-                    slots={slots.isPending || slots.data?.closed ? [] : (slots.data?.slots ?? [])}
-                    value={startTime}
-                    onChange={(value) => {
-                      setStartTime(value)
-                      setErrors(({ time: _fixed, ...rest }) => rest)
-                    }}
-                    emptyText={slots.isPending ? 'Finding free times…' : slots.data?.reason || 'No times free on this day. Try another date.'}
-                    hint={errors.time ?? (host.location ? `Meetings are at ${host.location}.` : undefined)}
-                  />
-                ) : null}
-              </View>
-            </Card>
-            <Card>
-              <View style={{ gap: space['space-4'] }}>
-                <SelectField
-                  label="About"
-                  options={(settings.data?.purposes ?? []).map((value) => ({ value, label: value }))}
-                  value={purpose}
+              ) : (
+                <Text variant="body" tone="muted">
+                  No days open in the next {maxDays} days.
+                </Text>
+              )}
+              {day ? (
+                <SlotPicker
+                  label="Time"
+                  slots={slotList.map((slot) => ({ value: slot.start, label: formatTime(slot.start), taken: !slot.open }))}
+                  value={startTime || null}
                   onChange={(value) => {
-                    setPurpose(value)
-                    setErrors(({ purpose: _fixed, ...rest }) => rest)
+                    setStartTime(value)
+                    setErrors(({ time: _fixed, ...rest }) => rest)
                   }}
-                  error={errors.purpose}
+                  emptyText={slots.isPending ? 'Finding free times…' : slots.data?.reason || 'No times free on this day. Try another date.'}
+                  hint={errors.time ?? (host.location ? `Meetings are at ${host.location}.` : undefined)}
                 />
-                <SegmentedControl<Mode>
-                  label="How"
-                  value={mode}
-                  onChange={setMode}
-                  options={[
-                    { value: 'in_person', label: 'At school' },
-                    { value: 'phone', label: 'Phone' },
-                    { value: 'video', label: 'Video' },
-                  ]}
-                />
-                <TextField label="Anything to share first" hint="Optional" value={agenda} onChangeText={setAgenda} multiline maxLength={1000} />
-                <TextField
-                  label="Phone"
-                  hint="Optional. Leave empty to use the number the school has."
-                  value={phone}
-                  onChangeText={setPhone}
-                  keyboardType="phone-pad"
-                  textContentType="telephoneNumber"
-                  autoComplete="tel"
-                />
-              </View>
-            </Card>
-            <Button label="Send request" onPress={submit} loading={request.isPending} fullWidth />
-          </>
-        )}
-      </Screen>
-    </KeyboardAvoidingView>
+              ) : null}
+            </View>
+          ) : null}
+
+          <ListGroup
+            header="About"
+            footer={errors.purpose}
+            items={[{ title: purpose || 'Choose what it is about', tone: errors.purpose ? 'danger' : 'default', onPress: () => setPicking('purpose') }]}
+          />
+          <View style={{ gap: space['space-3'] }}>
+            <Text variant="label" style={{ fontSize: 14, lineHeight: 20 }}>
+              How
+            </Text>
+            <SegmentedControl<Mode>
+              label="How"
+              value={mode}
+              onChange={setMode}
+              options={[
+                { value: 'in_person', label: 'At school' },
+                { value: 'phone', label: 'Phone' },
+                { value: 'video', label: 'Video' },
+              ]}
+            />
+          </View>
+          <MobileTextField label="Anything to share first" hint="Optional" value={agenda} onChangeText={setAgenda} multiline maxLength={1000} />
+          <MobileTextField
+            label="Phone"
+            type="tel"
+            hint="Optional. Leave empty to use the number the school has."
+            value={phone}
+            onChangeText={setPhone}
+            textContentType="telephoneNumber"
+          />
+        </>
+      )}
+    </MobileScreen>
   )
 }

@@ -196,6 +196,8 @@ const MODULE_MODEL_KEYS = Object.freeze({
     'StudentFeeAccount',
     'FeeDemand',
     'FeePayment',
+    'SchoolPaymentSettings',
+    'FeeOnlineOrder',
     'CapitalSettings',
     'CapitalCounter',
     'CapitalExpense',

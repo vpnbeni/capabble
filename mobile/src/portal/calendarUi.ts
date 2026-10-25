@@ -1,11 +1,14 @@
-import type { AgendaEntry, AgendaGroup } from '@/ui'
-import { dayKeyAdd } from '@/lib/format'
+import { CalendarDays, ClipboardList, GraduationCap, Trophy, Users, Wallet, type LucideIcon } from 'lucide-react-native'
+
+import { dayKeyAdd, formatDayKey, formatTime } from '@/lib/format'
 import type { CalendarData, CalendarItem, CalendarLayerKey, EventCategory, EventRole, EventStatus, ResponseValue } from '@/services/calendarTypes'
+import type { Palette, TileIndex } from '@/theme/tokens'
+import type { AgendaDay } from '@/ui'
 
 // Labels and mapping for calendar items. Same as client/src/components/calendar/calendarUi.ts.
 
 /** Fixed chart colour per layer, always shown with the item's own words. */
-export const LAYER_CATEGORY: Record<CalendarLayerKey, AgendaEntry['category']> = {
+export const LAYER_CATEGORY: Record<CalendarLayerKey, TileIndex> = {
   events: 1,
   exams: 3,
   duties: 4,
@@ -68,47 +71,85 @@ export const ANSWER_TONE: Record<ResponseValue, 'success' | 'danger' | 'warning'
   acknowledged: 'success', yes: 'success', no: 'danger', maybe: 'warning', given: 'success', declined: 'danger',
 }
 
-export const toEntry = (item: CalendarItem): AgendaEntry => {
+/** A layer's identity tile and glyph in rails and rows (tiles are identity, never status). */
+export const LAYER_TILE: Record<CalendarLayerKey, TileIndex> = {
+  events: 1,
+  exams: 6,
+  duties: 4,
+  fees: 3,
+  appointments: 2,
+  activities: 5,
+  school_days: 1,
+}
+
+export const LAYER_ICON: Record<CalendarLayerKey, LucideIcon> = {
+  events: CalendarDays,
+  exams: GraduationCap,
+  duties: ClipboardList,
+  fees: Wallet,
+  appointments: Users,
+  activities: Trophy,
+  school_days: CalendarDays,
+}
+
+/** An event part still waiting for this family's answer (and replies haven't closed). */
+export const needsReply = (item: CalendarItem, today: string) =>
+  item.status !== 'cancelled' &&
+  Boolean(
+    item.parts?.some(
+      (part) => part.response && part.response !== 'none' && !part.myResponse && !(part.responseDeadline && today > part.responseDeadline),
+    ),
+  )
+
+const itemMeta = (item: CalendarItem) => {
   const notes: string[] = []
   if (item.child) notes.push(`For ${item.child.name.split(' ')[0]}`)
   if (item.tentative) notes.push('Tentative')
   if (item.status === 'cancelled') notes.push('Cancelled')
-  return {
-    id: item.id,
-    title: item.title,
-    startTime: item.allDay ? null : item.startTime,
-    category: LAYER_CATEGORY[item.layer] ?? 1,
-    note: notes.join(' · ') || undefined,
-    meta: [item.venue, item.detail].filter(Boolean).join(' · ') || undefined,
-    muted: item.status === 'cancelled',
-  }
+  return [...notes, item.venue, item.detail].filter(Boolean).join(' · ') || undefined
 }
 
-/** Items grouped by each day they cover, within [from, to]. */
-export const groupByDay = (items: CalendarItem[], from: string, to: string, data?: CalendarData): AgendaGroup[] => {
-  const groups = new Map<string, CalendarItem[]>()
+/** Items keyed by each day they cover, within [from, to], days in order. */
+export const itemsByDay = (items: CalendarItem[], from: string, to: string) => {
+  const days = new Map<string, CalendarItem[]>()
   items.forEach((item) => {
     let key = item.startDate < from ? from : item.startDate
     const last = item.endDate > to ? to : item.endDate
     let guard = 0
     while (key <= last && guard < 62) {
-      groups.set(key, [...(groups.get(key) || []), item])
+      days.set(key, [...(days.get(key) || []), item])
       key = dayKeyAdd(key, 1)
       guard += 1
     }
   })
-  return [...groups.entries()]
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([date, list]) => {
-      const day = data?.days?.[date]
-      return {
-        date,
-        off: day ? !day.working : false,
-        dayLabel: day && day.kind !== 'working' && day.kind !== 'weekly_off' ? day.label : undefined,
-        entries: list.map(toEntry),
-      }
-    })
+  return new Map([...days.entries()].sort(([a], [b]) => a.localeCompare(b)))
 }
+
+/** The Agenda's days: "Today", "Tomorrow", then dates; a day without school says why. */
+export const agendaDays = (
+  byDay: Map<string, CalendarItem[]>,
+  today: string,
+  data: CalendarData | undefined,
+  colors: Palette,
+  onOpen: (item: CalendarItem) => void,
+): AgendaDay[] =>
+  [...byDay.entries()].map(([date, list]) => {
+    const day = data?.days?.[date]
+    const off = day && !day.working && day.kind !== 'weekly_off' ? day.label || 'No school' : undefined
+    return {
+      label: date === today ? 'Today' : date === dayKeyAdd(today, 1) ? 'Tomorrow' : formatDayKey(date, { weekday: 'short' }),
+      off,
+      items: list.map((item) => ({
+        time: item.allDay || !item.startTime ? 'All day' : formatTime(item.startTime),
+        end: !item.allDay && item.endTime ? formatTime(item.endTime) : undefined,
+        title: item.title,
+        meta: itemMeta(item),
+        color: colors[`chart-${LAYER_CATEGORY[item.layer] ?? 1}`],
+        badge: needsReply(item, today) ? { label: 'Reply', tone: 'warning' as const } : undefined,
+        onPress: () => onOpen(item),
+      })),
+    }
+  })
 
 /** Whether an item concerns one child (or everyone, when it isn't tied to a child). */
 export const isForChild = (item: CalendarItem, studentId: string) => {

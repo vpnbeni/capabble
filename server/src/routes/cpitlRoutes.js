@@ -9,6 +9,7 @@ const expense = require('../controllers/cpitl/expenseController');
 const fuel = require('../controllers/cpitl/fuelController');
 const facility = require('../controllers/cpitl/facilityController');
 const payroll = require('../controllers/cpitl/payrollController');
+const paymentSettings = require('../controllers/cpitl/paymentSettingsController');
 
 const router = express.Router();
 router.use(protect);
@@ -65,6 +66,11 @@ router.post('/fee-slips/students.pdf', fees, collection.studentSlipsPdf);
 // Settings
 router.get('/settings', fees, fee.getSettingsHandler);
 router.put('/settings', fees, can(P.SETTINGS), fee.updateSettings);
+
+// Settings → Payments: the school's own Razorpay account for online fee payments.
+router.get('/payment-settings', fees, can(P.SETTINGS), paymentSettings.getSettings);
+router.put('/payment-settings', fees, can(P.SETTINGS), paymentSettings.saveSettings);
+router.post('/payment-settings/test', fees, can(P.SETTINGS), paymentSettings.testSettings);
 
 // ── Phase 2: expenses ──────────────────────────────────────────────
 router.post('/attachments', requireAnyTenantFeature('cpitl_expenses', 'cpitl_payroll'), can(P.EXPENSE_LOG), expense.uploadAttachment);

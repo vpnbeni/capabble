@@ -1,67 +1,71 @@
 import { useRouter } from 'expo-router'
-import { GraduationCap } from 'lucide-react-native'
+import { useState } from 'react'
 
 import { formatDate } from '@/lib/format'
 import { ChildSwitcher } from '@/portal/ChildSwitcher'
 import { usePortal } from '@/portal/PortalProvider'
 import { usePortalResults } from '@/portal/queries'
 import { CardSkeleton, LoadFailed, NoChild } from '@/portal/states'
-import { Badge, Card, EmptyState, ListRow, Screen, Text } from '@/ui'
+import { ChipRail, Hero, ListGroup, MobileScreen, NavBar, SegmentedControl, StatusView, Surface } from '@/ui'
 
-/** Marks for exams the school has published to families, newest first. */
+/** Marks for exams the school has published to families, newest first, one exam at a time. */
 export default function ResultsScreen() {
   const router = useRouter()
   const { child } = usePortal()
   const results = usePortalResults(child?.studentId)
   const exams = [...(results.data ?? [])].reverse()
+  const [picked, setPicked] = useState<string | null>(null)
+  const exam = exams.find((entry) => entry.examId === picked) ?? exams[0]
+  const percent = exam ? Number.parseFloat(exam.percentage) : NaN
+  const published = exam?.publishedAt
+    ? formatDate(exam.publishedAt, { year: new Date(exam.publishedAt).getFullYear() !== new Date().getFullYear() })
+    : null
+  const options = exams.map((entry) => ({ value: entry.examId, label: entry.examName }))
 
   return (
-    <Screen title="Results" onBack={router.back} headerAction={<ChildSwitcher />} refreshing={results.isRefetching} onRefresh={results.refetch}>
+    <MobileScreen
+      refreshing={results.isRefetching}
+      onRefresh={results.refetch}
+      nav={<NavBar title="Results" back={{ label: 'Back', onPress: router.back }} trailing={<ChildSwitcher />} />}
+    >
       {!child ? (
         <NoChild />
       ) : results.isPending ? (
         <CardSkeleton rows={5} />
       ) : results.isError ? (
         <LoadFailed what="Results" error={results.error} onRetry={results.refetch} />
-      ) : exams.length === 0 ? (
-        <Card>
-          <EmptyState icon={GraduationCap} title="No results published yet" body="Marks appear here once the school publishes an exam's results." />
-        </Card>
+      ) : !exam ? (
+        <Surface padded={false}>
+          <StatusView compact kind="empty" title="No results published yet" body="Marks show here once the school publishes an exam's results." />
+        </Surface>
       ) : (
-        exams.map((exam) => (
-          <Card
-            key={exam.examId}
-            title={exam.examName}
-            subtitle={`${exam.total} / ${exam.maxTotal} · ${exam.percentage}%${
-              exam.publishedAt ? ` · Published ${formatDate(exam.publishedAt, { year: new Date(exam.publishedAt).getFullYear() !== new Date().getFullYear() })}` : ''
-            }`}
-            action={exam.absent ? <Badge label="Absent" tone="danger" /> : exam.grade ? <Badge label={`Grade ${exam.grade}`} dot={false} /> : undefined}
-            flush
-          >
-            {exam.subjects.map((subject, index) => {
+        <>
+          {exams.length > 1 && exams.length <= 3 ? (
+            <SegmentedControl label="Exam" value={exam.examId} onChange={setPicked} options={options} />
+          ) : exams.length > 3 ? (
+            <ChipRail label="Exam" value={exam.examId} onChange={setPicked} items={options.map((option) => ({ id: option.value, label: option.label }))} />
+          ) : null}
+          <Hero
+            tone="surface"
+            label={`${exam.examName} · overall`}
+            value={exam.absent ? 'Absent' : `${exam.percentage}%`}
+            detail={[exam.grade ? `Grade ${exam.grade}` : null, `${exam.total} of ${exam.maxTotal} marks`, published ? `published ${published}` : null].filter(Boolean).join(' · ')}
+            progress={Number.isFinite(percent) && !exam.absent ? percent : undefined}
+          />
+          <ListGroup
+            header="Subjects"
+            items={exam.subjects.map((subject) => {
               const absent = exam.absentSubjects.includes(subject.name)
-              return (
-                <ListRow
-                  key={subject.name}
-                  primary={subject.name}
-                  secondary={subject.role === 'additional' ? 'Additional subject' : undefined}
-                  divider={index < exam.subjects.length - 1}
-                  trailing={
-                    absent ? (
-                      <Badge label="Absent" tone="danger" />
-                    ) : (
-                      <Text variant="body-lg" numeric>
-                        {subject.marksObtained} / {subject.maxMarks}
-                        {subject.grade ? `  ·  ${subject.grade}` : ''}
-                      </Text>
-                    )
-                  }
-                />
-              )
+              return {
+                title: subject.name,
+                subtitle: [subject.role === 'additional' ? 'Additional subject' : null, subject.grade && !absent ? `Grade ${subject.grade}` : null].filter(Boolean).join(' · ') || undefined,
+                value: absent ? undefined : `${subject.marksObtained} / ${subject.maxMarks}`,
+                badge: absent ? { label: 'Absent', tone: 'danger' as const } : undefined,
+              }
             })}
-          </Card>
-        ))
+          />
+        </>
       )}
-    </Screen>
+    </MobileScreen>
   )
 }

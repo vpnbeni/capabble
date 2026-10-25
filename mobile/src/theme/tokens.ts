@@ -39,14 +39,36 @@ export type Palette = {
   highlight: string
   'danger-strong': string
   'on-danger': string
+  /** Dims what's behind a sheet or dialog. */
+  scrim: string
+  /** Translucent bars (nav bar, tab bar, action bar) over scrolling content. */
+  'material-chrome': string
+  /** Pressed rows and plain buttons. */
+  'fill-pressed': string
+  /** Gray buttons, search fields, segmented control tracks. */
+  'fill-control': string
 } & Record<`${Tone}-${'ink' | 'soft' | 'border' | 'solid'}`, string> &
-  Record<`chart-${1 | 2 | 3 | 4 | 5 | 6}`, string>
+  Record<`chart-${TileIndex}`, string> &
+  Record<`tile-${TileIndex}` | `tile-${TileIndex}-ink`, string>
+
+/** Shortcut tiles and rail cards cycle through six fills, each with its own ink. */
+export type TileIndex = 1 | 2 | 3 | 4 | 5 | 6
 
 export type Tone = 'success' | 'warning' | 'danger' | 'info' | 'neutral'
 
 export const palettes: Record<Scheme, Palette> = {
   light: buildPalette('light'),
   dark: buildPalette('dark'),
+}
+
+export type ShadowName = 'shadow-xs' | 'shadow-overlay' | 'shadow-card-m' | 'shadow-bar' | 'shadow-float'
+
+const shadowTokens = designTokens.shadow.tokens as { name: ShadowName; value: Record<Scheme, string> }[]
+
+/** CSS box-shadow strings per theme, for React Native's `boxShadow` style. */
+export const shadows: Record<Scheme, Record<ShadowName, string>> = {
+  light: Object.fromEntries(shadowTokens.map((token) => [token.name, token.value.light])) as Record<ShadowName, string>,
+  dark: Object.fromEntries(shadowTokens.map((token) => [token.name, token.value.dark])) as Record<ShadowName, string>,
 }
 
 const px = (value: string) => Number.parseFloat(value)
@@ -60,9 +82,12 @@ export const space = tokenMap(designTokens.spacing) as Record<
   number
 >
 
-export const radius = tokenMap(designTokens.radius) as Record<'radius-sm' | 'radius-md' | 'radius-lg' | 'radius-full', number>
+export const radius = tokenMap(designTokens.radius) as Record<
+  'radius-sm' | 'radius-md' | 'radius-lg' | 'radius-xl' | 'radius-2xl' | 'radius-tile' | 'radius-full',
+  number
+>
 
-/** Control heights, list rows and shell sizes. The companion app uses `control-lg` and `row-comfortable`. */
+/** Control heights, list rows and shell sizes. The app uses the mobile sizes (`touch-min`, `row-m`, bars). */
 export const size = tokenMap(designTokens.size) as Record<
   | 'control-sm'
   | 'control-md'
@@ -70,7 +95,14 @@ export const size = tokenMap(designTokens.size) as Record<
   | 'row-compact'
   | 'row-comfortable'
   | 'header-height'
-  | 'bottom-nav-height',
+  | 'bottom-nav-height'
+  | 'touch-min'
+  | 'nav-bar-height'
+  | 'large-title-height'
+  | 'tab-bar-height'
+  | 'row-m'
+  | 'tile-size'
+  | 'action-bar-height',
   number
 >
 
@@ -79,6 +111,7 @@ export const fontFamily = {
   400: 'Inter_400Regular',
   500: 'Inter_500Medium',
   600: 'Inter_600SemiBold',
+  700: 'Inter_700Bold',
 } as const
 
 export type TextVariant =
@@ -92,6 +125,12 @@ export type TextVariant =
   | 'caption'
   | 'stat'
   | 'stat-sm'
+  | 'm-hero'
+  | 'm-large-title'
+  | 'm-nav-title'
+  | 'm-section'
+  | 'm-headline'
+  | 'm-subhead'
 
 type TypeStyle = { fontFamily: string; fontSize: number; lineHeight: number; letterSpacing?: number }
 

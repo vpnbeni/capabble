@@ -1,94 +1,52 @@
-import type { LucideIcon } from 'lucide-react-native'
-import { useEffect, useState, type ReactNode } from 'react'
-import { Animated, StyleSheet, View, type DimensionValue } from 'react-native'
+import { useEffect, useState } from 'react'
+import { Animated, View, type DimensionValue } from 'react-native'
 
 import { useTheme } from '@/theme/ThemeProvider'
-import { radius, space, type Tone } from '@/theme/tokens'
+import { radius, space } from '@/theme/tokens'
 
-import { Icon } from './primitives'
-import { Text } from './Text'
+import { useReduceMotion } from './motion'
 
-/** Inline message on a screen: tone fill, tone outline, a title and the next step. */
-export function Banner({ tone = 'info', title, children }: { tone?: Tone; title: string; children?: ReactNode }) {
+type SkeletonProps = { width?: DimensionValue; height?: number; radius?: number; round?: boolean; lines?: number }
+
+/**
+ * A placeholder shaped like the content that's coming, never a lone spinner. A soft 1.2s shimmer,
+ * off under Reduce Motion. `lines` stacks text lines (the last one shorter). First load only.
+ */
+export function Skeleton({ width = '100%', height = 16, radius: corner, round, lines }: SkeletonProps) {
   const { colors } = useTheme()
-  return (
-    <View
-      accessibilityRole="alert"
-      style={[styles.banner, { backgroundColor: colors[`${tone}-soft`], borderColor: colors[`${tone}-border`] }]}
-    >
-      <Text variant="label" tone={tone}>
-        {title}
-      </Text>
-      {children ? (
-        <Text variant="small" tone="ink">
-          {children}
-        </Text>
-      ) : null}
-    </View>
-  )
-}
-
-/** Empty list or card: a fact, then the next step. Not for errors. */
-export function EmptyState({ icon, title, body, action }: { icon?: LucideIcon; title: string; body?: string; action?: ReactNode }) {
-  const { colors } = useTheme()
-  return (
-    <View style={styles.empty}>
-      {icon ? <Icon icon={icon} size={24} color={colors['ink-subtle']} /> : null}
-      <Text variant="card-title" style={{ textAlign: 'center' }}>
-        {title}
-      </Text>
-      {body ? (
-        <Text variant="body" tone="muted" style={{ textAlign: 'center' }}>
-          {body}
-        </Text>
-      ) : null}
-      {action ? <View style={{ marginTop: space['space-2'] }}>{action}</View> : null}
-    </View>
-  )
-}
-
-/** Shimmering placeholder that sketches the real layout while it loads. */
-export function Skeleton({ width = '100%', height = 16, round }: { width?: DimensionValue; height?: number; round?: boolean }) {
-  const { colors } = useTheme()
-  const [opacity] = useState(() => new Animated.Value(0.5))
+  const reduceMotion = useReduceMotion()
+  const [opacity] = useState(() => new Animated.Value(1))
 
   useEffect(() => {
-    const pulse = Animated.loop(
+    if (reduceMotion) {
+      opacity.setValue(1)
+      return
+    }
+    const shimmer = Animated.loop(
       Animated.sequence([
-        Animated.timing(opacity, { toValue: 1, duration: 700, useNativeDriver: true }),
-        Animated.timing(opacity, { toValue: 0.5, duration: 700, useNativeDriver: true }),
+        Animated.timing(opacity, { toValue: 0.55, duration: 600, useNativeDriver: true }),
+        Animated.timing(opacity, { toValue: 1, duration: 600, useNativeDriver: true }),
       ]),
     )
-    pulse.start()
-    return () => pulse.stop()
-  }, [opacity])
+    shimmer.start()
+    return () => shimmer.stop()
+  }, [opacity, reduceMotion])
 
-  return (
+  const block = (key: number | undefined, blockWidth: DimensionValue) => (
     <Animated.View
+      key={key}
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
       style={{
-        width,
+        width: blockWidth,
         height,
         opacity,
-        borderRadius: round ? height / 2 : radius['radius-sm'],
+        borderRadius: round ? height / 2 : (corner ?? radius['radius-sm']),
         backgroundColor: colors['surface-sunken'],
       }}
     />
   )
-}
 
-const styles = StyleSheet.create({
-  banner: {
-    borderWidth: 1,
-    borderRadius: radius['radius-md'],
-    padding: space['space-3'],
-    gap: space['space-1'],
-  },
-  empty: {
-    alignItems: 'center',
-    gap: space['space-2'],
-    paddingVertical: space['space-8'],
-    paddingHorizontal: space['space-4'],
-  },
-})
+  if (!lines || lines < 2) return block(undefined, width)
+  return <View style={{ gap: space['space-2'] }}>{Array.from({ length: lines }, (_, index) => block(index, index === lines - 1 ? '60%' : width))}</View>
+}

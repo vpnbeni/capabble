@@ -404,6 +404,134 @@
      "dark": "#F08AA6"
     },
     "usage": "Series 6. Fixed categorical palette; pair with labels, never colour alone."
+   },
+   {
+    "name": "scrim",
+    "value": {
+     "light": "rgba(17,19,20,0.40)",
+     "dark": "rgba(0,0,0,0.60)"
+    },
+    "usage": "Mobile: the dimmed layer behind a bottom sheet, action sheet or dialog. Tapping it dismisses."
+   },
+   {
+    "name": "material-chrome",
+    "value": {
+     "light": "rgba(255,255,255,0.82)",
+     "dark": "rgba(25,27,28,0.82)"
+    },
+    "usage": "Mobile: translucent ground of the navigation bar, tab bar and sticky action bar, always with a 20px background blur. Text on it is ink / ink-muted (the blur keeps it above 4.5:1). Chrome only, never cards."
+   },
+   {
+    "name": "fill-pressed",
+    "value": {
+     "light": "rgba(25,27,28,0.06)",
+     "dark": "rgba(237,239,240,0.08)"
+    },
+    "usage": "Mobile: overlay on a row, tile or card while the finger is down (with a 0.97 scale on cards and tiles). Never a resting fill."
+   },
+   {
+    "name": "fill-control",
+    "value": {
+     "light": "rgba(25,27,28,0.07)",
+     "dark": "rgba(237,239,240,0.11)"
+    },
+    "usage": "Mobile: the resting fill of search fields, segmented-control and stepper tracks, gray buttons and sheet close buttons. Translucent so it reads on bg, surface and sheets alike (surface-sunken goes darker than bg in dark mode, which looks like a hole on phones)."
+   },
+   {
+    "name": "tile-1",
+    "value": {
+     "light": "#E6EEFB",
+     "dark": "#172A4A"
+    },
+    "usage": "Mobile: ground of a shortcut tile or list-row icon tile (blue), from chart-1's hue. Fixed per module, never re-themed; ink passes 12:1+ on it. Decorative identity, never a status."
+   },
+   {
+    "name": "tile-1-ink",
+    "value": {
+     "light": "#2458AA",
+     "dark": "#A3C1F4"
+    },
+    "usage": "Mobile: the Lucide glyph on tile-1 (5:1+ light, 7.8:1+ dark)."
+   },
+   {
+    "name": "tile-2",
+    "value": {
+     "light": "#DFF3FB",
+     "dark": "#0D2B38"
+    },
+    "usage": "Mobile: ground of a shortcut tile or list-row icon tile (cyan), from chart-2's hue. Fixed per module, never re-themed; ink passes 12:1+ on it. Decorative identity, never a status."
+   },
+   {
+    "name": "tile-2-ink",
+    "value": {
+     "light": "#0F6485",
+     "dark": "#86D6F3"
+    },
+    "usage": "Mobile: the Lucide glyph on tile-2 (5:1+ light, 7.8:1+ dark)."
+   },
+   {
+    "name": "tile-3",
+    "value": {
+     "light": "#FBF0D6",
+     "dark": "#33270C"
+    },
+    "usage": "Mobile: ground of a shortcut tile or list-row icon tile (amber), from chart-3's hue. Fixed per module, never re-themed; ink passes 12:1+ on it. Decorative identity, never a status."
+   },
+   {
+    "name": "tile-3-ink",
+    "value": {
+     "light": "#7F5300",
+     "dark": "#F2C35A"
+    },
+    "usage": "Mobile: the Lucide glyph on tile-3 (5:1+ light, 7.8:1+ dark)."
+   },
+   {
+    "name": "tile-4",
+    "value": {
+     "light": "#EEEAFB",
+     "dark": "#251E42"
+    },
+    "usage": "Mobile: ground of a shortcut tile or list-row icon tile (violet), from chart-4's hue. Fixed per module, never re-themed; ink passes 12:1+ on it. Decorative identity, never a status."
+   },
+   {
+    "name": "tile-4-ink",
+    "value": {
+     "light": "#5B3FB3",
+     "dark": "#C3B4F3"
+    },
+    "usage": "Mobile: the Lucide glyph on tile-4 (5:1+ light, 7.8:1+ dark)."
+   },
+   {
+    "name": "tile-5",
+    "value": {
+     "light": "#E0F4EA",
+     "dark": "#0F2C22"
+    },
+    "usage": "Mobile: ground of a shortcut tile or list-row icon tile (green), from chart-5's hue. Fixed per module, never re-themed; ink passes 12:1+ on it. Decorative identity, never a status."
+   },
+   {
+    "name": "tile-5-ink",
+    "value": {
+     "light": "#1D7352",
+     "dark": "#7AD6B0"
+    },
+    "usage": "Mobile: the Lucide glyph on tile-5 (5:1+ light, 7.8:1+ dark)."
+   },
+   {
+    "name": "tile-6",
+    "value": {
+     "light": "#FCE7EE",
+     "dark": "#3A1824"
+    },
+    "usage": "Mobile: ground of a shortcut tile or list-row icon tile (rose), from chart-6's hue. Fixed per module, never re-themed; ink passes 12:1+ on it. Decorative identity, never a status."
+   },
+   {
+    "name": "tile-6-ink",
+    "value": {
+     "light": "#A3304F",
+     "dark": "#F5A3BA"
+    },
+    "usage": "Mobile: the Lucide glyph on tile-6 (5:1+ light, 7.8:1+ dark)."
    }
   ]
  },
@@ -514,6 +642,64 @@
       "sample": "94.2%"
      }
     ]
+   },
+   {
+    "name": "Mobile",
+    "family": "sans",
+    "styles": [
+     {
+      "name": "m-hero",
+      "fontSize": "40px",
+      "lineHeight": "44px",
+      "fontWeight": 700,
+      "letterSpacing": "-0.03em",
+      "usage": "Mobile: the one big fact on a screen — an amount due, an ETA, a percentage — in a Hero. One per screen, tabular figures.",
+      "sample": "₹12,400"
+     },
+     {
+      "name": "m-large-title",
+      "fontSize": "30px",
+      "lineHeight": "36px",
+      "fontWeight": 700,
+      "letterSpacing": "-0.02em",
+      "usage": "Mobile: the iOS large title at the top of a tab's root screen; collapses into m-nav-title on scroll.",
+      "sample": "Fees"
+     },
+     {
+      "name": "m-nav-title",
+      "fontSize": "17px",
+      "lineHeight": "22px",
+      "fontWeight": 600,
+      "letterSpacing": "-0.01em",
+      "usage": "Mobile: the centred title in the 44px navigation bar of pushed screens and collapsed large titles.",
+      "sample": "Term 2 fees"
+     },
+     {
+      "name": "m-section",
+      "fontSize": "20px",
+      "lineHeight": "26px",
+      "fontWeight": 700,
+      "letterSpacing": "-0.015em",
+      "usage": "Mobile: headings above a rail, shortcut grid or list group on a scrolling screen.",
+      "sample": "Coming up"
+     },
+     {
+      "name": "m-headline",
+      "fontSize": "16px",
+      "lineHeight": "22px",
+      "fontWeight": 600,
+      "usage": "Mobile: the primary line of a list row or rail card, button labels at control-lg.",
+      "sample": "Aarav Sharma"
+     },
+     {
+      "name": "m-subhead",
+      "fontSize": "14px",
+      "lineHeight": "20px",
+      "fontWeight": 400,
+      "usage": "Mobile: the secondary line of a row or card, list-group footers.",
+      "sample": "Class 7-A · Roll 12"
+     }
+    ]
    }
   ]
  },
@@ -582,6 +768,21 @@
     "name": "radius-full",
     "value": "9999px",
     "usage": "Avatars, status dots, progress bars, pills."
+   },
+   {
+    "name": "radius-xl",
+    "value": "16px",
+    "usage": "Mobile: cards, list groups, rail cards, the action bar, the hero."
+   },
+   {
+    "name": "radius-2xl",
+    "value": "24px",
+    "usage": "Mobile: top corners of bottom sheets and action sheets."
+   },
+   {
+    "name": "radius-tile",
+    "value": "14px",
+    "usage": "Mobile: shortcut tiles (56px) and 32px list-row icon tiles use 8px — squircle-like corners."
    }
   ]
  },
@@ -603,6 +804,30 @@
      "dark": "0 12px 32px rgba(0,0,0,0.55), 0 2px 6px rgba(0,0,0,0.4)"
     },
     "usage": "Menus, popovers, dialogs, sheets."
+   },
+   {
+    "name": "shadow-card-m",
+    "value": {
+     "light": "0 1px 2px rgba(25,27,28,0.04), 0 6px 20px rgba(25,27,28,0.06)",
+     "dark": "0 0 0 1px rgba(255,255,255,0.06)"
+    },
+    "usage": "Mobile: cards, list groups and rail cards on bg — replaces the web's border + shadow-xs. In dark it becomes a faint ring."
+   },
+   {
+    "name": "shadow-bar",
+    "value": {
+     "light": "0 -1px 0 rgba(25,27,28,0.06), 0 -8px 24px rgba(25,27,28,0.06)",
+     "dark": "0 -1px 0 rgba(255,255,255,0.06)"
+    },
+    "usage": "Mobile: the top edge of the tab bar and the sticky action bar."
+   },
+   {
+    "name": "shadow-float",
+    "value": {
+     "light": "0 8px 24px rgba(25,27,28,0.18), 0 2px 6px rgba(25,27,28,0.10)",
+     "dark": "0 8px 24px rgba(0,0,0,0.6)"
+    },
+    "usage": "Mobile: the floating action bar (pay, mark attendance) when it hovers above content and the tab bar."
    }
   ]
  },
@@ -658,6 +883,41 @@
     "name": "content-max",
     "value": "1280px",
     "usage": "Max width of workspace page content."
+   },
+   {
+    "name": "touch-min",
+    "value": "44px",
+    "usage": "Mobile: the minimum hit area for anything tappable (Apple HIG 44pt). Small glyphs get hit slop to reach it."
+   },
+   {
+    "name": "nav-bar-height",
+    "value": "44px",
+    "usage": "Mobile: the iOS navigation bar under the status bar (back, title, actions)."
+   },
+   {
+    "name": "large-title-height",
+    "value": "52px",
+    "usage": "Mobile: the band holding the large title below the nav bar on a tab's root screen."
+   },
+   {
+    "name": "tab-bar-height",
+    "value": "52px",
+    "usage": "Mobile: the native tab bar, plus the home-indicator safe area (34px on Face ID iPhones)."
+   },
+   {
+    "name": "row-m",
+    "value": "56px",
+    "usage": "Mobile: one-line rows in a list group with a 32px icon tile; two-line rows grow to 64px."
+   },
+   {
+    "name": "tile-size",
+    "value": "56px",
+    "usage": "Mobile: the tinted square in a ShortcutGrid cell; the cell itself is 1/4 of the width."
+   },
+   {
+    "name": "action-bar-height",
+    "value": "60px",
+    "usage": "Mobile: the floating action bar's height, 12px above the tab bar or the home indicator."
    }
   ]
  }

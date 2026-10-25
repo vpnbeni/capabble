@@ -1,13 +1,12 @@
 import { Paperclip } from 'lucide-react-native'
 import { useState } from 'react'
-import { Linking, Pressable, StyleSheet, View } from 'react-native'
+import { Linking, StyleSheet, View } from 'react-native'
 
 import { ApiError } from '@/lib/api'
 import { formatDayKey, formatRelative, formatTime, schoolToday } from '@/lib/format'
 import type { CalendarItem, CalendarPart, ResponseValue } from '@/services/calendarTypes'
-import { useTheme } from '@/theme/ThemeProvider'
-import { radius, space } from '@/theme/tokens'
-import { Badge, Button, EmptyState, Icon, SegmentedControl, Sheet, Skeleton, Text, TextField } from '@/ui'
+import { space } from '@/theme/tokens'
+import { Badge, BottomSheet, Callout, DetailList, haptic, ListGroup, MobileButton, SegmentedControl, Skeleton, StatusView, Stepper, Surface, Text } from '@/ui'
 
 import { ANSWER_LABELS, ANSWER_TONE, CATEGORY_LABELS, LAYER_LABELS, ROLE_LABELS, STATUS_LABELS } from './calendarUi'
 import { usePortalEvent, useRespondToEvent } from './queries'
@@ -21,6 +20,15 @@ const whenText = (item: CalendarItem) => {
   return `${days}, ${formatTime(item.startTime)}${item.endTime ? ` to ${formatTime(item.endTime)}` : ''}`
 }
 
+/** The earliest open reply deadline among the parts still waiting for an answer. */
+const replyBy = (parts: CalendarPart[]) => {
+  const today = schoolToday()
+  return parts
+    .filter((part) => part.response && part.response !== 'none' && !part.myResponse && part.responseDeadline && part.responseDeadline >= today)
+    .map((part) => part.responseDeadline as string)
+    .sort()[0]
+}
+
 /**
  * One calendar item as a bottom sheet: a school event with what it means for the family
  * (and the reply it asks for), a holiday, or a date from another part of the school.
@@ -32,14 +40,20 @@ export function CalendarItemSheet({ item, onClose }: { item: CalendarItem | null
   const parts = view.data?.parts ?? item?.parts ?? []
   const status = item?.status ? STATUS_LABELS[item.status] : null
   const description = view.data?.description || (isEvent ? item?.detail : undefined)
+  const deadline = item && item.status !== 'cancelled' ? replyBy(parts) : undefined
 
   return (
-    <Sheet
+    <BottomSheet
       open={Boolean(item)}
       onClose={onClose}
+      detent={isEvent ? 'large' : 'medium'}
       title={item?.title ?? ''}
       description={item ? whenText(item) : undefined}
-      footer={<Button label="Done" variant="secondary" onPress={onClose} />}
+      footer={
+        <MobileButton variant="gray" fullWidth onPress={onClose}>
+          Done
+        </MobileButton>
+      }
     >
       {item ? (
         <>
@@ -51,20 +65,35 @@ export function CalendarItemSheet({ item, onClose }: { item: CalendarItem | null
             {item.recurring ? <Badge label="Repeats" dot={false} /> : null}
           </View>
 
-          {item.venue ? <Detail label="Where" value={item.venue} /> : null}
-          {item.child && !isEvent ? <Detail label="For" value={item.child.name} /> : null}
+          {deadline ? (
+            <Callout tone="warning" title={`Reply by ${formatDayKey(deadline, { weekday: 'short' })}`}>
+              The school is waiting for your answer below.
+            </Callout>
+          ) : null}
+
+          {item.venue || (item.child && !isEvent) ? (
+            <DetailList
+              columns={2}
+              items={[
+                ...(item.venue ? [{ label: 'Where', value: item.venue }] : []),
+                ...(item.child && !isEvent ? [{ label: 'For', value: item.child.name }] : []),
+              ]}
+            />
+          ) : null}
           {item.detail && !isEvent ? <Text variant="body-lg">{item.detail}</Text> : null}
           {description ? <Text variant="body-lg">{description}</Text> : null}
           {view.data?.attachments?.length ? <Files files={view.data.attachments} /> : null}
 
           {isEvent ? (
             <View style={{ gap: space['space-3'] }}>
-              <Text variant="card-title" accessibilityRole="header">
+              <Text variant="m-headline" accessibilityRole="header">
                 What it means for you
               </Text>
-              {view.isPending && !parts.length ? <Skeleton height={48} /> : null}
+              {view.isPending && !parts.length ? <Skeleton height={64} radius={16} /> : null}
               {!view.isPending && !parts.length ? (
-                <EmptyState title="Nothing for you to do" body="You can see this event, but it has no instructions for you." />
+                <Surface padded={false}>
+                  <StatusView compact kind="empty" title="Nothing for you to do" body="You can see this event, but it has no instructions for you." />
+                </Surface>
               ) : (
                 parts.map((part) => (
                   <PartBlock
@@ -78,47 +107,24 @@ export function CalendarItemSheet({ item, onClose }: { item: CalendarItem | null
           ) : null}
         </>
       ) : null}
-    </Sheet>
-  )
-}
-
-function Detail({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={{ gap: 2 }}>
-      <Text variant="caption" tone="muted">
-        {label}
-      </Text>
-      <Text variant="body-lg">{value}</Text>
-    </View>
+    </BottomSheet>
   )
 }
 
 function Files({ files }: { files: { name: string; url: string }[] }) {
   return (
-    <View style={{ gap: space['space-1'] }}>
-      {files.map((file) => (
-        <Pressable
-          key={file.url}
-          accessibilityRole="link"
-          onPress={() => Linking.openURL(file.url)}
-          style={{ flexDirection: 'row', alignItems: 'center', gap: space['space-2'], minHeight: 44 }}
-        >
-          <Icon icon={Paperclip} size={16} />
-          <Text variant="body-lg" tone="accent" style={{ flexShrink: 1 }}>
-            {file.name}
-          </Text>
-        </Pressable>
-      ))}
-    </View>
+    <ListGroup
+      header="Attachments"
+      items={files.map((file) => ({ title: file.name, icon: Paperclip, tile: 6 as const, onPress: () => Linking.openURL(file.url) }))}
+    />
   )
 }
 
 function PartBlock({ part, eventId }: { part: CalendarPart; eventId?: string }) {
-  const { colors } = useTheme()
   return (
-    <View style={[styles.part, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+    <Surface>
       <View style={styles.partHead}>
-        <Text variant="label" style={{ flexShrink: 1 }}>
+        <Text variant="m-headline" style={{ flexShrink: 1 }}>
           {part.child ? `For ${part.child.name}` : part.label || 'For you'}
         </Text>
         {part.role && part.role !== 'attendee' ? <Badge label={ROLE_LABELS[part.role]} tone="info" dot={false} /> : null}
@@ -126,7 +132,7 @@ function PartBlock({ part, eventId }: { part: CalendarPart; eventId?: string }) 
       {part.instructions ? <Text variant="body-lg">{part.instructions}</Text> : null}
       {part.attachments?.length ? <Files files={part.attachments} /> : null}
       {eventId && part.response && part.response !== 'none' ? <ReplyControls eventId={eventId} part={part} /> : null}
-    </View>
+    </Surface>
   )
 }
 
@@ -142,16 +148,11 @@ function ReplyControls({ eventId, part }: { eventId: string; part: CalendarPart 
   const [rsvp, setRsvp] = useState<'yes' | 'no' | 'maybe'>(
     current && ['yes', 'no', 'maybe'].includes(current.value) ? (current.value as 'yes' | 'no' | 'maybe') : 'yes',
   )
-  const [count, setCount] = useState(String(current?.count || 1))
+  const [count, setCount] = useState(current?.count || 1)
   const closed = Boolean(part.responseDeadline && schoolToday() > part.responseDeadline)
   const deadline = part.responseDeadline ? ` by ${formatDayKey(part.responseDeadline, { weekday: 'short' })}` : ''
 
   const reply = async (value: ResponseValue) => {
-    const people = Math.round(Number(count))
-    if (part.response === 'rsvp' && value === 'yes' && !(people >= 1 && people <= 20)) {
-      setError('Enter how many people are coming, from 1 to 20')
-      return
-    }
     setError(null)
     try {
       await send.mutateAsync({
@@ -160,16 +161,18 @@ function ReplyControls({ eventId, part }: { eventId: string; part: CalendarPart 
           segmentKey: part.segmentKey,
           studentId: part.child?.studentId ?? null,
           value,
-          count: part.response === 'rsvp' && value === 'yes' ? people : undefined,
+          count: part.response === 'rsvp' && value === 'yes' ? count : undefined,
         },
       })
+      haptic.success()
       setEditing(false)
     } catch (failure) {
+      haptic.error()
       setError(failure instanceof ApiError ? failure.message : "Your answer didn't save. Try again.")
     }
   }
   const errorText = error ? (
-    <Text variant="small" tone="danger" accessibilityRole="alert">
+    <Text variant="label" tone="danger" accessibilityRole="alert">
       {error}
     </Text>
   ) : null
@@ -181,11 +184,13 @@ function ReplyControls({ eventId, part }: { eventId: string; part: CalendarPart 
           label={`${ANSWER_LABELS[current.value]}${current.value === 'yes' && current.count && current.count > 1 ? ` · ${current.count}` : ''}`}
           tone={ANSWER_TONE[current.value]}
         />
-        <Text variant="small" tone="muted">
+        <Text variant="m-subhead" tone="muted" style={{ flex: 1 }}>
           {formatRelative(current.respondedAt)}
         </Text>
         {!closed && part.response !== 'acknowledge' ? (
-          <Button label="Change answer" variant="tertiary" onPress={() => setEditing(true)} />
+          <MobileButton variant="plain" size="medium" onPress={() => setEditing(true)}>
+            Change answer
+          </MobileButton>
         ) : null}
       </View>
     )
@@ -207,7 +212,9 @@ function ReplyControls({ eventId, part }: { eventId: string; part: CalendarPart 
             Please confirm{deadline}.
           </Text>
         ) : null}
-        <Button label="I have read this" loading={send.isPending} onPress={() => reply('acknowledged')} fullWidth />
+        <MobileButton fullWidth loading={send.isPending} onPress={() => reply('acknowledged')}>
+          I have read this
+        </MobileButton>
         {errorText}
       </View>
     )
@@ -219,14 +226,12 @@ function ReplyControls({ eventId, part }: { eventId: string; part: CalendarPart 
         <Text variant="body" tone="muted">
           {part.child ? `Do you consent for ${part.child.name.split(' ')[0]}?` : 'Do you consent?'} Reply{deadline}.
         </Text>
-        <View style={styles.replyRow}>
-          <View style={{ flex: 1 }}>
-            <Button label="Give consent" loading={send.isPending} onPress={() => reply('given')} fullWidth />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Button label="Decline" variant="secondary" disabled={send.isPending} onPress={() => reply('declined')} fullWidth />
-          </View>
-        </View>
+        <MobileButton fullWidth loading={send.isPending} onPress={() => reply('given')}>
+          Give consent
+        </MobileButton>
+        <MobileButton variant="gray" fullWidth disabled={send.isPending} onPress={() => reply('declined')}>
+          Decline
+        </MobileButton>
         {errorText}
       </View>
     )
@@ -234,8 +239,9 @@ function ReplyControls({ eventId, part }: { eventId: string; part: CalendarPart 
 
   return (
     <View style={{ gap: space['space-3'] }}>
+      <Text variant="label">{`Will you come?${deadline ? ` Reply${deadline}.` : ''}`}</Text>
       <SegmentedControl
-        label={`Will you come?${deadline ? ` Reply${deadline}.` : ''}`}
+        label="Will you come?"
         value={rsvp}
         onChange={setRsvp}
         options={[
@@ -244,10 +250,10 @@ function ReplyControls({ eventId, part }: { eventId: string; part: CalendarPart 
           { value: 'maybe', label: 'Maybe' },
         ]}
       />
-      {rsvp === 'yes' ? (
-        <TextField label="How many people" keyboardType="number-pad" value={count} onChangeText={setCount} maxLength={2} />
-      ) : null}
-      <Button label="Send answer" loading={send.isPending} onPress={() => reply(rsvp)} fullWidth />
+      {rsvp === 'yes' ? <Stepper label="People coming" hint="Including you" value={count} onChange={setCount} min={1} max={20} /> : null}
+      <MobileButton fullWidth loading={send.isPending} onPress={() => reply(rsvp)}>
+        Send answer
+      </MobileButton>
       {errorText}
     </View>
   )
@@ -255,7 +261,6 @@ function ReplyControls({ eventId, part }: { eventId: string; part: CalendarPart 
 
 const styles = StyleSheet.create({
   badges: { flexDirection: 'row', flexWrap: 'wrap', gap: space['space-2'] },
-  part: { borderWidth: StyleSheet.hairlineWidth, borderRadius: radius['radius-lg'], padding: space['space-4'], gap: space['space-3'] },
   partHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space['space-2'] },
   replyRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: space['space-2'] },
 })

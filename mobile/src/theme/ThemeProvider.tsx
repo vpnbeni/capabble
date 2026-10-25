@@ -4,7 +4,7 @@ import { Appearance, useColorScheme } from 'react-native'
 
 import { storage } from '@/lib/storage'
 
-import { palettes, type Palette } from './tokens'
+import { palettes, shadows, type Palette, type ShadowName } from './tokens'
 
 /** `system` follows the device (the default); `light` and `dark` pin it on this device. */
 export type AppearancePreference = 'system' | 'light' | 'dark'
@@ -12,6 +12,8 @@ export type AppearancePreference = 'system' | 'light' | 'dark'
 type Theme = {
   scheme: 'light' | 'dark'
   colors: Palette
+  /** `boxShadow` strings for this theme. */
+  shadows: Record<ShadowName, string>
   appearance: AppearancePreference
   setAppearance: (next: AppearancePreference) => void
   /** The school's colour (#rrggbb) re-brands the accent tokens; null for Capabble blue. */
@@ -23,6 +25,7 @@ const APPEARANCE_KEY = 'capabble.appearance'
 const ThemeContext = createContext<Theme>({
   scheme: 'light',
   colors: palettes.light,
+  shadows: shadows.light,
   appearance: 'system',
   setAppearance: () => {},
   setSchoolColor: () => {},
@@ -56,6 +59,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     () => ({
       scheme,
       colors: accent ? { ...palettes[scheme], ...accent[scheme] } : palettes[scheme],
+      shadows: shadows[scheme],
       appearance,
       setAppearance,
       setSchoolColor,

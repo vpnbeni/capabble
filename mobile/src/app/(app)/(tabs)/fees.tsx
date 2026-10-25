@@ -1,16 +1,15 @@
-import { IndianRupee, UserRound } from 'lucide-react-native'
+import { Receipt } from 'lucide-react-native'
 import { useState } from 'react'
-import { StyleSheet, View } from 'react-native'
 
 import { formatDate, formatINR } from '@/lib/format'
 import { sharePdf } from '@/lib/sharePdf'
 import { ChildSwitcher } from '@/portal/ChildSwitcher'
 import { usePortal } from '@/portal/PortalProvider'
 import { usePortalFees } from '@/portal/queries'
+import { CardSkeleton, LoadFailed, NoChild } from '@/portal/states'
 import { portalService, type PortalFees } from '@/services/portalService'
-import { useTheme } from '@/theme/ThemeProvider'
-import { fontFamily, space, type Tone } from '@/theme/tokens'
-import { Badge, Button, Card, EmptyState, Figure, ListRow, Progress, Screen, Sheet, Skeleton, Text, useToast } from '@/ui'
+import { radius, type Tone } from '@/theme/tokens'
+import { Badge, BottomSheet, DetailList, Hero, ListGroup, MobileButton, MobileScreen, NavBar, Skeleton, StatusView, Surface, useToast } from '@/ui'
 
 type Demand = PortalFees['demands'][number]
 type Payment = PortalFees['payments'][number]
@@ -24,6 +23,7 @@ const STATUS: Record<string, { tone: Tone; label: string }> = {
 }
 
 const feeStatus = (demand: Demand) => STATUS[demand.isOverdue && demand.status !== 'paid' ? 'overdue' : demand.status] ?? STATUS.due
+const isOwing = (demand: Demand) => demand.balance > 0 && demand.status !== 'paid' && demand.status !== 'waived'
 
 const MODE_LABEL: Record<string, string> = {
   cash: 'Cash', upi: 'UPI', cheque: 'Cheque', dd: 'Demand draft', bank_transfer: 'Bank transfer', card: 'Card',
@@ -37,8 +37,8 @@ export default function FeesScreen() {
   const [open, setOpen] = useState<Demand | null>(null)
   const [downloading, setDownloading] = useState<string | null>(null)
 
-  const downloadReceipt = async (payment: Payment) => {
-    if (!child) return
+  const shareReceipt = async (payment: Payment) => {
+    if (!child || downloading) return
     setDownloading(payment._id)
     try {
       const bytes = await portalService.receiptPdf(child.studentId, payment._id)
@@ -50,167 +50,116 @@ export default function FeesScreen() {
     }
   }
 
+  const data = fees.data
+  const owing = data?.demands.filter(isOwing) ?? []
+  const overdue = owing.some((demand) => demand.isOverdue)
+  const next = [...owing].sort((a, b) => a.dueDate.localeCompare(b.dueDate))[0]
+  const paidShare = data && data.totals.demanded > 0 ? Math.round((data.totals.paid / data.totals.demanded) * 100) : 0
+
   return (
-    <Screen
-      title="Fees"
-      headerAction={<ChildSwitcher />}
+    <MobileScreen
+      tabs
       refreshing={fees.isRefetching}
       onRefresh={child ? fees.refetch : undefined}
+      nav={<NavBar large title="Fees" accessory={<ChildSwitcher />} />}
+      overlay={
+        <BottomSheet
+          open={Boolean(open)}
+          onClose={() => setOpen(null)}
+          title={open?.label ?? ''}
+          description={open ? `Due ${formatDate(open.dueDate)}` : undefined}
+          footer={
+            <MobileButton variant="gray" fullWidth onPress={() => setOpen(null)}>
+              Done
+            </MobileButton>
+          }
+        >
+          {open ? <DemandBreakdown demand={open} /> : null}
+        </BottomSheet>
+      }
     >
       {!child ? (
-        <Card>
-          <EmptyState icon={UserRound} title="No student is linked to this login" body="Ask the school office to link your child to your login." />
-        </Card>
+        <NoChild />
       ) : fees.isPending ? (
-        <FeesSkeleton />
+        <>
+          <Skeleton height={150} radius={radius['radius-xl']} />
+          <CardSkeleton rows={3} />
+        </>
       ) : fees.isError ? (
-        <Card>
-          <EmptyState
-            title="Fees didn't load"
-            body={fees.error.message}
-            action={<Button label="Try again" variant="secondary" onPress={() => fees.refetch()} />}
-          />
-        </Card>
-      ) : !fees.data ? (
-        <Card>
-          <EmptyState icon={IndianRupee} title="No fee account yet" body="Fees show here once the school sets up this session's fees." />
-        </Card>
+        <LoadFailed what="Fees" error={fees.error} onRetry={fees.refetch} />
+      ) : !data ? (
+        <Surface padded={false}>
+          <StatusView compact kind="empty" title="No fee account yet" body="Fees show here once the school sets up this session's fees." />
+        </Surface>
       ) : (
         <>
-          <Card title={child.name}>
-            <View style={{ gap: space['space-3'] }}>
-              <Figure
-                label={fees.data.totals.balance > 0 ? 'Still due' : 'All fees paid'}
-                value={formatINR(fees.data.totals.balance)}
-                caption={`${formatINR(fees.data.totals.paid)} paid of ${formatINR(fees.data.totals.demanded)} this session`}
-              />
-              <Progress value={fees.data.totals.paid} max={fees.data.totals.demanded} label="Fees paid this session" tone="success" />
-            </View>
-          </Card>
+          <Hero
+            tone={overdue ? 'strong' : data.totals.balance > 0 ? 'soft' : 'surface'}
+            label={data.totals.balance <= 0 ? 'All fees paid' : overdue ? 'Overdue' : next ? `Due ${formatDate(next.dueDate)}` : 'Still due'}
+            value={formatINR(data.totals.balance > 0 ? data.totals.balance : data.totals.paid)}
+            detail={
+              data.totals.balance > 0
+                ? `${formatINR(data.totals.paid)} paid of ${formatINR(data.totals.demanded)} this session`
+                : `Paid this session for ${child.name.split(' ')[0]}`
+            }
+            meta={data.totals.demanded > 0 ? `${paidShare}% paid` : undefined}
+            progress={data.totals.demanded > 0 ? paidShare : undefined}
+          />
 
-          <Card title="Fee schedule" flush>
-            {fees.data.demands.length === 0 ? (
-              <EmptyState title="No fees scheduled" />
-            ) : (
-              fees.data.demands.map((demand, index, demands) => {
+          {data.demands.length ? (
+            <ListGroup
+              header="Fee schedule"
+              items={data.demands.map((demand) => {
                 const status = feeStatus(demand)
-                const owing = demand.balance > 0 && demand.status !== 'paid' && demand.status !== 'waived'
-                return (
-                  <ListRow
-                    key={demand._id}
-                    primary={demand.label}
-                    secondary={`Due ${formatDate(demand.dueDate)} · ${owing ? `${formatINR(demand.balance)} still due` : formatINR(demand.total)}`}
-                    trailing={<Badge label={status.label} tone={status.tone} />}
-                    divider={index < demands.length - 1}
-                    onPress={() => setOpen(demand)}
-                  />
-                )
-              })
-            )}
-          </Card>
+                return {
+                  title: demand.label,
+                  subtitle: `Due ${formatDate(demand.dueDate)}`,
+                  value: formatINR(isOwing(demand) ? demand.balance : demand.total),
+                  badge: status.tone === 'info' ? undefined : status,
+                  onPress: () => setOpen(demand),
+                }
+              })}
+            />
+          ) : null}
 
-          <Card title="Payments" flush>
-            {fees.data.payments.length === 0 ? (
-              <EmptyState title="No payments yet" />
-            ) : (
-              fees.data.payments.map((payment, index, payments) => (
-                <ListRow
-                  key={payment._id}
-                  primary={formatINR(payment.amount)}
-                  secondary={`${formatDate(payment.date)} · ${MODE_LABEL[payment.mode] || payment.mode} · ${payment.receiptNo}`}
-                  trailing={
-                    <Button label="Receipt" variant="tertiary" loading={downloading === payment._id} onPress={() => downloadReceipt(payment)} />
-                  }
-                  divider={index < payments.length - 1}
-                />
-              ))
-            )}
-          </Card>
+          {data.payments.length ? (
+            <ListGroup
+              header="Receipts"
+              footer="Tap a receipt to share or save it."
+              items={data.payments.map((payment) => ({
+                title: payment.receiptNo,
+                subtitle: downloading === payment._id ? 'Preparing the receipt…' : `${formatDate(payment.date)} · ${MODE_LABEL[payment.mode] || payment.mode}`,
+                value: formatINR(payment.amount),
+                icon: Receipt,
+                tile: 3,
+                onPress: () => shareReceipt(payment),
+              }))}
+            />
+          ) : (
+            <Surface padded={false}>
+              <StatusView compact kind="empty" title="No payments yet" body="Receipts show here after the school records a payment." />
+            </Surface>
+          )}
         </>
       )}
-
-      <Sheet
-        open={Boolean(open)}
-        onClose={() => setOpen(null)}
-        title={open?.label ?? ''}
-        description={open ? `Due ${formatDate(open.dueDate)}` : undefined}
-        footer={<Button label="Done" onPress={() => setOpen(null)} />}
-      >
-        {open ? <DemandBreakdown demand={open} /> : null}
-      </Sheet>
-    </Screen>
+    </MobileScreen>
   )
 }
 
 function DemandBreakdown({ demand }: { demand: Demand }) {
-  const { colors } = useTheme()
   const status = feeStatus(demand)
   return (
-    <View style={{ gap: space['space-4'] }}>
-      <Badge label={status.label} tone={status.tone} />
-      <View>
-        {demand.lines.map((line) => (
-          <View key={line.name} style={[styles.line, { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }]}>
-            <Text variant="body-lg" style={{ flex: 1 }}>
-              {line.name}
-            </Text>
-            <Text variant="body-lg" numeric>
-              {formatINR(line.amount)}
-            </Text>
-          </View>
-        ))}
-        <TotalLine label="Total" value={demand.total} strong />
-        <TotalLine label="Paid" value={demand.paid} />
-        <TotalLine label="Still due" value={demand.balance} strong />
-      </View>
-    </View>
-  )
-}
-
-function TotalLine({ label, value, strong }: { label: string; value: number; strong?: boolean }) {
-  return (
-    <View style={styles.line}>
-      <Text variant="body-lg" tone={strong ? 'ink' : 'muted'} style={[{ flex: 1 }, strong && { fontFamily: fontFamily[600] }]}>
-        {label}
-      </Text>
-      <Text variant="body-lg" tone={strong ? 'ink' : 'muted'} numeric style={strong && { fontFamily: fontFamily[600] }}>
-        {formatINR(value)}
-      </Text>
-    </View>
-  )
-}
-
-function FeesSkeleton() {
-  return (
     <>
-      <Card>
-        <View style={{ flexDirection: 'row', gap: space['space-2'] }}>
-          {[0, 1, 2].map((tile) => (
-            <View key={tile} style={{ flex: 1 }}>
-              <Skeleton height={64} />
-            </View>
-          ))}
-        </View>
-      </Card>
-      <Card>
-        <View style={{ gap: space['space-4'] }}>
-          {[0, 1, 2].map((row) => (
-            <View key={row} style={{ gap: space['space-2'] }}>
-              <Skeleton width="50%" />
-              <Skeleton width="70%" height={12} />
-            </View>
-          ))}
-        </View>
-      </Card>
+      <Badge label={status.label} tone={status.tone} />
+      <ListGroup items={demand.lines.map((line) => ({ title: line.name, value: formatINR(line.amount) }))} />
+      <DetailList
+        columns={2}
+        items={[
+          { label: 'Total', value: formatINR(demand.total), numeric: true },
+          { label: 'Paid', value: formatINR(demand.paid), numeric: true },
+          { label: 'Still due', value: formatINR(demand.balance), numeric: true },
+        ]}
+      />
     </>
   )
 }
-
-const styles = StyleSheet.create({
-  line: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space['space-3'],
-    paddingVertical: space['space-2'],
-  },
-})

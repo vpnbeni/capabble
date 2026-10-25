@@ -13,6 +13,7 @@ const { featureOn, portalSections, openSections } = require('../rbac/portalSecti
 const { buildClassPDFContext } = require('../services/timetableExportService');
 const { buildCardData } = require('./reportCardController');
 const { receiptPdf } = require('./cpitl/collectionController');
+const { onlinePaymentStatus } = require('./portalPaymentController');
 const { sectionKey } = require('../rbac/scope');
 const schoolDays = require('../modules/clndr/schoolDays');
 const { withEffectiveDueDates, dueDateOf } = require('../modules/cpitl/dueDates');
@@ -311,7 +312,7 @@ const getFees = asyncHandler(async (req, res) => {
       .sort({ date: -1 }).lean()
   ]);
   const now = new Date();
-  const demands = await withEffectiveDueDates(req.models, storedDemands);
+  const [demands, onlinePayment] = await Promise.all([withEffectiveDueDates(req.models, storedDemands), onlinePaymentStatus(req)]);
 
   return res.json({
     success: true,
@@ -339,7 +340,9 @@ const getFees = asyncHandler(async (req, res) => {
         date: payment.date,
         mode: payment.mode,
         amount: payment.total ?? (Number(payment.feeAmount || 0) + Number(payment.lateFeeCollected || 0))
-      }))
+      })),
+      // Whether the school takes fees online (its own Razorpay account).
+      onlinePayment
     }
   });
 });

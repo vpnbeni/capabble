@@ -140,6 +140,8 @@ if (rateLimitEnabled) {
 
 // Razorpay webhooks are signed over the raw body, so they mount before the parsers and sanitizers.
 app.use('/api/webhooks', billing.webhookRouter);
+// School fee payments (each school's own Razorpay): its webhooks and the app's checkout page. No sign-in.
+app.use('/api/school-payments', require('./modules/cpitl/publicPayments').router);
 
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));

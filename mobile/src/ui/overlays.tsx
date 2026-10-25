@@ -1,68 +1,14 @@
-import { X } from 'lucide-react-native'
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { Modal, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native'
+import { Modal, Platform, Pressable, StyleSheet, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { useTheme } from '@/theme/ThemeProvider'
 import { radius, size, space, type Tone } from '@/theme/tokens'
 
-import { IconButton } from './controls'
+import { KeyboardRevealProvider, useKeyboardCover } from './keyboard'
 import { Text } from './Text'
 
-type SheetProps = {
-  open: boolean
-  onClose: () => void
-  title: string
-  description?: string
-  children?: ReactNode
-  /** Buttons pinned under the scrolling body. */
-  footer?: ReactNode
-}
-
-/**
- * A bottom sheet for details and short forms that shouldn't leave the screen (a calendar item,
- * a fee breakdown). Closes on the backdrop, the close button and Android back.
- */
-export function Sheet({ open, onClose, title, description, children, footer }: SheetProps) {
-  const { colors, scheme } = useTheme()
-  const insets = useSafeAreaInsets()
-  return (
-    // No fade on web: react-native-web never finishes it when the screen under it is hidden (a tab switch).
-    <Modal visible={open} transparent animationType={Platform.OS === 'web' ? 'none' : 'fade'} onRequestClose={onClose} statusBarTranslucent>
-      <View style={styles.root}>
-        <Pressable
-          accessibilityLabel="Close"
-          onPress={onClose}
-          style={[StyleSheet.absoluteFill, { backgroundColor: scheme === 'dark' ? 'rgba(0,0,0,0.6)' : 'rgba(25,27,28,0.4)' }]}
-        />
-        <View
-          accessibilityViewIsModal
-          style={[
-            styles.panel,
-            { backgroundColor: colors['surface-raised'], paddingBottom: Math.max(insets.bottom, space['space-4']) },
-          ]}
-        >
-          <View style={[styles.handle, { backgroundColor: colors['border-strong'] }]} />
-          <View style={styles.header}>
-            <View style={{ flex: 1, gap: space['space-1'] }}>
-              <Text variant="section-title" accessibilityRole="header">
-                {title}
-              </Text>
-              {description ? (
-                <Text variant="body" tone="muted">
-                  {description}
-                </Text>
-              ) : null}
-            </View>
-            <IconButton icon={X} label="Close" onPress={onClose} />
-          </View>
-          <ScrollView contentContainerStyle={styles.body}>{children}</ScrollView>
-          {footer ? <View style={[styles.footer, { borderTopColor: colors.border }]}>{footer}</View> : null}
-        </View>
-      </View>
-    </Modal>
-  )
-}
+const noop = () => {}
 
 type DialogProps = {
   open: boolean
@@ -78,14 +24,16 @@ type DialogProps = {
 
 /** A decision in the middle of the screen (cancel a meeting). Up to 4 fields; anything bigger is a Sheet or a screen. */
 export function Dialog({ open, onClose, title, description, children, footer }: DialogProps) {
-  const { colors, scheme } = useTheme()
+  const { colors } = useTheme()
+  // Centred in the space above the keyboard, so its field stays in view.
+  const cover = useKeyboardCover()
   return (
     <Modal visible={open} transparent animationType={Platform.OS === 'web' ? 'none' : 'fade'} onRequestClose={onClose} statusBarTranslucent>
-      <View style={styles.center}>
+      <View style={[styles.center, { paddingBottom: space['space-4'] + cover }]}>
         <Pressable
           accessibilityLabel="Close"
           onPress={onClose}
-          style={[StyleSheet.absoluteFill, { backgroundColor: scheme === 'dark' ? 'rgba(0,0,0,0.6)' : 'rgba(25,27,28,0.4)' }]}
+          style={[StyleSheet.absoluteFill, { backgroundColor: colors.scrim }]}
         />
         <View accessibilityViewIsModal style={[styles.dialog, { backgroundColor: colors['surface-raised'] }]}>
           <View style={{ gap: space['space-1'] }}>
@@ -98,7 +46,7 @@ export function Dialog({ open, onClose, title, description, children, footer }: 
               </Text>
             ) : null}
           </View>
-          {children}
+          <KeyboardRevealProvider value={noop}>{children}</KeyboardRevealProvider>
           <View style={styles.dialogFooter}>{footer}</View>
         </View>
       </View>
@@ -135,7 +83,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         <View
           pointerEvents="none"
           accessibilityLiveRegion="polite"
-          style={[styles.toastWrap, { bottom: insets.bottom + size['bottom-nav-height'] + space['space-3'] }]}
+          style={[styles.toastWrap, { bottom: insets.bottom + size['tab-bar-height'] + space['space-3'] }]}
         >
           <View style={[styles.toast, { backgroundColor: colors.ink }]}>
             <View style={[styles.toastDot, { backgroundColor: colors[`${toast.tone}-solid`] }]} />
@@ -152,31 +100,6 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 export const useToast = () => useContext(ToastContext)
 
 const styles = StyleSheet.create({
-  root: { flex: 1, justifyContent: 'flex-end' },
-  panel: {
-    maxHeight: '90%',
-    borderTopLeftRadius: radius['radius-lg'],
-    borderTopRightRadius: radius['radius-lg'],
-  },
-  handle: { alignSelf: 'center', width: 36, height: 4, borderRadius: 2, marginTop: space['space-2'] },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: space['space-2'],
-    paddingLeft: space['space-4'],
-    paddingRight: space['space-2'],
-    paddingTop: space['space-2'],
-  },
-  body: { padding: space['space-4'], gap: space['space-4'] },
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    flexWrap: 'wrap',
-    gap: space['space-2'],
-    paddingHorizontal: space['space-4'],
-    paddingTop: space['space-3'],
-    borderTopWidth: StyleSheet.hairlineWidth,
-  },
   center: { flex: 1, justifyContent: 'center', padding: space['space-4'] },
   dialog: {
     width: '100%',

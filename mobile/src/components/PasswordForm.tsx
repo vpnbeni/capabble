@@ -4,7 +4,7 @@ import { View } from 'react-native'
 import { ApiError } from '@/lib/api'
 import { authService, passwordProblem, type User } from '@/services/authService'
 import { space } from '@/theme/tokens'
-import { Banner, Button, TextField, type TextFieldRef } from '@/ui'
+import { Callout, MobileButton, MobileTextField, type MobileTextFieldRef } from '@/ui'
 
 type Errors = { current?: string; next?: string; confirm?: string; form?: string }
 
@@ -27,8 +27,8 @@ export function PasswordForm({
   const [confirm, setConfirm] = useState('')
   const [errors, setErrors] = useState<Errors>({})
   const [saving, setSaving] = useState(false)
-  const nextRef = useRef<TextFieldRef>(null)
-  const confirmRef = useRef<TextFieldRef>(null)
+  const nextRef = useRef<MobileTextFieldRef>(null)
+  const confirmRef = useRef<MobileTextFieldRef>(null)
 
   const save = async () => {
     const found: Errors = {}
@@ -59,8 +59,8 @@ export function PasswordForm({
 
   return (
     <View style={{ gap: space['space-4'] }}>
-      {errors.form ? <Banner tone="danger" title={errors.form} /> : null}
-      <TextField
+      {errors.form ? <Callout tone="danger" title={errors.form} /> : null}
+      <MobileTextField
         label={currentLabel}
         value={current}
         onChangeText={(value) => {
@@ -68,13 +68,13 @@ export function PasswordForm({
           clear('current')
         }}
         error={errors.current}
-        secureTextEntry
+        type="password"
         autoComplete="current-password"
         textContentType="password"
         returnKeyType="next"
         onSubmitEditing={() => nextRef.current?.focus()}
       />
-      <TextField
+      <MobileTextField
         ref={nextRef}
         label="New password"
         hint="At least 8 characters, with capital and small letters, a number and a symbol."
@@ -84,13 +84,13 @@ export function PasswordForm({
           clear('next')
         }}
         error={errors.next}
-        secureTextEntry
+        type="password"
         autoComplete="new-password"
         textContentType="newPassword"
         returnKeyType="next"
         onSubmitEditing={() => confirmRef.current?.focus()}
       />
-      <TextField
+      <MobileTextField
         ref={confirmRef}
         label="Type the new password again"
         value={confirm}
@@ -99,13 +99,15 @@ export function PasswordForm({
           clear('confirm')
         }}
         error={errors.confirm}
-        secureTextEntry
+        type="password"
         autoComplete="new-password"
         textContentType="newPassword"
         returnKeyType="go"
         onSubmitEditing={save}
       />
-      <Button label={submitLabel} onPress={save} loading={saving} fullWidth />
+      <MobileButton fullWidth loading={saving} onPress={save}>
+        {submitLabel}
+      </MobileButton>
     </View>
   )
 }

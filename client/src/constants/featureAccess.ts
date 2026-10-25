@@ -28,6 +28,7 @@ const EXTRA_PATH_PERMISSIONS: Array<[prefix: string, permission: string | string
   ['/settings/roles', 'core.users.read'],
   ['/settings/school-days', 'core.schooldays.write'],
   ['/settings/email', 'core.school.write'],
+  ['/settings/payments', 'cpitl.finance.settings'],
   // Everyone can see that the plan isn't set up; only billing managers can choose it.
   ['/get-started', ['core.billing.read', 'core.dashboard.read']],
 ]

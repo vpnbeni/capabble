@@ -28,18 +28,20 @@ export const usePortalFees = (studentId?: string) =>
     staleTime: STALE,
   })
 
-export const usePortalNotices = () => useQuery({ queryKey: portalKeys.notices(), queryFn: portalService.notices, staleTime: STALE })
+export const usePortalNotices = (enabled = true) =>
+  useQuery({ queryKey: portalKeys.notices(), queryFn: portalService.notices, staleTime: STALE, enabled })
 
 export const usePortalNotice = (id?: string) =>
   useQuery({ queryKey: portalKeys.notice(id ?? ''), queryFn: () => portalService.notice(id as string), enabled: Boolean(id), staleTime: STALE })
 
 /** The family's calendar between two school days (all linked children merged). */
-export const usePortalCalendar = (from: string, to: string) =>
+export const usePortalCalendar = (from: string, to: string, enabled = true) =>
   useQuery({
     queryKey: portalKeys.calendar(from, to),
     queryFn: () => portalService.calendar(from, to),
     placeholderData: keepPreviousData,
     staleTime: 60_000,
+    enabled,
   })
 
 /** An event's full view (description, attachments, parts) when the list item doesn't carry its parts. */

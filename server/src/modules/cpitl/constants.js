@@ -20,7 +20,8 @@ const roleHasPermission = (role, permission) => (ROLE_PERMISSIONS[role] || []).i
 
 const FEE_HEAD_CATEGORIES = Object.freeze(['academic', 'admission', 'transport', 'activity', 'examination', 'facility', 'misc']);
 
-const PAYMENT_MODES = Object.freeze(['cash', 'upi', 'cheque', 'dd', 'bank_transfer', 'card']);
+// 'online': paid by a parent through the school's own payment gateway (Razorpay).
+const PAYMENT_MODES = Object.freeze(['cash', 'upi', 'cheque', 'dd', 'bank_transfer', 'card', 'online']);
 
 // Typical heads used by CBSE/State board schools in India.
 const DEFAULT_FEE_HEADS = Object.freeze([

@@ -41,6 +41,23 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {
+        "asyncRoutes": {
+          "web": true
+        }
+      },
+      "eas": {
+        "projectId": "71695238-c853-4986-af61-f49b7fac6b36"
+      }
+    },
+    "owner": "capabble-platforms-llp",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/71695238-c853-4986-af61-f49b7fac6b36"
     }
   }
 }

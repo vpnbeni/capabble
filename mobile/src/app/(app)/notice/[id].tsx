@@ -1,5 +1,4 @@
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import { Bell } from 'lucide-react-native'
 import { useMemo } from 'react'
 import { View } from 'react-native'
 
@@ -8,8 +7,8 @@ import { HtmlView } from '@/components/HtmlView'
 import { formatDate } from '@/lib/format'
 import { usePortalNotice } from '@/portal/queries'
 import { useTheme } from '@/theme/ThemeProvider'
-import { space } from '@/theme/tokens'
-import { Button, Card, EmptyState, Screen, Skeleton } from '@/ui'
+import { radius, space } from '@/theme/tokens'
+import { MobileButton, MobileScreen, NavBar, Skeleton, StatusView, Surface } from '@/ui'
 
 /** One circular: its title, date and the school's own formatting. */
 export default function NoticeScreen() {
@@ -32,32 +31,39 @@ export default function NoticeScreen() {
     })
   }, [notice.data, colors])
 
+  const nav = <NavBar title="Notice" back={{ label: 'Notices', onPress: back }} />
+
   if (notice.data) {
     return (
-      <Screen title="Notice" onBack={back} scroll={false}>
+      <MobileScreen nav={nav} scroll={false}>
         <HtmlView html={html} />
-      </Screen>
+      </MobileScreen>
     )
   }
 
   return (
-    <Screen title="Notice" onBack={back}>
+    <MobileScreen nav={nav}>
       {notice.isError ? (
-        <Card>
-          <EmptyState
-            icon={Bell}
+        <Surface padded={false}>
+          <StatusView
+            compact
+            kind="empty"
             title="Notice not found"
             body="It may have been withdrawn by the school."
-            action={<Button label="Back to notices" variant="secondary" onPress={back} />}
+            actions={
+              <MobileButton variant="gray" size="medium" onPress={back}>
+                Back to notices
+              </MobileButton>
+            }
           />
-        </Card>
+        </Surface>
       ) : (
         <View style={{ gap: space['space-3'] }}>
-          <Skeleton width="70%" height={22} />
+          <Skeleton width="70%" height={24} />
           <Skeleton width="30%" height={14} />
-          <Skeleton height={240} />
+          <Skeleton height={240} radius={radius['radius-xl']} />
         </View>
       )}
-    </Screen>
+    </MobileScreen>
   )
 }

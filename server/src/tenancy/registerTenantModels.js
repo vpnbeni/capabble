@@ -115,6 +115,7 @@ const {
   ElectricityBill,
   InfraProject,
 } = require('../models/CapitalRecords');
+const { SchoolPaymentSettings, FeeOnlineOrder } = require('../models/FeeOnlineRecords');
 
 const tenantModelExports = {
   User,
@@ -238,6 +239,8 @@ const tenantModelExports = {
   StudentFeeAccount,
   FeeDemand,
   FeePayment,
+  SchoolPaymentSettings,
+  FeeOnlineOrder,
   CapitalSettings,
   CapitalCounter,
   CapitalExpense,

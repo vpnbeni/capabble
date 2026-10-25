@@ -5,6 +5,7 @@ const { requireAudience } = require('../rbac/middleware');
 const { AUDIENCE } = require('../rbac/session');
 const ctrl = require('../controllers/portalController');
 const appnt = require('../controllers/appntPortalController');
+const feePayments = require('../controllers/portalPaymentController');
 const notifications = require('../controllers/notificationController');
 const devices = require('../push/controller');
 const calendar = require('../modules/clndr/portal');
@@ -15,7 +16,8 @@ const { portalRequestSchema } = require('../validations/appntValidation');
  * Parent / student portal. Only portal sessions reach here (the tenant access
  * gate also rejects staff sessions). Everything is limited to the account's own
  * linked students and read-only, except meeting requests (appointments),
- * replies to calendar events and marking the account's own notifications read.
+ * replies to calendar events, paying fees online and marking the account's own
+ * notifications read.
  */
 const router = express.Router();
 router.use(protect);
@@ -79,6 +81,18 @@ router.get('/students/:studentId/timetable', ctrl.getTimetable);
 router.get('/students/:studentId/results', ctrl.getResults);
 router.get('/students/:studentId/fees', ctrl.getFees);
 router.get('/students/:studentId/fees/receipts/:paymentId', ctrl.getReceiptPdf);
+// Paying fees online (the school's own Razorpay account): parents only, rate limited.
+const paymentLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `${req.tenant?.slug || ''}:${req.user?._id || req.ip}`,
+  message: { success: false, message: 'Too many payment attempts. Try again in a few minutes.' }
+});
+router.post('/students/:studentId/fees/pay', paymentLimiter, feePayments.startPayment);
+router.post('/students/:studentId/fees/pay/:orderId/verify', paymentLimiter, feePayments.verifyPayment);
+router.get('/students/:studentId/fees/pay/:orderId', feePayments.getPayment);
 router.get('/students/:studentId/transport', ctrl.getTransport);
 router.get('/students/:studentId/transport/live', ctrl.getTransportLive);
 router.get('/students/:studentId/appointment-hosts', appnt.listHosts);

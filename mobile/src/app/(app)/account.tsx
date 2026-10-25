@@ -1,12 +1,11 @@
 import { useRouter } from 'expo-router'
-import { KeyboardAvoidingView, Platform } from 'react-native'
 
 import { PasswordForm } from '@/components/PasswordForm'
 import { useSession } from '@/session/SessionProvider'
 import { useTheme, type AppearancePreference } from '@/theme/ThemeProvider'
-import { Card, DetailList, Screen, SegmentedControl, useToast } from '@/ui'
+import { ListGroup, MobileScreen, NavBar, OptionList, Section, Surface, useToast } from '@/ui'
 
-/** The signed-in parent's or student's own login: details and password. */
+/** The signed-in parent's or student's own login: details, appearance and password. */
 export default function AccountScreen() {
   const router = useRouter()
   const session = useSession()
@@ -16,29 +15,28 @@ export default function AccountScreen() {
   const { user, school } = session
 
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-      <Screen title="Your login" onBack={router.back}>
-        <Card title="Login details">
-          <DetailList
-            items={[
-              { label: 'Name', value: user.displayName || user.name },
-              { label: 'Signs in with', value: user.username ? `${user.username}@${school.slug}` : user.email },
-            ]}
-          />
-        </Card>
-        <Card title="Appearance" subtitle="Only on this phone.">
-          <SegmentedControl<AppearancePreference>
-            label="Theme"
-            value={appearance}
-            onChange={setAppearance}
-            options={[
-              { value: 'system', label: 'System' },
-              { value: 'light', label: 'Light' },
-              { value: 'dark', label: 'Dark' },
-            ]}
-          />
-        </Card>
-        <Card title="Change password" subtitle="You stay signed in here; other devices are signed out.">
+    <MobileScreen nav={<NavBar title="Your login" back={{ label: 'More', onPress: router.back }} />}>
+      <ListGroup
+        header="Account"
+        items={[
+          { title: 'Name', value: user.displayName || user.name || '—' },
+          { title: 'Signs in with', value: (user.username ? `${user.username}@${school.slug}` : user.email) || '—' },
+        ]}
+      />
+      <OptionList<AppearancePreference>
+        header="Appearance"
+        footer="Only on this phone."
+        label="Appearance"
+        value={appearance}
+        onChange={setAppearance}
+        options={[
+          { value: 'system', label: 'Same as phone' },
+          { value: 'light', label: 'Light' },
+          { value: 'dark', label: 'Dark' },
+        ]}
+      />
+      <Section title="Change password">
+        <Surface>
           <PasswordForm
             currentLabel="Current password"
             submitLabel="Change password"
@@ -47,8 +45,8 @@ export default function AccountScreen() {
               toast('Password changed. Other devices have been signed out.')
             }}
           />
-        </Card>
-      </Screen>
-    </KeyboardAvoidingView>
+        </Surface>
+      </Section>
+    </MobileScreen>
   )
 }

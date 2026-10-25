@@ -630,6 +630,7 @@ const Header: React.FC<HeaderProps> = ({ isSidebarCollapsed, isMobileNav = false
             : { title: 'Roles', subtitle: 'Bundles of access you give to staff logins.' },
           'school-days': { title: 'School days', subtitle: 'Weekly offs, holidays, vacations, half days and closures.' },
           email: { title: 'School email', subtitle: 'Send calendar emails from your school’s own address.' },
+          payments: { title: 'Payments', subtitle: 'Let parents pay fees online into your school’s Razorpay account.' },
         }
         const info = titleMap[subPage] || { title: 'Settings', subtitle: '' }
         return {

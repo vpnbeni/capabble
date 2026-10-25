@@ -1772,6 +1772,8 @@ const Sidebar: React.FC<SidebarProps> = ({
   const canManageUsers = isPathAllowed('/settings/users')
   const canManageSchoolDays = isPathAllowed('/settings/school-days')
   const canManageSchoolEmail = isPathAllowed('/settings/email')
+  // Online fee payments need the fees module too.
+  const canManagePayments = isPathAllowed('/settings/payments') && isPathAllowed('/cpitl/settings')
   const currentSidebarWidth = isCollapsed ? collapsedWidth : expandedWidth
 
   useLayoutEffect(() => {
@@ -2177,6 +2179,16 @@ const Sidebar: React.FC<SidebarProps> = ({
                     >
                       <Mail size={16} strokeWidth={1.75} aria-hidden />
                       School email
+                    </NavLink>
+                  )}
+                  {canManagePayments && (
+                    <NavLink
+                      to="/settings/payments"
+                      role="menuitem"
+                      className={({ isActive }) => `cb-shellnav__schoolitem${isActive ? ' is-current' : ''}`}
+                    >
+                      <CreditCard size={16} strokeWidth={1.75} aria-hidden />
+                      Payments
                     </NavLink>
                   )}
                   {canAccessBilling && (
