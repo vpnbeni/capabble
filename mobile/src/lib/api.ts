@@ -43,6 +43,8 @@ type RequestOptions = {
   baseUrl?: string
   /** Don't try to refresh the session on a 401 (sign-in, refresh itself). */
   skipRefresh?: boolean
+  /** Return the whole response body, for the few endpoints that put fields next to `data`. */
+  raw?: boolean
 }
 
 const buildUrl = (path: string, base: string, params?: RequestOptions['params']) => {
@@ -113,7 +115,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
 
   if (!response.ok) throw await readError(response)
   const body = await response.json()
-  return body.data as T
+  return (options.raw ? body : body.data) as T
 }
 
 export const api = {

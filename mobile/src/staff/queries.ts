@@ -301,3 +301,27 @@ export const useMarkNotificationRead = () => {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: notificationKeys.all }),
   })
 }
+
+// Staff attendance (office).
+const staffAttendanceKeys = {
+  directory: [...staffKeys.all, 'staff-directory'] as const,
+  day: (date: string) => [...staffKeys.all, 'staff-attendance', date] as const,
+}
+
+export const useStaffDirectory = (enabled = true) =>
+  useQuery({ queryKey: staffAttendanceKeys.directory, queryFn: staffService.staffDirectory, staleTime: 10 * 60 * 1000, enabled })
+
+export const useStaffAttendance = (date: string, enabled = true) =>
+  useQuery({ queryKey: staffAttendanceKeys.day(date), queryFn: () => staffService.staffAttendance(date), staleTime: 30_000, enabled })
+
+export const useSaveStaffAttendance = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ date, staffIds, absentIds }: { date: string; staffIds: string[]; absentIds: string[] }) =>
+      staffService.saveStaffAttendance(date, staffIds, absentIds),
+    onSuccess: (_, { date }) => {
+      queryClient.invalidateQueries({ queryKey: staffAttendanceKeys.day(date) })
+      queryClient.invalidateQueries({ queryKey: [...staffKeys.all, 'glance'] })
+    },
+  })
+}

@@ -1,4 +1,4 @@
-import { api } from '@/lib/api'
+import { api, request } from '@/lib/api'
 
 import type { CalendarData, CalendarEventView, EventCategory, EventStatus, ReplyInput, ResponseType } from './calendarTypes'
 
@@ -165,6 +165,21 @@ export interface EventRecord extends MyEvent {
   segments: { key: string; label: string; personType: string; instructions?: string; response?: ResponseType }[]
 }
 
+export interface StaffMember {
+  _id: string
+  name: string
+  employeeId?: string | null
+  designation?: string
+  dutyType?: string
+  isActive?: boolean
+}
+
+export interface StaffAttendanceDay {
+  /** Only absences are stored: everyone else was present. */
+  absentIds: string[]
+  day: { working: boolean; label: string } | null
+}
+
 export const staffService = {
   myTimetable: (from: string, to: string) => api.get<MyTimetable>('/timetable/me', { from, to }),
   registers: (date: string) => api.get<RegisterDay>('/attnd/student-registers', { date }),
@@ -199,6 +214,22 @@ export const staffService = {
   eventRecord: (id: string) => api.get<EventRecord>(`/calendar/events/${encodeURIComponent(id)}`),
   approveEvent: (id: string) => api.post<unknown>(`/calendar/events/${encodeURIComponent(id)}/approve`),
   rejectEvent: (id: string, note: string) => api.post<unknown>(`/calendar/events/${encodeURIComponent(id)}/reject`, { note }),
+
+  staffDirectory: () => api.get<StaffMember[]>('/attnd/staff-directory'),
+  /** One day's staff absences, with whether the school is open. */
+  staffAttendance: async (date: string): Promise<StaffAttendanceDay> => {
+    const response = await request<{ data: { staffId: string; status: string }[]; schoolDays?: Record<string, { working: boolean; label: string }> }>(
+      '/attnd/staff',
+      { params: { date }, raw: true },
+    )
+    return {
+      absentIds: response.data.filter((record) => record.status === 'A').map((record) => String(record.staffId)),
+      day: response.schoolDays?.[date] ?? null,
+    }
+  },
+  /** Saves one day for these staff (replaces their marks for the day; others stay as they are). */
+  saveStaffAttendance: (date: string, staffIds: string[], absentIds: string[]) =>
+    api.put<unknown>('/attnd/staff', { date, staffIds, absences: absentIds.map((staffId) => ({ staffId, attendanceDate: date })) }),
 
   attendanceGlance: (date: string) => api.get<AttendanceGlance>('/attnd/dashboard', { date, month: date.slice(0, 7) }),
   feesGlance: () => api.get<FeesGlance>('/cpitl/dashboard'),

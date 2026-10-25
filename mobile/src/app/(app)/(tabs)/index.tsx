@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router'
-import { Megaphone } from 'lucide-react-native'
+import { Megaphone, UserCheck } from 'lucide-react-native'
 import { useMemo } from 'react'
 import { View } from 'react-native'
 
@@ -186,13 +186,29 @@ function StaffHome() {
 
 /** Office, accounts, library, clinic and other staff: today's meetings, and the way to the rest. */
 function OtherStaffToday() {
+  const router = useRouter()
   const session = useSession()
   const bell = useBell()
+  const staff = useStaff()
+  const staffAttendance = staff.canUse('attnd_staff_attendance') && staff.can('attnd.staff.write')
   if (session.status !== 'signedIn') return null
   const today = formatDayKey(schoolToday(), { weekday: 'short' })
 
   return (
     <MobileScreen tabs nav={<NavBar large eyebrow={today} title={`Hi, ${firstName(session.user.displayName || session.user.name)}`} actions={[bell]} />}>
+      {staffAttendance ? (
+        <ListGroup
+          items={[
+            {
+              title: 'Staff attendance',
+              subtitle: "Mark who is absent today",
+              icon: UserCheck,
+              tile: 5,
+              onPress: () => router.push('/staff-attendance'),
+            },
+          ]}
+        />
+      ) : null}
       <TodayMeetings />
       <ListGroup
         header="Signed in to"

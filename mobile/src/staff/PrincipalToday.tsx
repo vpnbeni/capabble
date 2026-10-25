@@ -11,7 +11,7 @@ import { ApprovalList, useApprovals } from './approvals'
 import { useAttendanceGlance, useFeesGlance, useRegisters } from './queries'
 import { TodayMeetings } from './TodayMeetings'
 import { useBell } from './useBell'
-import { openWebsite, useStaff } from './useStaff'
+import { useStaff } from './useStaff'
 
 /**
  * The principal's glance: four numbers, each opening its list, then what waits for a decision.
@@ -80,7 +80,7 @@ export function PrincipalToday() {
       tone: day?.working && team.todayAbsent ? 'danger' : undefined,
       icon: Users,
       tile: 2,
-      onPress: () => openWebsite('/attnd/staff-attendance'),
+      onPress: () => router.push('/staff-attendance'),
     })
   }
 
