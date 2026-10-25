@@ -1,12 +1,12 @@
 import Constants from 'expo-constants'
 import { useRouter } from 'expo-router'
-import { CalendarClock, KeyRound } from 'lucide-react-native'
+import { CalendarClock, KeyRound, Users } from 'lucide-react-native'
 import { useState } from 'react'
 
 import { PORTAL_MODULES } from '@/portal/modules'
 import { usePortal } from '@/portal/PortalProvider'
 import { useSession } from '@/session/SessionProvider'
-import { WEB_MODULES, webModulePath } from '@/staff/access'
+import { WEB_MODULES, isMeetingHost, webModulePath } from '@/staff/access'
 import { clearAttendanceQueue, useAttendanceQueue } from '@/staff/attendanceQueue'
 import { openWebsite, useStaff } from '@/staff/useStaff'
 import { ActionSheet, Avatar, ListGroup, MobileScreen, NavBar, ShortcutGrid } from '@/ui'
@@ -33,7 +33,10 @@ export default function MoreScreen() {
     : [KIND_LABEL[user.kind], children ? `${children} ${children === 1 ? 'child' : 'children'}` : null].filter(Boolean).join(' · ')
   const modules = isStaff ? [] : PORTAL_MODULES.filter((module) => !module.tab && has(module.section))
   // Staff places in the app that aren't tabs.
-  const staffShortcuts = isStaff && user.teacher ? [{ label: 'Timetable', icon: CalendarClock, tile: 4 as const, onPress: () => router.push('/timetable') }] : []
+  const staffShortcuts = [
+    ...(isStaff && user.teacher ? [{ label: 'Timetable', icon: CalendarClock, tile: 4 as const, onPress: () => router.push('/timetable') }] : []),
+    ...(isStaff && isMeetingHost(staff) ? [{ label: 'Meetings', icon: Users, tile: 2 as const, onPress: () => router.push('/meetings') }] : []),
+  ]
   // Staff: the desk work stays on the website; each module opens the first page this login may see.
   const webModules = isStaff
     ? WEB_MODULES.map((module) => ({ module, path: webModulePath(module, staff) })).filter((entry) => entry.path)

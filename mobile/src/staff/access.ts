@@ -108,3 +108,6 @@ export const WEB_MODULES: WebModule[] = [
 /** The website path a login would open for a module, or null when they can't use any of its pages. */
 export const webModulePath = (module: WebModule, perms: Permissions): string | null =>
   module.pages.find((page) => perms.canUse(page.feature))?.path ?? null
+
+/** Takes appointments as a host (appointments on for the school, and the host permission). */
+export const isMeetingHost = (perms: Permissions) => perms.canUse('appnt_desk') && perms.can('appnt.appointments.host')

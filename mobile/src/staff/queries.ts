@@ -2,6 +2,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 
 import { ApiError } from '@/lib/api'
 import { fileStore } from '@/lib/fileStore'
+import { appntService, type AppointmentAction } from '@/services/appntService'
 import type { ReplyInput } from '@/services/calendarTypes'
 import { staffService, type NewEvent, type RosterStudent } from '@/services/staffService'
 
@@ -123,5 +124,52 @@ export const useCreateEvent = () => {
       queryClient.invalidateQueries({ queryKey: staffKeys.myEvents() })
       queryClient.invalidateQueries({ queryKey: [...staffKeys.all, 'calendar'] })
     },
+  })
+}
+
+// Appointments (hosts). Writes refresh every meeting list.
+const meetingKeys = {
+  all: [...staffKeys.all, 'meetings'] as const,
+  day: (date: string) => [...staffKeys.all, 'meetings', 'day', date] as const,
+  list: (kind: string, from: string) => [...staffKeys.all, 'meetings', 'list', kind, from] as const,
+  host: () => [...staffKeys.all, 'meetings', 'host'] as const,
+}
+
+export const useMeetingDay = (date: string, enabled = true) =>
+  useQuery({ queryKey: meetingKeys.day(date), queryFn: () => appntService.day(date), staleTime: 30_000, enabled })
+
+/** Requests still to answer, or confirmed meetings after today, soonest first. */
+export const useMeetingList = (kind: 'requests' | 'upcoming', from: string, enabled = true) =>
+  useQuery({
+    queryKey: meetingKeys.list(kind, from),
+    queryFn: () => appntService.list({ status: kind === 'requests' ? 'requested' : 'confirmed', from, sort: 'upcoming' }),
+    staleTime: 30_000,
+    enabled,
+  })
+
+export const useMyHost = (enabled = true) =>
+  useQuery({ queryKey: meetingKeys.host(), queryFn: appntService.myHost, retry: false, enabled })
+
+export const useMeetingAction = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, action, note }: { id: string; action: AppointmentAction; note?: string }) => appntService.act(id, action, note),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: meetingKeys.all }),
+  })
+}
+
+export const useSaveMeetingNotes = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, notes }: { id: string; notes: string }) => appntService.saveNotes(id, notes),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: meetingKeys.all }),
+  })
+}
+
+export const useSaveMyHours = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: appntService.saveMyHours,
+    onSuccess: (host) => queryClient.setQueryData(meetingKeys.host(), host),
   })
 }

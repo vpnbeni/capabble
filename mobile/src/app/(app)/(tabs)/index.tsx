@@ -13,6 +13,7 @@ import { LoadFailed } from '@/portal/states'
 import type { CalendarItem } from '@/services/calendarTypes'
 import { useSession } from '@/session/SessionProvider'
 import { TeacherToday } from '@/staff/TeacherToday'
+import { TodayMeetings } from '@/staff/TodayMeetings'
 import { useStaff } from '@/staff/useStaff'
 import { radius, size, space } from '@/theme/tokens'
 import { Avatar, Callout, Hero, ListGroup, MobileScreen, NavBar, Rail, RailCard, Section, ShortcutGrid, Skeleton } from '@/ui'
@@ -183,14 +184,15 @@ function StaffHome() {
 
   return (
     <MobileScreen tabs nav={<NavBar large eyebrow={today} title={`Hi, ${firstName(session.user.displayName || session.user.name)}`} />}>
-      <Callout tone="info" title={mode === 'glance' ? 'Your school at a glance comes next' : 'Your day comes in the next update'}>
-        {mode === 'glance'
-          ? "Today's attendance, fees this month and what is waiting for your approval will show here."
-          : "Your calendar and today's meetings will show here."}
-      </Callout>
+      {mode === 'glance' ? (
+        <Callout tone="info" title="Your school at a glance comes next">
+          {"Today's attendance, fees this month and what is waiting for your approval will show here."}
+        </Callout>
+      ) : null}
+      <TodayMeetings />
       <ListGroup
         header="Signed in to"
-        footer="Everything else is under More, on the website."
+        footer="Your calendar is in the Calendar tab. Everything else is under More."
         items={[{ title: session.school.name, subtitle: session.user.roles.map((role) => role.name).join(', ') || 'Staff' }]}
       />
     </MobileScreen>

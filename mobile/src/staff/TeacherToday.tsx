@@ -11,6 +11,7 @@ import { Callout, Hero, MobileScreen, NavBar, Section, Skeleton, StatusView, Sur
 
 import { classTitle, periodName, periodTimeline } from './periods'
 import { useMyTimetable, useRegisters } from './queries'
+import { TodayMeetings } from './TodayMeetings'
 import { useStaff } from './useStaff'
 
 /** The school clock, ticking every 30 s so "now" and "in 12 min" stay true while the screen is open. */
@@ -118,6 +119,7 @@ export function TeacherToday() {
           </Surface>
         </Section>
       ) : null}
+      <TodayMeetings />
     </MobileScreen>
   )
 }
