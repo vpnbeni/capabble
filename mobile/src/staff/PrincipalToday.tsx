@@ -9,6 +9,7 @@ import { MobileScreen, NavBar, Section, Skeleton, StatTiles, StatusView, Surface
 
 import { ApprovalList, useApprovals } from './approvals'
 import { useAttendanceGlance, useFeesGlance, useRegisters } from './queries'
+import { TodayDuties } from './TodayDuties'
 import { TodayMeetings } from './TodayMeetings'
 import { useBell } from './useBell'
 import { useStaff } from './useStaff'
@@ -122,6 +123,7 @@ export function PrincipalToday() {
           )}
         </Section>
       ) : null}
+      <TodayDuties />
       <TodayMeetings />
     </MobileScreen>
   )

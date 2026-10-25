@@ -5,6 +5,8 @@ import { fileStore } from '@/lib/fileStore'
 import { shortClass } from '@/lib/format'
 import { appntService, type AppointmentAction } from '@/services/appntService'
 import type { ReplyInput } from '@/services/calendarTypes'
+import { clinicService, type ClinicVisitInput } from '@/services/clinicService'
+import { examService, type SubjectMark } from '@/services/examService'
 import { homeworkService, type HomeworkInput, type HomeworkStatus } from '@/services/homeworkService'
 import { notificationService } from '@/services/notificationService'
 import { studentService } from '@/services/studentService'
@@ -362,5 +364,55 @@ export const useHomeworkStatus = () => {
   return useMutation({
     mutationFn: ({ id, status }: { id: string; status: HomeworkStatus }) => homeworkService.setStatus(id, status),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: homeworkKeys.all }),
+  })
+}
+
+export const useColleagues = (search: string) =>
+  useQuery({
+    queryKey: [...staffKeys.all, 'colleagues', search] as const,
+    queryFn: () => staffService.directory(search),
+    placeholderData: keepPreviousData,
+    staleTime: 5 * 60 * 1000,
+  })
+
+// Marks (exam results).
+const marksKeys = {
+  all: [...staffKeys.all, 'marks'] as const,
+  exams: [...staffKeys.all, 'marks', 'exams'] as const,
+  status: (examId: string) => [...staffKeys.all, 'marks', 'status', examId] as const,
+  results: (examId: string, className: string, section: string) => [...staffKeys.all, 'marks', 'results', examId, className, section] as const,
+}
+
+export const useExams = () => useQuery({ queryKey: marksKeys.exams, queryFn: examService.exams, staleTime: 10 * 60 * 1000 })
+
+export const useEntryStatus = (examId?: string) =>
+  useQuery({ queryKey: marksKeys.status(examId ?? ''), queryFn: () => examService.entryStatus(examId as string), enabled: Boolean(examId), staleTime: 30_000 })
+
+export const useClassResults = (examId?: string, className?: string, section?: string) =>
+  useQuery({
+    queryKey: marksKeys.results(examId ?? '', className ?? '', section ?? ''),
+    queryFn: () => examService.results(examId as string, className as string, section as string),
+    enabled: Boolean(examId && className && section),
+  })
+
+export const useSaveSubjectMarks = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ examId, className, section, subjectId, rows }: { examId: string; className: string; section: string; subjectId: string; rows: SubjectMark[] }) =>
+      examService.saveSubject(examId, className, section, subjectId, rows),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: marksKeys.all }),
+  })
+}
+
+// Clinic visits.
+const clinicKey = [...staffKeys.all, 'clinic'] as const
+
+export const useClinicVisits = () => useQuery({ queryKey: clinicKey, queryFn: clinicService.list, staleTime: 30_000 })
+
+export const useSaveClinicVisit = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, visit }: { id?: string; visit: ClinicVisitInput }) => (id ? clinicService.update(id, visit) : clinicService.create(visit)),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: clinicKey }),
   })
 }

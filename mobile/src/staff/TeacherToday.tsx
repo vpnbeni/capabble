@@ -11,6 +11,7 @@ import { Callout, Hero, MobileScreen, NavBar, Section, Skeleton, StatusView, Sur
 
 import { classTitle, periodName, periodTimeline } from './periods'
 import { useMyTimetable, useRegisters } from './queries'
+import { TodayDuties } from './TodayDuties'
 import { TodayMeetings } from './TodayMeetings'
 import { useBell } from './useBell'
 import { useStaff } from './useStaff'
@@ -121,6 +122,7 @@ export function TeacherToday() {
           </Surface>
         </Section>
       ) : null}
+      <TodayDuties />
       <TodayMeetings />
     </MobileScreen>
   )

@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router'
-import { Megaphone, UserCheck } from 'lucide-react-native'
+import { HeartPulse, Megaphone, UserCheck } from 'lucide-react-native'
 import { useMemo } from 'react'
 import { View } from 'react-native'
 
@@ -14,6 +14,7 @@ import type { CalendarItem } from '@/services/calendarTypes'
 import { useSession } from '@/session/SessionProvider'
 import { PrincipalToday } from '@/staff/PrincipalToday'
 import { TeacherToday } from '@/staff/TeacherToday'
+import { TodayDuties } from '@/staff/TodayDuties'
 import { TodayMeetings } from '@/staff/TodayMeetings'
 import { useBell } from '@/staff/useBell'
 import { useStaff } from '@/staff/useStaff'
@@ -192,24 +193,23 @@ function OtherStaffToday() {
   const bell = useBell()
   const staff = useStaff()
   const staffAttendance = staff.canUse('attnd_staff_attendance') && staff.can('attnd.staff.write')
+  const clinic = staff.canUse('mdcl_clinic') && staff.can('mdcl.clinic.write')
   if (session.status !== 'signedIn') return null
   const today = formatDayKey(schoolToday(), { weekday: 'short' })
 
   return (
     <MobileScreen tabs nav={<NavBar large eyebrow={today} title={`Hi, ${firstName(session.user.displayName || session.user.name)}`} actions={[bell]} />}>
-      {staffAttendance ? (
+      {staffAttendance || clinic ? (
         <ListGroup
           items={[
-            {
-              title: 'Staff attendance',
-              subtitle: "Mark who is absent today",
-              icon: UserCheck,
-              tile: 5,
-              onPress: () => router.push('/staff-attendance'),
-            },
+            ...(staffAttendance
+              ? [{ title: 'Staff attendance', subtitle: 'Mark who is absent today', icon: UserCheck, tile: 5 as const, onPress: () => router.push('/staff-attendance') }]
+              : []),
+            ...(clinic ? [{ title: 'Clinic', subtitle: 'Log a visit', icon: HeartPulse, tile: 5 as const, onPress: () => router.push('/clinic') }] : []),
           ]}
         />
       ) : null}
+      <TodayDuties />
       <TodayMeetings />
       <ListGroup
         header="Signed in to"

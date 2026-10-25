@@ -12,6 +12,9 @@ const normalizeSubjectKey = (name) =>
     .toLowerCase()
     .replace(/\s+/g, '-');
 
+/** Subject keys are slugs of the subject name ("social-science"); never a path or operator. */
+const SUBJECT_KEY_PATTERN = /^[a-z0-9][a-z0-9-]{0,79}$/;
+
 const normalizeMarksMap = (marks) => {
   if (marks instanceof Map) return Object.fromEntries(marks);
   if (marks && typeof marks === 'object') return marks;
@@ -117,6 +120,41 @@ const upsertResults = asyncHandler(async (req, res) => {
   }
 
   const academicSession = req.academicSession || null;
+
+  // One subject at a time (the phone): only that subject's mark and absent flag change, so marks
+  // another teacher saved for other subjects in the meantime stay as they are.
+  const { subjectId } = req.body;
+  if (subjectId !== undefined) {
+    const key = String(subjectId).trim();
+    if (!SUBJECT_KEY_PATTERN.test(key)) {
+      return res.status(400).json({ success: false, message: 'Choose a subject.' });
+    }
+    const subjectOps = results.map((row) => {
+      const absentHere = Boolean(row?.absentSubjects?.map?.(String).includes(key));
+      const value = row?.marks?.[key];
+      const filled = value !== null && value !== undefined && value !== '';
+      const set = { class: className, section, ...(academicSession ? { academicSession } : {}) };
+      const update = { $setOnInsert: { examId, studentId: row.studentId } };
+      if (absentHere) {
+        update.$addToSet = { absentSubjects: key };
+        update.$unset = { [`marks.${key}`]: '' };
+      } else {
+        update.$pull = { absentSubjects: key };
+        if (filled) set[`marks.${key}`] = value;
+        else update.$unset = { [`marks.${key}`]: '' };
+      }
+      update.$set = set;
+      return {
+        updateOne: {
+          filter: { examId, studentId: row.studentId, ...(academicSession ? { academicSession } : {}) },
+          update,
+          upsert: true
+        }
+      };
+    });
+    await ExamResultModel.bulkWrite(subjectOps);
+    return res.status(200).json({ success: true, message: 'Results saved successfully.' });
+  }
 
   const ops = results.map(({ studentId, marks, absent, absentSubjects }) => {
     const subjects = Array.isArray(absentSubjects)

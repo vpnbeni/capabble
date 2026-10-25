@@ -89,6 +89,7 @@ call `onChange(value)` and are controlled (no `defaultValue`).
 | `MobileButton` | `variant: filled \| tinted \| gray \| plain \| destructive, size: large \| medium \| small, icon, fullWidth, loading, disabled, onPress, aria-label` | One filled per view (none when there's an `ActionBar`). Large (50) full width in sheets and status screens |
 | `Switch` | `value, onChange, label, disabled` | A setting that applies at once, usually as a `ListGroup` accessory |
 | `MobileTextField` | `label, hint, error, type: text \| email \| password \| tel \| number, prefix, icon, multiline, disabled` + TextInput props, `ref` | 50px box, label above; the right keyboard and autofill; password show/hide |
+| `NumberCell` | `label, value, onChangeText, invalid, disabled, width` + TextInput props, `ref` | A compact number box (44pt) as a `ListItem` accessory: marks against each student. Grows with the text size up to 1.3×; scrolls above the keyboard; the row's subtitle says what to fix. Not in the design system yet: added to our kit |
 | `OTPField` | `length, value, onChange, onComplete, label, hint, error` | Codes, filled by the phone (`one-time-code`) |
 | `SearchBar` | `placeholder, value, onChange, onCancel, label` | Above lists longer than ~12 |
 | `Stepper` | `value, onChange, min, max, label, hint` | Small counts (how many are coming) |

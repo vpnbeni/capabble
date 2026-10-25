@@ -45,15 +45,15 @@ desk work; More → "Open on the website" row links to the page.
 | Appointments · settings, reports | `AppntPages` | Web only | Setup |
 | Students | `Students`, `StudentDetail`, `StudentProfile` | **Now**: my classes → roster → student (call a guardian); principal: search all | Look-ups on the move. Respects "own classes only" |
 | Students · records | `StudentInfo`, imports, ID cards, stickers, alumni | Web only | Data entry and printing |
-| Staff | `StaafStaffMembers`, `StaafStaffProfile` | Later: directory to call a colleague (principal) | Read-only look-up |
+| Staff | `StaafStaffMembers`, `StaafStaffProfile` | **Done**: directory to call a colleague | Read-only look-up |
 | Staff · setup | Org structure, recruitment, staff groups | Web only | |
 | Academics | Homework, assignments | **Done**: homework. Assignments later | Short, phone-friendly |
 | Academics · planning | Curriculum, lesson plans, quizzes, overview | Web only | Long forms |
-| Exams | Marks entry (`ExmclResult`, award list) | Later: marks for one class and one exam | A grid of marks is borderline on a phone |
+| Exams | Marks entry (`ExmclResult`, award list) | **Done**: marks for one subject of one class | One subject at a time keeps it phone-sized |
 | Exams · setup | Exams, subjects, datesheets, admit cards, report cards and formats, question papers, syllabus, CBSE registration, circulars | Web only | Printing and formats |
-| Exam centre | Candidates, seating, rooms, Form 66, answer sheets, dispatch, guidelines, remuneration | Web only. Later: "my invigilation duty today" | Centre printing; duties are the one phone fact |
+| Exam centre | Candidates, seating, rooms, Form 66, answer sheets, dispatch, guidelines, remuneration | Web only. **Done**: today's duties on Today | Centre printing; duties are the one phone fact |
 | Activities | Houses, clubs, council, sports, tours, certificates | Web only | Admin and records |
-| Clinic | `MdclCases`, `MdclSupplies` | Later: the nurse logs a visit | Short form on the move; few users |
+| Clinic | `MdclCases`, `MdclSupplies` | **Done**: visit log. Supplies web only | Short form on the move |
 | Transport | Vehicles, routes, assignments, crew, trips, live | Later: crew app (start trip, mark boarding) and live map | Needs `expo-location` (background) and `react-native-maps`: **a new EAS build** |
 | Assets | Assets, locations, workflows, audits | Later: audit by scanning a tag | Needs `expo-camera`: **a new EAS build** |
 | Finance | Collection, fee slips, structures, ledger, expenses, payroll, budgets, settings | **Now** (principal, read): fees this month on the glance. Rest web only | Counter and accounts are desk work |
@@ -137,13 +137,19 @@ Each needs a stage deploy before its slice works on the phone. Tests in `server/
 | + | Notifications bell (unread dot) on every staff Today and the list; links open the app screen or the website page | `notifications.tsx`, `staff/useBell.ts`, `lib/notificationLinks.ts` | — |
 | + | Staff attendance for one day: everyone present, tap the absent, staff groups, any past day; from the principal's "Staff absent" tile, office Today and More | `staff-attendance.tsx` | — (staff groups moved to `packages/shared/src/staffTypes.ts`, used by the website too) |
 | + | Homework: due / drafts / past for the teacher's classes or one class, post and edit (published at once), publish a draft, close; from a class roster and More. Families see it in the app and on the web portal (portal section `homework`) | `homework/index.tsx`, `homework/new.tsx` | `GET /portal/students/:id/homework` for families |
+| + | Staff directory: search, staff groups, call a colleague | `staff-directory.tsx` | `GET /teachers?lite=true` (names and numbers only, no bank or ID details) |
+| + | Marks for one subject of one class: exam picker, classes with each subject's progress, a number box per student, absent per subject | `marks/index.tsx`, `marks/entry.tsx`; kit `NumberCell` | `POST /exam-results/bulk` with `subjectId` changes only that subject (other subjects' marks are left alone) |
+| + | Exam duties on Today (invigilation room, centre duty), from the calendar's "My duties" layer | `staff/TodayDuties.tsx` | — |
+| + | Clinic visit log: today and the last 30 days, log or add to a visit with a student picker; on Today for clinic staff | `clinic/index.tsx`, `clinic/visit.tsx` | — |
 
 Kit added on the way: `useFixedColumn`, `MonthPicker` (documented in `mobile/src/ui/DESIGN.md`).
 
 Checked against stage data (R.E.D. School, Jhajjar) through the API calls each screen makes, and by the
-user on an Android phone for slices 1–6. Not yet checked: answering a family's meeting request (no parent
-login on stage), the "own classes only" limit with a teacher who doesn't teach every class.
+user on an Android phone for slices 1–6. Also checked on stage: a family's meeting request confirmed and
+declined by the host; the "own classes only" limit with a teacher who has only 3rd-B (registers, students,
+roll call, events and homework for other classes are all refused); homework as a parent. Not checked:
+exam duties on Today (stage has no duty assignments), the web portal's Homework page (stage site is behind
+Vercel login).
 
-Next, from the "Later" rows: the staff directory, marks for one class,
-"my invigilation duty today", the clinic visit log. Needing a new EAS build: the transport crew app, the
-live bus map, scanning for assets and library books.
+Every "Later" row that needs no new EAS build is done. Needing a new EAS build: the transport crew app,
+the live bus map, scanning for assets and library books.

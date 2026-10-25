@@ -174,6 +174,15 @@ export interface StaffMember {
   isActive?: boolean
 }
 
+/** A colleague as the staff directory shows them (`GET /teachers?lite=true`: no bank or ID details). */
+export interface DirectoryEntry extends StaffMember {
+  department?: string
+  mobileNo?: string
+  phone?: string
+  email?: string
+  profileImage?: string | null
+}
+
 export interface StaffAttendanceDay {
   /** Only absences are stored: everyone else was present. */
   absentIds: string[]
@@ -216,6 +225,9 @@ export const staffService = {
   rejectEvent: (id: string, note: string) => api.post<unknown>(`/calendar/events/${encodeURIComponent(id)}/reject`, { note }),
 
   staffDirectory: () => api.get<StaffMember[]>('/attnd/staff-directory'),
+  /** Active staff with their phone numbers, by name; `search` matches name, ID, designation or phone. */
+  directory: async (search: string) =>
+    (await api.get<{ data: DirectoryEntry[] }>('/teachers', { lite: 'true', isActive: 'true', limit: 100, sort: 'name', search: search || undefined })).data,
   /** One day's staff absences, with whether the school is open. */
   staffAttendance: async (date: string): Promise<StaffAttendanceDay> => {
     const response = await request<{ data: { staffId: string; status: string }[]; schoolDays?: Record<string, { working: boolean; label: string }> }>(

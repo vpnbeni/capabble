@@ -28,7 +28,7 @@ export {
 export { SwipeRow, type SwipeAction } from './swipe'
 export { Agenda, DayGrid, MonthPicker, ProgressRing, Timeline, WeekStrip, useFixedColumn, type AgendaDay, type AgendaItem, type DayMark, type TimelineItem, type WeekDay } from './dates'
 export { MobileButton, Switch, type MobileButtonVariant } from './buttons'
-export { MobileTextField, OTPField, SearchBar, Stepper, type MobileTextFieldRef } from './fields'
+export { MobileTextField, NumberCell, OTPField, SearchBar, Stepper, type MobileTextFieldRef } from './fields'
 export { ChildSwitcher, ChipRail, OptionList, SegmentedControl, SlotPicker, type ChipItem, type ChoiceOption, type Slot, type SwitcherStudent } from './choosers'
 export { ActionBar, ActionSheet, BottomSheet, type SheetAction } from './sheets'
 export { Callout, NotificationBanner, StatusView, type StatusKind } from './states'
