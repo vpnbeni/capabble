@@ -83,6 +83,7 @@ call `onChange(value)` and are controlled (no `defaultValue`).
 | `WeekStrip` | `days[{date,weekday,day,today,off,dots}], value, onChange, onWeekChange` | Calendar and timetable day picker; swipe for the next week |
 | `Agenda` | `groups[{label,off,items[{time,end,title,meta,color,badge,onPress}]}], empty` | What's on by day |
 | `Timeline` | `items[{time,title,detail,state: done \| current \| upcoming,badge}], compact` | Bus stops, a day's periods, a request's progress |
+| `MonthPicker` | `value, onChange, today, min, label` | Picking one day, in a `BottomSheet` opened from a date row. Previous/next month arrows; chosen day `accent-strong`, today ringed, days before `min` dimmed. Not in the design system yet: added to our kit |
 | `DayGrid` | `year, month, marks{[date]:{tone,label,short}}, today, title, legend[{tone,label}]` | A month of attendance; only days that differ get a tone and a letter |
 | `ProgressRing` | `value, label, sublabel, size, stroke, tone, ariaLabel` | A percentage with the plain fact beside it |
 | `MobileButton` | `variant: filled \| tinted \| gray \| plain \| destructive, size: large \| medium \| small, icon, fullWidth, loading, disabled, onPress, aria-label` | One filled per view (none when there's an `ActionBar`). Large (50) full width in sheets and status screens |
@@ -122,7 +123,7 @@ State the one fact → `Hero` · the screen's main action → `ActionBar` (in a 
 into a module → `ShortcutGrid` or a `ListGroup` row with a tile · a few things sideways → `Rail` · records → `ListGroup`
 (`SwipeRow`s when rows have quick actions) · what's on → `WeekStrip` + `Agenda` · steps with "now" → `Timeline` · a month of
 attendance → `DayGrid` + `ProgressRing` + the plain fact · a record → `DetailList` · 2–4 options at once → `SegmentedControl` ·
-filter → `ChipRail` · pick from a list → `OptionList` in a `BottomSheet` · a time → `WeekStrip` + `SlotPicker` · a small count
+filter → `ChipRail` · pick from a list → `OptionList` in a `BottomSheet` · a date → a `ListGroup` row opening `MonthPicker` in a `BottomSheet` · a time → `WeekStrip` + `SlotPicker` · a small count
 → `Stepper` · text → `MobileTextField` / `OTPField` · 2–6 actions → `ActionSheet` · destroy → `Dialog` danger after the
 `ActionSheet` · the result of what they did → toast (never from a sheet) · true until fixed → `Callout` · a state → `StatusView`.
 

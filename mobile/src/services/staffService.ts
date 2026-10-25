@@ -1,5 +1,7 @@
 import { api } from '@/lib/api'
 
+import type { CalendarData, CalendarEventView, EventCategory, EventStatus, ReplyInput, ResponseType } from './calendarTypes'
+
 // Staff API: the same endpoints the website uses, plus the two the phone needed
 // (GET /timetable/me and GET /attnd/student-registers).
 
@@ -75,6 +77,59 @@ export interface RegisterSave {
   records: { studentId: string; status: 'P' | 'A' }[]
 }
 
+export interface AudienceSection {
+  /** "7|A": the value a section scope takes. */
+  key: string
+  className: string
+  section: string
+  students: number
+}
+
+export interface AudienceOptions {
+  /** May send to the whole school, roles, houses and routes (principal, office). */
+  wide: boolean
+  assignedOnly: boolean
+  canApprove: boolean
+  needsApprovalForFamilies: boolean
+  sections: AudienceSection[]
+}
+
+export interface MyEvent {
+  id: string
+  title: string
+  category: EventCategory
+  startDate: string
+  endDate: string
+  startTime?: string | null
+  allDay: boolean
+  status: EventStatus
+  rejectionNote?: string
+  audiences: string[]
+  updatedAt: string
+}
+
+export interface NewEvent {
+  title: string
+  description: string
+  category: EventCategory
+  allDay: boolean
+  startDate: string
+  endDate: string
+  startTime: string | null
+  endTime: string | null
+  venue: string
+  visibility: 'segments'
+  segments: {
+    label: string
+    personType: 'parent' | 'student'
+    scopes: { type: 'section'; value: string; label: string }[]
+    instructions: string
+    response: ResponseType
+    notify: 'now'
+  }[]
+  publish: true
+}
+
 export const staffService = {
   myTimetable: (from: string, to: string) => api.get<MyTimetable>('/timetable/me', { from, to }),
   registers: (date: string) => api.get<RegisterDay>('/attnd/student-registers', { date }),
@@ -92,4 +147,15 @@ export const staffService = {
       records,
       daySettings: [{ attendanceDate: date, category: 'academic' }],
     }),
+
+  /** Everything on this login's calendar between two days (school days, events, exams, duties…). */
+  calendar: (from: string, to: string) => api.get<CalendarData>('/calendar/me', { from, to }),
+  calendarEvent: (id: string) => api.get<CalendarEventView>(`/calendar/view/${encodeURIComponent(id)}`),
+  respondToEvent: (id: string, input: ReplyInput) => api.post<ReplyInput>(`/calendar/view/${encodeURIComponent(id)}/respond`, input),
+  /** Classes this login may send an event to, and whether families' events need the principal. */
+  audienceOptions: () => api.get<AudienceOptions>('/calendar/audience/options'),
+  /** Events this login created (drafts, waiting for approval, rejected, published). */
+  myEvents: () => api.get<MyEvent[]>('/calendar/events', { mine: '1' }),
+  /** Creates and publishes an event; families' events from a teacher wait for the principal. */
+  createEvent: (event: NewEvent) => api.post<{ id: string; status: EventStatus }>('/calendar/events', event),
 }

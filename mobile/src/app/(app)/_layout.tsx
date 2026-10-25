@@ -20,6 +20,7 @@ export default function AppLayout() {
           <Stack.Screen name="notice/[id]" />
           <Stack.Screen name="fee-payment/[orderId]" />
           <Stack.Screen name="roll-call" />
+          <Stack.Screen name="event-new" />
         </Stack>
       </ToastProvider>
     </PortalProvider>
