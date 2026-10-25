@@ -2,8 +2,10 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 
 import { ApiError } from '@/lib/api'
 import { fileStore } from '@/lib/fileStore'
+import { shortClass } from '@/lib/format'
 import { appntService, type AppointmentAction } from '@/services/appntService'
 import type { ReplyInput } from '@/services/calendarTypes'
+import { studentService } from '@/services/studentService'
 import { staffService, type NewEvent, type RosterStudent } from '@/services/staffService'
 
 // React Query hooks for the staff app. Writes invalidate `staffKeys.all` parts they touch.
@@ -205,3 +207,70 @@ export const useAttendanceGlance = (date: string, enabled = true) =>
 
 export const useFeesGlance = (enabled = true) =>
   useQuery({ queryKey: glanceKeys.fees, queryFn: staffService.feesGlance, staleTime: 5 * 60 * 1000, enabled })
+
+// Students (Classes and Students tabs).
+const studentKeys = {
+  classes: (scope: string) => [...staffKeys.all, 'students', 'classes', scope] as const,
+  roster: (className: string, section: string) => [...staffKeys.all, 'students', 'roster', className, section] as const,
+  search: (q: string) => [...staffKeys.all, 'students', 'search', q] as const,
+  one: (id: string) => [...staffKeys.all, 'students', 'one', id] as const,
+}
+
+export type ClassSection = { className: string; section: string; students: number }
+
+const classOrder = (name: string) => {
+  const n = Number(shortClass(name))
+  return Number.isFinite(n) ? n : -1
+}
+const sortClasses = (rows: ClassSection[]) =>
+  rows.sort((a, b) => classOrder(a.className) - classOrder(b.className) || a.className.localeCompare(b.className) || a.section.localeCompare(b.section))
+
+/**
+ * The class-sections this login can see, with how many students: whole-school logins from the
+ * school's counts, "own classes only" logins from their own (server-limited) student list.
+ */
+export const useClassSections = (wholeSchool: boolean, enabled = true) =>
+  useQuery({
+    queryKey: studentKeys.classes(wholeSchool ? 'all' : 'mine'),
+    queryFn: async (): Promise<ClassSection[]> => {
+      if (wholeSchool) {
+        const stats = await studentService.stats()
+        return sortClasses(
+          stats.byClassSection
+            .filter((row) => row._id.class && row._id.section && row.active)
+            .map((row) => ({ className: row._id.class, section: row._id.section, students: row.active })),
+        )
+      }
+      const { students } = await studentService.list({})
+      const counts = new Map<string, ClassSection>()
+      students.forEach((student) => {
+        const key = `${student.class}|${student.section}`
+        const entry = counts.get(key) ?? { className: student.class, section: student.section, students: 0 }
+        entry.students += 1
+        counts.set(key, entry)
+      })
+      return sortClasses([...counts.values()])
+    },
+    staleTime: 10 * 60 * 1000,
+    enabled,
+  })
+
+export const useClassRoster = (className?: string, section?: string) =>
+  useQuery({
+    queryKey: studentKeys.roster(className ?? '', section ?? ''),
+    queryFn: async () => (await studentService.list({ class: className, section })).students,
+    enabled: Boolean(className && section),
+    staleTime: 10 * 60 * 1000,
+  })
+
+export const useStudentSearch = (q: string) =>
+  useQuery({
+    queryKey: studentKeys.search(q),
+    queryFn: async () => (await studentService.list({ search: q, limit: 30 })).students,
+    enabled: q.length >= 2,
+    placeholderData: keepPreviousData,
+    staleTime: 60_000,
+  })
+
+export const useStudentRecord = (id?: string) =>
+  useQuery({ queryKey: studentKeys.one(id ?? ''), queryFn: () => studentService.get(id as string), enabled: Boolean(id), staleTime: 5 * 60 * 1000 })

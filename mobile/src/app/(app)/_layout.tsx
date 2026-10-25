@@ -23,6 +23,8 @@ export default function AppLayout() {
           <Stack.Screen name="event-new" />
           <Stack.Screen name="school-attendance" />
           <Stack.Screen name="fee-collection" />
+          <Stack.Screen name="class-roster" />
+          <Stack.Screen name="student/[id]" />
         </Stack>
       </ToastProvider>
     </PortalProvider>

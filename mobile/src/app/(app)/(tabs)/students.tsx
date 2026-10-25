@@ -1,18 +1,6 @@
-import { GraduationCap } from 'lucide-react-native'
+import { StudentsBrowser } from '@/staff/StudentsBrowser'
 
-import { ComingSoon } from '@/staff/ComingSoon'
-import { MobileScreen, NavBar } from '@/ui'
-
-/** Principal and office: find any student and call a guardian. */
+/** Principal and office: find any student, or open a class. */
 export default function StudentsScreen() {
-  return (
-    <MobileScreen tabs nav={<NavBar large title="Students" />}>
-      <ComingSoon
-        icon={GraduationCap}
-        title="Students come in a later update"
-        body="Search the school's students, see a student's details and call a guardian."
-        webPath="/stdnt/students"
-      />
-    </MobileScreen>
-  )
+  return <StudentsBrowser title="Students" />
 }
