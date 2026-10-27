@@ -1,6 +1,6 @@
 import Constants from 'expo-constants'
 import { useRouter } from 'expo-router'
-import { Award, Boxes, BookCheck, Library, Trophy, Receipt, Wallet, School, BookOpen, CalendarClock, IndianRupee, CalendarRange, ClipboardList, CalendarDays, CalendarOff, Contact, HeartPulse, KeyRound, NotebookPen, UserCheck, Users } from 'lucide-react-native'
+import { Award, Boxes, Bus, BookCheck, Library, Trophy, Receipt, Wallet, School, BookOpen, CalendarClock, IndianRupee, CalendarRange, ClipboardList, CalendarDays, CalendarOff, Contact, HeartPulse, KeyRound, NotebookPen, UserCheck, Users } from 'lucide-react-native'
 import { useState } from 'react'
 
 import { PORTAL_MODULES } from '@/portal/modules'
@@ -71,6 +71,7 @@ export default function MoreScreen() {
     ...(isStaff && staff.canUse('cpitl_expenses') ? [{ label: 'Expenses', icon: Receipt, tile: 3 as const, onPress: () => router.push('/expenses') }] : []),
     ...(isStaff && staff.canUse('cpitl_payroll') && staff.can('cpitl.finance.payroll') ? [{ label: 'Payroll', icon: Wallet, tile: 3 as const, onPress: () => router.push('/payroll') }] : []),
     ...(isStaff && staff.canUse('actvt_activities') ? [{ label: 'Activities', icon: Trophy, tile: 1 as const, onPress: () => router.push('/activities') }] : []),
+    ...(isStaff && staff.canUse('trnst_transport') ? [{ label: 'Transport', icon: Bus, tile: 2 as const, onPress: () => router.push('/school-transport') }] : []),
     ...(isStaff && staff.canUse('asets_dashboard') ? [{ label: 'Assets', icon: Boxes, tile: 2 as const, onPress: () => router.push('/asset-register') }] : []),
     ...(isStaff && staff.canUse('libry_catalogue') ? [{ label: 'Library', icon: Library, tile: 1 as const, onPress: () => router.push('/library') }] : []),
     ...(isStaff && staff.canUse('mdcl_clinic')
