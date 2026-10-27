@@ -1,6 +1,6 @@
 import Constants from 'expo-constants'
 import { useRouter } from 'expo-router'
-import { Award, CalendarClock, Contact, HeartPulse, KeyRound, NotebookPen, UserCheck, Users } from 'lucide-react-native'
+import { Award, CalendarClock, CalendarDays, Contact, HeartPulse, KeyRound, NotebookPen, UserCheck, Users } from 'lucide-react-native'
 import { useState } from 'react'
 
 import { PORTAL_MODULES } from '@/portal/modules'
@@ -35,6 +35,9 @@ export default function MoreScreen() {
   // Staff places in the app that aren't tabs.
   const staffShortcuts = [
     ...(isStaff && user.teacher ? [{ label: 'Timetable', icon: CalendarClock, tile: 4 as const, onPress: () => router.push('/timetable') }] : []),
+    ...(isStaff && staff.canUse('clndr_events') && (staff.can('clndr.events.create') || staff.can('clndr.events.manage'))
+      ? [{ label: 'Events', icon: CalendarDays, tile: 1 as const, onPress: () => router.push('/events') }]
+      : []),
     ...(isStaff && isMeetingHost(staff) ? [{ label: 'Meetings', icon: Users, tile: 2 as const, onPress: () => router.push('/meetings') }] : []),
     ...(isStaff && staff.canUse('acdmc_academics') && staff.can('acdmc.classwork.write')
       ? [{ label: 'Homework', icon: NotebookPen, tile: 4 as const, onPress: () => router.push('/homework') }]

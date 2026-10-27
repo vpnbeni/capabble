@@ -344,3 +344,12 @@ Fine as they were: Classes, Attendance tab, marks entry rows (the box leaves roo
 `WeekStrip`, More (staff and family), new event, homework list and form, clinic list and visit form, staff directory,
 Approvals, Students, meeting sheet, family fees, notices, results, transport, profile, request a meeting, Your login.
 Web-only noise seen in the preview: a `collapsable` warning from React Native Web.
+
+## Done: slices from the plan of 27 Oct 2026
+
+Each checked in the web preview (360 × 640, `?text=1.3&os=android`) against stage, as the role that uses it, then
+published to `preview`.
+
+| Slice | What | Code | Checked on stage |
+|---|---|---|---|
+| 1 | Manage events: Events list (coming up, drafts, waiting for approval, past and cancelled; managers switch to everyone's), event record with replies by audience, who hasn't replied (opens the child's record to call a guardian), send a reminder, edit (only changed fields are sent; an audience is sent back whole with its key so replies stay), send a draft for approval, cancel with a reason and "tell families", delete a draft. From More → Events and the Calendar tab. "Attendance" left "On the website" (roll call, staff attendance and attendance today cover its pages) | `events/index.tsx`, `events/[id].tsx`, `events/replies.tsx`, `event-new.tsx` (edit), `services/eventService.ts`, `staff/eventQueries.ts` | Teacher: list, record, replies, edited the venue of her pending event (stayed pending, audience key kept) and put it back. Admin: everyone's events, consent replies, sent one reminder (1 person), cancel sheet opened and closed without cancelling |

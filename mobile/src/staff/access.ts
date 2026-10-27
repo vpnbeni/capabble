@@ -6,7 +6,6 @@ import {
   Bus,
   CalendarClock,
   CalendarDays,
-  ClipboardCheck,
   GraduationCap,
   HeartPulse,
   Landmark,
@@ -67,15 +66,6 @@ export type WebModule = { label: string; icon: LucideIcon; tile: TileIndex; page
 export const WEB_MODULES: WebModule[] = [
   { label: 'Students', icon: GraduationCap, tile: 6, pages: [{ feature: 'stdnt_students', path: '/stdnt/students' }] },
   { label: 'Staff', icon: Users, tile: 2, pages: [{ feature: 'staaf_staff_members', path: '/staaf/overview' }] },
-  {
-    label: 'Attendance',
-    icon: ClipboardCheck,
-    tile: 5,
-    pages: [
-      { feature: 'attnd_student_attendance', path: '/attnd/student-attendance' },
-      { feature: 'attnd_staff_attendance', path: '/attnd/staff-attendance' },
-    ],
-  },
   {
     label: 'Timetable',
     icon: CalendarClock,

@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import { CalendarCheck, Plus } from 'lucide-react-native'
+import { CalendarCheck, CalendarDays, Plus } from 'lucide-react-native'
 import { useMemo, useState } from 'react'
 
 import { useCalendarRange } from '@/calendar/source'
@@ -109,7 +109,7 @@ export default function CalendarScreen() {
     >
       {sent.length ? (
         <ListGroup
-          header="Your events"
+          header="Waiting on the principal"
           items={sent.map((event) => ({
             title: event.title,
             subtitle:
@@ -118,8 +118,12 @@ export default function CalendarScreen() {
                 : [formatDayKey(event.startDate, { weekday: 'short' }), event.audiences.join(', ')].filter(Boolean).join(' · '),
             lines: 2,
             badge: event.status === 'pending_approval' ? { label: 'Waiting for approval', tone: 'warning' as const } : { label: 'Not approved', tone: 'danger' as const },
+            onPress: () => router.push({ pathname: '/events/[id]', params: { id: event.id } }),
           }))}
         />
+      ) : null}
+      {canCreate ? (
+        <ListGroup items={[{ title: 'Your events', subtitle: 'Edit, see replies, send reminders, cancel', icon: CalendarDays, tile: 1, onPress: () => router.push('/events') }]} />
       ) : null}
       <WeekStrip days={week} value={selected} onChange={setSelected} onWeekChange={(step) => setSelected(dayKeyAdd(selected, step * 7))} label="Choose a day" />
       {children.length > 1 ? (
