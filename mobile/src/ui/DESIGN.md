@@ -168,7 +168,12 @@ Every tap lands on the exact thing and marks it read (`lib/notificationLinks.ts`
 
 ## Platform notes
 
-iOS is the reference; Android gets the same layout with its back gesture, no back label, left-aligned titles, no ripples
+**Size for the small Android phone.** Most users are on Android phones about 360dp wide, often with larger text; the
+same layout reads bigger there than on a 390pt iPhone. Every screen is checked at 360 × 640dp with 1.3× text: nothing
+cut off, overlapping or scrolling sideways; one control at the end of a row at most; tiles and button pairs stack
+rather than squeeze; chrome labels stay on one line. See "Small Android screens come first" in `mobile/AGENTS.md`.
+
+iOS is the design reference; Android gets the same layout with its back gesture, no back label, left-aligned titles, no ripples
 or FAB. Sensitive screens (results, fees, profile) should hide their content in the app switcher. Screens put the school's
 HTML (a circular) in `components/HtmlView` (WebView, JavaScript off), never in `Text`.
 
