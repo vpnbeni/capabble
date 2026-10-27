@@ -1,16 +1,17 @@
 import { useRouter } from 'expo-router'
-import { ExternalLink, Wallet } from 'lucide-react-native'
+import { IndianRupee, TriangleAlert, Wallet } from 'lucide-react-native'
 
 import { classLabel, formatINR } from '@/lib/format'
 import { CardSkeleton, LoadFailed } from '@/portal/states'
 import { useFeesGlance } from '@/staff/queries'
-import { openWebsite } from '@/staff/useStaff'
-import { Hero, ListGroup, MobileButton, MobileScreen, NavBar, StatusView, Surface } from '@/ui'
+import { useStaff } from '@/staff/useStaff'
+import { Hero, ListGroup, MobileScreen, NavBar, StatusView, Surface } from '@/ui'
 
-/** Principal: this session's fee collection, then each class with what is still due. Read-only. */
+/** Principal: this session's fee collection, then each class with what is still due; the counter and dues from here. */
 export default function FeeCollectionScreen() {
   const router = useRouter()
   const fees = useFeesGlance()
+  const staff = useStaff()
   const data = fees.data
   const rate = data ? Math.round(data.totals.collectionRate) : 0
   const classes = [...(data?.byClass ?? [])].sort((a, b) => b.pending - a.pending)
@@ -27,7 +28,7 @@ export default function FeeCollectionScreen() {
         <LoadFailed what="Fee collection" error={fees.error} onRetry={fees.refetch} />
       ) : !data?.totals.expected ? (
         <Surface padded={false}>
-          <StatusView compact kind="empty" icon={Wallet} title="No fees set for this session" body="Fee structures are set on the website." />
+          <StatusView compact kind="empty" icon={Wallet} title="No fees set for this session" body="Dues show here once the accounts office sets the fee structures." />
         </Surface>
       ) : (
         <>
@@ -50,9 +51,14 @@ export default function FeeCollectionScreen() {
               badge: row.overdue ? { label: 'Overdue', tone: 'danger' as const } : undefined,
             }))}
           />
-          <MobileButton variant="gray" size="medium" icon={ExternalLink} onPress={() => openWebsite('/cpitl/collection')}>
-            Open fees on the website
-          </MobileButton>
+          {staff.canUse('cpitl_fees') ? (
+            <ListGroup
+              items={[
+                { title: 'Fee counter', subtitle: 'Find a student, take a payment, share a receipt', icon: IndianRupee, tile: 3, onPress: () => router.push('/counter') },
+                { title: 'Dues', subtitle: 'Who owes what, by class', icon: TriangleAlert, tile: 3, onPress: () => router.push('/counter/dues') },
+              ]}
+            />
+          ) : null}
         </>
       )}
     </MobileScreen>

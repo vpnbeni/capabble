@@ -133,7 +133,7 @@ export async function requestBytes(path: string, options: Omit<RequestOptions, '
 }
 
 export const api = {
-  get: <T>(path: string, params?: RequestOptions['params']) => request<T>(path, { params }),
+  get: <T>(path: string, params?: RequestOptions['params'], options?: Omit<RequestOptions, 'method' | 'body' | 'params'>) => request<T>(path, { ...options, params }),
   post: <T>(path: string, body?: unknown, options?: Omit<RequestOptions, 'method' | 'body'>) =>
     request<T>(path, { ...options, method: 'POST', body: body ?? {} }),
   put: <T>(path: string, body?: unknown, options?: Omit<RequestOptions, 'method' | 'body'>) =>

@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router'
-import { HeartPulse, Megaphone, UserCheck } from 'lucide-react-native'
+import { HeartPulse, IndianRupee, Megaphone, UserCheck } from 'lucide-react-native'
 import { useMemo } from 'react'
 import { View } from 'react-native'
 
@@ -197,18 +197,20 @@ function OtherStaffToday() {
   const staff = useStaff()
   const staffAttendance = staff.canUse('attnd_staff_attendance') && staff.can('attnd.staff.write')
   const clinic = staff.canUse('mdcl_clinic') && staff.can('mdcl.clinic.write')
+  const counter = staff.canUse('cpitl_fees') && staff.can('cpitl.finance.collect')
   if (session.status !== 'signedIn') return null
   const today = formatDayKey(schoolToday(), { weekday: 'short' })
 
   return (
     <MobileScreen tabs nav={<NavBar large eyebrow={today} title={`Hi, ${firstName(session.user.displayName || session.user.name)}`} actions={[bell]} />}>
-      {staffAttendance || clinic ? (
+      {staffAttendance || clinic || counter ? (
         <ListGroup
           items={[
             ...(staffAttendance
               ? [{ title: 'Staff attendance', subtitle: 'Mark who is absent today', icon: UserCheck, tile: 5 as const, onPress: () => router.push('/staff-attendance') }]
               : []),
             ...(clinic ? [{ title: 'Clinic', subtitle: 'Log a visit', icon: HeartPulse, tile: 5 as const, onPress: () => router.push('/clinic') }] : []),
+            ...(counter ? [{ title: 'Fee counter', subtitle: 'Take a payment, share a receipt', icon: IndianRupee, tile: 3 as const, onPress: () => router.push('/counter') }] : []),
           ]}
         />
       ) : null}
