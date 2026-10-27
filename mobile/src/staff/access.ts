@@ -2,7 +2,6 @@ import {
   Award,
   BookOpen,
   Boxes,
-  Briefcase,
   Bus,
   CalendarClock,
   GraduationCap,
@@ -90,7 +89,6 @@ export const WEB_MODULES: WebModule[] = [
   { label: 'Finance', icon: Landmark, tile: 3, pages: [{ feature: 'cpitl_dashboard', path: '/cpitl/dashboard' }] },
   { label: 'Assets', icon: Boxes, tile: 2, pages: [{ feature: 'asets_dashboard', path: '/asets/dashboard' }] },
   { label: 'Library', icon: Library, tile: 1, pages: [{ feature: 'libry_catalogue', path: '/libry/overview' }] },
-  { label: 'Appointments', icon: Briefcase, tile: 2, pages: [{ feature: 'appnt_desk', path: '/appnt/today' }] },
 ]
 
 /** The website path a login would open for a module, or null when they can't use any of its pages. */
@@ -99,3 +97,6 @@ export const webModulePath = (module: WebModule, perms: Permissions): string | n
 
 /** Takes appointments as a host (appointments on for the school, and the host permission). */
 export const isMeetingHost = (perms: Permissions) => perms.canUse('appnt_desk') && perms.can('appnt.appointments.host')
+
+/** Books and manages everyone's meetings (front desk, office, principal). */
+export const isFrontDesk = (perms: Permissions) => perms.canUse('appnt_desk') && (perms.can('appnt.appointments.book') || perms.can('appnt.appointments.manage'))

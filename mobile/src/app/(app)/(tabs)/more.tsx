@@ -6,7 +6,7 @@ import { useState } from 'react'
 import { PORTAL_MODULES } from '@/portal/modules'
 import { usePortal } from '@/portal/PortalProvider'
 import { useSession } from '@/session/SessionProvider'
-import { WEB_MODULES, isMeetingHost, webModulePath } from '@/staff/access'
+import { WEB_MODULES, isFrontDesk, isMeetingHost, webModulePath } from '@/staff/access'
 import { clearAttendanceQueue, useAttendanceQueue } from '@/staff/attendanceQueue'
 import { openWebsite, useStaff } from '@/staff/useStaff'
 import { ActionSheet, Avatar, ListGroup, MobileScreen, NavBar, ShortcutGrid } from '@/ui'
@@ -44,7 +44,7 @@ export default function MoreScreen() {
     ...(isStaff && (staff.canUse('timetable_class_wise') || staff.canUse('timetable_teacher_wise'))
       ? [{ label: 'Timetables', icon: CalendarRange, tile: 4 as const, onPress: () => router.push('/timetables') }]
       : []),
-    ...(isStaff && isMeetingHost(staff) ? [{ label: 'Meetings', icon: Users, tile: 2 as const, onPress: () => router.push('/meetings') }] : []),
+    ...(isStaff && (isMeetingHost(staff) || isFrontDesk(staff)) ? [{ label: 'Meetings', icon: Users, tile: 2 as const, onPress: () => router.push('/meetings') }] : []),
     ...(isStaff && staff.canUse('acdmc_academics') && staff.can('acdmc.classwork.write')
       ? [
           { label: 'Homework', icon: NotebookPen, tile: 4 as const, onPress: () => router.push('/homework') },

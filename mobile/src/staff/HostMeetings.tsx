@@ -1,20 +1,23 @@
 import { useRouter } from 'expo-router'
-import { CalendarClock, Clock, Users } from 'lucide-react-native'
+import { CalendarClock, CalendarPlus, Clock, UserCog, UserPlus, Users } from 'lucide-react-native'
 import { useState } from 'react'
 
 import { dayKeyAdd, formatDayKey, formatTime, minutesBetween, schoolTimeNow, schoolToday } from '@/lib/format'
 import { CardSkeleton, LoadFailed } from '@/portal/states'
 import type { Appointment } from '@/services/appntService'
-import { Callout, Hero, ListGroup, MobileScreen, NavBar, SegmentedControl, StatusView, Surface, useToast, type ListGroupItem } from '@/ui'
+import { ActionBar, ActionSheet, Callout, Hero, ListGroup, MobileScreen, NavBar, SegmentedControl, StatusView, Surface, useToast, type ListGroupItem } from '@/ui'
 
+import { isFrontDesk, isMeetingHost } from './access'
 import { MEETING_STATUS, MeetingSheet } from './MeetingSheet'
 import { useMeetingDay, useMeetingList } from './queries'
+import { useStaff } from './useStaff'
 
 type View = 'today' | 'requests' | 'upcoming'
 
-export const meetingRow = (a: Appointment, onPress: () => void, { withDate = false } = {}): ListGroupItem => ({
+/** A meeting row; the front desk's rows also say who it is with. */
+export const meetingRow = (a: Appointment, onPress: () => void, { withDate = false, withHost = false } = {}): ListGroupItem => ({
   title: a.visitor.name,
-  subtitle: [withDate ? formatDayKey(a.date, { weekday: 'short' }) : null, formatTime(a.startTime), a.purpose].filter(Boolean).join(' · '),
+  subtitle: [withDate ? formatDayKey(a.date, { weekday: 'short' }) : null, formatTime(a.startTime), withHost ? `with ${a.hostName}` : null, a.purpose].filter(Boolean).join(' · '),
   icon: Users,
   tile: 2,
   badge: MEETING_STATUS[a.status],
@@ -24,11 +27,17 @@ export const meetingRow = (a: Appointment, onPress: () => void, { withDate = fal
 
 /**
  * A host's meetings: today's (the next one as the Hero), requests to answer, and what's coming.
- * Each opens the meeting sheet to confirm, check in, finish, decline or cancel.
+ * Each opens the meeting sheet to confirm, check in, finish, decline, cancel or move. The front
+ * desk sees everyone's, books meetings and checks in walk-ins; the principal also sets hosts.
  */
 export function HostMeetings() {
   const router = useRouter()
   const toast = useToast()
+  const staff = useStaff()
+  const desk = isFrontDesk(staff)
+  const host = isMeetingHost(staff)
+  const canSetHosts = staff.can('appnt.appointments.settings')
+  const [booking, setBooking] = useState(false)
   const today = schoolToday()
   const now = schoolTimeNow()
   const [view, setView] = useState<View>('today')
@@ -57,10 +66,37 @@ export function HostMeetings() {
         <NavBar
           title="Meetings"
           back={{ label: 'Back', onPress: router.back }}
-          actions={[{ icon: Clock, label: 'Your hours', onPress: () => router.push('/meetings/hours') }]}
+          actions={[
+            ...(host ? [{ icon: Clock, label: 'Your hours', onPress: () => router.push('/meetings/hours') }] : []),
+            ...(canSetHosts ? [{ icon: UserCog, label: 'Hosts', onPress: () => router.push('/meetings/hosts') }] : []),
+          ]}
         />
       }
-      overlay={<MeetingSheet meeting={shown} onClose={() => setOpen(null)} onDone={(message) => toast(message)} />}
+      actionBar={
+        desk ? (
+          <ActionBar
+            icon={CalendarPlus}
+            summary={todays.length ? `${todays.length} ${todays.length === 1 ? 'meeting' : 'meetings'} today` : 'No meetings today'}
+            detail={day.data?.waiting ? `${day.data.waiting} waiting at the desk` : undefined}
+            label="Book or walk-in"
+            onPress={() => setBooking(true)}
+          />
+        ) : undefined
+      }
+      overlay={
+        <>
+          <MeetingSheet meeting={shown} onClose={() => setOpen(null)} onDone={(message) => toast(message)} />
+          <ActionSheet
+            open={booking}
+            onClose={() => setBooking(false)}
+            title="New meeting"
+            actions={[
+              { label: 'Walk-in: they are here now', icon: UserPlus, onSelect: () => (setBooking(false), router.push({ pathname: '/meetings/book', params: { walkIn: '1' } })) },
+              { label: 'Book for later', icon: CalendarPlus, onSelect: () => (setBooking(false), router.push('/meetings/book')) },
+            ]}
+          />
+        </>
+      }
     >
       {day.isPending ? null : next ? (
         <Hero
@@ -91,7 +127,7 @@ export function HostMeetings() {
       ) : list.isError ? (
         <LoadFailed what="Your meetings" error={list.error} onRetry={list.refetch} />
       ) : items.length ? (
-        <ListGroup items={items.map((a) => meetingRow(a, () => setOpen(a), { withDate: view !== 'today' }))} />
+        <ListGroup items={items.map((a) => meetingRow(a, () => setOpen(a), { withDate: view !== 'today', withHost: desk && !day.data?.isHostView }))} />
       ) : (
         <Surface padded={false}>
           <StatusView

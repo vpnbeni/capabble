@@ -3,7 +3,7 @@ import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClie
 import { ApiError } from '@/lib/api'
 import { fileStore } from '@/lib/fileStore'
 import { shortClass } from '@/lib/format'
-import { appntService, type AppointmentAction } from '@/services/appntService'
+import { appntService, type AppointmentAction, type BookingInput } from '@/services/appntService'
 import type { ReplyInput } from '@/services/calendarTypes'
 import { clinicService, type ClinicVisitInput } from '@/services/clinicService'
 import { examService, type SubjectMark } from '@/services/examService'
@@ -171,6 +171,31 @@ export const useSaveMeetingNotes = () => {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: meetingKeys.all }),
   })
 }
+
+export const useMeetingHosts = (enabled = true) => useQuery({ queryKey: [...meetingKeys.all, 'hosts'], queryFn: appntService.hosts, staleTime: 60_000, enabled })
+
+export const useAllHosts = (enabled = true) => useQuery({ queryKey: [...meetingKeys.all, 'hosts', 'all'], queryFn: appntService.allHosts, staleTime: 60_000, enabled })
+export const useHostCandidates = (enabled = true) =>
+  useQuery({ queryKey: [...meetingKeys.all, 'staff'], queryFn: appntService.staff, staleTime: 5 * 60 * 1000, enabled })
+export const useCreateHost = () => useMeetingWrite((teacherId: string) => appntService.createHost(teacherId))
+
+export const useHostSlots = (hostId: string, date: string) =>
+  useQuery({ queryKey: [...meetingKeys.all, 'slots', hostId, date], queryFn: () => appntService.slots(hostId, date), enabled: Boolean(hostId && date), staleTime: 15_000 })
+
+export const useDeskSettings = () => useQuery({ queryKey: [...meetingKeys.all, 'settings'], queryFn: appntService.settings, staleTime: 10 * 60 * 1000 })
+
+export const useDeskStudents = (enabled = true) =>
+  useQuery({ queryKey: [...meetingKeys.all, 'students'], queryFn: appntService.students, staleTime: 10 * 60 * 1000, enabled })
+
+const useMeetingWrite = <T, R>(fn: (input: T) => Promise<R>) => {
+  const queryClient = useQueryClient()
+  return useMutation({ mutationFn: fn, onSuccess: () => queryClient.invalidateQueries({ queryKey: meetingKeys.all }) })
+}
+
+export const useBookMeeting = () => useMeetingWrite(({ input, walkIn }: { input: BookingInput; walkIn: boolean }) => (walkIn ? appntService.walkIn(input) : appntService.book(input)))
+export const useRescheduleMeeting = () => useMeetingWrite(({ id, date, startTime }: { id: string; date: string; startTime: string }) => appntService.reschedule(id, date, startTime))
+export const useUpdateHost = () =>
+  useMeetingWrite(({ id, changes }: { id: string; changes: Parameters<typeof appntService.updateHost>[1] }) => appntService.updateHost(id, changes))
 
 export const useSaveMyHours = () => {
   const queryClient = useQueryClient()

@@ -25,7 +25,7 @@ import {
   useToast,
 } from '@/ui'
 
-import { useMyHost, useSaveMyHours } from './queries'
+import { useAllHosts, useMyHost, useSaveMyHours, useUpdateHost } from './queries'
 
 const DAYS = [1, 2, 3, 4, 5, 6, 0]
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
@@ -36,12 +36,23 @@ const TIMES = Array.from({ length: 25 }, (_, index) => {
 
 type Draft = Pick<MyHost, 'weeklyAvailability' | 'blockedDates'>
 
-/** A host's weekly hours for meetings and their days off. The front desk and families book inside these. */
-export function MyHours() {
+/**
+ * A host's weekly hours for meetings and their days off. The front desk and families book inside
+ * these. With `hostId` the principal edits someone else's (Meetings → Hosts).
+ */
+export function MyHours({ hostId }: { hostId?: string } = {}) {
   const router = useRouter()
   const toast = useToast()
-  const host = useMyHost()
-  const save = useSaveMyHours()
+  const own = useMyHost(!hostId)
+  const hosts = useAllHosts(Boolean(hostId))
+  const other = hosts.data?.find((row) => row._id === hostId)
+  const host = hostId ? { data: other, isPending: hosts.isPending, isError: hosts.isError || (!hosts.isPending && !other), error: hosts.error, refetch: hosts.refetch } : own
+  const saveOwn = useSaveMyHours()
+  const updateHost = useUpdateHost()
+  const save = hostId
+    ? { isPending: updateHost.isPending, mutateAsync: (changes: Draft) => updateHost.mutateAsync({ id: hostId, changes }) }
+    : saveOwn
+  const whose = hostId ? `${other?.displayName ?? 'Their'}’s` : 'Your'
   const today = schoolToday()
   const [draft, setDraft] = useState<Draft | null>(null)
   const [editingDay, setEditingDay] = useState<number | null>(null)
@@ -92,7 +103,7 @@ export function MyHours() {
       router.back()
     } catch (failure) {
       haptic.error()
-      setError(failure instanceof ApiError ? failure.message : "Your hours didn't save. Check your connection and try again.")
+      setError(failure instanceof ApiError ? failure.message : "The hours didn't save. Check your connection and try again.")
     }
   }
 
@@ -102,8 +113,8 @@ export function MyHours() {
 
   return (
     <MobileScreen
-      nav={<NavBar title="Your hours" back={{ label: 'Meetings', onPress: router.back }} />}
-      actionBar={dirty ? <ActionBar icon={Clock} summary="Your hours changed" detail="Families book in the new hours" label={save.isPending ? 'Saving…' : 'Save hours'} onPress={submit} /> : undefined}
+      nav={<NavBar title={hostId ? other?.displayName ?? 'Hours' : 'Your hours'} back={{ label: hostId ? 'Hosts' : 'Meetings', onPress: router.back }} />}
+      actionBar={dirty ? <ActionBar icon={Clock} summary={`${whose} hours changed`} detail="Families book in the new hours" label={save.isPending ? 'Saving…' : 'Save hours'} onPress={submit} /> : undefined}
       overlay={
         <>
           <BottomSheet
@@ -186,7 +197,7 @@ export function MyHours() {
           <ActionSheet
             open={Boolean(leaving)}
             onClose={() => setLeaving(null)}
-            title="Discard changes to your hours?"
+            title={hostId ? 'Discard changes to these hours?' : 'Discard changes to your hours?'}
             actions={[{ label: 'Discard changes', tone: 'danger', onSelect: () => leaving?.() }]}
             cancelLabel="Keep editing"
           />
@@ -200,11 +211,11 @@ export function MyHours() {
           <StatusView compact kind="empty" icon={Clock} title="You're not set up to take meetings" body={host.error?.message} />
         </Surface>
       ) : host.isError ? (
-        <LoadFailed what="Your hours" error={host.error} onRetry={host.refetch} />
+        <LoadFailed what={`${whose} hours`} error={host.error} onRetry={host.refetch} />
       ) : (
         <>
           {error ? (
-            <Callout tone="danger" title="Your hours weren't saved">
+            <Callout tone="danger" title={`${whose} hours weren’t saved`}>
               {error}
             </Callout>
           ) : null}

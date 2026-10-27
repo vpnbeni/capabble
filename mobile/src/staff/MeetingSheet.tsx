@@ -1,3 +1,4 @@
+import { useRouter } from 'expo-router'
 import { MoreHorizontal, Phone } from 'lucide-react-native'
 import { useState } from 'react'
 import { Linking, View } from 'react-native'
@@ -21,8 +22,8 @@ export const MEETING_STATUS: Record<AppointmentStatus, { label: string; tone: To
   no_show: { label: 'No-show', tone: 'danger' },
 }
 
-const VISITOR_LABEL: Record<VisitorType, string> = { parent: 'Parent', visitor: 'Visitor', staff: 'Staff', vendor: 'Vendor', other: 'Other' }
-const MODE_LABEL: Record<AppointmentMode, string> = { in_person: 'In person', phone: 'Phone call', video: 'Video call' }
+export const VISITOR_LABEL: Record<VisitorType, string> = { parent: 'Parent', visitor: 'Visitor', staff: 'Staff', vendor: 'Vendor', other: 'Other' }
+export const MODE_LABEL: Record<AppointmentMode, string> = { in_person: 'In person', phone: 'Phone call', video: 'Video call' }
 
 /** "Mother of Aarav Shah · Class 7-A" */
 export const visitorDetail = (a: Appointment) => {
@@ -56,6 +57,7 @@ const nextStep = (a: Appointment): { action: AppointmentAction; label: string } 
  * `onDone` gets the past-tense message; the screen shows it as a toast once the sheet is closed.
  */
 export function MeetingSheet({ meeting, onClose, onDone }: { meeting: Appointment | null; onClose: () => void; onDone: (message: string) => void }) {
+  const router = useRouter()
   const act = useMeetingAction()
   const saveNotes = useSaveMeetingNotes()
   const [notes, setNotes] = useState<string | null>(null)
@@ -217,15 +219,30 @@ export function MeetingSheet({ meeting, onClose, onDone }: { meeting: Appointmen
         open={more}
         onClose={() => setMore(false)}
         title={a.visitor.name}
-        actions={others.map((entry) => ({
-          label: entry.label,
-          tone: entry.tone,
-          onSelect: () => {
-            setMore(false)
-            if (entry.action === 'decline' || entry.action === 'cancel') setReasonFor(entry.action)
-            else run(entry.action)
-          },
-        }))}
+        actions={[
+          // A booked meeting can move to another free time (the visitor is told).
+          ...(a.canAct && (a.status === 'confirmed' || a.status === 'requested')
+            ? [
+                {
+                  label: 'Change time',
+                  onSelect: () => {
+                    setMore(false)
+                    onClose()
+                    router.push({ pathname: '/meetings/reschedule', params: { id: a._id, hostId: a.host, date: a.date, name: a.visitor.name } })
+                  },
+                },
+              ]
+            : []),
+          ...others.map((entry) => ({
+            label: entry.label,
+            tone: entry.tone,
+            onSelect: () => {
+              setMore(false)
+              if (entry.action === 'decline' || entry.action === 'cancel') setReasonFor(entry.action)
+              else run(entry.action)
+            },
+          })),
+        ]}
       />
     </>
   )
