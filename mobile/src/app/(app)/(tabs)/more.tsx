@@ -1,6 +1,6 @@
 import Constants from 'expo-constants'
 import { useRouter } from 'expo-router'
-import { Award, CalendarClock, CalendarDays, CalendarOff, Contact, HeartPulse, KeyRound, NotebookPen, UserCheck, Users } from 'lucide-react-native'
+import { Award, CalendarClock, ClipboardList, CalendarDays, CalendarOff, Contact, HeartPulse, KeyRound, NotebookPen, UserCheck, Users } from 'lucide-react-native'
 import { useState } from 'react'
 
 import { PORTAL_MODULES } from '@/portal/modules'
@@ -43,7 +43,10 @@ export default function MoreScreen() {
       : []),
     ...(isStaff && isMeetingHost(staff) ? [{ label: 'Meetings', icon: Users, tile: 2 as const, onPress: () => router.push('/meetings') }] : []),
     ...(isStaff && staff.canUse('acdmc_academics') && staff.can('acdmc.classwork.write')
-      ? [{ label: 'Homework', icon: NotebookPen, tile: 4 as const, onPress: () => router.push('/homework') }]
+      ? [
+          { label: 'Homework', icon: NotebookPen, tile: 4 as const, onPress: () => router.push('/homework') },
+          { label: 'Assignments', icon: ClipboardList, tile: 4 as const, onPress: () => router.push({ pathname: '/homework', params: { kind: 'assignment' } }) },
+        ]
       : []),
     ...(isStaff && staff.canUse('exmcl_result') && staff.can('exam.results.write')
       ? [{ label: 'Marks', icon: Award, tile: 6 as const, onPress: () => router.push('/marks') }]

@@ -7,7 +7,7 @@ import { appntService, type AppointmentAction } from '@/services/appntService'
 import type { ReplyInput } from '@/services/calendarTypes'
 import { clinicService, type ClinicVisitInput } from '@/services/clinicService'
 import { examService, type SubjectMark } from '@/services/examService'
-import { homeworkService, type HomeworkInput, type HomeworkStatus } from '@/services/homeworkService'
+import { homeworkService, type HomeworkInput, type HomeworkStatus, type SubmissionRow, type WorkKind } from '@/services/homeworkService'
 import { notificationService } from '@/services/notificationService'
 import { studentService } from '@/services/studentService'
 import { staffService, type NewEvent, type RosterStudent } from '@/services/staffService'
@@ -333,36 +333,48 @@ export const useSaveStaffAttendance = () => {
 const homeworkKeys = {
   all: [...staffKeys.all, 'homework'] as const,
   options: [...staffKeys.all, 'homework', 'options'] as const,
-  list: (className: string, section: string) => [...staffKeys.all, 'homework', 'list', className, section] as const,
-  one: (id: string) => [...staffKeys.all, 'homework', 'one', id] as const,
+  list: (kind: WorkKind, className: string, section: string) => [...staffKeys.all, 'homework', kind, 'list', className, section] as const,
+  one: (kind: WorkKind, id: string) => [...staffKeys.all, 'homework', kind, 'one', id] as const,
+  roster: (kind: WorkKind, id: string) => [...staffKeys.all, 'homework', kind, 'roster', id] as const,
 }
 
 export const useAcademicOptions = () =>
   useQuery({ queryKey: homeworkKeys.options, queryFn: homeworkService.options, staleTime: 10 * 60 * 1000 })
 
-/** Homework due from a week ago on, for one class or every class this login may see. */
-export const useHomeworkList = (className = '', section = '', from = '') =>
+/** Homework (or assignments, quizzes) due from a date on, for one class or every class this login may see. */
+export const useHomeworkList = (className = '', section = '', from = '', kind: WorkKind = 'homework') =>
   useQuery({
-    queryKey: homeworkKeys.list(className, section),
-    queryFn: async () => (await homeworkService.list({ className: className || undefined, section: section || undefined, from: from || undefined })).items,
+    queryKey: homeworkKeys.list(kind, className, section),
+    queryFn: async () => (await homeworkService.list(kind, { className: className || undefined, section: section || undefined, from: from || undefined })).items,
     staleTime: 60_000,
   })
 
-export const useHomework = (id?: string) =>
-  useQuery({ queryKey: homeworkKeys.one(id ?? ''), queryFn: () => homeworkService.get(id as string), enabled: Boolean(id) })
+export const useHomework = (id?: string, kind: WorkKind = 'homework') =>
+  useQuery({ queryKey: homeworkKeys.one(kind, id ?? ''), queryFn: () => homeworkService.get(kind, id as string), enabled: Boolean(id) })
 
-export const useSaveHomework = () => {
+export const useSaveHomework = (kind: WorkKind = 'homework') => {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, input }: { id?: string; input: HomeworkInput }) => (id ? homeworkService.update(id, input) : homeworkService.create(input)),
+    mutationFn: ({ id, input }: { id?: string; input: HomeworkInput }) => (id ? homeworkService.update(kind, id, input) : homeworkService.create(kind, input)),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: homeworkKeys.all }),
   })
 }
 
-export const useHomeworkStatus = () => {
+export const useHomeworkStatus = (kind: WorkKind = 'homework') => {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, status }: { id: string; status: HomeworkStatus }) => homeworkService.setStatus(id, status),
+    mutationFn: ({ id, status }: { id: string; status: HomeworkStatus }) => homeworkService.setStatus(kind, id, status),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: homeworkKeys.all }),
+  })
+}
+
+export const useWorkRoster = (kind: WorkKind, id?: string) =>
+  useQuery({ queryKey: homeworkKeys.roster(kind, id ?? ''), queryFn: () => homeworkService.roster(kind, id as string), enabled: Boolean(id) })
+
+export const useSaveSubmissions = (kind: WorkKind) => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, rows }: { id: string; rows: SubmissionRow[] }) => homeworkService.saveSubmissions(kind, id, rows),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: homeworkKeys.all }),
   })
 }
