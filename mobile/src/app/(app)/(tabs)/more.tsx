@@ -1,6 +1,6 @@
 import Constants from 'expo-constants'
 import { useRouter } from 'expo-router'
-import { Award, CalendarClock, IndianRupee, CalendarRange, ClipboardList, CalendarDays, CalendarOff, Contact, HeartPulse, KeyRound, NotebookPen, UserCheck, Users } from 'lucide-react-native'
+import { Award, BookCheck, BookOpen, CalendarClock, IndianRupee, CalendarRange, ClipboardList, CalendarDays, CalendarOff, Contact, HeartPulse, KeyRound, NotebookPen, UserCheck, Users } from 'lucide-react-native'
 import { useState } from 'react'
 
 import { PORTAL_MODULES } from '@/portal/modules'
@@ -53,6 +53,15 @@ export default function MoreScreen() {
       : []),
     ...(isStaff && staff.canUse('exmcl_result') && staff.can('exam.results.write')
       ? [{ label: 'Marks', icon: Award, tile: 6 as const, onPress: () => router.push('/marks') }]
+      : []),
+    ...(isStaff && staff.canUse('exmcl_result') && staff.can('exam.results.read')
+      ? [{ label: 'Exams', icon: Award, tile: 6 as const, onPress: () => router.push('/exams') }]
+      : []),
+    ...(isStaff && staff.canUse('acdmc_academics') && staff.can('acdmc.classwork.read')
+      ? [{ label: 'Lesson plans', icon: BookOpen, tile: 4 as const, onPress: () => router.push('/lessons') }]
+      : []),
+    ...(isStaff && staff.canUse('acdmc_academics') && (staff.can('acdmc.curriculum.read') || staff.can('acdmc.classwork.read'))
+      ? [{ label: 'Syllabus', icon: BookCheck, tile: 4 as const, onPress: () => router.push('/coverage') }]
       : []),
     ...(isStaff && staff.canUse('cpitl_fees')
       ? [{ label: 'Fee counter', icon: IndianRupee, tile: 3 as const, onPress: () => router.push('/counter') }]

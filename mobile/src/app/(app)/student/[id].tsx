@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import { FileText, IdCard, Pencil, Phone } from 'lucide-react-native'
+import { Award, FileText, IdCard, Pencil, Phone } from 'lucide-react-native'
 import { useState } from 'react'
 import { Linking, View } from 'react-native'
 
@@ -7,11 +7,12 @@ import { ApiError } from '@/lib/api'
 import { classLabel, formatDate } from '@/lib/format'
 import { sharePdf } from '@/lib/sharePdf'
 import { CardSkeleton, LoadFailed } from '@/portal/states'
+import { examService } from '@/services/examService'
 import { studentService } from '@/services/studentService'
-import { useStudentRecord } from '@/staff/queries'
+import { useExams, useStudentRecord } from '@/staff/queries'
 import { useStaff } from '@/staff/useStaff'
 import { space } from '@/theme/tokens'
-import { Avatar, DetailList, ListGroup, MobileButton, MobileScreen, NavBar, Surface, Text, haptic, useToast, type ListGroupItem } from '@/ui'
+import { ActionSheet, Avatar, DetailList, ListGroup, MobileButton, MobileScreen, NavBar, Surface, Text, haptic, useToast, type ListGroupItem } from '@/ui'
 
 const call = (phone: string, name: string) => (
   <MobileButton variant="tinted" size="medium" icon={Phone} aria-label={`Call ${name}`} onPress={() => Linking.openURL(`tel:${phone.replace(/\s+/g, '')}`)} />
@@ -31,6 +32,25 @@ export default function StudentScreen() {
   const canEdit = staff.can('stdnt.students.write')
   const canCard = staff.canUse('stdnt_id_cards') && staff.can('stdnt.idcards.write')
   const [sharing, setSharing] = useState(false)
+  const canReport = staff.canUse('exmcl_report_card') && staff.can('exam.results.read')
+  const exams = useExams(canReport)
+  const examList = exams.data ?? []
+  const [picking, setPicking] = useState(false)
+
+  const shareReport = async (examId: string, examName: string) => {
+    if (!data || sharing) return
+    setPicking(false)
+    setSharing(true)
+    try {
+      const bytes = await examService.reportCard(examId, data._id)
+      await sharePdf(bytes, `report-card-${examName}-${data.name}.pdf`.replace(/[^\w.-]+/g, '-'))
+    } catch (error) {
+      haptic.error()
+      toast(error instanceof ApiError ? error.message : "Couldn't make the report card. Try again.", 'danger')
+    } finally {
+      setSharing(false)
+    }
+  }
 
   const shareCard = async () => {
     if (!data || sharing) return
@@ -68,6 +88,14 @@ export default function StudentScreen() {
 
   return (
     <MobileScreen
+      overlay={
+        <ActionSheet
+          open={picking}
+          onClose={() => setPicking(false)}
+          title="Which exam's report card?"
+          actions={examList.map((exam) => ({ label: exam.name, icon: Award, onSelect: () => shareReport(exam._id, exam.name) }))}
+        />
+      }
       refreshing={record.isRefetching}
       onRefresh={record.refetch}
       nav={
@@ -122,16 +150,31 @@ export default function StudentScreen() {
               }))}
             />
           ) : null}
-          {canCard ? (
+          {canCard || (canReport && examList.length) ? (
             <ListGroup
               items={[
-                {
-                  title: sharing ? 'Making the ID card…' : 'ID card',
-                  subtitle: data.idCardIssuedAt ? `Issued ${formatDate(data.idCardIssuedAt)} · share or print` : 'Not issued yet · makes it now',
-                  icon: IdCard,
-                  tile: 6,
-                  onPress: shareCard,
-                },
+                ...(canReport && examList.length
+                  ? [
+                      {
+                        title: 'Report card',
+                        subtitle: examList.length === 1 ? `${examList[0].name} · share or print` : 'Choose the exam · share or print',
+                        icon: Award,
+                        tile: 6 as const,
+                        onPress: () => (examList.length === 1 ? shareReport(examList[0]._id, examList[0].name) : setPicking(true)),
+                      },
+                    ]
+                  : []),
+                ...(canCard
+                  ? [
+                      {
+                        title: sharing ? 'Making the PDF…' : 'ID card',
+                        subtitle: data.idCardIssuedAt ? `Issued ${formatDate(data.idCardIssuedAt)} · share or print` : 'Not issued yet · makes it now',
+                        icon: IdCard,
+                        tile: 6 as const,
+                        onPress: shareCard,
+                      },
+                    ]
+                  : []),
               ]}
             />
           ) : null}

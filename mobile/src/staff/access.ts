@@ -1,6 +1,4 @@
 import {
-  Award,
-  BookOpen,
   Boxes,
   Bus,
   CalendarClock,
@@ -67,16 +65,6 @@ export const WEB_MODULES: WebModule[] = [
     pages: [
       { feature: 'timetable_teacher_wise', path: '/time-table/teacher-wise' },
       { feature: 'timetable_class_wise', path: '/time-table/class-wise' },
-    ],
-  },
-  { label: 'Academics', icon: BookOpen, tile: 4, pages: [{ feature: 'acdmc_academics', path: '/acdmc/overview' }] },
-  {
-    label: 'Exams',
-    icon: Award,
-    tile: 6,
-    pages: [
-      { feature: 'exmcl_result', path: '/exmcl/result' },
-      { feature: 'exmcl_exams', path: '/exmcl/exams' },
     ],
   },
   { label: 'Activities', icon: Trophy, tile: 1, pages: [{ feature: 'actvt_activities', path: '/actvt/houses' }] },

@@ -7,6 +7,7 @@ import { appntService, type AppointmentAction, type BookingInput } from '@/servi
 import type { ReplyInput } from '@/services/calendarTypes'
 import { clinicService, type ClinicVisitInput } from '@/services/clinicService'
 import { examService, type SubjectMark } from '@/services/examService'
+import { lessonService, type LessonStatus } from '@/services/lessonService'
 import { homeworkService, type HomeworkInput, type HomeworkStatus, type SubmissionRow, type WorkKind } from '@/services/homeworkService'
 import { notificationService } from '@/services/notificationService'
 import { studentService, type StudentInput } from '@/services/studentService'
@@ -376,6 +377,39 @@ const homeworkKeys = {
   roster: (kind: WorkKind, id: string) => [...staffKeys.all, 'homework', kind, 'roster', id] as const,
 }
 
+const lessonKeys = {
+  all: [...staffKeys.all, 'lessons'] as const,
+  week: (from: string) => [...staffKeys.all, 'lessons', from] as const,
+  coverage: [...staffKeys.all, 'coverage'] as const,
+}
+
+export const useLessonPlans = (from: string, to: string) =>
+  useQuery({ queryKey: lessonKeys.week(from), queryFn: async () => (await lessonService.list(from, to)).items, staleTime: 60_000 })
+
+export const useLessonStatus = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, status, note }: { id: string; status: LessonStatus; note?: string }) => lessonService.setStatus(id, status, note),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: lessonKeys.all })
+      queryClient.invalidateQueries({ queryKey: lessonKeys.coverage })
+    },
+  })
+}
+
+export const useCoverage = () => useQuery({ queryKey: lessonKeys.coverage, queryFn: lessonService.overview, staleTime: 5 * 60 * 1000 })
+
+export const useExamDatesheets = (enabled = true) =>
+  useQuery({ queryKey: [...staffKeys.all, 'exam-datesheets'], queryFn: examService.datesheets, staleTime: 10 * 60 * 1000, enabled })
+
+export const usePublishResults = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ examId, published }: { examId: string; published: boolean }) => examService.setPublished(examId, published),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: [...staffKeys.all, 'marks'] }),
+  })
+}
+
 export const useAcademicOptions = () =>
   useQuery({ queryKey: homeworkKeys.options, queryFn: homeworkService.options, staleTime: 10 * 60 * 1000 })
 
@@ -447,7 +481,7 @@ const marksKeys = {
   results: (examId: string, className: string, section: string) => [...staffKeys.all, 'marks', 'results', examId, className, section] as const,
 }
 
-export const useExams = () => useQuery({ queryKey: marksKeys.exams, queryFn: examService.exams, staleTime: 10 * 60 * 1000 })
+export const useExams = (enabled = true) => useQuery({ queryKey: marksKeys.exams, queryFn: examService.exams, staleTime: 10 * 60 * 1000, enabled })
 
 export const useEntryStatus = (examId?: string) =>
   useQuery({ queryKey: marksKeys.status(examId ?? ''), queryFn: () => examService.entryStatus(examId as string), enabled: Boolean(examId), staleTime: 30_000 })
