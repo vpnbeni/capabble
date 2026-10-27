@@ -17,6 +17,8 @@ export interface MyPeriod {
   subject?: string
   className?: string
   section?: string
+  /** A class's timetable names who teaches each period. */
+  teacher?: string
 }
 
 export interface MyDay {

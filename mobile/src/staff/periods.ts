@@ -18,14 +18,30 @@ export const classTitle = (period: MyPeriod) => [classLabel(period.className, pe
  */
 export const periodTimeline = (
   periods: MyPeriod[],
-  { now, withBreaks = false, badgeFor }: { now: string | null; withBreaks?: boolean; badgeFor?: (period: MyPeriod) => TimelineItem['badge'] },
+  {
+    now,
+    withBreaks = false,
+    badgeFor,
+    forClass = false,
+  }: { now: string | null; withBreaks?: boolean; badgeFor?: (period: MyPeriod) => TimelineItem['badge']; forClass?: boolean },
 ): TimelineItem[] =>
   periods
     .filter((period) => withBreaks || period.kind !== 'break')
     .map((period) => ({
       time: formatTime(period.start),
-      title: period.kind === 'class' ? classTitle(period) : period.kind === 'break' ? sentenceCase(period.label) || 'Break' : 'Free period',
-      detail: period.kind === 'break' || !period.label ? undefined : periodName(period.label),
+      // A class's day reads subject first, with who teaches it; a teacher's reads class first.
+      title:
+        period.kind === 'class'
+          ? forClass
+            ? period.subject || 'Class'
+            : classTitle(period)
+          : period.kind === 'break'
+            ? sentenceCase(period.label) || 'Break'
+            : 'Free period',
+      detail:
+        period.kind === 'break'
+          ? undefined
+          : [forClass && period.kind === 'class' ? period.teacher : null, period.label ? periodName(period.label) : null].filter(Boolean).join(' · ') || undefined,
       state: !now ? 'upcoming' : now >= period.end ? 'done' : now >= period.start ? 'current' : 'upcoming',
       badge: badgeFor?.(period),
     }))

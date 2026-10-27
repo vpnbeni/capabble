@@ -1,6 +1,6 @@
 import Constants from 'expo-constants'
 import { useRouter } from 'expo-router'
-import { Award, CalendarClock, ClipboardList, CalendarDays, CalendarOff, Contact, HeartPulse, KeyRound, NotebookPen, UserCheck, Users } from 'lucide-react-native'
+import { Award, CalendarClock, CalendarRange, ClipboardList, CalendarDays, CalendarOff, Contact, HeartPulse, KeyRound, NotebookPen, UserCheck, Users } from 'lucide-react-native'
 import { useState } from 'react'
 
 import { PORTAL_MODULES } from '@/portal/modules'
@@ -40,6 +40,9 @@ export default function MoreScreen() {
       : []),
     ...(isStaff && staff.can('core.schooldays.write')
       ? [{ label: 'School days', icon: CalendarOff, tile: 1 as const, onPress: () => router.push('/school-days') }]
+      : []),
+    ...(isStaff && (staff.canUse('timetable_class_wise') || staff.canUse('timetable_teacher_wise'))
+      ? [{ label: 'Timetables', icon: CalendarRange, tile: 4 as const, onPress: () => router.push('/timetables') }]
       : []),
     ...(isStaff && isMeetingHost(staff) ? [{ label: 'Meetings', icon: Users, tile: 2 as const, onPress: () => router.push('/meetings') }] : []),
     ...(isStaff && staff.canUse('acdmc_academics') && staff.can('acdmc.classwork.write')
