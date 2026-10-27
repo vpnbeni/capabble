@@ -92,6 +92,8 @@ export interface AudienceOptions {
   canApprove: boolean
   needsApprovalForFamilies: boolean
   sections: AudienceSection[]
+  /** Class names of those sections ("7", "10"), in school order. */
+  classes: string[]
 }
 
 export interface MyEvent {

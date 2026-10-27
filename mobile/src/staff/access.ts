@@ -5,7 +5,6 @@ import {
   Briefcase,
   Bus,
   CalendarClock,
-  CalendarDays,
   GraduationCap,
   HeartPulse,
   Landmark,
@@ -75,7 +74,6 @@ export const WEB_MODULES: WebModule[] = [
       { feature: 'timetable_class_wise', path: '/time-table/class-wise' },
     ],
   },
-  { label: 'Calendar', icon: CalendarDays, tile: 1, pages: [{ feature: 'clndr_calendar', path: '/calendar' }] },
   { label: 'Academics', icon: BookOpen, tile: 4, pages: [{ feature: 'acdmc_academics', path: '/acdmc/overview' }] },
   {
     label: 'Exams',
