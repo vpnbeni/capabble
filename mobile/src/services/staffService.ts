@@ -187,6 +187,20 @@ export interface DirectoryEntry extends StaffMember {
   profileImage?: string | null
 }
 
+/** A staff member's record (GET /teachers/:id). Bank and ID fields are left out of the phone. */
+export interface StaffRecord extends DirectoryEntry {
+  qualification?: string
+  experience?: number
+  dateOfJoining?: string | null
+  dateOfBirth?: string | null
+  gender?: string
+  notes?: string
+  staffType?: string
+}
+
+/** The fields the phone changes on a staff record; only those given are sent. */
+export type StaffInput = Partial<Pick<StaffRecord, 'name' | 'designation' | 'department' | 'mobileNo' | 'phone' | 'email' | 'qualification' | 'notes' | 'isActive'>>
+
 export interface StaffAttendanceDay {
   /** Only absences are stored: everyone else was present. */
   absentIds: string[]
@@ -229,6 +243,8 @@ export const staffService = {
   rejectEvent: (id: string, note: string) => api.post<unknown>(`/calendar/events/${encodeURIComponent(id)}/reject`, { note }),
 
   staffDirectory: () => api.get<StaffMember[]>('/attnd/staff-directory'),
+  staffRecord: (id: string) => api.get<StaffRecord>(`/teachers/${encodeURIComponent(id)}`),
+  updateStaff: (id: string, input: StaffInput) => api.put<StaffRecord>(`/teachers/${encodeURIComponent(id)}`, input),
   /** Active staff with their phone numbers, by name; `search` matches name, ID, designation or phone. */
   directory: async (search: string) =>
     (await api.get<{ data: DirectoryEntry[] }>('/teachers', { lite: 'true', isActive: 'true', limit: 100, sort: 'name', search: search || undefined })).data,

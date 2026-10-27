@@ -9,8 +9,8 @@ import { clinicService, type ClinicVisitInput } from '@/services/clinicService'
 import { examService, type SubjectMark } from '@/services/examService'
 import { homeworkService, type HomeworkInput, type HomeworkStatus, type SubmissionRow, type WorkKind } from '@/services/homeworkService'
 import { notificationService } from '@/services/notificationService'
-import { studentService } from '@/services/studentService'
-import { staffService, type NewEvent, type RosterStudent } from '@/services/staffService'
+import { studentService, type StudentInput } from '@/services/studentService'
+import { staffService, type StaffInput, type NewEvent, type RosterStudent } from '@/services/staffService'
 
 // React Query hooks for the staff app. Writes invalidate `staffKeys.all` parts they touch.
 
@@ -239,6 +239,7 @@ export const useFeesGlance = (enabled = true) =>
 
 // Students (Classes and Students tabs).
 const studentKeys = {
+  all: [...staffKeys.all, 'students'] as const,
   classes: (scope: string) => [...staffKeys.all, 'students', 'classes', scope] as const,
   roster: (className: string, section: string) => [...staffKeys.all, 'students', 'roster', className, section] as const,
   search: (q: string) => [...staffKeys.all, 'students', 'search', q] as const,
@@ -303,6 +304,18 @@ export const useStudentSearch = (q: string) =>
 
 export const useStudentRecord = (id?: string) =>
   useQuery({ queryKey: studentKeys.one(id ?? ''), queryFn: () => studentService.get(id as string), enabled: Boolean(id), staleTime: 5 * 60 * 1000 })
+
+/** Adds a student, or changes only the given fields of one. */
+export const useSaveStudent = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, input }: { id?: string; input: StudentInput }) => (id ? studentService.update(id, input) : studentService.create(input)),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: studentKeys.all }),
+  })
+}
+
+export const useAlumni = (search: string, enabled = true) =>
+  useQuery({ queryKey: [...studentKeys.all, 'alumni', search], queryFn: () => studentService.alumni(search), placeholderData: keepPreviousData, staleTime: 5 * 60 * 1000, enabled })
 
 // Notifications (the bell on Today).
 const notificationKeys = {
@@ -401,6 +414,20 @@ export const useSaveSubmissions = (kind: WorkKind) => {
   return useMutation({
     mutationFn: ({ id, rows }: { id: string; rows: SubmissionRow[] }) => homeworkService.saveSubmissions(kind, id, rows),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: homeworkKeys.all }),
+  })
+}
+
+export const useStaffRecord = (id?: string) =>
+  useQuery({ queryKey: [...staffKeys.all, 'colleague', id ?? ''], queryFn: () => staffService.staffRecord(id as string), enabled: Boolean(id), staleTime: 5 * 60 * 1000 })
+
+export const useUpdateStaff = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, input }: { id: string; input: StaffInput }) => staffService.updateStaff(id, input),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [...staffKeys.all, 'colleague'] })
+      queryClient.invalidateQueries({ queryKey: [...staffKeys.all, 'colleagues'] })
+    },
   })
 }
 

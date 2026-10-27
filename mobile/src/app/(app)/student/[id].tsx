@@ -1,24 +1,51 @@
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import { ExternalLink, Phone } from 'lucide-react-native'
+import { FileText, IdCard, Pencil, Phone } from 'lucide-react-native'
+import { useState } from 'react'
 import { Linking, View } from 'react-native'
 
+import { ApiError } from '@/lib/api'
 import { classLabel, formatDate } from '@/lib/format'
+import { sharePdf } from '@/lib/sharePdf'
 import { CardSkeleton, LoadFailed } from '@/portal/states'
+import { studentService } from '@/services/studentService'
 import { useStudentRecord } from '@/staff/queries'
-import { openWebsite } from '@/staff/useStaff'
+import { useStaff } from '@/staff/useStaff'
 import { space } from '@/theme/tokens'
-import { Avatar, DetailList, ListGroup, MobileButton, MobileScreen, NavBar, Surface, Text, type ListGroupItem } from '@/ui'
+import { Avatar, DetailList, ListGroup, MobileButton, MobileScreen, NavBar, Surface, Text, haptic, useToast, type ListGroupItem } from '@/ui'
 
 const call = (phone: string, name: string) => (
   <MobileButton variant="tinted" size="medium" icon={Phone} aria-label={`Call ${name}`} onPress={() => Linking.openURL(`tel:${phone.replace(/\s+/g, '')}`)} />
 )
 
-/** A student's record for staff, with the family to call. Changes are made on the website. */
+/**
+ * A student's record for staff, with the family to call, their documents and ID card. The office
+ * (student records write) edits it from here.
+ */
 export default function StudentScreen() {
   const router = useRouter()
+  const toast = useToast()
+  const staff = useStaff()
   const { id } = useLocalSearchParams<{ id: string }>()
   const record = useStudentRecord(id)
   const data = record.data
+  const canEdit = staff.can('stdnt.students.write')
+  const canCard = staff.canUse('stdnt_id_cards') && staff.can('stdnt.idcards.write')
+  const [sharing, setSharing] = useState(false)
+
+  const shareCard = async () => {
+    if (!data || sharing) return
+    setSharing(true)
+    try {
+      const bytes = await studentService.idCard(data._id)
+      haptic.success()
+      await sharePdf(bytes, `id-card-${data.name.replace(/[^\w-]+/g, '-')}.pdf`)
+    } catch (error) {
+      haptic.error()
+      toast(error instanceof ApiError ? error.message : "Couldn't make the ID card. Try again.", 'danger')
+    } finally {
+      setSharing(false)
+    }
+  }
 
   const family: ListGroupItem[] = data
     ? [
@@ -43,7 +70,13 @@ export default function StudentScreen() {
     <MobileScreen
       refreshing={record.isRefetching}
       onRefresh={record.refetch}
-      nav={<NavBar title="Student" back={{ label: 'Back', onPress: router.back }} />}
+      nav={
+        <NavBar
+          title="Student"
+          back={{ label: 'Back', onPress: router.back }}
+          actions={canEdit && data ? [{ icon: Pencil, label: 'Edit student', onPress: () => router.push({ pathname: '/student/edit', params: { id: data._id } }) }] : []}
+        />
+      }
     >
       {record.isPending ? (
         <CardSkeleton rows={4} />
@@ -72,12 +105,36 @@ export default function StudentScreen() {
                 { label: 'Admitted on', value: data.admissionDate ? formatDate(data.admissionDate) : null },
                 { label: 'Email', value: data.guardianEmail, wide: true },
                 { label: 'Address', value: data.fullAddress, wide: true },
+                ...(data.notes ? [{ label: 'Notes', value: data.notes, wide: true }] : []),
               ]}
             />
           </Surface>
-          <MobileButton variant="gray" size="medium" icon={ExternalLink} onPress={() => openWebsite('/stdnt/students')}>
-            Open students on the website
-          </MobileButton>
+          {data.documents?.length ? (
+            <ListGroup
+              header="Documents"
+              footer="Opens the file. New documents are added from a computer for now."
+              items={data.documents.map((doc) => ({
+                title: doc.name || doc.type || 'Document',
+                subtitle: doc.uploadedAt ? `Added ${formatDate(doc.uploadedAt)}` : undefined,
+                icon: FileText,
+                tile: 6,
+                onPress: () => Linking.openURL(doc.url),
+              }))}
+            />
+          ) : null}
+          {canCard ? (
+            <ListGroup
+              items={[
+                {
+                  title: sharing ? 'Making the ID card…' : 'ID card',
+                  subtitle: data.idCardIssuedAt ? `Issued ${formatDate(data.idCardIssuedAt)} · share or print` : 'Not issued yet · makes it now',
+                  icon: IdCard,
+                  tile: 6,
+                  onPress: shareCard,
+                },
+              ]}
+            />
+          ) : null}
         </>
       ) : null}
     </MobileScreen>

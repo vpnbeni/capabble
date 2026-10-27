@@ -9,7 +9,7 @@ import { useColleagues } from '@/staff/queries'
 import { space } from '@/theme/tokens'
 import { Avatar, ChipRail, ListGroup, MobileButton, MobileScreen, NavBar, SearchBar, StatusView, Surface } from '@/ui'
 
-/** Staff directory: find a colleague by name, designation or employee ID, and call them. */
+/** Staff directory: find a colleague by name, designation or employee ID, call them, or open their record. */
 export default function StaffDirectoryScreen() {
   const router = useRouter()
   const [query, setQuery] = useState('')
@@ -48,6 +48,7 @@ export default function StaffDirectoryScreen() {
               title: member.name,
               subtitle: [member.designation, member.employeeId].filter(Boolean).join(' · ') || undefined,
               avatar: <Avatar name={member.name} src={member.profileImage} size={36} />,
+              onPress: () => router.push({ pathname: '/colleague/[id]', params: { id: member._id } }),
               accessory: phone ? (
                 <MobileButton
                   variant="tinted"
@@ -67,7 +68,7 @@ export default function StaffDirectoryScreen() {
             kind="empty"
             icon={Users}
             title={q.length >= 2 ? `No one matches "${q}"` : 'No staff yet'}
-            body={q.length >= 2 ? 'Search by name, designation, employee ID or phone number.' : 'Staff show here once the office adds them on the website.'}
+            body={q.length >= 2 ? 'Search by name, designation, employee ID or phone number.' : 'Staff show here once the office adds them.'}
           />
         </Surface>
       )}

@@ -4,12 +4,10 @@ import {
   Boxes,
   Bus,
   CalendarClock,
-  GraduationCap,
   HeartPulse,
   Landmark,
   Library,
   Trophy,
-  Users,
   type LucideIcon,
 } from 'lucide-react-native'
 
@@ -62,8 +60,6 @@ export type WebModule = { label: string; icon: LucideIcon; tile: TileIndex; page
  * of the module this login may see. Labels are the product's module names (never codes).
  */
 export const WEB_MODULES: WebModule[] = [
-  { label: 'Students', icon: GraduationCap, tile: 6, pages: [{ feature: 'stdnt_students', path: '/stdnt/students' }] },
-  { label: 'Staff', icon: Users, tile: 2, pages: [{ feature: 'staaf_staff_members', path: '/staaf/overview' }] },
   {
     label: 'Timetable',
     icon: CalendarClock,

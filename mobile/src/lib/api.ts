@@ -118,6 +118,20 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   return (options.raw ? body : body.data) as T
 }
 
+/** A file the API sends back (a receipt, a report card, an ID card PDF), as bytes. */
+export async function requestBytes(path: string, options: Omit<RequestOptions, 'raw'> = {}): Promise<ArrayBuffer> {
+  let response: Response
+  try {
+    response = await send(path, options)
+  } catch {
+    throw new ApiError("You're offline. Check your connection and try again.", 0, 'network')
+  }
+  if (response.status === 401 && !options.skipRefresh && (await refreshSession())) response = await send(path, options)
+  if (response.status === 401) onSessionEnded?.()
+  if (!response.ok) throw await readError(response)
+  return response.arrayBuffer()
+}
+
 export const api = {
   get: <T>(path: string, params?: RequestOptions['params']) => request<T>(path, { params }),
   post: <T>(path: string, body?: unknown, options?: Omit<RequestOptions, 'method' | 'body'>) =>

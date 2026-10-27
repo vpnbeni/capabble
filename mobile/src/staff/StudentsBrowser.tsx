@@ -1,11 +1,11 @@
 import { useRouter } from 'expo-router'
-import { GraduationCap, Users } from 'lucide-react-native'
+import { GraduationCap, UserPlus, Users } from 'lucide-react-native'
 import { useState } from 'react'
 
 import { classLabel } from '@/lib/format'
 import { CardSkeleton, LoadFailed } from '@/portal/states'
 import type { StudentRow } from '@/services/studentService'
-import { Avatar, ListGroup, MobileScreen, NavBar, SearchBar, StatusView, Surface, type ListGroupItem } from '@/ui'
+import { ActionBar, Avatar, ListGroup, MobileScreen, NavBar, SearchBar, StatusView, Surface, type ListGroupItem } from '@/ui'
 
 import { useClassSections, useStudentSearch } from './queries'
 import { useStaff } from './useStaff'
@@ -35,7 +35,28 @@ export function StudentsBrowser({ title }: { title: string }) {
   const openStudent = (student: StudentRow) => router.push({ pathname: '/student/[id]', params: { id: student._id } })
 
   return (
-    <MobileScreen tabs refreshing={classes.isRefetching} onRefresh={classes.refetch} nav={<NavBar large title={title} />}>
+    <MobileScreen
+      tabs
+      refreshing={classes.isRefetching}
+      onRefresh={classes.refetch}
+      nav={
+        <NavBar
+          large
+          title={title}
+          actions={staff.canUse('almni_directory') ? [{ icon: GraduationCap, label: 'Alumni', onPress: () => router.push('/alumni') }] : []}
+        />
+      }
+      actionBar={
+        wholeSchool && staff.can('stdnt.students.write') ? (
+          <ActionBar
+            icon={UserPlus}
+            summary={`${(classes.data ?? []).reduce((sum, entry) => sum + entry.students, 0)} students`}
+            label="Add a student"
+            onPress={() => router.push('/student/edit')}
+          />
+        ) : undefined
+      }
+    >
       <SearchBar placeholder={wholeSchool ? 'Search students' : 'Search your students'} value={query} onChange={setQuery} onCancel={() => setQuery('')} />
       {q.length >= 2 ? (
         search.isPending ? (
