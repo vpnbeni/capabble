@@ -134,9 +134,11 @@ export default function MoreScreen() {
       {webModules.length ? (
         <ListGroup
           header="On the website"
-          footer="Opens in your browser. Sign in there with the same login."
+          footer="Setup and printing are done at a computer. Opens in your browser; sign in there with the same login."
           items={webModules.map(({ module, path }) => ({
             title: module.label,
+            subtitle: module.reason,
+            lines: 3,
             icon: module.icon,
             tile: module.tile,
             onPress: () => openWebsite(path as string),
