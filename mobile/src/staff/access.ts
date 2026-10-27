@@ -1,5 +1,4 @@
 import {
-  Boxes,
   Bus,
   CalendarClock,
   Landmark,
@@ -67,7 +66,6 @@ export const WEB_MODULES: WebModule[] = [
   },
   { label: 'Transport', icon: Bus, tile: 2, pages: [{ feature: 'trnst_transport', path: '/trnst' }] },
   { label: 'Finance', icon: Landmark, tile: 3, pages: [{ feature: 'cpitl_dashboard', path: '/cpitl/dashboard' }] },
-  { label: 'Assets', icon: Boxes, tile: 2, pages: [{ feature: 'asets_dashboard', path: '/asets/dashboard' }] },
   { label: 'Library', icon: Library, tile: 1, pages: [{ feature: 'libry_catalogue', path: '/libry/overview' }] },
 ]
 
