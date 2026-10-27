@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router'
-import { HeartPulse } from 'lucide-react-native'
+import { HeartPulse, Pill } from 'lucide-react-native'
 
 import { classLabel, dayKeyAdd, formatDayKey, schoolToday } from '@/lib/format'
 import { CardSkeleton, LoadFailed } from '@/portal/states'
@@ -34,7 +34,7 @@ export default function ClinicScreen() {
     <MobileScreen
       refreshing={visits.isRefetching}
       onRefresh={visits.refetch}
-      nav={<NavBar title="Clinic" back={{ label: 'Back', onPress: router.back }} />}
+      nav={<NavBar title="Clinic" back={{ label: 'Back', onPress: router.back }} actions={[{ icon: Pill, label: 'Supplies', onPress: () => router.push('/clinic/supplies') }]} />}
       actionBar={
         canLog ? (
           <ActionBar

@@ -5,7 +5,7 @@ import { fileStore } from '@/lib/fileStore'
 import { shortClass } from '@/lib/format'
 import { appntService, type AppointmentAction, type BookingInput } from '@/services/appntService'
 import type { ReplyInput } from '@/services/calendarTypes'
-import { clinicService, type ClinicVisitInput } from '@/services/clinicService'
+import { clinicService, type ClinicSupplyInput, type ClinicVisitInput } from '@/services/clinicService'
 import { examService, type SubjectMark } from '@/services/examService'
 import { lessonService, type LessonStatus } from '@/services/lessonService'
 import { homeworkService, type HomeworkInput, type HomeworkStatus, type SubmissionRow, type WorkKind } from '@/services/homeworkService'
@@ -512,5 +512,15 @@ export const useSaveClinicVisit = () => {
   return useMutation({
     mutationFn: ({ id, visit }: { id?: string; visit: ClinicVisitInput }) => (id ? clinicService.update(id, visit) : clinicService.create(visit)),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: clinicKey }),
+  })
+}
+
+export const useClinicSupplies = () => useQuery({ queryKey: [...staffKeys.all, 'clinic-supplies'], queryFn: clinicService.supplies, staleTime: 60_000 })
+
+export const useSaveSupply = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, input }: { id?: string; input: ClinicSupplyInput }) => (id ? clinicService.updateSupply(id, input) : clinicService.addSupply(input)),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: [...staffKeys.all, 'clinic-supplies'] }),
   })
 }
