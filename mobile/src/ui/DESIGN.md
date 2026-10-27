@@ -59,7 +59,7 @@ Text scales with the phone's text size; chrome (tab labels, nav titles, buttons)
 Nothing wraps mid-word at large text sizes: chrome labels are one line (`numberOfLines={1}`, shrinking with
 `adjustsFontSizeToFit` where space is fixed, like tab labels), and fixed columns (times in `Agenda` and `Timeline`)
 grow with the text size up to 1.3×. Check new screens with the phone's text size turned up.
-From 1.15× text `ShortcutGrid` drops to 3 columns (labels stay on one line); at the largest sizes `StatTiles` stack. A large title's eyebrow (and Home's school logo) sit on their own line above the title, which shrinks to fit rather than truncating. Inputs are 16px so iOS never zooms.
+From 1.15× text (or below 380 wide) the kit makes room instead of cutting: `ShortcutGrid` drops to 3 columns (labels stay on one line), `StatTiles` stack as compact rows, a `ListItem`'s badge and a value that won't fit beside the title go under it, the `ActionBar` stacks its action under the summary, a `Hero`'s meta goes under its label, and iOS drops the back label. A large title's eyebrow (and Home's school logo) sit on their own line above the title, which shrinks to fit rather than truncating. Inputs are 16px so iOS never zooms.
 
 ## Kit (`import { … } from '@/ui'`)
 
@@ -70,22 +70,22 @@ call `onChange(value)` and are controlled (no `defaultValue`).
 | Component | Key props | Use |
 |---|---|---|
 | `MobileScreen` | `nav, tabBar \| tabs, actionBar, overlay, refreshing, onRefresh, scroll` | Root of every screen. `tabs` when the tab layout's `TabBar` floats over it. Pads for the bars and safe areas; collapses the large title on scroll |
-| `NavBar` | `title, large, eyebrow, back{label,onPress}, leading, trailing, accessory, actions[{icon,label,onPress,badge}]` | Large title on tab roots; inline bar with back on pushed screens. ≤2 actions, the rest in an `ActionSheet`. Android: chevron only, title left |
+| `NavBar` | `title, large, eyebrow, back{label,onPress}, leading, trailing, accessory, actions[{icon,label,onPress,badge}]` | Large title on tab roots; inline bar with back on pushed screens. ≤2 actions, the rest in an `ActionSheet`. Android: chevron only, title left. A long bar title shrinks to 0.8 before truncating |
 | `TabBar` | `items[{label,icon,active,badge,onPress}]` | 4–5 nouns, tinted (not a pill), selection haptic. Replaces `BottomNav` |
 | `Section` | `title, action{label,onPress}` | `m-section` heading + "See all" |
-| `Hero` | `label, value, detail, meta, icon, tone: soft \| strong \| surface, progress, action, ariaLabel` | One per screen. `strong` only for the single most urgent state |
+| `Hero` | `label, value, detail, meta, icon, tone: soft \| strong \| surface, progress, action, ariaLabel` | One per screen. `strong` only for the single most urgent state. The value takes up to two lines and shrinks to fit |
 | `ShortcutGrid` | `items[{label,icon,tile,badge,onPress}], columns` | Home (≤8) and More. Tiles scale to 0.94 on press |
 | `Rail` + `RailCard` | `title, action`; card `title, eyebrow, meta, icon, tile, badge{label,tone}, width, onPress` | ≤10 cards then "See all"; ≤2 rails per screen; the list screen holds everything |
-| `ListGroup` / `ListItem` | `header, footer, items[{title,subtitle,icon,tile,avatar,value,badge,accessory,chevron,tone,onPress,lines}]` or children | iOS inset grouped list: settings, details, fee lines, receipts. Sign out alone in its own group, `tone: 'danger'` |
-| `SwipeRow` | `title, subtitle, meta, unread, actions[{label,icon,tone,onPress}], defaultRevealed, onPress, divider` | Notices and messages inside a `ListGroup`. Every swipe action is also on the detail screen and in accessibility actions |
+| `ListGroup` / `ListItem` | `header, footer, items[{title,subtitle,icon,tile,avatar,value,badge,accessory,accessoryWidth,chevron,tone,onPress,lines}]` or children | iOS inset grouped list: settings, details, fee lines, receipts. Sign out alone in its own group, `tone: 'danger'`. A row control with `accessoryWidth` (a `SegmentedControl`) goes under the title, full width, when it would leave the title fewer than 12 characters. `lines: 2` for rows whose subtitle carries the point (a phone number, a meeting's purpose) |
+| `SwipeRow` | `title, subtitle, meta, unread, actions[{label,icon,tone,onPress}], defaultRevealed, onPress, divider` | Notices and messages inside a `ListGroup`; the title takes up to two lines. Every swipe action is also on the detail screen and in accessibility actions |
 | `DetailList` | `items[{label,value,wide,numeric}], columns: 1 \| 2` | A record's facts, label above value; "—" when missing |
-| `StatTiles` | `items[{label,value,detail,tone,icon,tile,onPress}]` | Principal/teacher glance: ≤4, each opens its list |
+| `StatTiles` | `items[{label,value,detail,tone,icon,tile,onPress}]` | Principal/teacher glance: ≤4, each opens its list. Two-up; stacked rows (label left, number right) on a small phone or with larger text |
 | `WeekStrip` | `days[{date,weekday,day,today,off,dots}], value, onChange, onWeekChange` | Calendar and timetable day picker; swipe for the next week |
-| `Agenda` | `groups[{label,off,items[{time,end,title,meta,color,badge,onPress}]}], empty` | What's on by day |
+| `Agenda` | `groups[{label,off,items[{time,end,title,meta,color,badge,onPress}]}], empty` | What's on by day; titles take up to three lines |
 | `Timeline` | `items[{time,title,detail,state: done \| current \| upcoming,badge}], compact` | Bus stops, a day's periods, a request's progress |
 | `MonthPicker` | `value, onChange, today, min, label` | Picking one day, in a `BottomSheet` opened from a date row. Previous/next month arrows; chosen day `accent-strong`, today ringed, days before `min` dimmed. Not in the design system yet: added to our kit |
 | `DayGrid` | `year, month, marks{[date]:{tone,label,short}}, today, title, legend[{tone,label}]` | A month of attendance; only days that differ get a tone and a letter |
-| `ProgressRing` | `value, label, sublabel, size, stroke, tone, ariaLabel` | A percentage with the plain fact beside it |
+| `ProgressRing` | `value, label, sublabel, size, stroke, tone, ariaLabel` | A percentage with the plain fact beside it. The figures inside stop growing at 1.1× text so they stay in the ring |
 | `MobileButton` | `variant: filled \| tinted \| gray \| plain \| destructive, size: large \| medium \| small, icon, fullWidth, loading, disabled, onPress, aria-label` | One filled per view (none when there's an `ActionBar`). Large (50) full width in sheets and status screens |
 | `Switch` | `value, onChange, label, disabled` | A setting that applies at once, usually as a `ListGroup` accessory |
 | `MobileTextField` | `label, hint, error, type: text \| email \| password \| tel \| number, prefix, icon, multiline, disabled` + TextInput props, `ref` | 50px box, label above; the right keyboard and autofill; password show/hide |
@@ -100,7 +100,7 @@ call `onChange(value)` and are controlled (no `defaultValue`).
 | `ChildSwitcher` | `students[{id,name,meta,src}], value, onChange` | Pill in the nav bar for parents with 2+ children (one child: just the avatar). `portal/ChildSwitcher` wraps it with the portal's state |
 | `BottomSheet` | `open, onClose, title, description, detent: medium \| large, footer` | Short task or preview. Drags to large, down to close. Footer: large `MobileButton`s, filled on top. No toasts from inside |
 | `ActionSheet` | `open, onClose, title, message, actions[{label,icon,tone,onSelect}], cancelLabel` | 2–6 actions; destructive last, then a `Dialog` when it can't be undone |
-| `ActionBar` | `summary, detail, label, icon, onPress` | The screen's one main action. Hide it when there's nothing to do; never disabled. `haptic.success()` when it completes |
+| `ActionBar` | `summary, detail, label, icon, onPress` | The screen's one main action. Hide it when there's nothing to do; never disabled. `haptic.success()` when it completes. On a small phone or with larger text: no icon, summary and detail on top at full width, the action under them; `MobileScreen` pads for its measured height |
 | `Callout` | `tone, title, icon, action{label,onPress}` + children | Something true until fixed: offline, a deadline, a form problem |
 | `StatusView` | `kind: success \| error \| empty \| offline \| permission, title, body, value, icon, details, actions, compact` | Whole-screen or card states. Success plays the success haptic; say whether money moved on errors |
 | `NotificationBanner` | `title, body, time, appIcon, onPress` | In-app banner for a push (4 s, unless already on that screen); title ≤40, body ≤110 |
@@ -111,7 +111,7 @@ call `onChange(value)` and are controlled (no `defaultValue`).
 
 Helpers: `haptic.selection / light / medium / success / error` (no-op on web), `PressScale` (0.97 press + spring),
 `useReduceMotion`, `useReduceTransparency`, `Tile`, `MODULE_TILE`, `useFixedColumn(base)` (a fixed column's width
-that grows with the text size up to 1.3×: wrap a row's `SegmentedControl` accessory in a `View` that wide).
+that grows with the text size up to 1.3×: pass it as the row's `accessoryWidth` with a `SegmentedControl` accessory), `useFontScale()` (the phone's text size; the web preview's `?text=`).
 
 ### Older pieces
 
@@ -172,6 +172,11 @@ Every tap lands on the exact thing and marks it read (`lib/notificationLinks.ts`
 same layout reads bigger there than on a 390pt iPhone. Every screen is checked at 360 × 640dp with 1.3× text: nothing
 cut off, overlapping or scrolling sideways; one control at the end of a row at most; tiles and button pairs stack
 rather than squeeze; chrome labels stay on one line. See "Small Android screens come first" in `mobile/AGENTS.md`.
+
+**Checking without a phone.** The web build (`npx expo start --web`) takes `?text=1.3&os=android` in its URL: the kit
+scales text as Android would (capped by each `maxFontSizeMultiplier`) and draws Android's nav bar. Set the browser to
+360 × 640. The web ignores `adjustsFontSizeToFit`, so a tab label or `Hero` value that shows "…" there shrinks on the
+phone instead. The stage API refuses other origins, so the preview needs a local API or a local CORS proxy.
 
 iOS is the design reference; Android gets the same layout with its back gesture, no back label, left-aligned titles, no ripples
 or FAB. Sensitive screens (results, fees, profile) should hide their content in the app switcher. Screens put the school's

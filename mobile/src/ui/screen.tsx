@@ -1,7 +1,7 @@
 import { useScrollToTop } from 'expo-router'
 import { ChevronLeft, type LucideIcon } from 'lucide-react-native'
 import { createContext, useContext, useRef, useState, type ComponentRef, type ReactNode } from 'react'
-import { Platform, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native'
+import { Platform, Pressable, RefreshControl, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { useTheme } from '@/theme/ThemeProvider'
@@ -11,6 +11,7 @@ import { CountBadge } from './content'
 import { haptic } from './haptics'
 import { KeyboardRevealProvider, useKeyboardAwareScroll } from './keyboard'
 import { Chrome } from './motion'
+import { androidLayout, useFontScale } from './preview'
 import { Icon } from './primitives'
 import { Text } from './Text'
 
@@ -50,10 +51,12 @@ export function MobileScreen({ nav, tabBar, tabs, actionBar, overlay, children, 
   const hasTabs = !!tabBar || !!tabs
   const top = nav ? insets.top + size['nav-bar-height'] : insets.top
   const tabSpace = hasTabs ? size['tab-bar-height'] : 0
-  const actionSpace = actionBar ? size['action-bar-height'] + space['space-3'] : 0
+  // The action bar grows on small phones with larger text (its text wraps), so pad for its real height.
+  const [barHeight, setBarHeight] = useState<number>(size['action-bar-height'])
+  const actionSpace = actionBar ? barHeight + space['space-3'] : 0
   // The keyboard covers the tab bar; the action bar rides above the keyboard so the submit stays reachable.
   const { cover, onScroll: trackScroll, reveal } = useKeyboardAwareScroll(scrollRef, actionSpace)
-  const bottom = Math.max(insets.bottom + tabSpace + (actionBar ? size['action-bar-height'] + 36 : 24), cover + actionSpace + space['space-6'])
+  const bottom = Math.max(insets.bottom + tabSpace + (actionBar ? barHeight + 36 : 24), cover + actionSpace + space['space-6'])
 
   return (
     <NavCollapsed.Provider value={collapsed}>
@@ -87,7 +90,14 @@ export function MobileScreen({ nav, tabBar, tabs, actionBar, overlay, children, 
             <NavPart.Provider value="bar">{nav}</NavPart.Provider>
           </View>
         ) : null}
-        {actionBar ? <View style={[styles.action, { bottom: cover ? cover + space['space-3'] : insets.bottom + tabSpace + space['space-3'] }]}>{actionBar}</View> : null}
+        {actionBar ? (
+          <View
+            onLayout={(event) => setBarHeight(Math.max(size['action-bar-height'], Math.round(event.nativeEvent.layout.height)))}
+            style={[styles.action, { bottom: cover ? cover + space['space-3'] : insets.bottom + tabSpace + space['space-3'] }]}
+          >
+            {actionBar}
+          </View>
+        ) : null}
         {tabBar ? <View style={styles.tabs}>{tabBar}</View> : null}
         {overlay}
       </View>
@@ -125,8 +135,12 @@ export function NavBar({ title, large, collapsed: collapsedProp, eyebrow, back, 
   const part = useContext(NavPart)
   const scrolled = useContext(NavCollapsed)
   const collapsed = collapsedProp ?? scrolled
-  const android = Platform.OS === 'android'
+  const android = androidLayout
   const showBarTitle = !large || collapsed
+  // iOS drops the back label when the title needs the room: on a small phone or with larger text.
+  const { width } = useWindowDimensions()
+  const fontScale = useFontScale()
+  const backLabel = !android && fontScale < 1.15 && width >= 380
 
   const bar = (
     <View style={{ paddingTop: part ? insets.top : 0 }}>
@@ -135,7 +149,7 @@ export function NavBar({ title, large, collapsed: collapsedProp, eyebrow, back, 
           {back ? (
             <Pressable accessibilityRole="button" accessibilityLabel={`Back to ${back.label}`} onPress={back.onPress} hitSlop={6} style={({ pressed }) => [styles.back, pressed && { opacity: 0.5 }]}>
               <Icon icon={ChevronLeft} size={28} color={colors['accent-strong']} />
-              {!android ? (
+              {backLabel ? (
                 <Text variant="m-nav-title" numberOfLines={1} maxFontSizeMultiplier={1.3} style={{ color: colors['accent-strong'], fontFamily: fontFamily[400], maxWidth: 96 }}>
                   {back.label}
                 </Text>
@@ -145,14 +159,14 @@ export function NavBar({ title, large, collapsed: collapsedProp, eyebrow, back, 
             leading
           ) : null}
           {android && showBarTitle ? (
-            <Text variant="m-nav-title" accessibilityRole="header" numberOfLines={1} maxFontSizeMultiplier={1.3} style={{ flexShrink: 1, marginLeft: back ? 0 : space['space-2'] }}>
+            <Text variant="m-nav-title" accessibilityRole="header" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} maxFontSizeMultiplier={1.3} style={{ flexShrink: 1, marginLeft: back ? 0 : space['space-2'] }}>
               {title}
             </Text>
           ) : null}
         </View>
         {!android && showBarTitle ? (
           <View pointerEvents="none" style={styles.navTitle}>
-            <Text variant="m-nav-title" accessibilityRole="header" numberOfLines={1} maxFontSizeMultiplier={1.3} style={{ textAlign: 'center' }}>
+            <Text variant="m-nav-title" accessibilityRole="header" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} maxFontSizeMultiplier={1.3} style={{ textAlign: 'center' }}>
               {title}
             </Text>
           </View>
@@ -248,7 +262,8 @@ export function TabBar({ items }: { items: TabBarItem[] }) {
                 variant="caption"
                 numberOfLines={1}
                 adjustsFontSizeToFit
-                minimumFontScale={0.8}
+                // Down to the 12px caption floor at 1.3× text: "Attendance" fits a 72dp tab on a 360dp phone.
+                minimumFontScale={0.77}
                 maxFontSizeMultiplier={1.3}
                 style={{ color: tint, fontFamily: fontFamily[item.active ? 600 : 500], alignSelf: 'stretch', textAlign: 'center' }}
               >

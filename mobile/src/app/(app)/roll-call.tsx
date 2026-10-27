@@ -221,18 +221,17 @@ export default function RollCallScreen() {
                     haptic.selection()
                     mark(student._id, value === 'A' ? 'P' : 'A')
                   },
+                  accessoryWidth: segmentWidth,
                   accessory: (
-                    <View style={{ width: segmentWidth }}>
-                      <SegmentedControl
-                        label={`${student.name}: attendance`}
-                        value={value}
-                        onChange={(next) => mark(student._id, next)}
-                        options={[
-                          { value: 'P', label: 'Present' },
-                          { value: 'A', label: 'Absent' },
-                        ]}
-                      />
-                    </View>
+                    <SegmentedControl
+                      label={`${student.name}: attendance`}
+                      value={value}
+                      onChange={(next) => mark(student._id, next)}
+                      options={[
+                        { value: 'P', label: 'Present' },
+                        { value: 'A', label: 'Absent' },
+                      ]}
+                    />
                   ),
                 }
               })}

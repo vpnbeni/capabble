@@ -213,18 +213,17 @@ export default function StaffAttendanceScreen() {
                         mark(member._id, value === 'A' ? 'P' : 'A')
                       }
                     : undefined,
+                  accessoryWidth: segmentWidth,
                   accessory: canEdit ? (
-                    <View style={{ width: segmentWidth }}>
-                      <SegmentedControl
-                        label={`${member.name}: attendance`}
-                        value={value}
-                        onChange={(next) => mark(member._id, next)}
-                        options={[
-                          { value: 'P', label: 'Present' },
-                          { value: 'A', label: 'Absent' },
-                        ]}
-                      />
-                    </View>
+                    <SegmentedControl
+                      label={`${member.name}: attendance`}
+                      value={value}
+                      onChange={(next) => mark(member._id, next)}
+                      options={[
+                        { value: 'P', label: 'Present' },
+                        { value: 'A', label: 'Absent' },
+                      ]}
+                    />
                   ) : undefined,
                 }
               })}

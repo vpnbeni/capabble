@@ -21,7 +21,9 @@ import { useStaff } from '@/staff/useStaff'
 import { radius, size, space } from '@/theme/tokens'
 import { Avatar, Callout, Hero, ListGroup, MobileScreen, NavBar, Rail, RailCard, Section, ShortcutGrid, Skeleton } from '@/ui'
 
-const firstName = (name?: string | null) => (name ?? '').trim().split(/\s+/)[0] || 'there'
+/** "Ms. Kiran Nurse" → "Kiran": titles are skipped. */
+const TITLES = /^(mr|mrs|ms|miss|dr|prof|sir|smt|shri|sh)\.?$/i
+const firstName = (name?: string | null) => (name ?? '').trim().split(/\s+/).find((word) => word && !TITLES.test(word)) || 'there'
 
 export default function HomeScreen() {
   const session = useSession()
@@ -120,6 +122,7 @@ function FamilyHome() {
                   subtitle: formatDate(notice.circularDate),
                   icon: Megaphone,
                   tile: 1,
+                  lines: 2,
                   onPress: () => router.push({ pathname: '/notice/[id]', params: { id: notice._id } }),
                 }))}
               />

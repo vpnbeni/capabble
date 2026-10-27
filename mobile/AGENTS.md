@@ -22,7 +22,7 @@ This is an Expo/React Native mobile application. Prioritize mobile-first pattern
 - Every screen must fit that width with nothing cut off, overlapping or scrolling sideways: rows use `flex: 1` + `minWidth: 0` for text and `numberOfLines` on chrome; fixed columns use `useFixedColumn`; at most one control at the end of a row (a `SegmentedControl` or `NumberCell` row leaves room for the name to show at least 12 characters at 360dp and 1.3×, else move the control below or into a sheet).
 - Prefer stacking to squeezing: two-up tiles, button pairs and side-by-side fields stack below 360dp or above 1.15× text (as `StatTiles` and `ShortcutGrid` already do). Labels stay one line and shrink to fit (`adjustsFontSizeToFit`) rather than wrap mid-word.
 - No fixed heights for text containers and no absolute positioning of text; long names, class labels and amounts must wrap or truncate cleanly.
-- When a screen is done, say how it was checked at 360dp / 1.3× (a phone, an emulator, or the simulator at the smallest size) and with what data.
+- When a screen is done, say how it was checked at 360dp / 1.3× (a phone, an emulator, or the web preview at 360 × 640 with `?text=1.3&os=android`, see `src/ui/DESIGN.md` "Platform notes") and with what data.
 
 ## How we ship
 

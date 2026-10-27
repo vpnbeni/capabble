@@ -1,7 +1,8 @@
 import { Check, ChevronLeft, ChevronRight } from 'lucide-react-native'
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
-import { Animated, PanResponder, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native'
+import { Animated, PanResponder, Pressable, StyleSheet, View } from 'react-native'
 import Svg, { Circle } from 'react-native-svg'
+import { useFontScale } from './preview'
 
 import { useTheme } from '@/theme/ThemeProvider'
 import { fontFamily, radius, space, type Tone } from '@/theme/tokens'
@@ -18,7 +19,7 @@ import { Text } from './Text'
  */
 const TIME_SCALE_CAP = 1.3
 export const useFixedColumn = (base: number) => {
-  const { fontScale } = useWindowDimensions()
+  const fontScale = useFontScale()
   return Math.ceil(base * Math.min(Math.max(fontScale, 1), TIME_SCALE_CAP))
 }
 const useTimeColumn = useFixedColumn
@@ -162,7 +163,7 @@ export function Agenda({ groups, empty }: { groups: AgendaDay[]; empty?: ReactNo
                   </View>
                   <View style={[styles.agendaBar, { backgroundColor: item.color }]} />
                   <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-                    <Text variant="m-headline" numberOfLines={2}>
+                    <Text variant="m-headline" numberOfLines={3}>
                       {item.title}
                     </Text>
                     {item.meta ? (
@@ -187,7 +188,7 @@ export type TimelineItem = { time: string; title: string; detail?: string; state
 /** Steps down a line (a bus's stops, a day's periods) with the current step ringed. `compact` for a day's periods. */
 export function Timeline({ items, compact }: { items: TimelineItem[]; compact?: boolean }) {
   const { colors } = useTheme()
-  const timeWidth = useTimeColumn(64)
+  const timeWidth = useTimeColumn(70)
   return (
     <View>
       {items.map((item, index) => {
@@ -503,11 +504,12 @@ export function ProgressRing({ value, label, sublabel, size = 112, stroke = 10, 
         />
       </Svg>
       <View style={styles.ringInner}>
-        <Text numeric maxFontSizeMultiplier={1.3} style={{ fontFamily: fontFamily[700], fontSize: Math.round(size * 0.24), lineHeight: Math.round(size * 0.27), letterSpacing: -0.5, color: colors.ink }}>
+        {/* The ring doesn't grow, so the figures inside it stop growing at 1.1× text ("100%" stays inside). */}
+        <Text numeric maxFontSizeMultiplier={1.1} style={{ fontFamily: fontFamily[700], fontSize: Math.round(size * 0.24), lineHeight: Math.round(size * 0.27), letterSpacing: -0.5, color: colors.ink }}>
           {label ?? `${Math.round(value)}%`}
         </Text>
         {sublabel ? (
-          <Text variant="caption" tone="muted" maxFontSizeMultiplier={1.3}>
+          <Text variant="caption" tone="muted" maxFontSizeMultiplier={1.1}>
             {sublabel}
           </Text>
         ) : null}

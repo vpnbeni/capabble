@@ -153,3 +153,194 @@ Vercel login).
 
 Every "Later" row that needs no new EAS build is done. Needing a new EAS build: the transport crew app,
 the live bus map, scanning for assets and library books.
+
+---
+
+# Next: every staff page on the phone (plan of 27 Oct 2026, waiting for approval)
+
+Goal: More → "On the website" ends up holding only desk work, each with its reason below. Every staff web page
+(`client/src/App.tsx` routes, `packages/shared/src/tenantFeatureCatalog.json`) is marked **In app** (done),
+**Bring** (with the phone pattern and its slice number) or **Web only** (reason). Endpoints named are the ones the
+web already calls; "server:" marks the few places a phone flow needs something new.
+
+Before any new screen: **slice 0, sizing pass** on every existing staff and family screen at 360 × 640dp with 1.3×
+text (roll call and staff attendance rows, marks rows, `StatTiles`, nav titles with class and subject, `Hero` values,
+`ActionBar` text), fixes in the kit where shared, each screen's check written down.
+
+## Native modules (each needs a new EAS build and a version bump: ask first)
+
+Not installed today: `expo-image-picker` (photos: student photo and documents, an expense bill, a clinic note),
+`expo-camera` (scanning asset tags and library barcodes), `expo-location` + `react-native-maps` (crew app, live bus).
+`expo-sharing` and `react-native-webview` are installed, so viewing and sharing PDFs (receipts, report cards, ID
+cards) ships as an update. Slices that would need a picker ship without the upload first and say so.
+
+## Page by page
+
+### Everyday, all staff
+| Web page | Mark | Phone pattern |
+|---|---|---|
+| `Home`, `Dashboard` | In app | Today tab by mode |
+| `Notifications` | In app | Bell + list |
+| `CalendarPage` | In app | Calendar tab, reply, create for approval |
+| `CalendarEvents` (manage) | **Bring · 1** | My events list (`ChipRail` upcoming / waiting / drafts / past) → event record (`DetailList`, replies counted by answer) → "Who hasn't replied" list with call buttons → `ActionSheet`: edit, send a reminder (`POST /calendar/events/:id/remind-pending`), cancel (`Dialog`). Edit = the create form prefilled (`PATCH /:id`). Audience builder stays as on create (segments picked from `/audience/options`) |
+| `settings/SchoolDays` | **Bring · 2** | Principal declares a holiday or closure on the move: month list of school-day rules, "Add a day off" sheet (date, name, all classes or some; `POST /school-days/rules`; the calendar reads them from `/calendar/days`), cancel a rule. Weekly offs and session setup stay on the web (setup) |
+| `AccountSettings` (your login) | In app | Your login |
+| `HelpSupport` | Web only | Long help pages; the app's Your login links to it |
+
+### Teachers
+| Web page | Mark | Phone pattern |
+|---|---|---|
+| `AttndStudentAttendance` | In app | Roll call, any day |
+| `ExmclResult` (marks entry) | In app | One subject of one class |
+| `AcdmcHomework`, `AcdmcWorkDetail` (homework) | In app | Homework |
+| `AcdmcAssignment`, `AcdmcQuiz`, `AcdmcWorkDetail` | **Bring · 3** | Same screens as homework with a kind switch; a work's record shows submissions summary; "Check submissions" = roster where each row opens a sheet (status `OptionList`: submitted, late, missing, excused; marks `NumberCell` when the work has max marks). Saves only the changed rows (check the update endpoint merges, as marks did) |
+| `TeacherWise` (my timetable) | In app | Your timetable |
+| `ClassWise` | **Bring · 4** | Class picker → `WeekStrip` + `Timeline` of that class's day, from the published version (`/timetable/state` read; server: a `GET /timetable/class/:section?from=&to=` like `/timetable/me` if the state is too big for a phone) |
+| `TeacherWise` (any teacher, principal) | **Bring · 4** | Staff directory row → "Timetable" → the same week view for that teacher (server: `/timetable/me` with `teacherId` for logins holding `timetable.timetable.read`) |
+| `Substitution` | Blocked | No server data; needs the web feature first (then: today's absent teachers → free teachers per period, assign in a sheet) |
+| `AcdmcLessonPlan` | **Bring · 9** | My lesson plans by week (list), record, "Mark taught" if the model has a status; writing a full plan stays on the web (long rich form) |
+| `AcdmcCurriculum`, `AcdmcCurriculumDetail` | **Bring · 9** (read) | Class + subject → units with coverage `ProgressRing` (`/acdmc/curriculum/:id/coverage`). Authoring the curriculum stays on the web (long tree form) |
+| `AcdmcOverview` | **Bring · 9** | Principal: coverage by class as a list, no charts |
+
+### Office, front desk, principal
+| Web page | Mark | Phone pattern |
+|---|---|---|
+| `Students`, `StudentProfile` | In app (look-up) · **Bring · 6** (edit) | Student record gets "Edit" → pushed form by section (personal, guardians, address, class), `ActionBar` "Save changes"; only changed fields sent. "Add a student" from the Students list (`POST /students`, next roll number from `/students/next-roll-number`). Documents: list and open (share sheet); upload waits for the picker build |
+| `StudentInfo` (stdntboard) | **Bring · 6** | Principal: counts by class as a `ListGroup` under Students, not a dashboard |
+| `AlmniDirectory` | **Bring · 6** | Search + list + record with call / email |
+| `StdntIdCards` | **Bring · 6** (view) | Student record → "ID card": the card from `POST /id-cards/generate` for one student in a WebView, share. Card design and class-wise printing stay on the web |
+| `StaafStaffMembers`, `StaafStaffGroup` | In app | Staff directory |
+| `StaafStaffProfile` | **Bring · 7** | Directory row → staff record (`DetailList`: role, groups, joining, contact; bank and ID details only with `staaf.staff.write`), "Edit" pushed form by section for the office. "Add a staff member" from the directory |
+| `StaafOverview` | **Bring · 7** | Counts by staff group as list headers in the directory |
+| `StaafOrgStructure` | Web only | A drawn chart; the directory's groups cover the look-up |
+| `StaafRecruitment` | Web only | Long application forms and documents at a desk; revisit if schools ask |
+| `AttndStaffAttendance` | In app | Staff attendance |
+| `Attndboard` | In app | Principal attendance today |
+| `AppntPages` today, appointments (host) | In app | Meetings |
+| `AppntPages` today, appointments (front desk) | **Bring · 5** | Desk Today: all hosts' meetings by time, arrivals; "Book a meeting" pushed form (host, student or visitor from `/appnt/lookup/*`, `WeekStrip` + `SlotPicker` from `/hosts/:id/slots`); "Walk-in" sheet (`POST /appointments/walk-in`); check in / done / no-show / cancel / reschedule in the meeting sheet |
+| `AppntPages` hosts | **Bring · 5** | Hosts list, turn a host on or off, edit a host's hours (reuses Your hours) |
+| `AppntPages` availability | In app | Your hours |
+| `AppntPages` settings, reports | Web only | Setup and monthly numbers |
+| `settings/UsersAndAccess`, `UserDetail` | **Bring · 10** | Admins: users list (search, `ChipRail` staff / parents / students / invited), record, "Create a login" sheet, reset password (sends the email), turn off, change roles (`OptionList multiple`). Same endpoints as the web |
+| `settings/Roles`, `RoleEditor` | Web only | Permission grid of every module × action: a desk task done once |
+| `settings/SchoolEmail`, `SchoolPayments` | Web only | SMTP and Razorpay secrets: typed once at a desk, never shown again |
+| School profile (`/school-profile`) | **Bring · 10** (view, edit contact fields) | Logo and letterhead stay on the web |
+| `Billing`, workspace closure | Web only | Billing and account closure |
+
+### Accounts
+| Web page | Mark | Phone pattern |
+|---|---|---|
+| `CpitlDashboard` | In app (principal glance: fees this month) · **Bring · 8** | Finance Today for accountants: collected today / this month `StatTiles`, recent payments |
+| `CpitlCollection`, `CpitlStudentLedger` | **Bring · 8** | Counter: `SearchBar` student (`/cpitl/students`) → account (dues by head, paid, balance; `/students/:id/account`) → "Record a payment" pushed form (amount, mode cash / UPI / cheque / bank with reference, date; `POST /students/:id/payments`) → success `StatusView` with "Share receipt" (`/payments/:id/receipt.pdf` via share sheet). Cancel a payment: `ActionSheet` → `Dialog` with reason, only with the cancel permission |
+| `CpitlPayments` | **Bring · 8** | Payments list by day and mode, cheque status update in a sheet |
+| Defaulters (collection filter) | **Bring · 8** | Dues list by class with amount and days overdue, call the guardian |
+| `CpitlFeeSlips` | Web only | Printing slips in bulk |
+| `CpitlFeeStructures`, `CpitlFeeStructureDetail`, `CpitlSettings` | Web only | Fee setup once a year; waivers of one demand are in the student account (**8**) |
+| `CpitlExpenses`, `CpitlOperating`, `CpitlFuel`, `CpitlElectricity` | **Bring · 11** | "Record an expense" pushed form by kind (category, amount, paid to, date, note; fuel: vehicle, litres, odometer; electricity: connection, units), list by month with void in an `ActionSheet`. Bill photo waits for the picker build. Analytics and projections stay on the web |
+| `CpitlPayroll`, `CpitlSalary`, `CpitlPayrollRun` | **Bring · 11** (view) | Month → run status and totals, staff rows with net pay; running and approving payroll stays on the web (statutory checks over a full grid) — revisit approval on the phone once the run has an approve step |
+| `CpitlBudgets`, `CpitlInfra`, `CpitlInfraDetail` | Web only | Yearly planning sheets. Infra project status (view) can join **11** if asked |
+
+### Exams (internal)
+| Web page | Mark | Phone pattern |
+|---|---|---|
+| `ExmclExams`, `ExmclDatesheets` | **Bring · 9** | Exams list → exam record with its datesheet as an `Agenda` by day; creating exams and datesheets stays on the web |
+| Results overview + publishing | **Bring · 9** | Exam → classes × subjects progress (`/exam-results/status`), "Publish results" `ActionBar` (`PUT /exam-definitions/:id/results-publication`) with a `Dialog` (families are told) |
+| `ExmclReportCard` (one student) | **Bring · 9** | Student record → "Report card": `/report-cards/single` in a WebView, share |
+| `ExmclAwardList` (view) | **Bring · 9** | Covered by marks entry per subject; the printable award list stays on the web |
+| `ExmclAdmitCards`, `ExmclReportCardFormat`, `ExmclAwardListFormat`, `ExmclAdmitCardFormat`, `Performas` | Web only | Print layouts and formats |
+| `ExmclSubjects`, `ExmclMarksDistribution`, `ExmclSyllabus`, `ExmclQuestionPapers`, `ExmclCbseRegistration`, `ExmclCirculars` | Web only | Exam setup, file uploads and board registration at a desk |
+
+### Exam centre (CNTR and the exam-centre pages of internal exams)
+| Web page | Mark | Phone pattern |
+|---|---|---|
+| Duties (my duty today) | In app | Today |
+| `CentreDetails`, `Candidates`, `CandidateDetail`, `DateSheets`, `SeatingPlan`, `RoomAllocation`, `Form66`, `AnswerSheets`, `AnswerSheetDetails`, `DispatchSlip`, `Attendance`, `PwdInfo`, `Umcs`, `Stickers`, `Performas`, `Remuneration`, `UndertakingForm`, `CentreGuidelines`, `CBSECirculars`, `CBSEPortals`, `Subjects`, `TeacherDetail`, `Duties` (assigning) | Web only | Board-centre operations: PDF imports, seating and room plans, Form 66, stickers and dispatch printing, done by the centre superintendent at a desk |
+
+### Activities
+| Web page | Mark | Phone pattern |
+|---|---|---|
+| `ActvtHouses`, `ActvtHouseDetail`, `ActvtHouseRanking` | **Bring · 12** | Houses list with points and rank, house record with members; "Award points" sheet if the house model takes point entries |
+| `ActvtClubs`, `ActvtClubDetail` | **Bring · 12** | My clubs (in-charge) → members, call a guardian |
+| `ActvtStudentCouncil` | **Bring · 12** (view) | Posts and who holds them; elections setup stays on the web |
+| `ActvtStudentProfile` | **Bring · 12** | A section on the student record: house, clubs, posts, certificates |
+| `ActvtBoard`, `ActvtFunctions`, `ActvtSports`, `ActvtTours` | **Bring · 12** (view) | Upcoming as an `Agenda`; tours: list with students going. Planning forms stay on the web |
+| `ActvtCertificates` | **Bring · 12** | View a student's certificates; "Record a certificate" sheet. Certificate design stays on the web |
+| `Activities` (old page) | — | Redirect, nothing to do |
+
+### Clinic, library, assets, transport
+| Web page | Mark | Phone pattern |
+|---|---|---|
+| `MdclCases` | In app | Clinic visits |
+| `MdclSupplies` | **Bring · 13** | Supplies list (`ChipRail` all / low), item record, "Add stock" / "Use" sheet with `Stepper`, reorder level edit |
+| `LibryCirculation`, `LibryBarcodeDesk` | **Bring · 14** | Issue: member search (`/libry/members/lookup`) → type accession number (`/copies/lookup`) → "Issue book" (`POST /loans/issue`); return / renew by accession number; scanning comes with the camera build |
+| `LibryCatalogue`, `LibryInventory` | **Bring · 14** | Catalogue search → title record with copies and who has them |
+| `LibryMembers` | **Bring · 14** | Member record: books out, due, fines; collect or waive a fine (`/fines/:id/waive`) |
+| `LibryOverview` | **Bring · 14** | Library Today: due today, overdue, issued today |
+| `LibryAcquisitions` | **Bring · 14** (review) | Teachers' book requests: approve / reject in `SwipeRow`s. Purchase orders and suppliers stay on the web |
+| `LibryStocktakes`, `LibryAudit` | Later (camera build) | Shelf scanning |
+| `LibryReports`, `LibryDigitalLibrary`, `LibryReading` | Web only (reports) · Later (reading lists for teachers) | Reports are print/export; reading lists revisit with families' reading in the app |
+| `AsetsAssets`, `AsetsAssetDetail`, `AsetsLocations`, `AsetsLocationDetail` | **Bring · 15** | Asset search and by location; record; "Allocate" / "Move" / "Return" sheets (`/allocations`, `/transfers`) |
+| `AsetsMaintenance` | **Bring · 15** | "Report a problem" sheet from any asset or location (anyone with the permission), the maintenance list for the in-charge with status updates |
+| `AsetsStock` | **Bring · 15** | Consumables: stock list, adjust in a sheet |
+| `AsetsDisposals` | **Bring · 15** (approve) | Disposal requests to approve in the Approvals tab |
+| `AsetsDashboard` | **Bring · 15** | Counts as list headers, no charts |
+| `AsetsAudits` | Later (camera build) | Audit by scanning tags; without scanning, ticking items in a list is possible — ask |
+| `AsetsCategories`, `AsetsVendors`, `AsetsProcurement`, `AsetsReports`, `AsetsSettings` | Web only | Setup, purchasing paperwork and reports |
+| `TrnstOverview`, `TrnstVehicles`, `TrnstRoutes`, `TrnstAssignments`, `TrnstTrips` | **Bring · 16** (view) | Transport Today: trips running and done; routes → stops `Timeline` → students on the route with guardian calls; vehicles with documents' due dates. Changing a student's route: one sheet (`/assignments/bulk` with one student). Route and vehicle setup stays on the web |
+| `TrnstSelfStudents` | **Bring · 16** (view) | Students who come on their own, list |
+| `TrnstCrew`, `TrnstLive` | Later (location build) | Crew app and live map need `expo-location` and `react-native-maps` |
+
+### Timetable and school setup (web only, reason: built once per term at a desk)
+`TimetableTeachers`, `TimetableClasses` (also `stdnt/classes`), `TimetableSubjects`, `Departments`, `BellTimings`,
+`Generate`, `PeriodAllocation`, `SubjectAllocation`, `Versions`, `Formats`, onboarding pages, every bulk import
+(students, staff, candidates), `Stickers`, `Performas`, `GetStarted`.
+
+## Slice order (by how often staff need it on the move)
+
+0. Sizing pass (all existing screens) · 1. Manage my events · 2. School days off · 3. Assignments and quizzes ·
+4. Class and teacher timetables · 5. Front desk meetings · 6. Student records (edit, add, alumni, ID card) ·
+7. Staff records · 8. Fee counter, payments, dues · 9. Exams: list, datesheet, results status and publish, report card,
+lesson plans and coverage · 10. Users and access, school profile · 11. Expenses and payroll view · 12. Activities ·
+13. Clinic supplies · 14. Library desk · 15. Assets · 16. Transport (view).
+Then, with your go-ahead for a new build: photos (picker), scanning (camera), crew app and live map (location, maps).
+
+Each slice removes its `WEB_MODULES` entry (or the pages it covers) and the `openWebsite` buttons it replaces
+(`fee-collection.tsx`, `student/[id].tsx`). When slice 16 is done "On the website" keeps only: Timetable setup,
+Exam setup and print formats, Exam centre, Finance setup, Library and asset purchasing and reports, Roles, School
+email and payments, Billing — each row in the app showing its one-line reason.
+
+## Questions for approval
+1. The order above (calendar management and school days first, then teacher work, then office, then accounts).
+2. Users and access on the phone for administrators (slice 10): creating logins and resetting passwords from a phone is
+   convenient but powerful; it uses the same permission checks as the web.
+3. Payroll and recruitment stay view-only / web-only as written.
+
+## Done: slice 0, sizing pass (27 Oct 2026)
+
+Checked in the web preview at 360 × 640 with `?text=1.3&os=android` (kit text scaled as Android does, Android nav
+bar) against stage data, signed in as the teacher with a staff record, the administrator, the clinic nurse and the
+parent; then at 390 × 844 with 1.0× text to confirm the normal layouts are unchanged. Not checked on a real phone yet;
+the web ignores `adjustsFontSizeToFit` (tab labels, bar titles, `Hero` values shrink on the phone instead of "…").
+
+| Screen (who) | Found at 360 / 1.3× | Fix |
+|---|---|---|
+| Roll call, staff attendance | Name cut to 3 letters beside Present / Absent | Kit: `ListItem` `accessoryWidth`: the control goes under the name, full width, when the name would get under 12 characters |
+| Every `ActionBar` (roll call, homework, events, marks, clinic, meetings, fees) | Summary cut to "1 …" | Kit: no icon tile, summary and detail on top, action under them; `MobileScreen` pads for the bar's measured height |
+| Principal Today | `StatTiles` labels cut ("Present …"), amount filling the tile | Kit: stack from 1.15× text or below 360 wide, as compact rows |
+| Teacher Today, Your timetable | "12:10 …" in the periods | Kit: `Timeline` time column 64 → 70 |
+| Today meetings, Meetings (host and family) | Visitor's name cut beside the status badge | Kit: badge under the text on tight screens; meeting rows take two lines |
+| Your hours, Marks (exam row), fee collection, results | Day names or the chosen value cut | Kit: a value that won't fit beside the title goes under it |
+| Attendance today, family attendance | "100%" spilling out of the ring | Kit: `ProgressRing` figures stop growing at 1.1× |
+| Fee collection, Hero cards | Label and meta squeezed into two narrow columns | Kit: meta under the label on tight screens; value up to two lines, shrinks to fit |
+| Notifications | Titles cut ("Your visitor has arri…") | Kit: `SwipeRow` title two lines |
+| Calendar (staff and family) | Event titles cut at two lines | Kit: `Agenda` titles three lines |
+| Student record | Guardian's phone number cut | Guardian and student rows take two lines |
+| Family Home | Notice titles cut | Two lines |
+| Pushed screens (iOS) | Centred title squeezed by the back label | Kit: back label hidden on tight screens (Android never shows it); bar titles shrink to 0.8 before "…" |
+| Tab bar | "Attendance", "Approvals" don't fit 72dp | Kit: labels shrink to the 12px floor at 1.3× |
+| Clinic Today | "Hi, Ms." | Greeting skips titles (Mr, Mrs, Ms, Dr…) |
+
+Fine as they were: Classes, Attendance tab, marks entry rows (the box leaves room for 13+ characters), Calendar
+`WeekStrip`, More (staff and family), new event, homework list and form, clinic list and visit form, staff directory,
+Approvals, Students, meeting sheet, family fees, notices, results, transport, profile, request a meeting, Your login.
+Web-only noise seen in the preview: a `collapsable` warning from React Native Web.

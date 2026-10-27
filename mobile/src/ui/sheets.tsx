@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useTheme } from '@/theme/ThemeProvider'
 import { fontFamily, radius, size, space } from '@/theme/tokens'
 
+import { useFontScale } from './preview'
 import { haptic } from './haptics'
 import { KeyboardRevealProvider, useKeyboardAwareScroll } from './keyboard'
 import { PressScale, useReduceMotion } from './motion'
@@ -296,32 +297,35 @@ type ActionBarProps = {
  */
 export function ActionBar({ summary, detail, label, icon, onPress }: ActionBarProps) {
   const { colors, shadows } = useTheme()
+  // Small phone or larger text: no icon tile, and the summary and detail wrap rather than cut off.
+  const { width } = useWindowDimensions()
+  const tight = useFontScale() >= 1.15 || width < 380
   return (
     <PressScale
       accessibilityRole="button"
       accessibilityLabel={[summary, detail, label].filter(Boolean).join(', ')}
       scale={0.98}
       onPress={onPress}
-      style={[styles.bar, { backgroundColor: colors['accent-strong'], boxShadow: shadows['shadow-float'] }]}
+      style={[styles.bar, tight && styles.barStacked, { backgroundColor: colors['accent-strong'], boxShadow: shadows['shadow-float'] }]}
       pressedStyle={{ backgroundColor: colors['accent-strong-hover'] }}
     >
-      {icon ? (
+      {icon && !tight ? (
         <View style={[styles.barIcon, { backgroundColor: colors['on-accent'] }]}>
           <Icon icon={icon} size={20} color={colors['accent-strong']} />
         </View>
       ) : null}
-      <View style={{ flex: 1, minWidth: 0 }}>
-        <Text variant="m-nav-title" numeric numberOfLines={1} maxFontSizeMultiplier={1.3} style={{ color: colors['on-accent'], fontFamily: fontFamily[700] }}>
+      <View style={tight ? { alignSelf: 'stretch' } : { flex: 1, minWidth: 0 }}>
+        <Text variant="m-nav-title" numeric numberOfLines={tight ? 3 : 1} maxFontSizeMultiplier={1.3} style={{ color: colors['on-accent'], fontFamily: fontFamily[700] }}>
           {summary}
         </Text>
         {detail ? (
-          <Text variant="label" numberOfLines={1} maxFontSizeMultiplier={1.3} style={{ color: colors['on-accent'], opacity: 0.92 }}>
+          <Text variant="label" numberOfLines={tight ? 2 : 1} maxFontSizeMultiplier={1.3} style={{ color: colors['on-accent'], opacity: 0.92 }}>
             {detail}
           </Text>
         ) : null}
       </View>
-      <View style={styles.barCta}>
-        <Text variant="m-headline" maxFontSizeMultiplier={1.3} style={{ color: colors['on-accent'] }}>
+      <View style={[styles.barCta, tight && { alignSelf: 'flex-end' }]}>
+        <Text variant="m-headline" numberOfLines={1} maxFontSizeMultiplier={1.3} style={{ color: colors['on-accent'] }}>
           {label}
         </Text>
         <Icon icon={ChevronRight} size={18} color={colors['on-accent']} />
@@ -342,7 +346,7 @@ const styles = StyleSheet.create({
   actionHead: { paddingVertical: 14, paddingHorizontal: space['space-4'], borderBottomWidth: StyleSheet.hairlineWidth },
   action: { height: 56, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: space['space-2'] },
   bar: {
-    height: size['action-bar-height'],
+    minHeight: size['action-bar-height'],
     flexDirection: 'row',
     alignItems: 'center',
     gap: space['space-3'],
@@ -350,6 +354,8 @@ const styles = StyleSheet.create({
     paddingRight: space['space-3'],
     borderRadius: radius['radius-xl'],
   },
+  // Stacked: the summary and detail on top at full width, the action on its own line at the end.
+  barStacked: { flexDirection: 'column', alignItems: 'stretch', gap: space['space-1'], paddingVertical: space['space-3'], paddingRight: space['space-4'] },
   barIcon: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   barCta: { flexDirection: 'row', alignItems: 'center', gap: 2 },
 })

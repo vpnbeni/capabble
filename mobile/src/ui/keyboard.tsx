@@ -53,7 +53,7 @@ export function useKeyboardAwareScroll(scrollRef: RefObject<ComponentRef<typeof 
   const reveal = useCallback(() => {
     // Wait a frame so the padding for the keyboard is laid out before measuring.
     setTimeout(() => {
-      const input = TextInput.State.currentlyFocusedInput() as { measureInWindow?: (callback: (x: number, y: number, w: number, h: number) => void) => void } | null
+      const input = TextInput.State?.currentlyFocusedInput?.() as { measureInWindow?: (callback: (x: number, y: number, w: number, h: number) => void) => void } | null
       const { cover: hidden, keepClear: clear } = latest.current
       if (!input?.measureInWindow || !hidden) return
       input.measureInWindow((_x, y, _w, h) => {

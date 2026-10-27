@@ -1,6 +1,7 @@
 import { CircleAlert, Eye, EyeOff, Minus, Plus, Search, X, type LucideIcon } from 'lucide-react-native'
 import { useRef, useState, type ComponentRef, type Ref } from 'react'
-import { Pressable, StyleSheet, TextInput, View, useWindowDimensions, type TextInputProps } from 'react-native'
+import { Pressable, StyleSheet, TextInput, View, type TextInputProps } from 'react-native'
+import { previewTextStyle, useFontScale } from './preview'
 
 import { useTheme } from '@/theme/ThemeProvider'
 import { fontFamily, radius, space } from '@/theme/tokens'
@@ -81,7 +82,7 @@ export function MobileTextField({ ref, label, hint, error, type = 'text', prefix
             setFocused(false)
             onBlur?.(event)
           }}
-          style={[styles.input, multiline && styles.multiInput, { color: colors.ink }, style]}
+          style={previewTextStyle([styles.input, multiline && styles.multiInput, { color: colors.ink }, style])}
         />
         {type === 'password' ? (
           <Pressable
@@ -227,7 +228,7 @@ export function SearchBar({ placeholder, value, onChange, onCancel, label }: Sea
           autoCorrect={false}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
-          style={[styles.searchInput, { color: colors.ink }]}
+          style={previewTextStyle([styles.searchInput, { color: colors.ink }])}
         />
         {value ? (
           <Pressable accessibilityRole="button" accessibilityLabel="Clear search" hitSlop={13} onPress={() => onChange('')} style={[styles.clear, { backgroundColor: colors['ink-subtle'] }]}>
@@ -335,7 +336,7 @@ export function NumberCell({ ref, label, invalid, disabled, width = 76, style, o
   const { colors } = useTheme()
   const revealOnFocus = useRevealOnFocus()
   const [focused, setFocused] = useState(false)
-  const { fontScale } = useWindowDimensions()
+  const fontScale = useFontScale()
   const side = Math.ceil(width * Math.min(Math.max(fontScale, 1), 1.3))
   const outline = invalid ? colors['danger-solid'] : focused ? colors['focus-ring'] : colors['border-control']
   return (
@@ -364,7 +365,7 @@ export function NumberCell({ ref, label, invalid, disabled, width = 76, style, o
           setFocused(false)
           onBlur?.(event)
         }}
-        style={[styles.cellInput, { color: colors.ink }, style]}
+        style={previewTextStyle([styles.cellInput, { color: colors.ink }, style], 1.3)}
       />
     </View>
   )

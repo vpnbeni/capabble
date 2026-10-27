@@ -102,7 +102,7 @@ export function SwipeRow({ title, subtitle, meta, unread, actions = [], defaultR
         <View style={[styles.unread, { backgroundColor: unread ? colors.accent : 'transparent' }]} />
         <View style={{ flex: 1, minWidth: 0 }}>
           <View style={styles.line}>
-            <Text variant="m-headline" numberOfLines={1} style={{ flex: 1 }}>
+            <Text variant="m-headline" numberOfLines={2} style={{ flex: 1 }}>
               {title}
             </Text>
             {meta ? (

@@ -1,6 +1,7 @@
 import { ChevronRight, type LucideIcon } from 'lucide-react-native'
 import { Children, type ReactNode } from 'react'
 import { Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native'
+import { useFontScale } from './preview'
 
 import { useTheme } from '@/theme/ThemeProvider'
 import { fontFamily, radius, size, space, type TileIndex, type Tone } from '@/theme/tokens'
@@ -87,6 +88,10 @@ export function Hero({ label, value, detail, meta, icon, tone = 'soft', progress
   const muted = tone === 'surface' ? colors['ink-muted'] : ink
   const fill = tone === 'surface' ? colors.accent : ink
   const track = { soft: colors.surface, strong: colors['accent-strong-hover'], surface: colors['surface-sunken'] }[tone]
+  // Small phone or larger text: the meta goes under the label instead of squeezing it.
+  const { width } = useWindowDimensions()
+  const fontScale = useFontScale()
+  const stackTop = fontScale >= 1.15 || width < 380
 
   return (
     <View
@@ -94,7 +99,7 @@ export function Hero({ label, value, detail, meta, icon, tone = 'soft', progress
       accessibilityLabel={ariaLabel ?? [label, value, detail].filter(Boolean).join(', ')}
       style={[styles.hero, { backgroundColor: ground }, tone === 'surface' && { boxShadow: shadows['shadow-card-m'] }]}
     >
-      <View style={styles.heroTop}>
+      <View style={[styles.heroTop, stackTop && { flexDirection: 'column', alignItems: 'flex-start', gap: 2 }]}>
         <View style={styles.heroLabel}>
           {icon ? <Icon icon={icon} size={16} color={ink} /> : null}
           <Text variant="body" style={{ color: ink, fontFamily: fontFamily[600] }}>
@@ -107,7 +112,8 @@ export function Hero({ label, value, detail, meta, icon, tone = 'soft', progress
           </Text>
         ) : null}
       </View>
-      <Text variant="m-hero" numeric style={{ color: tone === 'surface' ? colors.ink : ink, marginTop: space['space-2'] }}>
+      {/* Up to two lines (a holiday's or a visitor's name), shrinking to fit before anything is cut. */}
+      <Text variant="m-hero" numeric numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.6} style={{ color: tone === 'surface' ? colors.ink : ink, marginTop: space['space-2'] }}>
         {value}
       </Text>
       {detail ? (
@@ -143,7 +149,7 @@ export type ShortcutItem = { label: string; icon: LucideIcon; tile: TileIndex; b
 export function ShortcutGrid({ items, columns }: { items: ShortcutItem[]; columns?: 3 | 4 }) {
   const { colors } = useTheme()
   // Three across once the phone's text is enlarged, so every label fits on one line.
-  const { fontScale } = useWindowDimensions()
+  const fontScale = useFontScale()
   const cols = columns ?? (fontScale >= 1.15 ? 3 : 4)
   const rows = Array.from({ length: Math.ceil(items.length / cols) }, (_, index) => items.slice(index * cols, index * cols + cols))
 
@@ -266,6 +272,12 @@ export type ListGroupItem = {
   badge?: { label: string; tone: Tone }
   /** A control at the end, e.g. a Switch. */
   accessory?: ReactNode
+  /**
+   * The control's width (a `SegmentedControl`, from `useFixedColumn`); the row sizes it. When it would
+   * leave the title fewer than 12 characters (a 360dp phone, larger text), the control goes under the
+   * text at the full width of the row.
+   */
+  accessoryWidth?: number
   /** Default: shown when the row opens something (has onPress) and isn't danger. */
   chevron?: boolean
   /** 'danger' for sign out and other destructive rows, alone in their own group. */
@@ -301,11 +313,35 @@ export function ListGroup({ header, footer, items, children }: { header?: string
 }
 
 /** One ListGroup row: 56px (64 with a subtitle), hairline inset to the text. Also usable as a child of ListGroup. */
+/**
+ * Whether a row's end control leaves its title room for 12 characters (`m-headline`, about 0.55em
+ * a character). Rows sit in a 16px screen gutter with 16px padding each side; a leading tile or
+ * avatar takes 32 + 12.
+ */
+const fitsBeside = (width: number, fontScale: number, control: number, lead: boolean) => {
+  const room = width - 2 * space['space-4'] - 2 * space['space-4'] - (lead ? 44 : 0) - space['space-3'] - control
+  return room >= 12 * 16 * 0.55 * Math.min(Math.max(fontScale, 1), 1.6)
+}
+
+/** Whether a row's text fits on one line beside its tile, chevron and gutters. */
+const fitsOneLine = (width: number, fontScale: number, text: string, lead: boolean, chevron: boolean) => {
+  const room = width - 4 * space['space-4'] - (lead ? 44 : 0) - (chevron ? 30 : 0) - space['space-3']
+  return text.length * 16 * 0.6 * Math.min(Math.max(fontScale, 1), 1.6) <= room
+}
+
 export function ListItem({ item, first }: { item: ListGroupItem; first?: boolean }) {
   const { colors } = useTheme()
-  const { title, subtitle, icon, tile = 1, avatar, value, badge, accessory, tone = 'default', onPress, lines = 1 } = item
+  const { title, subtitle, icon, tile = 1, avatar, value, badge, accessory, accessoryWidth, tone = 'default', onPress, lines = 1 } = item
   const chevron = item.chevron ?? (!!onPress && tone === 'default' && !accessory)
   const leadInset = icon || avatar ? 60 : space['space-4']
+  // On a small phone or with larger text the badge goes under the text, so the name isn't cut short.
+  const { width } = useWindowDimensions()
+  const fontScale = useFontScale()
+  const badgeBelow = !!badge && (fontScale >= 1.15 || width < 380)
+  // A value that won't fit beside the title ("1:30 pm to 3:00 pm" by "Wednesday") goes under it.
+  const longer = subtitle && subtitle.length > title.length ? subtitle : title
+  const valueBelow = !!value && !fitsOneLine(width, fontScale, `${longer}  ${value}`, !!(icon || avatar), chevron)
+  const accessoryBelow = !!accessory && !!accessoryWidth && !fitsBeside(width, fontScale, accessoryWidth, !!(icon || avatar))
 
   return (
     <Pressable
@@ -331,14 +367,25 @@ export function ListItem({ item, first }: { item: ListGroupItem; first?: boolean
             {subtitle}
           </Text>
         ) : null}
+        {valueBelow ? (
+          <Text variant="body-lg" tone="muted" numeric numberOfLines={2}>
+            {value}
+          </Text>
+        ) : null}
+        {accessoryBelow ? <View style={{ marginTop: space['space-2'], marginBottom: space['space-1'] }}>{accessory}</View> : null}
+        {badgeBelow ? (
+          <View style={{ flexDirection: 'row', marginTop: space['space-1'] }}>
+            <Badge label={badge.label} tone={badge.tone} />
+          </View>
+        ) : null}
       </View>
-      {value ? (
-        <Text variant="body-lg" tone="muted" numeric numberOfLines={1} style={{ lineHeight: 22, maxWidth: '45%' }}>
+      {value && !valueBelow ? (
+        <Text variant="body-lg" tone="muted" numeric numberOfLines={1} style={{ lineHeight: 22, flexShrink: 1, maxWidth: '60%' }}>
           {value}
         </Text>
       ) : null}
-      {badge ? <Badge label={badge.label} tone={badge.tone} /> : null}
-      {accessory}
+      {badge && !badgeBelow ? <Badge label={badge.label} tone={badge.tone} /> : null}
+      {accessoryBelow ? null : accessoryWidth ? <View style={{ width: accessoryWidth }}>{accessory}</View> : accessory}
       {chevron ? (
         <View style={{ marginRight: -4 }}>
           <Icon icon={ChevronRight} size={18} color={colors['ink-subtle']} />
@@ -358,12 +405,17 @@ export function Surface({ children, padded = true }: { children: ReactNode; padd
 
 export type StatTile = { label: string; value: string; detail?: string; tone?: Tone; icon?: LucideIcon; tile?: TileIndex; onPress?: () => void }
 
-/** Two-up number tiles for a glance screen: at most four, each opening the list behind it. */
+/**
+ * Two-up number tiles for a glance screen: at most four, each opening the list behind it. On a small
+ * phone or with larger text they stack, one compact row each (label and detail, the number at the end).
+ */
 export function StatTiles({ items }: { items: StatTile[] }) {
   const { colors, shadows } = useTheme()
-  const { width, fontScale } = useWindowDimensions()
-  const stacked = fontScale > 1.35 || width < 340
+  const { width } = useWindowDimensions()
+  const fontScale = useFontScale()
+  const stacked = fontScale >= 1.15 || width < 360
   const rows = stacked ? items.slice(0, 4).map((item) => [item]) : [items.slice(0, 2), items.slice(2, 4)].filter((row) => row.length)
+  const detailTone = (item: StatTile) => (item.tone && item.tone !== 'neutral' && item.tone !== 'info' ? item.tone : 'muted')
 
   return (
     <View style={{ gap: space['space-3'] }}>
@@ -376,22 +428,43 @@ export function StatTiles({ items }: { items: StatTile[] }) {
               accessibilityLabel={[item.label, item.value, item.detail].filter(Boolean).join(', ')}
               disabled={!item.onPress}
               onPress={item.onPress}
-              style={[styles.stat, { backgroundColor: colors.surface, boxShadow: shadows['shadow-card-m'] }]}
+              style={[stacked ? styles.statRow : styles.stat, { backgroundColor: colors.surface, boxShadow: shadows['shadow-card-m'] }]}
             >
-              <View style={styles.statTop}>
-                {item.icon ? <Tile icon={item.icon} tile={item.tile ?? 1} side={28} corner={8} glyph={16} /> : null}
-                <Text variant="body" tone="muted" numberOfLines={1} style={{ flex: 1, fontFamily: fontFamily[500] }}>
-                  {item.label}
-                </Text>
-              </View>
-              <Text variant="stat" numeric style={{ fontFamily: fontFamily[700], fontSize: 26, lineHeight: 32, letterSpacing: -0.52 }}>
-                {item.value}
-              </Text>
-              {item.detail ? (
-                <Text variant="label" tone={item.tone && item.tone !== 'neutral' && item.tone !== 'info' ? item.tone : 'muted'}>
-                  {item.detail}
-                </Text>
-              ) : null}
+              {stacked ? (
+                <>
+                  {item.icon ? <Tile icon={item.icon} tile={item.tile ?? 1} side={32} corner={8} glyph={18} /> : null}
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text variant="body" tone="muted" numberOfLines={2} style={{ fontFamily: fontFamily[500] }}>
+                      {item.label}
+                    </Text>
+                    {item.detail ? (
+                      <Text variant="label" tone={detailTone(item)} numberOfLines={2}>
+                        {item.detail}
+                      </Text>
+                    ) : null}
+                  </View>
+                  <Text variant="stat" numeric numberOfLines={1} style={{ fontFamily: fontFamily[700], fontSize: 24, lineHeight: 30, letterSpacing: -0.48, maxWidth: '50%' }}>
+                    {item.value}
+                  </Text>
+                </>
+              ) : (
+                <>
+                  <View style={styles.statTop}>
+                    {item.icon ? <Tile icon={item.icon} tile={item.tile ?? 1} side={28} corner={8} glyph={16} /> : null}
+                    <Text variant="body" tone="muted" numberOfLines={1} style={{ flex: 1, fontFamily: fontFamily[500] }}>
+                      {item.label}
+                    </Text>
+                  </View>
+                  <Text variant="stat" numeric style={{ fontFamily: fontFamily[700], fontSize: 26, lineHeight: 32, letterSpacing: -0.52 }}>
+                    {item.value}
+                  </Text>
+                  {item.detail ? (
+                    <Text variant="label" tone={detailTone(item)}>
+                      {item.detail}
+                    </Text>
+                  ) : null}
+                </>
+              )}
             </PressScale>
           ))}
           {row.length === 1 && !stacked ? <View style={{ flex: 1 }} /> : null}
@@ -442,5 +515,6 @@ const styles = StyleSheet.create({
   },
   separator: { position: 'absolute', top: 0, right: 0, height: StyleSheet.hairlineWidth },
   stat: { flex: 1, gap: 4, paddingTop: 14, paddingHorizontal: space['space-4'], paddingBottom: space['space-4'], borderRadius: radius['radius-xl'], alignItems: 'flex-start' },
+  statRow: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: space['space-3'], paddingVertical: space['space-3'], paddingHorizontal: space['space-4'], borderRadius: radius['radius-xl'] },
   statTop: { flexDirection: 'row', alignItems: 'center', gap: space['space-2'], marginBottom: 4, alignSelf: 'stretch' },
 })

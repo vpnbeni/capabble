@@ -18,6 +18,7 @@ export const meetingRow = (a: Appointment, onPress: () => void, { withDate = fal
   icon: Users,
   tile: 2,
   badge: MEETING_STATUS[a.status],
+  lines: 2,
   onPress,
 })
 

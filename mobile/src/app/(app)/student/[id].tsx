@@ -29,12 +29,13 @@ export default function StudentScreen() {
                 subtitle: ['Guardian', data.guardianPhone].filter(Boolean).join(' · '),
                 avatar: <Avatar name={data.guardianName || 'Guardian'} size={36} />,
                 accessory: data.guardianPhone ? call(data.guardianPhone, data.guardianName || 'the guardian') : undefined,
+                lines: 2,
               },
             ]
           : []),
         ...(data.fatherName && data.fatherName !== data.guardianName ? [{ title: data.fatherName, subtitle: 'Father', avatar: <Avatar name={data.fatherName} size={36} /> }] : []),
         ...(data.motherName && data.motherName !== data.guardianName ? [{ title: data.motherName, subtitle: 'Mother', avatar: <Avatar name={data.motherName} size={36} /> }] : []),
-        ...(data.phone ? [{ title: data.name, subtitle: `Student · ${data.phone}`, avatar: <Avatar name={data.name} size={36} />, accessory: call(data.phone, data.name) }] : []),
+        ...(data.phone ? [{ title: data.name, subtitle: `Student · ${data.phone}`, avatar: <Avatar name={data.name} size={36} />, accessory: call(data.phone, data.name), lines: 2 }] : []),
       ]
     : []
 

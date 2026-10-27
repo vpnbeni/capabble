@@ -203,6 +203,7 @@ function FamilyMeetings() {
                 title: a.hostName,
                 subtitle: `${when(a)} · ${[a.purpose, a.studentSnapshot?.name?.split(' ')[0]].filter(Boolean).join(' · ')}`,
                 badge: MEETING_STATUS[a.status],
+                lines: 2,
                 onPress: () => setOpen(a),
               }))}
             />
