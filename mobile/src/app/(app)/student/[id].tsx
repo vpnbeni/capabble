@@ -9,6 +9,7 @@ import { sharePdf } from '@/lib/sharePdf'
 import { CardSkeleton, LoadFailed } from '@/portal/states'
 import { examService } from '@/services/examService'
 import { studentService } from '@/services/studentService'
+import { useActivityProfile } from '@/staff/activityQueries'
 import { useExams, useStudentRecord } from '@/staff/queries'
 import { useStaff } from '@/staff/useStaff'
 import { space } from '@/theme/tokens'
@@ -33,6 +34,7 @@ export default function StudentScreen() {
   const canCard = staff.canUse('stdnt_id_cards') && staff.can('stdnt.idcards.write')
   const [sharing, setSharing] = useState(false)
   const canReport = staff.canUse('exmcl_report_card') && staff.can('exam.results.read')
+  const activity = useActivityProfile(id, staff.canUse('actvt_activities') && staff.can('actvt.activities.read'))
   const exams = useExams(canReport)
   const examList = exams.data ?? []
   const [picking, setPicking] = useState(false)
@@ -137,6 +139,20 @@ export default function StudentScreen() {
               ]}
             />
           </Surface>
+          {activity.data && (activity.data.house || activity.data.certificates.length) ? (
+            <ListGroup
+              header="Activities"
+              items={[
+                ...(activity.data.house ? [{ title: 'House', value: activity.data.house.name }] : []),
+                ...activity.data.certificates.slice(0, 6).map((certificate) => ({
+                  title: certificate.title,
+                  subtitle: [certificate.role, certificate.issuedOn ? formatDate(certificate.issuedOn) : null].filter(Boolean).join(' · '),
+                  icon: Award,
+                  tile: 1 as const,
+                })),
+              ]}
+            />
+          ) : null}
           {data.documents?.length ? (
             <ListGroup
               header="Documents"

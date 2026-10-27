@@ -5,7 +5,6 @@ import {
   HeartPulse,
   Landmark,
   Library,
-  Trophy,
   type LucideIcon,
 } from 'lucide-react-native'
 
@@ -67,7 +66,6 @@ export const WEB_MODULES: WebModule[] = [
       { feature: 'timetable_class_wise', path: '/time-table/class-wise' },
     ],
   },
-  { label: 'Activities', icon: Trophy, tile: 1, pages: [{ feature: 'actvt_activities', path: '/actvt/houses' }] },
   { label: 'Clinic', icon: HeartPulse, tile: 5, pages: [{ feature: 'mdcl_clinic', path: '/mdcl/cases' }] },
   { label: 'Transport', icon: Bus, tile: 2, pages: [{ feature: 'trnst_transport', path: '/trnst' }] },
   { label: 'Finance', icon: Landmark, tile: 3, pages: [{ feature: 'cpitl_dashboard', path: '/cpitl/dashboard' }] },
