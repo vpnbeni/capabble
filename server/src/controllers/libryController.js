@@ -324,8 +324,18 @@ exports.receivePurchaseOrder = async (req, res) => {
       }
       const remaining = order.lines.reduce((total, line) => total + Math.max(0, line.quantity - line.receivedQuantity), 0);
       if (created.length > remaining) throw Object.assign(new Error('Received copy count exceeds the outstanding purchase-order quantity.'), { statusCode: 400 });
-      let toAllocate = created.length;
-      for (const line of order.lines) { if (!toAllocate) break; const available = line.quantity - line.receivedQuantity; const add = Math.min(available, toAllocate); line.receivedQuantity += add; toAllocate -= add; }
+      // Copies that name their order line count against it; otherwise they fill the lines in order.
+      if (copies.every((entry) => entry.lineId)) {
+        for (const entry of copies) {
+          const line = order.lines.find((row) => String(row._id) === String(entry.lineId));
+          if (!line) throw Object.assign(new Error('A received copy names a line that is not on this order.'), { statusCode: 400 });
+          if (line.receivedQuantity >= line.quantity) throw Object.assign(new Error(`More copies of ${line.title} than were ordered.`), { statusCode: 400 });
+          line.receivedQuantity += 1;
+        }
+      } else {
+        let toAllocate = created.length;
+        for (const line of order.lines) { if (!toAllocate) break; const available = line.quantity - line.receivedQuantity; const add = Math.min(available, toAllocate); line.receivedQuantity += add; toAllocate -= add; }
+      }
       order.status = order.lines.every((line) => line.receivedQuantity >= line.quantity) ? 'received' : 'partially_received'; await order.save({ session });
       [receipt] = await Receipt.create([{ purchaseOrderId: order._id, receivedBy: actor(req), copies: created }], { session });
     });

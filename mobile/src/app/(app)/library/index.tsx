@@ -1,12 +1,12 @@
 import { useRouter } from 'expo-router'
-import { BookCopy, BookOpen, CornerDownLeft, Library, Search } from 'lucide-react-native'
+import { BarChart3, BookCopy, BookOpen, BookPlus, ClipboardCheck, CornerDownLeft, Ellipsis, Globe, Library, Search, ShoppingCart } from 'lucide-react-native'
 import { useState } from 'react'
 import { View } from 'react-native'
 
 import { ApiError } from '@/lib/api'
 import { classLabel, formatDate, formatINR, schoolToday } from '@/lib/format'
 import { CardSkeleton, LoadFailed } from '@/portal/states'
-import type { Fine, Loan } from '@/services/libraryService'
+import type { Fine, LibraryTitle, Loan } from '@/services/libraryService'
 import { useFines, useLibraryTitles, useLibraryToday, useLoans, useRenewLoan, useReturnBook, useWaiveFine } from '@/staff/libraryQueries'
 import { useStaff } from '@/staff/useStaff'
 import { space } from '@/theme/tokens'
@@ -16,7 +16,8 @@ type View_ = 'out' | 'catalogue' | 'fines'
 
 /**
  * The library desk: books out (overdue first), return a book by its accession number, renew a
- * loan, look a title up in the catalogue, and fines. Issuing has its own screen.
+ * loan, look a title up in the catalogue, and fines. Issuing has its own screen; More leads to
+ * adding books, buying them, stocktakes, reports and the digital library.
  */
 export default function LibraryScreen() {
   const router = useRouter()
@@ -39,6 +40,16 @@ export default function LibraryScreen() {
   const [waiving, setWaiving] = useState<Fine | null>(null)
   const [reason, setReason] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [menu, setMenu] = useState(false)
+  const [book, setBook] = useState<LibraryTitle | null>(null)
+  const canAddBooks = staff.can('libry.catalogue.create')
+  const more = [
+    ...(canAddBooks ? [{ label: 'Add a book', icon: BookPlus, onSelect: () => (setMenu(false), router.push('/library/add-book')) }] : []),
+    ...(staff.can('libry.acquisitions.view') ? [{ label: 'Buying books', icon: ShoppingCart, onSelect: () => (setMenu(false), router.push('/library/purchases')) }] : []),
+    ...(staff.can('libry.stocktake.view') ? [{ label: 'Stocktake', icon: ClipboardCheck, onSelect: () => (setMenu(false), router.push('/library/stocktake')) }] : []),
+    ...(staff.can('libry.reports.view') ? [{ label: 'Reports', icon: BarChart3, onSelect: () => (setMenu(false), router.push('/library/reports')) }] : []),
+    ...(staff.can('libry.digital.view') ? [{ label: 'Digital library', icon: Globe, onSelect: () => (setMenu(false), router.push('/library/digital')) }] : []),
+  ]
 
   const out = [...(loans.data ?? [])].sort((a, b) => a.dueAt.localeCompare(b.dueAt))
   const overdue = (loan: Loan) => loan.dueAt.slice(0, 10) < today
@@ -101,7 +112,10 @@ export default function LibraryScreen() {
         <NavBar
           title="Library"
           back={{ label: 'Back', onPress: router.back }}
-          actions={staff.can('libry.circulation.return') ? [{ icon: CornerDownLeft, label: 'Return a book', onPress: () => (setError(null), setReturning(true)) }] : []}
+          actions={[
+            ...(staff.can('libry.circulation.return') ? [{ icon: CornerDownLeft, label: 'Return a book', onPress: () => (setError(null), setReturning(true)) }] : []),
+            ...(more.length ? [{ icon: Ellipsis, label: 'More', onPress: () => setMenu(true) }] : []),
+          ]}
         />
       }
       actionBar={staff.can('libry.circulation.issue') ? <ActionBar icon={BookCopy} summary={`${summary.data?.issued ?? 0} books out`} detail={summary.data?.overdue ? `${summary.data.overdue} overdue` : undefined} label="Issue a book" onPress={() => router.push('/library/issue')} /> : undefined}
@@ -150,6 +164,14 @@ export default function LibraryScreen() {
                   ]
                 : []
             }
+          />
+          <ActionSheet open={menu} onClose={() => setMenu(false)} title="Library" actions={more} />
+          <ActionSheet
+            open={Boolean(book)}
+            onClose={() => setBook(null)}
+            title={book?.title ?? ''}
+            message={book?.inventory ? `${book.inventory.available} of ${book.inventory.copies} copies on the shelf` : undefined}
+            actions={[{ label: 'Add copies', icon: BookPlus, onSelect: () => (setBook(null), book && router.push({ pathname: '/library/add-book', params: { titleId: book._id, title: book.title } })) }]}
           />
           <Dialog
             open={Boolean(waiving)}
@@ -228,12 +250,13 @@ export default function LibraryScreen() {
                 lines: 2,
                 icon: BookOpen,
                 tile: 1,
+                onPress: canAddBooks ? () => setBook(title) : undefined,
               }))}
               footer="Copies on the shelf, of all copies."
             />
           ) : (
             <Surface padded={false}>
-              <StatusView compact kind="empty" icon={Search} title={query.trim() ? 'No book found' : 'The catalogue is empty'} body={query.trim() ? 'Try the author, or part of the title.' : 'Books are added to the catalogue on the website.'} />
+              <StatusView compact kind="empty" icon={Search} title={query.trim() ? 'No book found' : 'The catalogue is empty'} body={query.trim() ? 'Try the author, or part of the title.' : canAddBooks ? 'Add books from More → Add a book.' : 'Books the library adds show here.'} />
             </Surface>
           )}
         </>
