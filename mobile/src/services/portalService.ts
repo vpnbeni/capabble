@@ -166,10 +166,19 @@ export interface PortalBusLive {
   active: boolean
   assigned: boolean
   busNo?: string
+  /** The vehicle record's type (Bus, Van, Auto…); picks the picture on the map. */
+  vehicleType?: string
   route?: { name: string; code: string }
-  stops?: { id: string; name: string; pickupTime?: string; dropTime?: string }[]
+  /** The road through the stops (encoded polyline), when the school has put its stops on the map. */
+  roadPath?: { polyline: string; distanceM: number; durationS: number } | null
+  stops?: { id: string; name: string; pickupTime?: string; dropTime?: string; lat?: number | null; lng?: number | null }[]
   myStopId?: string
-  trip?: { direction: 'pickup' | 'drop'; startedAt: string; bus: { at: string } | null; staleSeconds: number | null } | null
+  trip?: {
+    direction: 'pickup' | 'drop'
+    startedAt: string
+    bus: { lat: number; lng: number; heading: number | null; speed: number | null; at: string } | null
+    staleSeconds: number | null
+  } | null
   today?: { event: 'boarded' | 'dropped' | 'absent'; at: string }[]
 }
 

@@ -1,6 +1,9 @@
 const mongoose = require('mongoose');
 const createContextModelProxy = require('../tenancy/createContextModelProxy');
 
+// Auto is a three-wheeler (auto-rickshaw or e-rickshaw); maps draw each type as itself.
+const VEHICLE_TYPES = ['Bus', 'Mini Bus', 'Van', 'Winger', 'Car', 'Auto', 'Other'];
+
 const transportVehicleSchema = new mongoose.Schema({
   busNo: {
     type: String,
@@ -17,7 +20,7 @@ const transportVehicleSchema = new mongoose.Schema({
   },
   vehicleType: {
     type: String,
-    enum: ['Bus', 'Mini Bus', 'Van', 'Winger', 'Other'],
+    enum: VEHICLE_TYPES,
     default: 'Bus',
   },
   make: { type: String, trim: true, default: '' },

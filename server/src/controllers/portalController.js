@@ -21,6 +21,7 @@ const { withEffectiveDueDates, dueDateOf } = require('../modules/cpitl/dueDates'
 const {
   closeStaleTrips, serviceDate, sortedStops, publicStop, staleSeconds
 } = require('../modules/trnst/trips');
+const { roadPathFor } = require('../modules/trnst/roadPath');
 
 const STUDENT_FIELDS = 'name rollNumber class section classRollNo gender dateOfBirth fatherName motherName '
   + 'guardianName guardianPhone guardianEmail email phone house busNo profileImage address admissionDate isActive';
@@ -447,20 +448,20 @@ const resolveStudentTransport = async (models, student) => {
     : null;
   if (assignment && TransportRoute) {
     const route = await TransportRoute.findOne({ _id: assignment.routeId, isActive: { $ne: false } })
-      .select('name code vehicleId stops').lean();
+      .select('name code vehicleId stops roadPath').lean();
     if (route) {
       const vehicle = route.vehicleId && TransportVehicle
         ? await TransportVehicle.findById(route.vehicleId)
-          .select('busNo registrationNumber driverName driverPhone conductorName conductorPhone status').lean()
+          .select('busNo registrationNumber vehicleType driverName driverPhone conductorName conductorPhone status').lean()
         : null;
       return { assignment, vehicle, routes: [route] };
     }
   }
   if (!student.busNo || !TransportVehicle) return { assignment: null, vehicle: null, routes: [] };
   const vehicle = await TransportVehicle.findOne({ busNo: student.busNo })
-    .select('busNo registrationNumber driverName driverPhone conductorName conductorPhone status').lean();
+    .select('busNo registrationNumber vehicleType driverName driverPhone conductorName conductorPhone status').lean();
   const routes = vehicle && TransportRoute
-    ? await TransportRoute.find({ vehicleId: vehicle._id, isActive: true }).select('name code vehicleId stops').lean()
+    ? await TransportRoute.find({ vehicleId: vehicle._id, isActive: true }).select('name code vehicleId stops roadPath').lean()
     : [];
   return { assignment: null, vehicle, routes };
 };
@@ -514,7 +515,7 @@ const directionFor = (shift) => (shift === 'both' ? {} : { direction: shift });
 // The location is shared only while the bus is on a trip on the child's route.
 const getTransportLive = asyncHandler(async (req, res) => {
   if (!transportOpen(req)) return unavailable(res, 'Transport is not available.');
-  const { TransportTrip, TransportBoarding } = req.models || {};
+  const { TransportTrip, TransportBoarding, TransportRoute } = req.models || {};
   const student = req.portalStudent;
   const { assignment, vehicle, routes } = await resolveStudentTransport(req.models || {}, student);
   const route = assignment ? routes[0] : null;
@@ -535,6 +536,7 @@ const getTransportLive = asyncHandler(async (req, res) => {
       .select('event at tripId').sort({ at: 1 }).lean()
     : [];
   const now = new Date();
+  const roadPath = await roadPathFor(TransportRoute, route);
 
   return res.json({
     success: true,
@@ -542,7 +544,9 @@ const getTransportLive = asyncHandler(async (req, res) => {
       active: Boolean(trip),
       assigned: true,
       busNo: vehicle?.busNo || '',
+      vehicleType: vehicle?.vehicleType || 'Bus',
       route: { name: route.name, code: route.code },
+      roadPath,
       stops: sortedStops(route).map(publicStop),
       myStopId: assignment.stopId ? String(assignment.stopId) : '',
       trip: trip ? {

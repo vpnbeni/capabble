@@ -1,5 +1,6 @@
-import React from 'react'
+import React, { useMemo } from 'react'
 import { Bus } from 'lucide-react'
+import { roadLineFromPolyline, runsForward, tripProgress } from '@capabble/shared/roadPath'
 import { Badge, Card, DataTable, DetailList, EmptyState, Page, PageHeader, formatTime, type DataTableColumn } from '@/components/ui'
 import TransportMap from '@/components/trnst/TransportMap'
 import { STALE_AFTER_SECONDS, agoLabel, distanceLabel, distanceMeters } from '@/components/trnst/TrnstUi'
@@ -19,10 +20,27 @@ const WhereIsTheBus: React.FC<{ live: PortalBusLive; childName: string }> = ({ l
   const bus = trip?.bus
   const myStop = live.stops?.find((stop) => stop.id === live.myStopId)
   const stale = trip ? trip.staleSeconds === null || trip.staleSeconds > STALE_AFTER_SECONDS : false
-  const away = bus && myStop && typeof myStop.lat === 'number' && typeof myStop.lng === 'number'
-    ? distanceMeters(bus, { lat: myStop.lat, lng: myStop.lng as number })
+  const stopPoint = myStop && typeof myStop.lat === 'number' && typeof myStop.lng === 'number' ? { lat: myStop.lat, lng: myStop.lng } : null
+  const road = useMemo(() => roadLineFromPolyline(live.roadPath?.polyline), [live.roadPath?.polyline])
+  const forward = runsForward(live.stops || [], trip?.direction || 'pickup')
+  // How far the bus still has to drive to the child's stop, along the road.
+  const progress = road && bus
+    ? tripProgress(road, bus, { forward, stop: stopPoint, distanceM: live.roadPath?.distanceM, durationS: live.roadPath?.durationS })
     : null
+  const away = bus && stopPoint ? distanceMeters(bus, stopPoint) : null
   const firstName = childName.split(' ')[0] || childName
+  const vehicleLabel = live.busNo || 'Bus'
+  const hasMap = Boolean(road) || (live.stops || []).some((stop) => typeof stop.lat === 'number')
+
+  const howFar = !myStop || !bus
+    ? ''
+    : progress?.passedStop
+      ? ` · has passed ${myStop.name}`
+      : progress?.toStopM !== null && progress?.toStopM !== undefined
+        ? ` · about ${distanceLabel(progress.toStopM)} by road from ${myStop.name}${progress.toStopMin ? `, about ${progress.toStopMin} min` : ''}`
+        : away !== null
+          ? ` · about ${distanceLabel(away)} from ${myStop.name} in a straight line`
+          : ''
 
   const status = !live.active
     ? <Badge tone="neutral">Not on the road</Badge>
@@ -45,20 +63,27 @@ const WhereIsTheBus: React.FC<{ live: PortalBusLive; childName: string }> = ({ l
               label="School bus location"
               stops={live.stops}
               myStopId={live.myStopId}
-              buses={bus ? [{ id: 'bus', lat: bus.lat, lng: bus.lng, heading: bus.heading, label: live.busNo || 'Bus', stale }] : []}
+              roadPath={live.roadPath?.polyline}
+              roadForward={forward}
+              buses={bus ? [{ id: 'bus', lat: bus.lat, lng: bus.lng, heading: bus.heading, label: vehicleLabel, vehicleType: live.vehicleType, stale }] : []}
               followBusId="bus"
             />
             <p className="cb-muted">
               {trip.direction === 'pickup' ? 'On the way to school' : 'On the way home'}
-              {away !== null && myStop ? ` · about ${distanceLabel(away)} from ${myStop.name} in a straight line` : ''}
+              {howFar}
               {bus ? ` · updated ${agoLabel(trip.staleSeconds)}` : ' · the bus has started; its location appears once the phone finds a GPS signal'}
             </p>
           </>
         ) : (
-          <p className="cb-muted">
-            The bus shows here while it is on a trip.
-            {myStop ? ` ${firstName}'s stop is ${myStop.name}${myStop.pickupTime ? `, pickup ${formatTime(myStop.pickupTime)}` : ''}${myStop.dropTime ? `, drop ${formatTime(myStop.dropTime)}` : ''}.` : ''}
-          </p>
+          <>
+            {hasMap ? (
+              <TransportMap label="School bus route" className="tr-map--short" stops={live.stops} myStopId={live.myStopId} roadPath={live.roadPath?.polyline} />
+            ) : null}
+            <p className="cb-muted">
+              The bus shows here while it is on a trip.
+              {myStop ? ` ${firstName}'s stop is ${myStop.name}${myStop.pickupTime ? `, pickup ${formatTime(myStop.pickupTime)}` : ''}${myStop.dropTime ? `, drop ${formatTime(myStop.dropTime)}` : ''}.` : ''}
+            </p>
+          </>
         )}
         {live.today?.length ? (
           <ul className="pt-bus-events" aria-label="Today on the bus">

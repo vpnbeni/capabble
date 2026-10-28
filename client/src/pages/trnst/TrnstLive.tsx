@@ -5,6 +5,7 @@ import { Button, Card, EmptyState, Page, Skeleton, StatCard } from '@/components
 import TransportMap, { type MapBus } from '@/components/trnst/TransportMap'
 import { DIRECTION_LABEL, Entity, LiveBadge, STALE_AFTER_SECONDS } from '@/components/trnst/TrnstUi'
 import { useLiveBuses } from '@/hooks/useTrnst'
+import { runsForward } from '@capabble/shared/roadPath'
 
 const TrnstLive: React.FC = () => {
   const navigate = useNavigate()
@@ -22,6 +23,8 @@ const TrnstLive: React.FC = () => {
           lng: trip.lastLocation!.lng,
           heading: trip.lastLocation!.heading,
           label: trip.vehicle?.busNo || trip.route?.code || 'Bus',
+          vehicleType: trip.vehicle?.vehicleType,
+          roadPath: trip.route?.roadPath?.polyline ?? null,
           stale: (trip.staleSeconds ?? 0) > STALE_AFTER_SECONDS,
           onClick: () => setFocused(trip._id),
         })),
@@ -61,6 +64,8 @@ const TrnstLive: React.FC = () => {
             className="tr-map--tall"
             buses={buses}
             stops={focusedTrip?.route?.stops}
+            roadPath={focusedTrip?.route?.roadPath?.polyline}
+            roadForward={focusedTrip ? runsForward(focusedTrip.route?.stops || [], focusedTrip.direction) : undefined}
             followBusId={focused || undefined}
             fitKey={focused || `all-${buses.length}`}
           />

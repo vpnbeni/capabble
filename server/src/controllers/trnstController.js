@@ -54,7 +54,7 @@ const toCoordinate = (value, limit) => {
 const vehiclePayload = (body = {}, crew = {}) => ({
   busNo: normalizeString(body.busNo),
   registrationNumber: normalizeString(body.registrationNumber).toUpperCase(),
-  vehicleType: ['Bus', 'Mini Bus', 'Van', 'Winger', 'Other'].includes(body.vehicleType) ? body.vehicleType : 'Bus',
+  vehicleType: ['Bus', 'Mini Bus', 'Van', 'Winger', 'Car', 'Auto', 'Other'].includes(body.vehicleType) ? body.vehicleType : 'Bus',
   make: normalizeString(body.make),
   model: normalizeString(body.model),
   color: normalizeString(body.color),

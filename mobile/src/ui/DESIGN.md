@@ -180,7 +180,7 @@ phone instead. The stage API refuses other origins, so the preview needs a local
 
 iOS is the design reference; Android gets the same layout with its back gesture, no back label, left-aligned titles, no ripples
 or FAB. Sensitive screens (results, fees, profile) should hide their content in the app switcher. Screens put the school's
-HTML (a circular) in `components/HtmlView` (WebView, JavaScript off), never in `Text`.
+HTML (a circular) in `components/HtmlView` (WebView, JavaScript off), never in `Text`. The bus map's WebView (`components/BusMap`) is the one with JavaScript on: it loads only our own page and pinned Leaflet.
 
 ## Rejected on mobile
 
@@ -192,4 +192,5 @@ toasts for errors that need action.
 ## Open
 
 - Back buttons say "Back" where a screen can be reached from more than one place (Home and More); the design system wants the previous screen's name.
-- Gaps the design system hasn't drawn yet: subject result detail, the live bus map (needs `react-native-maps`), the teacher's create-event form.
+- Gaps the design system hasn't drawn yet: subject result detail, the teacher's create-event form.
+- The live bus map is `components/BusMap`: Leaflet in a WebView (no native module), the vehicle drawn from above and driven along the road between locations (`@capabble/shared/roadPath`, `vehicleArt`). Tiles: `EXPO_PUBLIC_MAP_TILE_URL`, OpenStreetMap by default. Move to `react-native-maps` only with a new EAS build.

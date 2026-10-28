@@ -191,7 +191,10 @@ export interface PortalBusLive {
   active: boolean
   assigned: boolean
   busNo?: string
+  vehicleType?: string
   route?: { name: string; code: string }
+  /** The road through the stops (encoded polyline), when the school's stops are on the map. */
+  roadPath?: { polyline: string; distanceM: number; durationS: number } | null
   stops?: PortalBusStop[]
   myStopId?: string
   trip?: {

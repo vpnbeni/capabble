@@ -1,7 +1,7 @@
 import api from './api'
 
 export type VehicleStatus = 'active' | 'maintenance' | 'inactive'
-export type VehicleType = 'Bus' | 'Mini Bus' | 'Van' | 'Winger' | 'Other'
+export type VehicleType = 'Bus' | 'Mini Bus' | 'Van' | 'Winger' | 'Car' | 'Auto' | 'Other'
 export type RouteShift = 'morning' | 'afternoon' | 'both'
 
 export type TransportVehicle = {
@@ -158,6 +158,9 @@ export type PublicStop = {
   lng: number | null
 }
 
+/** The road through a route's stops, from the routing server (null when it couldn't be worked out). */
+export type RoadPath = { polyline: string; distanceM: number; durationS: number }
+
 export type TripCounts = { assigned: number; boarded: number; dropped: number; absent: number }
 
 export type TripSummary = {
@@ -172,8 +175,8 @@ export type TripSummary = {
   lastLocation?: GeoPoint | null
   staleSeconds: number | null
   pingCount?: number
-  vehicle: { _id: string; busNo: string; registrationNumber: string; driverName?: string; driverPhone?: string; conductorName?: string } | null
-  route: { _id: string; name: string; code: string; stops: PublicStop[] } | null
+  vehicle: { _id: string; busNo: string; vehicleType?: VehicleType; registrationNumber: string; driverName?: string; driverPhone?: string; conductorName?: string } | null
+  route: { _id: string; name: string; code: string; stops: PublicStop[]; roadPath?: RoadPath | null } | null
   counts: TripCounts
 }
 

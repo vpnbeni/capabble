@@ -4,6 +4,7 @@
 const mongoose = require('mongoose');
 const asyncHandler = require('../../middleware/asyncHandler');
 const { closeStaleTrips, serviceDate, sortedStops, publicStop, staleSeconds } = require('../../modules/trnst/trips');
+const { roadPathsFor } = require('../../modules/trnst/roadPath');
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const MAX_TRAIL_POINTS = 2000;
@@ -44,7 +45,7 @@ const tripCounts = async (models, trips) => {
   return counts;
 };
 
-const tripSummary = (trip, counts, now) => ({
+const tripSummary = (trip, counts, now, roadPaths = new Map()) => ({
   _id: trip._id,
   direction: trip.direction,
   serviceDate: trip.serviceDate,
@@ -59,6 +60,7 @@ const tripSummary = (trip, counts, now) => ({
   vehicle: trip.vehicleId ? {
     _id: trip.vehicleId._id,
     busNo: trip.vehicleId.busNo,
+    vehicleType: trip.vehicleId.vehicleType || 'Bus',
     registrationNumber: trip.vehicleId.registrationNumber,
     driverName: trip.vehicleId.driverName,
     driverPhone: trip.vehicleId.driverPhone,
@@ -68,14 +70,15 @@ const tripSummary = (trip, counts, now) => ({
     _id: trip.routeId._id,
     name: trip.routeId.name,
     code: trip.routeId.code,
-    stops: sortedStops(trip.routeId).map(publicStop)
+    stops: sortedStops(trip.routeId).map(publicStop),
+    roadPath: roadPaths.get(String(trip.routeId._id)) || null
   } : null,
   counts: counts.get(String(trip._id)) || { assigned: 0, boarded: 0, dropped: 0, absent: 0 }
 });
 
 const populateTrip = (query) => query
-  .populate('vehicleId', 'busNo registrationNumber driverName driverPhone conductorName')
-  .populate('routeId', 'name code stops');
+  .populate('vehicleId', 'busNo registrationNumber vehicleType driverName driverPhone conductorName')
+  .populate('routeId', 'name code stops roadPath');
 
 // GET /api/trnst/live — every bus on a trip right now
 const getLive = asyncHandler(async (req, res) => {
@@ -83,8 +86,12 @@ const getLive = asyncHandler(async (req, res) => {
   await closeStaleTrips(TransportTrip);
   const now = new Date();
   const trips = await populateTrip(TransportTrip.find({ status: 'active' }).sort({ startedAt: 1 })).lean();
-  const counts = await tripCounts(req.models, trips);
-  return res.json({ success: true, data: { at: now, trips: trips.map((trip) => tripSummary(trip, counts, now)) } });
+  const [counts, roadPaths] = await Promise.all([
+    tripCounts(req.models, trips),
+    roadPathsFor(req.models.TransportRoute, trips.map((trip) => trip.routeId))
+  ]);
+  const summaries = trips.map((trip) => tripSummary(trip, counts, now, roadPaths));
+  return res.json({ success: true, data: { at: now, trips: summaries } });
 });
 
 // GET /api/trnst/trips?date=YYYY-MM-DD — trips on one day
@@ -119,12 +126,15 @@ const getTrip = asyncHandler(async (req, res) => {
   // Thin long trails evenly so the map stays light.
   const step = Math.max(1, Math.ceil(pings.length / MAX_TRAIL_POINTS));
   const trail = pings.filter((_, index) => index % step === 0 || index === pings.length - 1);
-  const counts = await tripCounts(req.models, [trip]);
+  const [counts, roadPaths] = await Promise.all([
+    tripCounts(req.models, [trip]),
+    roadPathsFor(req.models.TransportRoute, [trip.routeId])
+  ]);
 
   return res.json({
     success: true,
     data: {
-      ...tripSummary(trip, counts, new Date()),
+      ...tripSummary(trip, counts, new Date(), roadPaths),
       trail,
       boarding: marks.map((mark) => {
         const student = byId.get(String(mark.studentId));

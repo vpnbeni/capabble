@@ -2,6 +2,11 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import L from 'leaflet'
 import { MapContainer, Marker, Polyline, TileLayer, Tooltip, useMap, useMapEvents } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
+import {
+  frameAt, placeOnRoad, roadLineFromPolyline, splitAtBus, travelFrames, turnDeg, locate,
+  type Frame, type LatLng, type RoadLine,
+} from '@capabble/shared/roadPath'
+import { VEHICLE_SIZE, vehicleKind, vehicleSvg } from '@capabble/shared/vehicleArt'
 import { cx } from '@/components/ui'
 import type { PublicStop } from '@/services/trnstService'
 import { leafletLayer } from 'protomaps-leaflet'
@@ -19,6 +24,10 @@ export type MapBus = {
   lng: number
   heading?: number | null
   label: string
+  /** The vehicle record's type (Bus, Van, Auto…); picks the picture on the map. */
+  vehicleType?: string
+  /** The road this vehicle's route follows (encoded polyline), so it moves along the road. */
+  roadPath?: string | null
   /** Last position is old: drawn muted. */
   stale?: boolean
   onClick?: () => void
@@ -29,6 +38,10 @@ type Props = {
   myStopId?: string
   buses?: MapBus[]
   trail?: Array<{ lat: number; lng: number }>
+  /** The road through the stops (encoded polyline). Without it the stops are joined by a dashed line. */
+  roadPath?: string | null
+  /** Which way the followed vehicle drives the road; the part behind it is drawn as driven. */
+  roadForward?: boolean
   /** Click-to-place mode for setting a stop's position. */
   pick?: { value: { lat: number; lng: number } | null; onChange: (point: { lat: number; lng: number }) => void }
   /** Change this to re-fit the view to everything on the map. */
@@ -52,15 +65,134 @@ const stopIcon = (index: number, mine: boolean) =>
     iconAnchor: [12, 12],
   })
 
-const busIcon = (bus: MapBus) =>
-  L.divIcon({
+const VEHICLE_BOX = 60
+
+const vehicleIcon = (type: string | undefined, label: string) => {
+  const kind = vehicleKind(type)
+  const { width, height } = VEHICLE_SIZE[kind]
+  return L.divIcon({
     className: '',
-    html: `<span class="tr-bus${bus.stale ? ' tr-bus--stale' : ''}">`
-      + (typeof bus.heading === 'number' ? `<span class="tr-bus__arrow" style="transform:rotate(${Math.round(bus.heading)}deg)"></span>` : '')
-      + `<span class="tr-bus__label">${escapeHtml(bus.label)}</span></span>`,
-    iconSize: [36, 36],
-    iconAnchor: [18, 18],
+    html: `<span class="tr-veh tr-veh--${kind}">`
+      + '<span class="tr-veh__halo"></span>'
+      + `<span class="tr-veh__body" style="width:${width}px;height:${height}px">${vehicleSvg(kind)}</span>`
+      + `<span class="tr-veh__label">${escapeHtml(label)}</span></span>`,
+    iconSize: [VEHICLE_BOX, VEHICLE_BOX],
+    iconAnchor: [VEHICLE_BOX / 2, VEHICLE_BOX / 2],
   })
+}
+
+// Locations arrive about every 10 s; spread the drive over most of that so the vehicle keeps moving.
+const MOVE_MS = 9000
+// A jump this long (a signal gap, a new trip) is drawn at once, not driven.
+const JUMP_M = 3000
+
+const roadCache = new Map<string, RoadLine | null>()
+const roadFor = (polyline?: string | null): RoadLine | null => {
+  if (!polyline) return null
+  if (!roadCache.has(polyline)) roadCache.set(polyline, roadLineFromPolyline(polyline))
+  return roadCache.get(polyline) ?? null
+}
+
+/**
+ * A vehicle that drives along its road from one location to the next (Rapido / Zomato
+ * style) and turns with the road. Reports how far down the road it is for the driven line.
+ */
+const VehicleMarker: React.FC<{ bus: MapBus; onAlong?: (along: number) => void }> = ({ bus, onAlong }) => {
+  const map = useMap()
+  const marker = useRef<L.Marker | null>(null)
+  const shown = useRef<Frame | null>(null)
+  const rotation = useRef<number | null>(null)
+  const raf = useRef<number | null>(null)
+  const lastReport = useRef(0)
+  const line = roadFor(bus.roadPath)
+  const onClick = useRef(bus.onClick)
+  const reportAlong = useRef(onAlong)
+  onClick.current = bus.onClick
+  reportAlong.current = onAlong
+
+  const draw = (frame: Frame, final = false) => {
+    shown.current = frame
+    const target = marker.current
+    if (!target) return
+    target.setLatLng([frame.lat, frame.lng])
+    // Turn the short way round, never a full spin from 359° to 1°.
+    rotation.current = rotation.current === null ? frame.bearing : rotation.current + turnDeg(rotation.current, frame.bearing)
+    const body = target.getElement()?.querySelector<HTMLElement>('.tr-veh__body')
+    if (body) body.style.transform = `translate(-50%, -50%) rotate(${rotation.current.toFixed(1)}deg)`
+    const now = performance.now()
+    if (line && reportAlong.current && (final || now - lastReport.current > 400)) {
+      lastReport.current = now
+      reportAlong.current(locate(line, frame).along)
+    }
+  }
+
+  useEffect(() => {
+    const created = L.marker([bus.lat, bus.lng], { icon: vehicleIcon(bus.vehicleType, bus.label), zIndexOffset: 1000, keyboard: false })
+      .bindTooltip(bus.label, { direction: 'top', offset: [0, -20] })
+      .on('click', () => onClick.current?.())
+      .addTo(map)
+    marker.current = created
+    rotation.current = null
+    if (shown.current) draw(shown.current, true)
+    return () => {
+      created.remove()
+      marker.current = null
+    }
+  }, [map, bus.vehicleType, bus.label])
+
+  useEffect(() => {
+    marker.current?.getElement()?.querySelector('.tr-veh')?.classList.toggle('tr-veh--stale', Boolean(bus.stale))
+  }, [bus.stale, bus.vehicleType, bus.label])
+
+  useEffect(() => {
+    const to: LatLng = { lat: bus.lat, lng: bus.lng }
+    const from = shown.current
+    if (raf.current !== null) cancelAnimationFrame(raf.current)
+    const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    const frames = from ? travelFrames(line, from, to, bus.heading) : [placeOnRoad(line, to, bus.heading)]
+    const end = frames[frames.length - 1]
+    if (!from || frames.length === 1 || reduceMotion || document.hidden || Math.hypot(end.lat - from.lat, end.lng - from.lng) * 111000 > JUMP_M) {
+      draw(end, true)
+      return
+    }
+    const start = performance.now()
+    const step = (now: number) => {
+      const t = Math.min(1, (now - start) / MOVE_MS)
+      draw(frameAt(frames, t), t === 1)
+      raf.current = t < 1 ? requestAnimationFrame(step) : null
+    }
+    raf.current = requestAnimationFrame(step)
+    return () => {
+      if (raf.current !== null) cancelAnimationFrame(raf.current)
+    }
+  }, [bus.lat, bus.lng, bus.heading, line])
+
+  return null
+}
+
+/** The road as navigation apps draw it: a light casing under a solid line, the driven part greyed. */
+const RoadRoute: React.FC<{ line: RoadLine; drivenAlong?: number | null; forward?: boolean }> = ({ line, drivenAlong, forward = true }) => {
+  const full = useMemo(() => line.points.map((point) => [point.lat, point.lng] as L.LatLngTuple), [line])
+  const split = useMemo(
+    () => (typeof drivenAlong === 'number' ? splitAtBus(line, drivenAlong, forward) : null),
+    [line, drivenAlong, forward]
+  )
+  const toTuples = (points: LatLng[]) => points.map((point) => [point.lat, point.lng] as L.LatLngTuple)
+  const round = { lineCap: 'round', lineJoin: 'round' } as const
+  return (
+    <>
+      <Polyline positions={full} pathOptions={{ ...round, className: 'tr-map__road-casing' }} interactive={false} />
+      {split ? (
+        <>
+          <Polyline positions={toTuples(split.driven)} pathOptions={{ ...round, className: 'tr-map__road tr-map__road--driven' }} interactive={false} />
+          <Polyline positions={toTuples(split.ahead)} pathOptions={{ ...round, className: 'tr-map__road' }} interactive={false} />
+        </>
+      ) : (
+        <Polyline positions={full} pathOptions={{ ...round, className: 'tr-map__road' }} interactive={false} />
+      )}
+    </>
+  )
+}
 
 const pickIcon = L.divIcon({ className: '', html: '<span class="tr-pin tr-pin--mine tr-pin--pick"></span>', iconSize: [24, 24], iconAnchor: [12, 12] })
 
@@ -166,7 +298,7 @@ const SizeWatcher: React.FC = () => {
   return null
 }
 
-const TransportMap: React.FC<Props> = ({ stops = [], myStopId, buses = [], trail, pick, fitKey, followBusId, focus, label, className }) => {
+const TransportMap: React.FC<Props> = ({ stops = [], myStopId, buses = [], trail, roadPath, roadForward, pick, fitKey, followBusId, focus, label, className }) => {
   const placedStops = useMemo(() => stops.map((stop, index) => ({ stop, index })).filter(({ stop }) => hasPoint(stop)), [stops])
 
   const points = useMemo<L.LatLngTuple[]>(() => {
@@ -181,6 +313,11 @@ const TransportMap: React.FC<Props> = ({ stops = [], myStopId, buses = [], trail
     () => placedStops.map(({ stop }) => [stop.lat as number, stop.lng as number]),
     [placedStops]
   )
+  const road = roadFor(roadPath)
+  // Grey out the road behind the followed vehicle (or the only one) once we know which way it drives.
+  const drivingBusId = typeof roadForward === 'boolean' ? (followBusId || (buses.length === 1 ? buses[0].id : undefined)) : undefined
+  const [drivenAlong, setDrivenAlong] = useState<number | null>(null)
+  useEffect(() => setDrivenAlong(null), [drivingBusId, roadPath])
 
   return (
     <div className={cx('tr-map', className)} role="region" aria-label={label}>
@@ -192,7 +329,11 @@ const TransportMap: React.FC<Props> = ({ stops = [], myStopId, buses = [], trail
         {pick ? <PickHandler onPick={pick.onChange} /> : null}
         {focus ? <FocusView focus={focus} /> : null}
 
-        {routeLine.length > 1 ? <Polyline positions={routeLine} pathOptions={{ className: 'tr-map__route' }} /> : null}
+        {road ? (
+          <RoadRoute line={road} drivenAlong={drivingBusId ? drivenAlong : null} forward={roadForward} />
+        ) : routeLine.length > 1 ? (
+          <Polyline positions={routeLine} pathOptions={{ className: 'tr-map__route' }} />
+        ) : null}
         {trail && trail.length > 1 ? (
           <Polyline positions={trail.map((point) => [point.lat, point.lng] as L.LatLngTuple)} pathOptions={{ className: 'tr-map__trail' }} />
         ) : null}
@@ -208,15 +349,11 @@ const TransportMap: React.FC<Props> = ({ stops = [], myStopId, buses = [], trail
         ))}
 
         {buses.map((bus) => (
-          <Marker
+          <VehicleMarker
             key={bus.id}
-            position={[bus.lat, bus.lng]}
-            icon={busIcon(bus)}
-            zIndexOffset={1000}
-            eventHandlers={bus.onClick ? { click: bus.onClick } : undefined}
-          >
-            <Tooltip direction="top" offset={[0, -16]}>{bus.label}</Tooltip>
-          </Marker>
+            bus={bus.roadPath === undefined && road ? { ...bus, roadPath } : bus}
+            onAlong={bus.id === drivingBusId ? setDrivenAlong : undefined}
+          />
         ))}
 
         {pick?.value ? <Marker position={[pick.value.lat, pick.value.lng]} icon={pickIcon} /> : null}

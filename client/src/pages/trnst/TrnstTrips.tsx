@@ -156,9 +156,10 @@ const TrnstTrips: React.FC = () => {
               label="Route driven on this trip"
               className="tr-map--short"
               stops={trip.route?.stops}
+              roadPath={trip.route?.roadPath?.polyline}
               trail={trip.trail}
               buses={trip.status === 'active' && trip.lastLocation
-                ? [{ id: trip._id, lat: trip.lastLocation.lat, lng: trip.lastLocation.lng, heading: trip.lastLocation.heading, label: trip.vehicle?.busNo || 'Bus' }]
+                ? [{ id: trip._id, lat: trip.lastLocation.lat, lng: trip.lastLocation.lng, heading: trip.lastLocation.heading, label: trip.vehicle?.busNo || 'Bus', vehicleType: trip.vehicle?.vehicleType }]
                 : []}
               fitKey={trip._id}
             />

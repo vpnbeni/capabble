@@ -296,6 +296,8 @@ See `.env.example` (root and `/server`) for required variables:
 
 **Online fee payments** (each school's own Razorpay account, Settings → Payments; code in `server/src/modules/cpitl/onlinePayments.js` + `publicPayments.js`, never the billing module): keys encrypted with `MAIL_CREDENTIALS_KEY`, `PAYMENT_LINK_SECRET` (signs the app's checkout links, falls back to JWT_SECRET), `API_URL` (webhook URL `/api/school-payments/webhook/<slug>` and the checkout page)
 
+**School transport maps:** `ROUTING_URL` (OSRM server for the road between a route's stops, default the public `https://router.project-osrm.org`; `off` draws straight lines). The road is fetched once per set of stop positions and kept on the route (`roadPath`). Client `VITE_MAP_TILE_URL` / mobile `EXPO_PUBLIC_MAP_TILE_URL` override the map tiles
+
 **Push notifications** (the Capabble app, `server/src/push`): `PUSH_OUTBOX_ENABLED` (default true; sends every in-app notification to the recipient's phones through Expo every 30 s), optional `EXPO_ACCESS_TOKEN` (only when enhanced push security is on in Expo)
 
 **Backups and workspace data** (see `server/docs/backups.md`):

@@ -40,6 +40,17 @@ const transportRouteSchema = new mongoose.Schema({
   endPoint: { type: String, trim: true, default: '' },
   distanceKm: { type: Number, min: 0, default: 0 },
   stops: { type: [stopSchema], default: [] },
+  // The road between the stops, from the routing server; refetched when a stop moves.
+  roadPath: {
+    type: new mongoose.Schema({
+      key: { type: String, default: '' },
+      polyline: { type: String, default: '' },
+      distanceM: { type: Number, default: 0 },
+      durationS: { type: Number, default: 0 },
+      at: { type: Date, default: null },
+    }, { _id: false }),
+    default: null,
+  },
   isActive: { type: Boolean, default: true },
 }, { timestamps: true });
 

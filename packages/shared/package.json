@@ -8,6 +8,8 @@
     "./permissionCatalog.json": "./src/permissionCatalog.json",
     "./designTokens.json": "./src/designTokens.json",
     "./schoolAccent": "./src/schoolAccent.ts",
-    "./staffTypes": "./src/staffTypes.ts"
+    "./staffTypes": "./src/staffTypes.ts",
+    "./roadPath": "./src/roadPath.ts",
+    "./vehicleArt": "./src/vehicleArt.ts"
   }
 }
