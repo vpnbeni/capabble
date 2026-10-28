@@ -1,6 +1,7 @@
 import { Text as RNText, type TextProps as RNTextProps } from 'react-native'
 
 import { useTheme } from '@/theme/ThemeProvider'
+import { previewTextStyle } from './preview'
 import { type, type TextVariant, type Tone } from '@/theme/tokens'
 
 export type TextTone = 'ink' | 'muted' | 'subtle' | 'accent' | 'on-accent' | Tone
@@ -13,7 +14,7 @@ type TextProps = RNTextProps & {
 }
 
 /** All text in the app. `body-lg` is the companion default (16px); nothing goes below `caption` (12px). */
-export function Text({ variant = 'body-lg', tone = 'ink', numeric, style, ...props }: TextProps) {
+export function Text({ variant = 'body-lg', tone = 'ink', numeric, style, maxFontSizeMultiplier = 1.6, ...props }: TextProps) {
   const { colors } = useTheme()
   const color =
     tone === 'ink'
@@ -30,9 +31,9 @@ export function Text({ variant = 'body-lg', tone = 'ink', numeric, style, ...pro
 
   return (
     <RNText
-      maxFontSizeMultiplier={1.6}
+      maxFontSizeMultiplier={maxFontSizeMultiplier}
       {...props}
-      style={[type[variant], { color }, numeric && { fontVariant: ['tabular-nums'] }, style]}
+      style={previewTextStyle([type[variant], { color }, numeric && { fontVariant: ['tabular-nums'] }, style], maxFontSizeMultiplier ?? 1.6)}
     />
   )
 }

@@ -1,6 +1,7 @@
 const express = require('express');
 const { protect } = require('../middleware/auth');
 const {
+  getMyTimetable,
   getTimetableState,
   upsertTimetableState,
   getBellTimings,
@@ -24,6 +25,9 @@ const {
 const router = express.Router();
 
 router.use(protect);
+
+// The signed-in teacher's own periods (any staff login; see the catalog's route rule).
+router.get('/me', getMyTimetable);
 
 // ── Existing configuration endpoints ────────────────────────────────────────
 router.route('/state').get(getTimetableState).put(upsertTimetableState);

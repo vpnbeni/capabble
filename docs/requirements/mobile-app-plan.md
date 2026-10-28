@@ -1,6 +1,6 @@
 # Capabble mobile app — plan
 
-Status: Phase 0 (foundation) is in the repo at `/mobile`. Written 23 Oct 2026.
+Status: Phases 0–1 (family app) and 2–3 (staff app) are built and on the `preview` channel. Written 23 Oct 2026, updated 25 Oct 2026.
 
 ## What we are building
 
@@ -74,7 +74,8 @@ one child (remembered on the device).
   and the WebView (both native-only).
 
 Also done: the rest of the family portal under More, each shown only when the school has the
-section on: Attendance (month grid and summary), Timetable (one day at a time), Results,
+section on: Attendance (month grid and summary), Timetable (one day at a time), Homework (25 Oct:
+due and the last two weeks, with the child's own mark; also on the web portal), Results,
 Transport (crew to call, stops, whether the bus is on the road), Meetings (list, request with
 free slots, cancel), Profile, Your login (change password). First sign-in with a temporary
 password goes through "Set your own password" (the API refuses everything else until then).
@@ -95,10 +96,16 @@ Still to do:
 8. Crash reporting (Sentry for React Native) before the first public build.
 
 ## Phase 2 — teacher app
-Attendance roll call (`AttendanceGrid` phone view) with offline queue, my timetable, calendar, appointments as host, leave. Gate every screen with `can()` from the permission catalog; "own classes only" grants are already enforced by the API.
+Done 25 Oct 2026, except leave (no leave feature exists yet). Plan, decisions and what was built:
+`mobile-staff-plan.md`. Teachers get Today (next class, unmarked registers, periods), roll call with an
+offline queue, their timetable, the calendar with "Create event" for approval, meetings as host,
+classes and students, and notifications. Screens are gated by `usePermissions()` (`mobile/src/lib/permissions.ts`)
+and the school's feature toggles; "own classes only" grants are enforced by the API.
 
 ## Phase 3 — principal glance
-Read-only stats and approvals, following the dashboard recipe (≤4 stats, each tied to a decision).
+Done 25 Oct 2026 (`mobile-staff-plan.md`): Today with four `StatTiles` (present today, fees this month,
+approvals, staff absent), each opening its list, and the Approvals tab (teachers' events and meeting
+requests, swipe to approve or reject).
 
 ## Accounts and tools we need
 

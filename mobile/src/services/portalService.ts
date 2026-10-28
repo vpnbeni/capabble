@@ -10,11 +10,25 @@ export type PortalSection =
   | 'calendar'
   | 'attendance'
   | 'timetable'
+  | 'homework'
   | 'results'
   | 'fees'
   | 'notices'
   | 'transport'
   | 'appointments'
+
+/** Homework set for the child's class, with the child's own mark once the teacher records it. */
+export interface PortalHomework {
+  id: string
+  title: string
+  subjectName: string
+  teacherName: string
+  assignedDate: string
+  dueDate: string
+  instructions: string
+  status: 'published' | 'closed'
+  submission: { status: 'submitted' | 'late' | 'missing' | 'excused'; remark: string } | null
+}
 
 export interface PortalChild {
   studentId: string
@@ -51,6 +65,29 @@ export interface PortalFees {
     lines: { name: string; amount: number }[]
   }[]
   payments: { _id: string; receiptNo: string; date: string; mode: string; amount: number }[]
+  /** Whether the school takes fees online (its own Razorpay account). */
+  onlinePayment?: { enabled: boolean; mode?: 'test' | 'live' | null }
+}
+
+/** A started online payment. The app pays on `checkoutUrl` in the browser. */
+export interface PortalPaymentOrder {
+  orderId: string
+  amount: number
+  installments: { _id: string; label: string; amount: number }[]
+  checkoutUrl: string
+}
+
+export interface PortalPaymentResult {
+  orderId: string
+  /** created: not paid yet · processing: being recorded · review: paid, the office makes the receipt */
+  status: 'created' | 'processing' | 'paid' | 'review'
+  amount: number
+  receiptNo: string | null
+  feePaymentId: string | null
+  paidAt: string | null
+  method: string
+  paymentId: string | null
+  message: string
 }
 
 export interface PortalNotice {
@@ -207,6 +244,7 @@ export const portalService = {
   results: (studentId: string) => api.get<PortalResult[]>(`${student(studentId)}/results`),
   transport: (studentId: string) => api.get<PortalTransport>(`${student(studentId)}/transport`),
   busLive: (studentId: string) => api.get<PortalBusLive>(`${student(studentId)}/transport/live`),
+  homework: (studentId: string) => api.get<PortalHomework[]>(`${student(studentId)}/homework`),
   appointments: () => api.get<PortalAppointments>('/portal/appointments'),
   appointmentHosts: (studentId: string) => api.get<PortalAppointmentHost[]>(`${student(studentId)}/appointment-hosts`),
   appointmentSlots: (studentId: string, hostId: string, date: string) =>
@@ -215,6 +253,11 @@ export const portalService = {
     api.post<PortalAppointment>(`${student(studentId)}/appointments`, payload),
   cancelAppointment: (id: string, reason?: string) =>
     api.post<PortalAppointment>(`/portal/appointments/${encodeURIComponent(id)}/cancel`, { reason: reason || '' }),
+
+  startPayment: (studentId: string, demandIds: string[]) =>
+    api.post<PortalPaymentOrder>(`${student(studentId)}/fees/pay`, { demandIds, source: 'app' }),
+  payment: (studentId: string, orderId: string) =>
+    api.get<PortalPaymentResult>(`${student(studentId)}/fees/pay/${encodeURIComponent(orderId)}`),
 
   /** A fee receipt as PDF bytes (the session cookie goes with the request). */
   receiptPdf: async (studentId: string, paymentId: string): Promise<ArrayBuffer> => {

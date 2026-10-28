@@ -9,6 +9,7 @@ import PortalLayout from './PortalLayout'
 import PortalOverview from './pages/PortalOverview'
 import PortalAttendance from './pages/PortalAttendance'
 import PortalTimetable from './pages/PortalTimetable'
+import PortalHomework from './pages/PortalHomework'
 import PortalResults from './pages/PortalResults'
 import PortalFees from './pages/PortalFees'
 import { PortalNoticeDetail, PortalNotices } from './pages/PortalNotices'
@@ -54,6 +55,7 @@ const PortalApp: React.FC = () => {
           <Route path="calendar" element={<Guard section="calendar"><PortalCalendar /></Guard>} />
           <Route path="attendance" element={<Guard section="attendance"><PortalAttendance /></Guard>} />
           <Route path="timetable" element={<Guard section="timetable"><PortalTimetable /></Guard>} />
+          <Route path="homework" element={<Guard section="homework"><PortalHomework /></Guard>} />
           <Route path="results" element={<Guard section="results"><PortalResults /></Guard>} />
           <Route path="fees" element={<Guard section="fees"><PortalFees /></Guard>} />
           <Route path="notices" element={<Guard section="notices"><PortalNotices /></Guard>} />

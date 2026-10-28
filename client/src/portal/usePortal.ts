@@ -39,6 +39,9 @@ export const usePortalAttendance = (id: string | undefined, month: string, enabl
 export const usePortalTimetable = (id?: string, enabled = true) =>
   useQuery({ queryKey: keys.student(id || '', 'timetable'), queryFn: () => portalService.timetable(id as string), enabled: Boolean(id) && enabled, staleTime: STALE })
 
+export const usePortalHomework = (id?: string, enabled = true) =>
+  useQuery({ queryKey: keys.student(id || '', 'homework'), queryFn: () => portalService.homework(id as string), enabled: Boolean(id) && enabled, staleTime: STALE })
+
 export const usePortalResults = (id?: string, enabled = true) =>
   useQuery({ queryKey: keys.student(id || '', 'results'), queryFn: () => portalService.results(id as string), enabled: Boolean(id) && enabled, staleTime: STALE })
 

@@ -168,7 +168,7 @@ npm run workspace:lifecycle [-- --now=<date>] # Daily workspace job; --now needs
 - `/admin` - React 18 + TypeScript + Vite admin portal (port 5174)
 - `/schol` + `/school-intelligence` - SCHOL UI + Python API
 - `/capabble-landing` - Next.js marketing site (capabble.cloud)
-- `/mobile` - Expo (SDK 58) iOS/Android app for families and staff, the design system's Companion surface. Not a workspace (React 19 vs the web's 18): `cd mobile && npm install` with Node 22.13+. Reads `packages/shared` through Metro. Plan: `docs/requirements/mobile-app-plan.md`; rules: `mobile/AGENTS.md`
+- `/mobile` - Expo (SDK 58) iOS/Android app for families and staff, the design system's Companion surface. Not a workspace (React 19 vs the web's 18): `cd mobile && npm install` with Node 22.13+. Reads `packages/shared` through Metro. Plan: `docs/requirements/mobile-app-plan.md` and `mobile-staff-plan.md`; rules: `mobile/AGENTS.md` (staff work happens in the app, not on the website; screens are sized for 360dp Android phones with larger text first)
 - `/packages/shared` - `@capabble/shared`: code/data used by more than one app (e.g. `tenantFeatureCatalog.json`)
 
 **npm workspaces + Turborepo**: `client`, `admin`, `schol`, `capabble-landing` and `packages/*` are workspaces sharing one root `package-lock.json` — run `npm install` from the root, never inside an app. `npm run build:all` / `npm run type-check` run through Turborepo.
@@ -293,6 +293,8 @@ See `.env.example` (root and `/server`) for required variables:
 **Cloudinary:** `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`
 
 **Calendar and school email:** `CALENDAR_JOBS_ENABLED` (scheduled publishing every minute, event reminders every 15 min), `MAIL_OUTBOX_ENABLED`, `MAIL_EVENTS_HOST` / `_PORT` / `_SECURE` / `_USER` / `_PASS` / `_FROM` (the events mailbox, e.g. `events@capabble.cloud`), `MAIL_EVENTS_DAILY_CAP_PER_TENANT` (300), `MAIL_CREDENTIALS_KEY` (32 bytes base64; encrypts schools' SMTP passwords, falls back to JWT_SECRET), `MAIL_LINK_SECRET` (unsubscribe links), `CLIENT_URL` (links in emails), `API_URL` (unsubscribe and calendar feed links)
+
+**Online fee payments** (each school's own Razorpay account, Settings → Payments; code in `server/src/modules/cpitl/onlinePayments.js` + `publicPayments.js`, never the billing module): keys encrypted with `MAIL_CREDENTIALS_KEY`, `PAYMENT_LINK_SECRET` (signs the app's checkout links, falls back to JWT_SECRET), `API_URL` (webhook URL `/api/school-payments/webhook/<slug>` and the checkout page)
 
 **Push notifications** (the Capabble app, `server/src/push`): `PUSH_OUTBOX_ENABLED` (default true; sends every in-app notification to the recipient's phones through Expo every 30 s), optional `EXPO_ACCESS_TOKEN` (only when enhanced push security is on in Expo)
 

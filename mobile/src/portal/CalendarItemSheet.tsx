@@ -9,7 +9,7 @@ import { space } from '@/theme/tokens'
 import { Badge, BottomSheet, Callout, DetailList, haptic, ListGroup, MobileButton, SegmentedControl, Skeleton, StatusView, Stepper, Surface, Text } from '@/ui'
 
 import { ANSWER_LABELS, ANSWER_TONE, CATEGORY_LABELS, LAYER_LABELS, ROLE_LABELS, STATUS_LABELS } from './calendarUi'
-import { usePortalEvent, useRespondToEvent } from './queries'
+import { useCalendarEvent, useCalendarReply } from '@/calendar/source'
 
 const whenText = (item: CalendarItem) => {
   const days =
@@ -36,7 +36,7 @@ const replyBy = (parts: CalendarPart[]) => {
  */
 export function CalendarItemSheet({ item, onClose }: { item: CalendarItem | null; onClose: () => void }) {
   const isEvent = Boolean(item?.eventId)
-  const view = usePortalEvent(isEvent ? item?.eventId : null)
+  const view = useCalendarEvent(isEvent ? item?.eventId : null)
   const parts = view.data?.parts ?? item?.parts ?? []
   const status = item?.status ? STATUS_LABELS[item.status] : null
   const description = view.data?.description || (isEvent ? item?.detail : undefined)
@@ -141,7 +141,7 @@ function PartBlock({ part, eventId }: { part: CalendarPart; eventId?: string }) 
  * The saved answer's badge confirms it; errors show here because a toast would sit under the sheet.
  */
 function ReplyControls({ eventId, part }: { eventId: string; part: CalendarPart }) {
-  const send = useRespondToEvent()
+  const send = useCalendarReply()
   const current = part.myResponse ?? null
   const [editing, setEditing] = useState(!current)
   const [error, setError] = useState<string | null>(null)

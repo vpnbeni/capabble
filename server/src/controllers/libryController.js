@@ -104,7 +104,7 @@ exports.createCopy = async (req, res) => {
 };
 
 exports.bulkCreateCopies = async (req, res) => {
-  const session = model(req, 'LibraryCopy').db.startSession();
+  const session = await model(req, 'LibraryCopy').db.startSession();
   try {
     const Copy = model(req, 'LibraryCopy'); const Title = model(req, 'LibraryTitle'); const body = req.body || {}; const copies = Array.isArray(body.copies) ? body.copies : [];
     if (!mongoose.Types.ObjectId.isValid(body.titleId) || !await Title.exists({ _id: body.titleId, isActive: true }).session(session)) throw Object.assign(new Error('Choose an active catalogue title.'), { statusCode: 400 });
@@ -176,7 +176,7 @@ exports.listLoans = async (req, res) => {
 };
 
 exports.issueLoan = async (req, res) => {
-  const session = model(req, 'LibraryCopy').db.startSession();
+  const session = await model(req, 'LibraryCopy').db.startSession();
   try {
     const Copy = model(req, 'LibraryCopy'); const Member = model(req, 'LibraryMember'); const Policy = model(req, 'LibraryPolicy'); const Loan = model(req, 'LibraryLoan'); const body = req.body || {}; let loan;
     await session.withTransaction(async () => {
@@ -195,7 +195,7 @@ exports.issueLoan = async (req, res) => {
 };
 
 exports.returnLoan = async (req, res) => {
-  const session = model(req, 'LibraryCopy').db.startSession();
+  const session = await model(req, 'LibraryCopy').db.startSession();
   try {
     const Loan = model(req, 'LibraryLoan'); const Copy = model(req, 'LibraryCopy'); let loan;
     await session.withTransaction(async () => {
@@ -208,7 +208,7 @@ exports.returnLoan = async (req, res) => {
 };
 
 exports.returnByBarcode = async (req, res) => {
-  const session = model(req, 'LibraryCopy').db.startSession();
+  const session = await model(req, 'LibraryCopy').db.startSession();
   try {
     const Copy = model(req, 'LibraryCopy'); const Loan = model(req, 'LibraryLoan'); const code = String(req.body?.code || '').trim(); const condition = String(req.body?.condition || 'good'); if (!code) throw Object.assign(new Error('Enter or scan a copy barcode.'), { statusCode: 400 }); let loan;
     await session.withTransaction(async () => {
@@ -309,7 +309,7 @@ exports.createPurchaseOrder = async (req, res) => {
 };
 
 exports.receivePurchaseOrder = async (req, res) => {
-  const session = model(req, 'LibraryCopy').db.startSession();
+  const session = await model(req, 'LibraryCopy').db.startSession();
   try {
     const PurchaseOrder = model(req, 'LibraryPurchaseOrder'); const Receipt = model(req, 'LibraryGoodsReceipt'); const Copy = model(req, 'LibraryCopy'); const Title = model(req, 'LibraryTitle'); const body = req.body || {}; let receipt;
     await session.withTransaction(async () => {

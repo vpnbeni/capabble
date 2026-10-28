@@ -83,6 +83,94 @@ const getTeacherBusyPeriods = async (models, teacherId, date) => {
   return day?.halfDayEndTime ? busy.filter((period) => period.start < day.halfDayEndTime) : busy;
 };
 
+/**
+ * Pure part: one teacher's whole day on a weekday, period by period, for the
+ * phone's "Your periods": each bell row as a class (subject, class, section),
+ * a free period or a break. A shared period names both classes' cells; the
+ * first one wins.
+ */
+const teacherDayFromGrid = ({ grid, bellTimings, teacherName, dayName, classes = [] }) => {
+  let teachable = 0;
+  return periodTimes(bellTimings).map((row) => {
+    const base = { id: row.id, label: row.label || '', start: row.start, end: row.end };
+    if (row.type === 'break') return { ...base, kind: 'break' };
+    const slot = String(teachable++);
+    let found = null;
+    Object.entries(grid || {}).some(([classId, days]) => {
+      const cell = ((days || {})[dayName] || {});
+      const entry = cell[slot] || cell[row.id];
+      if (!entry || !teacherName || !cellHasTeacher(entry.teacher, teacherName)) return false;
+      const cls = classes.find((item) => item.id === classId);
+      found = { subject: entry.subject || '', className: cls?.className || '', section: cls?.section || '' };
+      return true;
+    });
+    return found ? { ...base, kind: 'class', ...found } : { ...base, kind: 'free' };
+  });
+};
+
+const MAX_DAYS = 14;
+
+/**
+ * A teacher's days from `from` to `to` ('YYYY-MM-DD', at most 14 days): school days
+ * (closed days have no periods; half days drop periods after school ends) and
+ * their periods from the published timetable of the session.
+ * @param {object} models  req.models
+ * @param {object} filter  session filter for TimetableState / TimetableVersion
+ * @returns {{ teacher: {id, name}|null, publishedAt: Date|null, days: object[] }}
+ */
+const getTeacherDays = async (models, teacherId, { from, to, filter = {} }) => {
+  const State = models?.TimetableState;
+  const Version = models?.TimetableVersion;
+  const schoolDayMap = await schoolDays.range(models, from, to);
+  const keys = Object.keys(schoolDayMap).sort();
+  if (keys.length > MAX_DAYS) {
+    throw Object.assign(new Error(`Ask for at most ${MAX_DAYS} days at a time`), { status: 400 });
+  }
+
+  const state = State && teacherId
+    ? await State.findOne(filter).select('teachers classes bellTimings').lean()
+    : null;
+  const teacher = (state?.teachers || []).find((row) => String(row.id) === String(teacherId)) || null;
+  const published = teacher && Version
+    ? await Version.findOne({ ...filter, status: 'published' })
+      .sort({ publishedAt: -1 })
+      .select('grid publishedAt updatedAt')
+      .lean()
+    : null;
+
+  const days = keys.map((date) => {
+    const day = schoolDayMap[date];
+    const dayName = DAY_NAMES[new Date(`${date}T00:00:00Z`).getUTCDay()];
+    let periods = published && day.working
+      ? teacherDayFromGrid({
+        grid: published.grid,
+        bellTimings: state.bellTimings,
+        teacherName: teacher.name,
+        dayName,
+        classes: state.classes
+      })
+      : [];
+    if (day.halfDayEndTime) periods = periods.filter((period) => period.start < day.halfDayEndTime);
+    // A day with no class at all (e.g. Sunday in a Mon–Sat grid) has no periods to show.
+    if (!periods.some((period) => period.kind === 'class')) periods = [];
+    return {
+      date,
+      weekday: day.weekday,
+      working: day.working,
+      kind: day.kind,
+      label: day.label,
+      halfDayEndTime: day.halfDayEndTime || null,
+      periods
+    };
+  });
+
+  return {
+    teacher: teacher ? { id: String(teacher.id), name: teacher.name } : null,
+    publishedAt: published ? (published.publishedAt || published.updatedAt) : null,
+    days
+  };
+};
+
 module.exports = {
-  getTeacherBusyPeriods, busyPeriodsFromGrid, periodTimes, cellHasTeacher
+  getTeacherBusyPeriods, busyPeriodsFromGrid, teacherDayFromGrid, getTeacherDays, periodTimes, cellHasTeacher
 };

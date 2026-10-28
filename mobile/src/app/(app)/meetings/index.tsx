@@ -5,6 +5,8 @@ import { useState } from 'react'
 import { ApiError } from '@/lib/api'
 import { formatDayKey, formatTime, schoolToday } from '@/lib/format'
 import { usePortal } from '@/portal/PortalProvider'
+import { useSession } from '@/session/SessionProvider'
+import { HostMeetings } from '@/staff/HostMeetings'
 import { useCancelAppointment, usePortalAppointments } from '@/portal/queries'
 import { CardSkeleton, LoadFailed, NoChild } from '@/portal/states'
 import type { PortalAppointment, PortalAppointmentStatus } from '@/services/portalService'
@@ -44,8 +46,14 @@ const MODE_LABEL = { in_person: 'At school', phone: 'Phone call', video: 'Video 
 const when = (a: PortalAppointment) => `${formatDayKey(a.date, { weekday: 'short' })}, ${formatTime(a.startTime)}`
 const isUpcoming = (a: PortalAppointment) => (a.status === 'requested' || a.status === 'confirmed') && a.date >= schoolToday()
 
-/** Meetings a parent has asked for or the school has booked with them. */
 export default function MeetingsScreen() {
+  const session = useSession()
+  if (session.status !== 'signedIn') return null
+  return session.user.kind === 'staff' ? <HostMeetings /> : <FamilyMeetings />
+}
+
+/** Meetings a parent has asked for or the school has booked with them. */
+function FamilyMeetings() {
   const router = useRouter()
   const toast = useToast()
   const { child, isParent } = usePortal()
@@ -195,6 +203,7 @@ export default function MeetingsScreen() {
                 title: a.hostName,
                 subtitle: `${when(a)} · ${[a.purpose, a.studentSnapshot?.name?.split(' ')[0]].filter(Boolean).join(' · ')}`,
                 badge: MEETING_STATUS[a.status],
+                lines: 2,
                 onPress: () => setOpen(a),
               }))}
             />

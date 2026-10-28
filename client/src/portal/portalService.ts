@@ -7,7 +7,7 @@ const silent = (config?: AxiosRequestConfig): AxiosRequestConfig => ({ ...(confi
 const get = (url: string, config?: AxiosRequestConfig) => baseApi.get(url, silent(config))
 const post = (url: string, data?: unknown) => baseApi.post(url, data, silent())
 
-export type PortalSection = 'profile' | 'calendar' | 'attendance' | 'timetable' | 'results' | 'fees' | 'notices' | 'transport' | 'appointments'
+export type PortalSection = 'profile' | 'calendar' | 'attendance' | 'timetable' | 'homework' | 'results' | 'fees' | 'notices' | 'transport' | 'appointments'
 
 export interface PortalChild {
   studentId: string
@@ -65,6 +65,19 @@ export interface PortalAttendance {
   }
 }
 
+/** Homework set for the child's class, with the child's own mark once the teacher records it. */
+export interface PortalHomework {
+  id: string
+  title: string
+  subjectName: string
+  teacherName: string
+  assignedDate: string
+  dueDate: string
+  instructions: string
+  status: 'published' | 'closed'
+  submission: { status: 'submitted' | 'late' | 'missing' | 'excused'; remark: string } | null
+}
+
 export interface PortalTimetable {
   className: string
   section: string
@@ -101,6 +114,41 @@ export interface PortalFees {
     lines: Array<{ name: string; amount: number }>
   }>
   payments: Array<{ _id: string; receiptNo: string; date: string; mode: string; amount: number }>
+  /** Whether the school takes fees online (its own Razorpay account). */
+  onlinePayment?: { enabled: boolean; mode?: 'test' | 'live' | null }
+}
+
+/** A started online payment: what Razorpay Checkout needs. */
+export interface PortalPaymentOrder {
+  orderId: string
+  razorpayOrderId: string
+  keyId: string
+  amount: number
+  amountPaise: number
+  currency: 'INR'
+  schoolName: string
+  description: string
+  installments: Array<{ _id: string; label: string; amount: number }>
+  prefill: { name: string; email: string; contact: string }
+  checkoutUrl: string
+}
+
+export interface PortalPaymentResult {
+  orderId: string
+  status: 'created' | 'processing' | 'paid' | 'review'
+  amount: number
+  receiptNo: string | null
+  feePaymentId: string | null
+  paidAt: string | null
+  method: string
+  paymentId: string | null
+  message: string
+}
+
+export interface PortalCheckoutResponse {
+  razorpay_payment_id: string
+  razorpay_order_id: string
+  razorpay_signature: string
 }
 
 export interface PortalNotice {
@@ -215,6 +263,7 @@ const portalService = {
   attendance: async (id: string, month: string): Promise<PortalAttendance> =>
     (await get(`${student(id)}/attendance`, { params: { month } })).data.data,
   timetable: async (id: string): Promise<PortalTimetable | null> => (await get(`${student(id)}/timetable`)).data.data,
+  homework: async (id: string): Promise<PortalHomework[]> => (await get(`${student(id)}/homework`)).data.data,
   results: async (id: string): Promise<PortalResult[]> => (await get(`${student(id)}/results`)).data.data,
   fees: async (id: string): Promise<PortalFees | null> => (await get(`${student(id)}/fees`)).data.data,
   transport: async (id: string): Promise<PortalTransport> => (await get(`${student(id)}/transport`)).data.data,
@@ -236,6 +285,12 @@ const portalService = {
   calendarFeedOff: async (): Promise<FeedStatus> => (await baseApi.delete('/portal/calendar/feed', silent())).data.data,
   respondToEvent: async (id: string, input: ReplyInput): Promise<ReplyInput> =>
     (await post(`/portal/calendar/events/${encodeURIComponent(id)}/respond`, input)).data.data,
+  startPayment: async (studentId: string, demandIds: string[]): Promise<PortalPaymentOrder> =>
+    (await post(`${student(studentId)}/fees/pay`, { demandIds, source: 'web' })).data.data,
+  verifyPayment: async (studentId: string, orderId: string, response: PortalCheckoutResponse): Promise<PortalPaymentResult> =>
+    (await post(`${student(studentId)}/fees/pay/${encodeURIComponent(orderId)}/verify`, response)).data.data,
+  payment: async (studentId: string, orderId: string): Promise<PortalPaymentResult> =>
+    (await get(`${student(studentId)}/fees/pay/${encodeURIComponent(orderId)}`)).data.data,
   receiptPdf: async (studentId: string, paymentId: string): Promise<Blob> =>
     (await get(`${student(studentId)}/fees/receipts/${encodeURIComponent(paymentId)}`, { responseType: 'blob' })).data,
 }

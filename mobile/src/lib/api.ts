@@ -43,6 +43,8 @@ type RequestOptions = {
   baseUrl?: string
   /** Don't try to refresh the session on a 401 (sign-in, refresh itself). */
   skipRefresh?: boolean
+  /** Return the whole response body, for the few endpoints that put fields next to `data`. */
+  raw?: boolean
 }
 
 const buildUrl = (path: string, base: string, params?: RequestOptions['params']) => {
@@ -113,13 +115,30 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
 
   if (!response.ok) throw await readError(response)
   const body = await response.json()
-  return body.data as T
+  return (options.raw ? body : body.data) as T
+}
+
+/** A file the API sends back (a receipt, a report card, an ID card PDF), as bytes. */
+export async function requestBytes(path: string, options: Omit<RequestOptions, 'raw'> = {}): Promise<ArrayBuffer> {
+  let response: Response
+  try {
+    response = await send(path, options)
+  } catch {
+    throw new ApiError("You're offline. Check your connection and try again.", 0, 'network')
+  }
+  if (response.status === 401 && !options.skipRefresh && (await refreshSession())) response = await send(path, options)
+  if (response.status === 401) onSessionEnded?.()
+  if (!response.ok) throw await readError(response)
+  return response.arrayBuffer()
 }
 
 export const api = {
-  get: <T>(path: string, params?: RequestOptions['params']) => request<T>(path, { params }),
+  get: <T>(path: string, params?: RequestOptions['params'], options?: Omit<RequestOptions, 'method' | 'body' | 'params'>) => request<T>(path, { ...options, params }),
   post: <T>(path: string, body?: unknown, options?: Omit<RequestOptions, 'method' | 'body'>) =>
     request<T>(path, { ...options, method: 'POST', body: body ?? {} }),
   put: <T>(path: string, body?: unknown, options?: Omit<RequestOptions, 'method' | 'body'>) =>
     request<T>(path, { ...options, method: 'PUT', body: body ?? {} }),
+  patch: <T>(path: string, body?: unknown, options?: Omit<RequestOptions, 'method' | 'body'>) =>
+    request<T>(path, { ...options, method: 'PATCH', body: body ?? {} }),
+  delete: <T>(path: string, params?: RequestOptions['params']) => request<T>(path, { method: 'DELETE', params }),
 }

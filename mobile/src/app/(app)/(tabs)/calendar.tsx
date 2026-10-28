@@ -1,22 +1,28 @@
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import { CalendarCheck } from 'lucide-react-native'
+import { CalendarCheck, CalendarDays, Plus } from 'lucide-react-native'
 import { useMemo, useState } from 'react'
 
+import { useCalendarRange } from '@/calendar/source'
 import { dayKeyAdd, formatDayKey, formatMonth, monthOf, schoolToday } from '@/lib/format'
 import { CalendarItemSheet } from '@/portal/CalendarItemSheet'
 import { LAYER_CATEGORY, agendaDays, isForChild, itemsByDay } from '@/portal/calendarUi'
-import { usePortalCalendar } from '@/portal/queries'
 import { CardSkeleton, LoadFailed } from '@/portal/states'
 import type { CalendarItem } from '@/services/calendarTypes'
+import { useMyEvents } from '@/staff/queries'
+import { useStaff } from '@/staff/useStaff'
 import { useTheme } from '@/theme/ThemeProvider'
-import { Agenda, ChipRail, MobileScreen, NavBar, StatusView, Surface, WeekStrip, type WeekDay } from '@/ui'
+import { Agenda, ChipRail, ListGroup, MobileScreen, NavBar, StatusView, Surface, WeekStrip, type WeekDay } from '@/ui'
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const weekdayOf = (key: string) => new Date(`${key}T00:00:00.000Z`).getUTCDay()
 /** The Monday of the week a day falls in. */
 const weekStart = (key: string) => dayKeyAdd(key, -((weekdayOf(key) + 6) % 7))
 
-/** The family's calendar by day: holidays, school events with their own instructions, exams, fee dates, meetings. */
+/**
+ * The calendar by day: holidays, school events with their own instructions, exams, fee dates,
+ * meetings. Families see their children's; staff see their own, plus "Create event" and the
+ * events they sent for approval.
+ */
 export default function CalendarScreen() {
   const { colors } = useTheme()
   const today = schoolToday()
@@ -30,7 +36,12 @@ export default function CalendarScreen() {
   // Six weeks from the Monday of the chosen week: the strip, then the agenda after the chosen day.
   const from = weekStart(selected)
   const to = dayKeyAdd(from, 41)
-  const calendar = usePortalCalendar(from, to)
+  const calendar = useCalendarRange(from, to)
+  const staff = useStaff()
+  const canCreate = Boolean(staff.mode) && staff.canUse('clndr_events') && staff.can('clndr.events.create')
+  const myEvents = useMyEvents(canCreate)
+  // Teachers' events waiting for the principal, or sent back: the rest are on the calendar itself.
+  const sent = (myEvents.data ?? []).filter((event) => event.status === 'pending_approval' || (event.status === 'draft' && event.rejectionNote))
   const data = calendar.data
   const schoolDay = data?.today ?? today
 
@@ -79,17 +90,41 @@ export default function CalendarScreen() {
     <MobileScreen
       tabs
       refreshing={calendar.isRefetching}
-      onRefresh={calendar.refetch}
+      onRefresh={() => {
+        calendar.refetch()
+        if (canCreate) myEvents.refetch()
+      }}
       nav={
         <NavBar
           large
           eyebrow={`Calendar · ${year}`}
           title={monthName}
-          actions={selected !== schoolDay ? [{ icon: CalendarCheck, label: 'Go to today', onPress: () => setSelected(schoolDay) }] : []}
+          actions={[
+            ...(selected !== schoolDay ? [{ icon: CalendarCheck, label: 'Go to today', onPress: () => setSelected(schoolDay) }] : []),
+            ...(canCreate ? [{ icon: Plus, label: 'Create event', onPress: () => router.push('/event-new') }] : []),
+          ]}
         />
       }
       overlay={<CalendarItemSheet item={openItem} onClose={close} />}
     >
+      {sent.length ? (
+        <ListGroup
+          header="Waiting on the principal"
+          items={sent.map((event) => ({
+            title: event.title,
+            subtitle:
+              event.status === 'draft' && event.rejectionNote
+                ? `Not approved: ${event.rejectionNote}`
+                : [formatDayKey(event.startDate, { weekday: 'short' }), event.audiences.join(', ')].filter(Boolean).join(' · '),
+            lines: 2,
+            badge: event.status === 'pending_approval' ? { label: 'Waiting for approval', tone: 'warning' as const } : { label: 'Not approved', tone: 'danger' as const },
+            onPress: () => router.push({ pathname: '/events/[id]', params: { id: event.id } }),
+          }))}
+        />
+      ) : null}
+      {canCreate ? (
+        <ListGroup items={[{ title: 'Your events', subtitle: 'Edit, see replies, send reminders, cancel', icon: CalendarDays, tile: 1, onPress: () => router.push('/events') }]} />
+      ) : null}
       <WeekStrip days={week} value={selected} onChange={setSelected} onWeekChange={(step) => setSelected(dayKeyAdd(selected, step * 7))} label="Choose a day" />
       {children.length > 1 ? (
         <ChipRail
