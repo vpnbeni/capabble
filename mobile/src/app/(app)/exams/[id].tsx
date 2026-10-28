@@ -1,17 +1,33 @@
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import { Award, Eye, EyeOff } from 'lucide-react-native'
+import { Award, BookOpen, Ellipsis, Eye, EyeOff, ListChecks, Pencil, Plus, Printer } from 'lucide-react-native'
 import { useMemo, useState } from 'react'
 
 import { ApiError } from '@/lib/api'
-import { classLabel, formatDate, formatTime } from '@/lib/format'
+import { classLabel, formatDate } from '@/lib/format'
 import { CardSkeleton, LoadFailed } from '@/portal/states'
+import type { ExamDatesheet } from '@/services/examService'
+import { ExamSheet } from '@/staff/ExamSheet'
+import { useRemoveExam } from '@/staff/examSetupQueries'
 import { useEntryStatus, useExamDatesheets, useExams, usePublishResults } from '@/staff/queries'
 import { useStaff } from '@/staff/useStaff'
-import { ActionBar, Dialog, ListGroup, MobileButton, MobileScreen, NavBar, StatusView, Surface, haptic, useToast } from '@/ui'
+import { ActionBar, ActionSheet, Dialog, ListGroup, MobileButton, MobileScreen, NavBar, StatusView, Surface, haptic, useToast, type NavAction } from '@/ui'
+
+const sheetExamId = (sheet: ExamDatesheet) => (typeof sheet.examId === 'string' ? sheet.examId : sheet.examId?._id)
+
+/** "12 to 20 Mar · 6 papers" for a datesheet row. */
+const sheetSummary = (sheet: ExamDatesheet) => {
+  const dates = sheet.subjects.map((entry) => entry.examDate).filter(Boolean).sort()
+  const papers = `${sheet.subjects.length} ${sheet.subjects.length === 1 ? 'paper' : 'papers'}`
+  if (!dates.length) return 'No papers yet'
+  const first = formatDate(dates[0])
+  const last = formatDate(dates[dates.length - 1])
+  return `${first === last ? first : `${first} to ${last}`} · ${papers}`
+}
 
 /**
- * One exam: its datesheet by class, how far marks entry is in each class, and publishing results
- * to families (the principal), with a confirm because families are told at once.
+ * One exam: how far marks entry is in each class, its datesheets (open one to change or publish
+ * it), its subjects, printing, and publishing results to families with a confirm because they are
+ * told at once. Those who set exams up also edit or remove the exam here.
  */
 export default function ExamScreen() {
   const router = useRouter()
@@ -23,11 +39,20 @@ export default function ExamScreen() {
   const status = useEntryStatus(id)
   const sheets = useExamDatesheets(staff.can('exam.setup.read'))
   const publish = usePublishResults()
+  const remove = useRemoveExam()
   const [asking, setAsking] = useState(false)
-  const canPublish = staff.canUse('exmcl_exams') && staff.can('exam.setup.write')
+  const [menu, setMenu] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [removing, setRemoving] = useState(false)
+  const canSetUp = staff.canUse('exmcl_exams') && staff.can('exam.setup.write')
+  const canDatesheets = staff.canUse('exmcl_datesheets') && staff.can('exam.setup.write')
+  const canSubjects = staff.canUse('exmcl_subjects') && staff.can('exam.setup.write')
+  const canPrint =
+    (staff.canUse('exmcl_admit_cards') && staff.can('exam.setup.write')) ||
+    ((staff.canUse('exmcl_award_list') || staff.canUse('exmcl_report_card')) && staff.can('exam.results.read'))
 
   const datesheets = useMemo(
-    () => (sheets.data ?? []).filter((sheet) => (typeof sheet.examId === 'string' ? sheet.examId : sheet.examId?._id) === id),
+    () => (sheets.data ?? []).filter((sheet) => sheetExamId(sheet) === id).sort((a, b) => a.class.localeCompare(b.class, undefined, { numeric: true }) || (a.section ?? '').localeCompare(b.section ?? '')),
     [sheets.data, id],
   )
   const classes = status.data ?? []
@@ -48,16 +73,38 @@ export default function ExamScreen() {
     }
   }
 
+  const removeExam = async () => {
+    if (!exam) return
+    try {
+      await remove.mutateAsync(exam._id)
+      haptic.medium()
+      setRemoving(false)
+      toast(`${exam.name} removed`)
+      router.back()
+    } catch (error) {
+      haptic.error()
+      setRemoving(false)
+      toast(error instanceof ApiError ? error.message : "The exam wasn't removed. Try again.", 'danger')
+    }
+  }
+
+  const navActions: NavAction[] = [
+    ...(exam && canPrint ? [{ icon: Printer, label: 'Print', onPress: () => router.push({ pathname: '/exams/print', params: { id: exam._id } }) }] : []),
+    ...(exam && canSetUp ? [{ icon: Ellipsis, label: 'More actions', onPress: () => setMenu(true) }] : []),
+  ]
+  const subjectCount = exam?.subjectKeys?.length ?? 0
+
   return (
     <MobileScreen
       refreshing={status.isRefetching}
       onRefresh={() => {
         status.refetch()
         exams.refetch()
+        sheets.refetch()
       }}
-      nav={<NavBar title={exam?.name ?? 'Exam'} back={{ label: 'Exams', onPress: router.back }} />}
+      nav={<NavBar title={exam?.name ?? 'Exam'} back={{ label: 'Exams', onPress: router.back }} actions={navActions} />}
       actionBar={
-        exam && canPublish ? (
+        exam && canSetUp ? (
           <ActionBar
             icon={exam.resultsPublished ? EyeOff : Eye}
             summary={`${done} of ${classes.length} classes complete`}
@@ -68,27 +115,61 @@ export default function ExamScreen() {
         ) : undefined
       }
       overlay={
-        <Dialog
-          open={asking}
-          onClose={() => setAsking(false)}
-          tone={exam?.resultsPublished ? 'danger' : 'default'}
-          title={exam?.resultsPublished ? `Hide ${exam.name} results?` : `Publish ${exam?.name ?? ''} results?`}
-          description={
-            exam?.resultsPublished
-              ? 'Families stop seeing these marks in the app until you publish again.'
-              : `Every family sees their child's marks and gets a notification.${done < classes.length ? ` ${classes.length - done} classes still have marks missing.` : ''}`
-          }
-          footer={
+        <>
+          <Dialog
+            open={asking}
+            onClose={() => setAsking(false)}
+            tone={exam?.resultsPublished ? 'danger' : 'default'}
+            title={exam?.resultsPublished ? `Hide ${exam.name} results?` : `Publish ${exam?.name ?? ''} results?`}
+            description={
+              exam?.resultsPublished
+                ? 'Families stop seeing these marks in the app until you publish again.'
+                : `Every family sees their child's marks and gets a notification.${done < classes.length ? ` ${classes.length - done} classes still have marks missing.` : ''}`
+            }
+            footer={
+              <>
+                <MobileButton variant="gray" onPress={() => setAsking(false)}>
+                  Not now
+                </MobileButton>
+                <MobileButton variant={exam?.resultsPublished ? 'destructive' : 'filled'} loading={publish.isPending} onPress={toggle}>
+                  {exam?.resultsPublished ? 'Hide results' : 'Publish'}
+                </MobileButton>
+              </>
+            }
+          />
+          {exam && canSetUp ? (
             <>
-              <MobileButton variant="gray" onPress={() => setAsking(false)}>
-                Not now
-              </MobileButton>
-              <MobileButton variant={exam?.resultsPublished ? 'destructive' : 'filled'} loading={publish.isPending} onPress={toggle}>
-                {exam?.resultsPublished ? 'Hide results' : 'Publish'}
-              </MobileButton>
+              <ActionSheet
+                open={menu}
+                onClose={() => setMenu(false)}
+                title={exam.name}
+                actions={[
+                  { label: 'Edit exam', icon: Pencil, onSelect: () => (setMenu(false), setEditing(true)) },
+                  ...(canSubjects ? [{ label: 'Choose subjects', icon: ListChecks, onSelect: () => (setMenu(false), router.push({ pathname: '/exams/subjects', params: { id: exam._id } })) }] : []),
+                  { label: 'Remove exam', tone: 'danger' as const, onSelect: () => (setMenu(false), setRemoving(true)) },
+                ]}
+              />
+              <ExamSheet open={editing} onClose={() => setEditing(false)} exam={exam} exams={exams.data ?? []} />
+              <Dialog
+                open={removing}
+                onClose={() => setRemoving(false)}
+                tone="danger"
+                title={`Remove ${exam.name}?`}
+                description="It leaves the exam list, marks entry and printing. Marks already entered stay saved."
+                footer={
+                  <>
+                    <MobileButton variant="gray" onPress={() => setRemoving(false)}>
+                      Keep it
+                    </MobileButton>
+                    <MobileButton variant="destructive" loading={remove.isPending} onPress={removeExam}>
+                      Remove
+                    </MobileButton>
+                  </>
+                }
+              />
             </>
-          }
-        />
+          ) : null}
+        </>
       }
     >
       {exams.isPending || status.isPending ? (
@@ -115,20 +196,42 @@ export default function ExamScreen() {
               })}
             />
           ) : null}
-          {datesheets.length ? (
-            datesheets.map((sheet) => (
-              <ListGroup
-                key={sheet._id}
-                header={`Datesheet · ${classLabel(sheet.class, sheet.section)}`}
-                items={[...sheet.subjects]
-                  .sort((a, b) => a.examDate.localeCompare(b.examDate))
-                  .map((entry) => ({
-                    title: entry.subject?.name ?? 'Subject',
-                    subtitle: [formatDate(entry.examDate), entry.timeSlot?.start ? `${formatTime(entry.timeSlot.start)}${entry.timeSlot.end ? ` to ${formatTime(entry.timeSlot.end)}` : ''}` : null].filter(Boolean).join(' · '),
-                    lines: 2,
-                  }))}
-              />
-            ))
+
+          {canSubjects ? (
+            <ListGroup
+              header="Subjects"
+              items={[
+                {
+                  title: subjectCount ? `${subjectCount} ${subjectCount === 1 ? 'subject' : 'subjects'}` : 'Every subject of each class',
+                  subtitle: subjectCount ? undefined : 'Choose subjects to leave some out of this exam.',
+                  icon: BookOpen,
+                  tile: 6,
+                  chevron: true,
+                  lines: 2,
+                  onPress: () => router.push({ pathname: '/exams/subjects', params: { id: exam._id } }),
+                },
+              ]}
+            />
+          ) : null}
+
+          {sheets.isError ? (
+            <LoadFailed what="Datesheets" error={sheets.error} onRetry={sheets.refetch} />
+          ) : datesheets.length || canDatesheets ? (
+            <ListGroup
+              header="Datesheets"
+              footer={canDatesheets && datesheets.length ? 'A published datesheet can’t be changed.' : undefined}
+              items={[
+                ...datesheets.map((sheet) => ({
+                  title: classLabel(sheet.class, sheet.section),
+                  subtitle: sheetSummary(sheet),
+                  badge: sheet.status === 'published' ? { label: 'Published', tone: 'success' as const } : { label: 'Draft', tone: 'neutral' as const },
+                  chevron: true,
+                  lines: 2,
+                  onPress: () => router.push({ pathname: '/exams/datesheet', params: { examId: exam._id, id: sheet._id } }),
+                })),
+                ...(canDatesheets ? [{ title: 'Add a datesheet', icon: Plus, tile: 6 as const, onPress: () => router.push({ pathname: '/exams/datesheet', params: { examId: exam._id } }) }] : []),
+              ]}
+            />
           ) : sheets.isSuccess ? (
             <Surface padded={false}>
               <StatusView compact kind="empty" icon={Award} title="No datesheet yet" body="The exam's datesheet shows here once the school makes it." />

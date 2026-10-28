@@ -84,15 +84,12 @@ export const WEB_MODULES: WebModule[] = [
     ],
   },
   {
-    label: 'Exam setup and printing',
-    anyOf: ['exam.setup.write', 'exam.results.write'],
-    reason: 'Exam schemes, admit cards, seating plans and report card designs',
+    label: 'Exam print designs',
+    anyOf: ['exam.setup.write'],
+    reason: 'Laying out admit cards, report cards and award lists; printing them is in the app',
     icon: FileText,
     tile: 5,
-    pages: [
-      { feature: 'exmcl_exams', path: '/exmcl/exams' },
-      { feature: 'exmcl_admit_cards', path: '/exmcl/admit-cards' },
-    ],
+    pages: [{ feature: 'exmcl_performas', path: '/exmcl/performas' }],
   },
   {
     label: 'Board exam centre',
