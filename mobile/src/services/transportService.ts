@@ -67,6 +67,23 @@ export interface Trip {
   counts: { assigned: number; boarded: number; dropped: number; absent: number }
 }
 
+/** A bus on a trip now, with what the map needs (GET /trnst/live). */
+export interface LiveTrip {
+  _id: string
+  direction: 'pickup' | 'drop'
+  startedAt: string
+  staleSeconds: number | null
+  lastLocation?: { lat: number; lng: number; heading?: number | null; at: string } | null
+  vehicle: { _id: string; busNo: string; vehicleType?: string; driverName?: string; driverPhone?: string } | null
+  route: {
+    _id: string
+    name: string
+    stops: { id: string; name: string; lat: number | null; lng: number | null; pickupTime?: string; dropTime?: string }[]
+    roadPath: { polyline: string } | null
+  } | null
+  counts: { assigned: number; boarded: number; dropped: number; absent: number }
+}
+
 export interface OwnWay {
   _id: string
   studentId: string
@@ -129,6 +146,7 @@ export const transportService = {
   },
   saveRoute: (id: string | undefined, input: RouteInput) => (id ? api.put<Route>(`/trnst/routes/${encodeURIComponent(id)}`, input) : api.post<Route>('/trnst/routes', input)),
   trips: async () => (await api.get<{ date: string; trips: Trip[] }>('/trnst/trips')).trips,
+  live: async () => (await api.get<{ at: string; trips: LiveTrip[] }>('/trnst/live')).trips,
   routes: () => api.get<Route[]>('/trnst/routes'),
   vehicles: () => api.get<VehicleRecord[]>('/trnst/vehicles'),
   riders: async (routeId?: string) => (await api.get<{ rows: Rider[] }>('/trnst/assignments', { routeId: routeId || undefined })).rows,

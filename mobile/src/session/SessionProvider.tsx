@@ -2,6 +2,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 
 import { setSessionEndedHandler, setStaffSession, setTenantSlug } from '@/lib/api'
+import { stopSharing } from '@/lib/busLocation'
 import { unregisterFromPush } from '@/lib/push'
 import { storage } from '@/lib/storage'
 import { authService, type School, type User } from '@/services/authService'
@@ -116,8 +117,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       await authService.stopViewAs().catch(() => {})
       kind = 'staff'
     }
-    // Stop pushes to this phone first, while the session can still say so.
+    // Stop pushes to this phone first, while the session can still say so; a bus trip stops sharing too.
     if (kind) await unregisterFromPush(kind)
+    await stopSharing().catch(() => {})
     try {
       await authService.logout()
     } catch {

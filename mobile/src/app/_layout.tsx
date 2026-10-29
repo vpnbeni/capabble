@@ -7,6 +7,8 @@ import { useEffect, useState } from 'react'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 
 import { ApiError } from '@/lib/api'
+// Registers the bus location task at start-up: Android may start the app in the background to deliver locations.
+import '@/lib/busLocation'
 import { usePushNotifications } from '@/lib/usePushNotifications'
 import { SessionProvider, useSession } from '@/session/SessionProvider'
 import { ThemeProvider, useTheme } from '@/theme/ThemeProvider'

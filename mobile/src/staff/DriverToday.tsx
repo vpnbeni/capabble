@@ -3,6 +3,7 @@ import { Bus, CircleCheck } from 'lucide-react-native'
 import { useState } from 'react'
 
 import { ApiError } from '@/lib/api'
+import { startSharing } from '@/lib/busLocation'
 import { formatClock, formatDayKey, formatTime, schoolTimeNow, schoolToday } from '@/lib/format'
 import { CardSkeleton, LoadFailed } from '@/portal/states'
 import { DIRECTION_LABELS, type CrewRoute, type CrewTrip, type CrewVehicle, type Direction } from '@/services/crewService'
@@ -52,14 +53,17 @@ export function DriverToday() {
   const shownDirection: Direction = active?.direction ?? next?.direction ?? preferred
   const finished = trips.filter((trip) => trip.status !== 'active')
 
-  const open = (trip: CrewTrip) => router.push({ pathname: '/crew-trip', params: { id: trip._id } })
+  const busOf = (trip: CrewTrip) => busTitle(vehicles.find((vehicle) => vehicle._id === trip.vehicleId)?.busNo)
+  const open = (trip: CrewTrip) => router.push({ pathname: '/crew-trip', params: { id: trip._id, bus: busOf(trip) } })
   const begin = (routeId: string, direction: Direction) => {
     setError(null)
     start.mutate(
       { routeId, direction },
       {
-        onSuccess: (trip) => {
+        onSuccess: async (trip) => {
           haptic.success()
+          // Asks for location the first time; the trip screen says what to do if it was refused.
+          await startSharing(trip._id, busOf(trip)).catch(() => undefined)
           open(trip)
         },
         onError: (failure) => {
@@ -174,7 +178,7 @@ function VehicleTrips({
   return (
     <ListGroup
       header={`${busTitle(vehicle.busNo)} · ${vehicle.registrationNumber}`}
-      footer="Families get a notification when the trip starts and when you mark their child. The bus's live location comes with a later app update."
+      footer="While a trip is on, families see the bus on the map and get a notification when it starts and when you mark their child."
       items={vehicle.routes.flatMap((route) =>
         directionsOf(route).map((direction) => {
           const running = active && active.routeId === route._id && active.direction === direction

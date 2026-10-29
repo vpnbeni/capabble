@@ -3,7 +3,7 @@
     "name": "Capabble",
     "slug": "capabble",
     "scheme": "capabble",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -52,6 +52,16 @@
           "cameraPermission": "Capabble uses the camera to scan book and asset barcodes.",
           "microphonePermission": false,
           "recordAudioAndroid": false
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Capabble shares the school bus’s location with families while you run a trip.",
+          "locationAlwaysAndWhenInUsePermission": "Capabble keeps sharing the school bus’s location with the screen locked, until you end the trip.",
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true,
+          "isIosBackgroundLocationEnabled": true
         }
       ]
     ],

@@ -213,6 +213,7 @@ export default function SchoolTransportScreen() {
         label="On the road now"
         value={String(onRoad)}
         detail={`${many(trips.data?.length ?? 0, 'trip')} today · ${many(riding.length, 'student')} on the bus`}
+        action={onRoad ? { label: 'See on the map', onPress: () => router.push('/school-transport/live') } : undefined}
       />
       <ChipRail
         label="Show"
