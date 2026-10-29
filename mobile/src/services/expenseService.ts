@@ -1,6 +1,7 @@
 import { api, requestBytes } from '@/lib/api'
 
 import type { PaymentMode } from './feeService'
+import type { Attachment } from './uploadService'
 
 // Expenses, fuel and payroll (/api/cpitl), the website's Finance → Expenses, Fuel and Payroll. Rupees.
 
@@ -36,6 +37,8 @@ export interface ExpenseInput {
   mode?: PaymentMode
   reference?: string
   notes?: string
+  /** Photos of the bill, uploaded first (uploadService.attachment). */
+  attachments?: Attachment[]
 }
 
 export interface Vehicle {

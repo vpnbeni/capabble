@@ -1,14 +1,13 @@
 import { useRouter, type Href } from 'expo-router'
-import { CreditCard, KeyRound, Mail, School, ShieldCheck } from 'lucide-react-native'
+import { CreditCard, FileUp, KeyRound, Mail, School, ShieldCheck } from 'lucide-react-native'
 
 import { useMailSettings, usePaymentSettings } from '@/staff/schoolSetupQueries'
 import { useStaff } from '@/staff/useStaff'
 import { ListGroup, MobileScreen, NavBar, type ListGroupItem } from '@/ui'
 
 /**
- * School setup (the website's Settings): the school's details and colour, who can sign in and what
- * each role may do, the school's email account and online fee payments. The logo is an image and
- * waits for the app's photo picker.
+ * School setup (the website's Settings): the school's details, logo and colour, who can sign in and
+ * what each role may do, the school's email account, online fee payments, and importing students.
  */
 export default function SchoolSetupScreen() {
   const router = useRouter()
@@ -20,12 +19,13 @@ export default function SchoolSetupScreen() {
 
   const go = (path: Href) => () => router.push(path)
   const items: ListGroupItem[] = [
-    ...(canSchool
-      ? [{ title: 'School details', subtitle: 'Name, address, contact and colour', icon: School, tile: 4 as const, lines: 2 as const, chevron: true, onPress: go('/school-profile') }]
-      : []),
+    ...(canSchool ? [{ title: 'School details', subtitle: 'Name, address, logo and colour', icon: School, tile: 4 as const, lines: 2 as const, chevron: true, onPress: go('/school-profile') }] : []),
     ...(staff.can('core.users.manage') ? [{ title: 'Users', subtitle: 'Who can sign in', icon: KeyRound, tile: 4 as const, lines: 2 as const, chevron: true, onPress: go('/users') }] : []),
     ...(staff.can('core.users.read')
       ? [{ title: 'Roles', subtitle: 'What each role may do', icon: ShieldCheck, tile: 1 as const, lines: 2 as const, chevron: true, onPress: go('/school-setup/roles') }]
+      : []),
+    ...(staff.canUse('stdnt_students') && staff.can('stdnt.students.write')
+      ? [{ title: 'Import students', subtitle: 'From a spreadsheet', icon: FileUp, tile: 1 as const, lines: 2 as const, chevron: true, onPress: go('/school-setup/import-students') }]
       : []),
     ...(canSchool
       ? [

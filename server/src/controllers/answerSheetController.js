@@ -1314,7 +1314,8 @@ exports.parseTemplate = async (req, res) => {
  */
 exports.downloadTemplate = async (req, res) => {
   try {
-    const excelPath = path.join(__dirname, '../../../client/public/Answer Sheets.xlsx')
+    // The server deploys on its own (no client folder), so it keeps its own copy of the template.
+    const excelPath = path.join(__dirname, '../assets/answer-sheets-template.xlsx')
 
     if (!fs.existsSync(excelPath)) {
       return res.status(404).json({

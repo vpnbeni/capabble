@@ -1,15 +1,23 @@
+import { useQueryClient } from '@tanstack/react-query'
 import { useRouter, type Href } from 'expo-router'
-import { Building2, ClipboardCheck, DoorOpen, FileStack, Printer, UserCheck } from 'lucide-react-native'
+import { Building2, ClipboardCheck, DoorOpen, FileStack, FileUp, Printer, UserCheck } from 'lucide-react-native'
+import { useState } from 'react'
 
-import { useStaff } from '@/staff/useStaff'
+import { ApiError } from '@/lib/api'
+import { PDF, pickDocument } from '@/lib/pickFile'
+import { uploadService } from '@/services/uploadService'
 import { useCentreDetails, useCentrePapers, useExamRooms } from '@/staff/centreQueries'
-import { ListGroup, MobileScreen, NavBar, type ListGroupItem } from '@/ui'
+import { staffKeys } from '@/staff/queries'
+import { useStaff } from '@/staff/useStaff'
+import { ActionSheet, ListGroup, MobileScreen, NavBar, haptic, useToast, type ListGroupItem } from '@/ui'
+
+type BoardFile = 'datesheet' | 'candidates'
 
 /**
  * The board exam centre (the website's Exam centre pages), for the centre superintendent: what the
  * centre is, its rooms, who sits in each room on a day, the answer sheets, and every printed form
- * (seating, stickers, dispatch slip, duty record, Form 66) as a PDF. Importing the board's
- * datesheet, candidates and Form 66 needs a file and stays on the website until the app can pick one.
+ * (seating, stickers, dispatch slip, duty record, Form 66) as a PDF; and the board's datesheet and
+ * candidate PDFs, picked from Files. The seating plan layout is designed on the website.
  */
 export default function CentreScreen() {
   const router = useRouter()
@@ -17,6 +25,28 @@ export default function CentreScreen() {
   const details = useCentreDetails()
   const rooms = useExamRooms()
   const papers = useCentrePapers()
+  const toast = useToast()
+  const queryClient = useQueryClient()
+  const [asking, setAsking] = useState<BoardFile | null>(null)
+  const [importing, setImporting] = useState<BoardFile | null>(null)
+
+  const importBoard = async (what: BoardFile) => {
+    setAsking(null)
+    const picked = await pickDocument(PDF)
+    if (!picked) return
+    setImporting(what)
+    try {
+      const message = what === 'datesheet' ? await uploadService.boardDatesheet(picked) : await uploadService.candidates(picked)
+      haptic.success()
+      await queryClient.invalidateQueries({ queryKey: staffKeys.all })
+      toast(message || (what === 'datesheet' ? 'Datesheet imported' : 'Candidates imported'))
+    } catch (failure) {
+      haptic.error()
+      toast(failure instanceof ApiError ? failure.message : "The file wasn't imported. Try again.", 'danger')
+    } finally {
+      setImporting(null)
+    }
+  }
 
   const setup = staff.can('exam.setup.read')
   const conduct = staff.can('exam.conduct.read')
@@ -80,13 +110,54 @@ export default function CentreScreen() {
       : []),
   ]
 
+  const boardItems: ListGroupItem[] = [
+    ...(staff.can('exam.setup.write') && staff.canUse('datesheets')
+      ? [
+          {
+            title: 'Import the datesheet',
+            subtitle: importing === 'datesheet' ? 'Reading the PDF…' : 'The board’s datesheet PDF',
+            icon: FileUp,
+            tile: 3 as const,
+            lines: 2 as const,
+            onPress: importing ? undefined : () => setAsking('datesheet'),
+          },
+        ]
+      : []),
+    ...(staff.can('exam.candidates.write') && staff.canUse('candidates')
+      ? [
+          {
+            title: 'Import candidates',
+            subtitle: importing === 'candidates' ? 'Reading the PDF…' : 'The board’s candidate list PDF',
+            icon: FileUp,
+            tile: 3 as const,
+            lines: 2 as const,
+            onPress: importing ? undefined : () => setAsking('candidates'),
+          },
+        ]
+      : []),
+  ]
+
   return (
     <MobileScreen
       refreshing={details.isRefetching || rooms.isRefetching || papers.isRefetching}
       onRefresh={() => (details.refetch(), rooms.refetch(), papers.refetch())}
       nav={<NavBar title="Board exam centre" back={{ label: 'Back', onPress: router.back }} />}
+      overlay={
+        <ActionSheet
+          open={Boolean(asking)}
+          onClose={() => setAsking(null)}
+          title={asking === 'datesheet' ? 'Import the board’s datesheet?' : 'Import candidates?'}
+          message={
+            asking === 'datesheet'
+              ? 'Choose the datesheet PDF from the board. It replaces the datesheet the centre has now.'
+              : 'Choose the candidate list PDF from the board. Candidates already here are kept; new roll numbers are added.'
+          }
+          actions={[{ label: 'Choose the PDF', onSelect: () => asking && importBoard(asking) }]}
+        />
+      }
     >
-      <ListGroup items={items} footer="Importing the board's datesheet, candidates and Form 66 files is done on the website." />
+      <ListGroup items={items} />
+      {boardItems.length ? <ListGroup header="From the board" footer="PDFs from the board's portal, from Files, Drive or WhatsApp." items={boardItems} /> : null}
     </MobileScreen>
   )
 }

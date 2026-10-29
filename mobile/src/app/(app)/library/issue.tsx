@@ -8,6 +8,7 @@ import { classLabel } from '@/lib/format'
 import { libraryService, type LibraryCopy, type LibraryMember } from '@/services/libraryService'
 import { useIssueBook } from '@/staff/libraryQueries'
 import { space } from '@/theme/tokens'
+import { ScanSheet } from '@/staff/ScanSheet'
 import { ActionBar, Callout, ListGroup, MobileButton, MobileScreen, MobileTextField, NavBar, SearchBar, haptic, useToast } from '@/ui'
 
 type Borrower = { member: LibraryMember; activeLoans: number; eligible: boolean; policy: { maxActiveLoans: number; loanDays: number } | null }
@@ -25,6 +26,7 @@ export default function IssueBookScreen() {
   const [query, setQuery] = useState('')
   const [matches, setMatches] = useState<LibraryMember[]>([])
   const [bookCode, setBookCode] = useState('')
+  const [scanning, setScanning] = useState(false)
   const [copy, setCopy] = useState<LibraryCopy | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -57,11 +59,13 @@ export default function IssueBookScreen() {
     }
   }
 
-  const findCopy = async () => {
-    if (!bookCode.trim()) return
+  const findCopy = async (scanned?: string) => {
+    const value = (scanned ?? bookCode).trim()
+    if (!value) return
+    if (scanned) setBookCode(scanned)
     setBusy(true)
     try {
-      const found = await libraryService.copy(bookCode.trim())
+      const found = await libraryService.copy(value)
       setCopy(found)
       setError(found.status === 'available' ? null : `This copy is ${found.status}, not on the shelf.`)
     } catch (failure) {
@@ -100,6 +104,7 @@ export default function IssueBookScreen() {
           <ActionBar icon={BookCopy} summary={copy.titleId?.title ?? copy.accessionNumber} detail={`To ${borrower.member.name}`} label={issue.isPending ? 'Issuing…' : 'Issue book'} onPress={submit} />
         ) : undefined
       }
+      overlay={<ScanSheet open={scanning} onClose={() => setScanning(false)} onScan={(value) => findCopy(value)} title="Scan the book's label" />}
     >
       {error ? (
         <Callout tone="danger" title="Can't issue yet">
@@ -149,9 +154,12 @@ export default function IssueBookScreen() {
           />
         ) : (
           <View style={{ gap: space['space-3'] }}>
-            <MobileTextField label="Accession number" hint="On the label inside the book." value={bookCode} onChangeText={setBookCode} autoCapitalize="characters" returnKeyType="search" onSubmitEditing={findCopy} maxLength={40} />
-            <MobileButton variant="tinted" loading={busy} onPress={findCopy}>
+            <MobileTextField label="Accession number" hint="On the label inside the book." value={bookCode} onChangeText={setBookCode} autoCapitalize="characters" returnKeyType="search" onSubmitEditing={() => findCopy()} maxLength={40} />
+            <MobileButton variant="tinted" loading={busy} onPress={() => findCopy()}>
               Find book
+            </MobileButton>
+            <MobileButton variant="gray" onPress={() => setScanning(true)}>
+              Scan the label
             </MobileButton>
           </View>
         )

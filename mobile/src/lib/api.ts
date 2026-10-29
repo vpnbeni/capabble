@@ -76,12 +76,14 @@ const send = async (path: string, options: RequestOptions) => {
   }
   if (tenantSlug) headers['x-tenant-slug'] = tenantSlug
   if (staffSession) headers['x-academic-session'] = currentSessionLabel()
-  if (options.body !== undefined) headers['Content-Type'] = 'application/json'
+  // A file upload sends its form as it is; fetch sets the multipart boundary.
+  const isForm = typeof FormData !== 'undefined' && options.body instanceof FormData
+  if (options.body !== undefined && !isForm) headers['Content-Type'] = 'application/json'
 
   return fetch(buildUrl(path, options.baseUrl ?? API_BASE_URL, options.params), {
     method: options.method ?? 'GET',
     headers,
-    body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+    body: options.body === undefined ? undefined : isForm ? (options.body as FormData) : JSON.stringify(options.body),
     credentials: 'include',
   })
 }
@@ -156,4 +158,6 @@ export const api = {
   patch: <T>(path: string, body?: unknown, options?: Omit<RequestOptions, 'method' | 'body'>) =>
     request<T>(path, { ...options, method: 'PATCH', body: body ?? {} }),
   delete: <T>(path: string, params?: RequestOptions['params']) => request<T>(path, { method: 'DELETE', params }),
+  /** A file upload (see lib/pickFile). Several import routes answer with fields next to `data`, so this returns the whole body. */
+  upload: <T>(path: string, form: FormData) => request<T>(path, { method: 'POST', body: form, raw: true }),
 }

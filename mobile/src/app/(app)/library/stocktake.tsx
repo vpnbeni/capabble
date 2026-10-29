@@ -8,6 +8,7 @@ import { formatDate, formatRelative, formatDayKey, schoolToday } from '@/lib/for
 import { CardSkeleton, LoadFailed } from '@/portal/states'
 import type { Stocktake } from '@/services/libraryService'
 import { useCheckCopy, useCloseStocktake, useStartStocktake, useStocktakes } from '@/staff/libraryQueries'
+import { ScanSheet } from '@/staff/ScanSheet'
 import { useStaff } from '@/staff/useStaff'
 import { space } from '@/theme/tokens'
 import { ActionBar, Callout, Dialog, Hero, ListGroup, MobileButton, MobileScreen, MobileTextField, NavBar, StatusView, Surface, haptic, useToast, type MobileTextFieldRef } from '@/ui'
@@ -37,6 +38,8 @@ export default function StocktakeScreen() {
   const [error, setError] = useState<string | null>(null)
   const [confirm, setConfirm] = useState<'start' | 'close' | null>(null)
   const [name, setName] = useState('')
+  const [scanning, setScanning] = useState(false)
+  const [lastScan, setLastScan] = useState<string | null>(null)
 
   const list = stocktakes.data ?? []
   const current = list.find((row) => row.status === 'open')
@@ -44,8 +47,8 @@ export default function StocktakeScreen() {
   const counts = current ? tally(current) : null
   const recent = current ? current.items.filter((item) => item.state === 'verified' && item.scannedAt).sort((a, b) => String(b.scannedAt).localeCompare(String(a.scannedAt))).slice(0, 8) : []
 
-  const found = async () => {
-    const value = code.trim()
+  const found = async (scanned?: string) => {
+    const value = (scanned ?? code).trim()
     if (!current || !value) return
     const already = current.items.find((item) => item.accessionNumber === value && item.state === 'verified')
     if (already) {
@@ -58,7 +61,8 @@ export default function StocktakeScreen() {
       haptic.light()
       setCode('')
       setError(null)
-      field.current?.focus()
+      setLastScan(scanned ? value : null)
+      if (!scanned) field.current?.focus()
     } catch (failure) {
       haptic.error()
       setError(failure instanceof ApiError ? (failure.status === 404 ? `${value} isn't in the library's copies. Check the number.` : failure.message) : "It wasn't counted. Try again.")
@@ -99,29 +103,32 @@ export default function StocktakeScreen() {
         )
       }
       overlay={
-        <Dialog
-          open={Boolean(confirm)}
-          onClose={() => setConfirm(null)}
-          tone={confirm === 'close' ? 'danger' : 'default'}
-          title={confirm === 'start' ? 'Start a stocktake?' : 'Close the stocktake?'}
-          description={
-            confirm === 'start'
-              ? 'Every copy the library has goes on the list to find.'
-              : `${(counts?.total ?? 0) - (counts?.found ?? 0)} copies not found go on its missing list. Nothing more can be counted after.`
-          }
-          footer={
-            <>
-              <MobileButton variant="gray" onPress={() => setConfirm(null)}>
-                Not now
-              </MobileButton>
-              <MobileButton variant={confirm === 'close' ? 'destructive' : 'filled'} loading={start.isPending || close.isPending} onPress={act}>
-                {confirm === 'start' ? 'Start' : 'Close'}
-              </MobileButton>
-            </>
-          }
-        >
-          {confirm === 'start' ? <MobileTextField label="Name (optional)" placeholder={`Stocktake ${formatDayKey(schoolToday(), { year: true })}`} value={name} onChangeText={setName} maxLength={200} /> : null}
-        </Dialog>
+        <>
+          <Dialog
+            open={Boolean(confirm)}
+            onClose={() => setConfirm(null)}
+            tone={confirm === 'close' ? 'danger' : 'default'}
+            title={confirm === 'start' ? 'Start a stocktake?' : 'Close the stocktake?'}
+            description={
+              confirm === 'start'
+                ? 'Every copy the library has goes on the list to find.'
+                : `${(counts?.total ?? 0) - (counts?.found ?? 0)} copies not found go on its missing list. Nothing more can be counted after.`
+            }
+            footer={
+              <>
+                <MobileButton variant="gray" onPress={() => setConfirm(null)}>
+                  Not now
+                </MobileButton>
+                <MobileButton variant={confirm === 'close' ? 'destructive' : 'filled'} loading={start.isPending || close.isPending} onPress={act}>
+                  {confirm === 'start' ? 'Start' : 'Close'}
+                </MobileButton>
+              </>
+            }
+          >
+            {confirm === 'start' ? <MobileTextField label="Name (optional)" placeholder={`Stocktake ${formatDayKey(schoolToday(), { year: true })}`} value={name} onChangeText={setName} maxLength={200} /> : null}
+          </Dialog>
+          <ScanSheet open={scanning} onClose={() => setScanning(false)} onScan={(value) => found(value)} title="Scan copies" continuous last={error ?? (lastScan ? `${lastScan} counted` : null)} />
+        </>
       }
     >
       {stocktakes.isPending ? (
@@ -156,10 +163,13 @@ export default function StocktakeScreen() {
                   maxLength={40}
                   returnKeyType="done"
                   blurOnSubmit={false}
-                  onSubmitEditing={found}
+                  onSubmitEditing={() => found()}
                 />
-                <MobileButton variant="tinted" fullWidth loading={check.isPending} onPress={found}>
+                <MobileButton variant="tinted" fullWidth loading={check.isPending} onPress={() => found()}>
                   Found
+                </MobileButton>
+                <MobileButton variant="gray" fullWidth onPress={() => (setError(null), setScanning(true))}>
+                  Scan with the camera
                 </MobileButton>
               </View>
             </Surface>

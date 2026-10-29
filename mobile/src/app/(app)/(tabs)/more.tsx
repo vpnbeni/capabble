@@ -58,7 +58,7 @@ export default function MoreScreen() {
       ? [{ label: 'Exams', icon: Award, tile: 6 as const, onPress: () => router.push('/exams') }]
       : []),
     ...(isStaff &&
-    ['centre_details', 'examrooms', 'seatingplan', 'duties', 'answersheets', 'form66'].some((feature) => staff.canUse(feature)) &&
+    ['centre_details', 'datesheets', 'candidates', 'examrooms', 'seatingplan', 'duties', 'answersheets', 'form66'].some((feature) => staff.canUse(feature)) &&
     (staff.can('exam.setup.read') || staff.can('exam.conduct.read') || staff.can('exam.duties.read'))
       ? [{ label: 'Board exam centre', icon: Building2, tile: 3 as const, onPress: () => router.push('/centre') }]
       : []),
@@ -69,7 +69,8 @@ export default function MoreScreen() {
       ? [{ label: 'Syllabus', icon: BookCheck, tile: 4 as const, onPress: () => router.push('/coverage') }]
       : []),
     ...(isStaff && staff.can('core.users.manage') ? [{ label: 'Users', icon: KeyRound, tile: 4 as const, onPress: () => router.push('/users') }] : []),
-    ...(isStaff && (staff.can('core.school.write') || staff.can('core.users.read') || (staff.canUse('cpitl_fees') && staff.can('cpitl.finance.settings')))
+    ...(isStaff &&
+    (staff.can('core.school.write') || staff.can('core.users.read') || (staff.canUse('stdnt_students') && staff.can('stdnt.students.write')) || (staff.canUse('cpitl_fees') && staff.can('cpitl.finance.settings')))
       ? [{ label: 'School setup', icon: School, tile: 4 as const, onPress: () => router.push('/school-setup') }]
       : []),
     ...(isStaff && staff.canUse('billing') && staff.can('core.billing.read') ? [{ label: 'Billing', icon: CreditCard, tile: 3 as const, onPress: () => router.push('/billing') }] : []),

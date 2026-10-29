@@ -9,6 +9,7 @@ import { CardSkeleton, LoadFailed } from '@/portal/states'
 import type { AuditItem, AuditItemState } from '@/services/assetService'
 import { LocationChooser } from '@/staff/LocationChooser'
 import { useAssetAudit, useAssetAudits, useAssetCategories, useCheckAsset, useCloseAudit, useMarkAuditItem, useStartAudit } from '@/staff/assetQueries'
+import { ScanSheet } from '@/staff/ScanSheet'
 import { useStaff } from '@/staff/useStaff'
 import { space } from '@/theme/tokens'
 import {
@@ -61,6 +62,8 @@ export default function AssetAuditScreen() {
   const check = useCheckAsset()
   const mark = useMarkAuditItem()
   const close = useCloseAudit()
+  const [scanning, setScanning] = useState(false)
+  const [lastScan, setLastScan] = useState<string | null>(null)
   const field = useRef<MobileTextFieldRef>(null)
   const [code, setCode] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -75,15 +78,16 @@ export default function AssetAuditScreen() {
   const pending = items.filter((item) => item.state === 'Unverified')
   const marked = items.filter((item) => item.state !== 'Unverified' && item.state !== 'Verified')
 
-  const doCheck = async () => {
-    const value = code.trim()
+  const doCheck = async (scanned?: string) => {
+    const value = (scanned ?? code).trim()
     if (!current || !value) return
     try {
       await check.mutateAsync({ id: current._id, code: value })
       haptic.light()
       setCode('')
       setError(null)
-      field.current?.focus()
+      setLastScan(scanned ? value : null)
+      if (!scanned) field.current?.focus()
     } catch (failure) {
       haptic.error()
       setError(failure instanceof ApiError ? (failure.status === 404 ? `${value} isn't an asset ID, barcode or tag of this school.` : failure.message) : "It wasn't checked. Try again.")
@@ -151,6 +155,7 @@ export default function AssetAuditScreen() {
       }
       overlay={
         <>
+          <ScanSheet open={scanning} onClose={() => setScanning(false)} onScan={(value) => doCheck(value)} title="Scan asset tags" continuous last={error ?? (lastScan ? `${lastScan} checked` : null)} />
           <BottomSheet open={starting} onClose={() => setStarting(false)} title="Start an audit" detent="large" footer={<MobileButton fullWidth loading={start.isPending} onPress={doStart}>Start</MobileButton>}>
             {error ? <Callout tone="danger" title="Not started">{error}</Callout> : null}
             <SegmentedControl
@@ -213,9 +218,12 @@ export default function AssetAuditScreen() {
             <Surface>
               <View style={{ gap: space['space-3'] }}>
                 {error ? <Callout tone="danger" title="Not checked">{error}</Callout> : null}
-                <MobileTextField ref={field} label="Asset ID" hint="Type the ID on the tag of each asset you find." value={code} onChangeText={setCode} autoCapitalize="characters" maxLength={60} returnKeyType="done" blurOnSubmit={false} onSubmitEditing={doCheck} />
-                <MobileButton variant="tinted" fullWidth loading={check.isPending} onPress={doCheck}>
+                <MobileTextField ref={field} label="Asset ID" hint="Type the ID on the tag of each asset you find." value={code} onChangeText={setCode} autoCapitalize="characters" maxLength={60} returnKeyType="done" blurOnSubmit={false} onSubmitEditing={() => doCheck()} />
+                <MobileButton variant="tinted" fullWidth loading={check.isPending} onPress={() => doCheck()}>
                   Found
+                </MobileButton>
+                <MobileButton variant="gray" fullWidth onPress={() => (setError(null), setScanning(true))}>
+                  Scan tags with the camera
                 </MobileButton>
               </View>
             </Surface>

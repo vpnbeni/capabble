@@ -5,11 +5,13 @@ import { useState } from 'react'
 import { View } from 'react-native'
 
 import { ApiError } from '@/lib/api'
+import { pickImage } from '@/lib/pickFile'
 import { CardSkeleton, LoadFailed } from '@/portal/states'
 import { schoolProfileService, type SchoolProfile, type SchoolProfileInput } from '@/services/schoolProfileService'
+import { uploadService } from '@/services/uploadService'
 import { staffKeys } from '@/staff/queries'
 import { space } from '@/theme/tokens'
-import { ActionBar, ActionSheet, Avatar, Callout, MobileScreen, MobileTextField, NavBar, haptic, useToast } from '@/ui'
+import { ActionBar, ActionSheet, Avatar, Callout, MobileButton, MobileScreen, MobileTextField, NavBar, haptic, useToast } from '@/ui'
 
 type Form = { schoolName: string; tagline: string; address: string; contact: string; email: string; affiliationNo: string; udiseCode: string; brandColor: string }
 const fromProfile = (profile: SchoolProfile): Form => ({
@@ -25,7 +27,7 @@ const fromProfile = (profile: SchoolProfile): Form => ({
 
 /**
  * The school's name, address, contact and brand colour, as printed on receipts, report cards and
- * emails. The logo is an image and waits for the app's photo picker.
+ * emails, and its logo from the phone's photos or camera.
  */
 export default function SchoolProfileScreen() {
   const router = useRouter()
@@ -39,6 +41,26 @@ export default function SchoolProfileScreen() {
   const [edited, setForm] = useState<Form | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [leaving, setLeaving] = useState<null | (() => void)>(null)
+  const [logoMenu, setLogoMenu] = useState(false)
+  const [uploading, setUploading] = useState(false)
+
+  const changeLogo = async (camera: boolean) => {
+    setLogoMenu(false)
+    const picked = await pickImage({ camera, square: true })
+    if (!picked) return
+    setUploading(true)
+    try {
+      await uploadService.schoolLogo(picked)
+      haptic.success()
+      await queryClient.invalidateQueries({ queryKey: [...staffKeys.all, 'school-profile'] })
+      toast('Logo changed')
+    } catch (failure) {
+      haptic.error()
+      toast(failure instanceof ApiError ? failure.message : "The logo wasn't changed. Try again.", 'danger')
+    } finally {
+      setUploading(false)
+    }
+  }
   const start = profile.data ? fromProfile(profile.data) : null
   const form = edited ?? start
   const changes = form && start ? (Object.fromEntries(Object.entries(form).filter(([key, value]) => value.trim() !== start[key as keyof Form])) as SchoolProfileInput) : {}
@@ -78,13 +100,25 @@ export default function SchoolProfileScreen() {
       nav={<NavBar title="School details" back={{ label: 'Back', onPress: router.back }} />}
       actionBar={count ? <ActionBar icon={School} summary={form?.schoolName.trim() || 'School'} detail={`${count} ${count === 1 ? 'change' : 'changes'}`} label={save.isPending ? 'Saving…' : 'Save'} onPress={submit} /> : undefined}
       overlay={
-        <ActionSheet
-          open={Boolean(leaving)}
-          onClose={() => setLeaving(null)}
-          title="Discard your changes?"
-          actions={[{ label: 'Discard', tone: 'danger', onSelect: () => leaving?.() }]}
-          cancelLabel="Keep editing"
-        />
+        <>
+          <ActionSheet
+            open={Boolean(leaving)}
+            onClose={() => setLeaving(null)}
+            title="Discard your changes?"
+            actions={[{ label: 'Discard', tone: 'danger', onSelect: () => leaving?.() }]}
+            cancelLabel="Keep editing"
+          />
+          <ActionSheet
+            open={logoMenu}
+            onClose={() => setLogoMenu(false)}
+            title="The school’s logo"
+            message="A square picture works best. It shows on receipts, report cards and emails."
+            actions={[
+              { label: 'Choose a photo', onSelect: () => changeLogo(false) },
+              { label: 'Take a photo', onSelect: () => changeLogo(true) },
+            ]}
+          />
+        </>
       }
     >
       {profile.isPending ? (
@@ -98,8 +132,11 @@ export default function SchoolProfileScreen() {
               {error}
             </Callout>
           ) : null}
-          <View style={{ alignItems: 'center' }}>
+          <View style={{ alignItems: 'center', gap: space['space-2'] }}>
             <Avatar name={form.schoolName} src={profile.data?.logoUrl || undefined} size={72} />
+            <MobileButton variant="plain" loading={uploading} onPress={() => setLogoMenu(true)}>
+              Change the logo
+            </MobileButton>
           </View>
           <View style={{ gap: space['space-4'] }}>
             {field('schoolName', 'School name', { maxLength: 200 })}

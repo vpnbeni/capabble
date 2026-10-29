@@ -1,17 +1,19 @@
 import { useRouter } from 'expo-router'
-import { CalendarDays, FileStack } from 'lucide-react-native'
+import { CalendarDays, FileStack, FileUp } from 'lucide-react-native'
 import { useState } from 'react'
 import { View } from 'react-native'
 
 import { ApiError } from '@/lib/api'
 import { formatDayKey, schoolToday } from '@/lib/format'
-import { sharePdf } from '@/lib/sharePdf'
+import { SPREADSHEET, pickDocument } from '@/lib/pickFile'
+import { shareBytes, sharePdf } from '@/lib/sharePdf'
 import { CardSkeleton, LoadFailed } from '@/portal/states'
 import { centreService, leftOf, serialError, spoiltOf, type AnswerSheet } from '@/services/centreService'
+import { uploadService } from '@/services/uploadService'
 import { useAnswerSheets, useCentrePapers, useDaySheets, useDiscardSerials, useSaveSerials } from '@/staff/centreQueries'
 import { useStaff } from '@/staff/useStaff'
 import { space } from '@/theme/tokens'
-import { BottomSheet, Callout, ChipRail, ListGroup, MobileButton, MobileScreen, MobileTextField, NavBar, StatusView, Surface, haptic, useToast } from '@/ui'
+import { ActionSheet, BottomSheet, Callout, ChipRail, ListGroup, MobileButton, MobileScreen, MobileTextField, NavBar, StatusView, Surface, haptic, useToast } from '@/ui'
 
 type Tab = 'stock' | 'day'
 type Sheet = { sheet: AnswerSheet; view: 'menu' | 'serials' | 'spoilt'; from: string; to: string; reason: string }
@@ -105,63 +107,113 @@ export default function CentreAnswerSheetsScreen() {
 
   const multiple = (sheet: AnswerSheet) => (sheet.serialRanges?.length ?? 0) > 1
 
+  const [importMenu, setImportMenu] = useState(false)
+  const [importing, setImporting] = useState(false)
+
+  const shareTemplate = async () => {
+    try {
+      const bytes = await uploadService.answerSheetsTemplate()
+      await shareBytes(bytes, 'Answer sheets template.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    } catch (failure) {
+      toast(fail(failure, "The template didn't download. Try again."), 'danger')
+    }
+  }
+
+  const importSheet = async () => {
+    const picked = await pickDocument(SPREADSHEET)
+    if (!picked) return
+    setImporting(true)
+    try {
+      const result = await uploadService.answerSheets(picked)
+      haptic.success()
+      await sheets.refetch()
+      toast(`${result?.created ?? 0} added${result?.skipped ? `, ${result.skipped} already there` : ''}${result?.failed ? `, ${result.failed} not read` : ''}`)
+    } catch (failure) {
+      toast(fail(failure, "The spreadsheet wasn't imported. Try again."), 'danger')
+    } finally {
+      setImporting(false)
+    }
+  }
+
   return (
     <MobileScreen
       refreshing={sheets.isRefetching}
       onRefresh={() => (sheets.refetch(), papers.refetch(), daySheets.refetch())}
-      nav={<NavBar title="Answer sheets" back={{ label: 'Centre', onPress: router.back }} />}
+      nav={
+        <NavBar
+          title="Answer sheets"
+          back={{ label: 'Centre', onPress: router.back }}
+          actions={canWrite ? [{ label: importing ? 'Importing…' : 'Import a spreadsheet', icon: FileUp, onPress: () => !importing && setImportMenu(true) }] : undefined}
+        />
+      }
       overlay={
-        <BottomSheet
-          open={Boolean(open)}
-          onClose={() => (open && open.view !== 'menu' && open.sheet._id && !open.sheet.isTemplate ? setOpen({ ...open, view: 'menu' }) : setOpen(null))}
-          title={open ? `Class ${open.sheet.class} · ${nameOf(open.sheet)}` : ''}
-          description={
-            open?.view === 'serials' ? 'The first and last serial in the packets received.' : open?.view === 'spoilt' ? 'A run of serials that can’t be used. One serial: the same in both.' : undefined
-          }
-          footer={
-            open?.view === 'serials' ? (
-              <MobileButton fullWidth loading={saveSerials.isPending} onPress={doSerials}>
-                Save serials
-              </MobileButton>
-            ) : open?.view === 'spoilt' ? (
-              <MobileButton fullWidth loading={discard.isPending} onPress={doSpoilt}>
-                Mark spoilt
-              </MobileButton>
-            ) : undefined
-          }
-        >
-          {!open ? null : open.view === 'menu' ? (
-            <ListGroup
-              items={[
-                ...(canWrite && !multiple(open.sheet)
-                  ? [{ title: 'Change the serials received', value: rangeOf(open.sheet), lines: 2 as const, chevron: true, onPress: () => (setError(null), setOpen({ ...open, view: 'serials' })) }]
-                  : []),
-                ...(canWrite
-                  ? [
-                      {
-                        title: 'Mark serials spoilt',
-                        subtitle: `${spoiltOf(open.sheet)} spoilt so far`,
-                        chevron: true,
-                        onPress: () => (setError(null), setOpen({ ...open, view: 'spoilt', from: '', to: '' })),
-                      },
-                    ]
-                  : []),
-                { title: 'Share the consolidated record', subtitle: 'Every serial used and spoilt, as a PDF', onPress: () => shareRecord(open.sheet) },
-              ]}
-            />
-          ) : (
-            <View style={{ gap: space['space-4'] }}>
-              {error ? (
-                <Callout tone="danger" title="Not saved">
-                  {error}
-                </Callout>
-              ) : null}
-              <MobileTextField label="First serial" value={open.from} onChangeText={(from) => setOpen({ ...open, from })} autoCapitalize="characters" maxLength={20} returnKeyType="next" />
-              <MobileTextField label="Last serial" value={open.to} onChangeText={(to) => setOpen({ ...open, to })} autoCapitalize="characters" maxLength={20} />
-              {open.view === 'spoilt' ? <MobileTextField label="Why" value={open.reason} onChangeText={(reason) => setOpen({ ...open, reason })} placeholder="Torn" maxLength={200} /> : null}
-            </View>
-          )}
-        </BottomSheet>
+        <>
+          <ActionSheet
+            open={importMenu}
+            onClose={() => setImportMenu(false)}
+            title="Answer sheets from a spreadsheet"
+            message="Fill the template with each kind's serials, then choose it from Files."
+            actions={[
+              { label: 'Choose the filled spreadsheet', onSelect: importSheet },
+              { label: 'Get the template', onSelect: shareTemplate },
+            ]}
+          />
+          <BottomSheet
+            open={Boolean(open)}
+            onClose={() => (open && open.view !== 'menu' && open.sheet._id && !open.sheet.isTemplate ? setOpen({ ...open, view: 'menu' }) : setOpen(null))}
+            title={open ? `Class ${open.sheet.class} · ${nameOf(open.sheet)}` : ''}
+            description={
+              open?.view === 'serials'
+                ? 'The first and last serial in the packets received.'
+                : open?.view === 'spoilt'
+                  ? 'A run of serials that can’t be used. One serial: the same in both.'
+                  : undefined
+            }
+            footer={
+              open?.view === 'serials' ? (
+                <MobileButton fullWidth loading={saveSerials.isPending} onPress={doSerials}>
+                  Save serials
+                </MobileButton>
+              ) : open?.view === 'spoilt' ? (
+                <MobileButton fullWidth loading={discard.isPending} onPress={doSpoilt}>
+                  Mark spoilt
+                </MobileButton>
+              ) : undefined
+            }
+          >
+            {!open ? null : open.view === 'menu' ? (
+              <ListGroup
+                items={[
+                  ...(canWrite && !multiple(open.sheet)
+                    ? [{ title: 'Change the serials received', value: rangeOf(open.sheet), lines: 2 as const, chevron: true, onPress: () => (setError(null), setOpen({ ...open, view: 'serials' })) }]
+                    : []),
+                  ...(canWrite
+                    ? [
+                        {
+                          title: 'Mark serials spoilt',
+                          subtitle: `${spoiltOf(open.sheet)} spoilt so far`,
+                          chevron: true,
+                          onPress: () => (setError(null), setOpen({ ...open, view: 'spoilt', from: '', to: '' })),
+                        },
+                      ]
+                    : []),
+                  { title: 'Share the consolidated record', subtitle: 'Every serial used and spoilt, as a PDF', onPress: () => shareRecord(open.sheet) },
+                ]}
+              />
+            ) : (
+              <View style={{ gap: space['space-4'] }}>
+                {error ? (
+                  <Callout tone="danger" title="Not saved">
+                    {error}
+                  </Callout>
+                ) : null}
+                <MobileTextField label="First serial" value={open.from} onChangeText={(from) => setOpen({ ...open, from })} autoCapitalize="characters" maxLength={20} returnKeyType="next" />
+                <MobileTextField label="Last serial" value={open.to} onChangeText={(to) => setOpen({ ...open, to })} autoCapitalize="characters" maxLength={20} />
+                {open.view === 'spoilt' ? <MobileTextField label="Why" value={open.reason} onChangeText={(reason) => setOpen({ ...open, reason })} placeholder="Torn" maxLength={200} /> : null}
+              </View>
+            )}
+          </BottomSheet>
+        </>
       }
     >
       <ChipRail

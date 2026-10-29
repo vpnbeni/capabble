@@ -4,9 +4,11 @@ import { useState } from 'react'
 import { View } from 'react-native'
 
 import { ApiError } from '@/lib/api'
+import { pickImage } from '@/lib/pickFile'
 import { formatDayKey, formatINR, schoolToday } from '@/lib/format'
 import { CardSkeleton } from '@/portal/states'
 import { MODE_LABELS, type PaymentMode } from '@/services/feeService'
+import { uploadService, type Attachment } from '@/services/uploadService'
 import { useExpenseCategories, useRecordExpense, useRecordFuel, useVehicles } from '@/staff/expenseQueries'
 import { space } from '@/theme/tokens'
 import {
@@ -49,6 +51,9 @@ export default function RecordExpenseScreen() {
   const [payee, setPayee] = useState('')
   const [mode, setMode] = useState<PaymentMode>('cash')
   const [reference, setReference] = useState('')
+  const [bills, setBills] = useState<Attachment[]>([])
+  const [photoMenu, setPhotoMenu] = useState(false)
+  const [uploading, setUploading] = useState(false)
   const [date, setDate] = useState(today)
   const [vehicleId, setVehicleId] = useState('')
   const [litres, setLitres] = useState('')
@@ -75,13 +80,29 @@ export default function RecordExpenseScreen() {
     setError(message)
   }
 
+  const addBill = async (camera: boolean) => {
+    setPhotoMenu(false)
+    const picked = await pickImage({ camera })
+    if (!picked) return
+    setUploading(true)
+    try {
+      const bill = await uploadService.attachment(picked)
+      haptic.light()
+      setBills((current) => [...current, bill])
+    } catch (failure) {
+      fail(failure instanceof ApiError ? failure.message : "The photo wasn't added. Try again.")
+    } finally {
+      setUploading(false)
+    }
+  }
+
   const submit = async () => {
     try {
       if (kind === 'expense') {
         if (!title.trim()) return fail('Write what it was for, such as "Printer toner".')
         if (!(money(amount) > 0)) return fail('Enter the amount paid.')
         if (!categoryId) return fail('Choose a category.')
-        await recordExpense.mutateAsync({ title: title.trim(), amount: money(amount), date, categoryId, payee: payee.trim(), mode, reference: reference.trim() })
+        await recordExpense.mutateAsync({ title: title.trim(), amount: money(amount), date, categoryId, payee: payee.trim(), mode, reference: reference.trim(), attachments: bills.length ? bills : undefined })
       } else {
         if (!vehicleId) return fail('Choose the vehicle.')
         if (!(money(litres) > 0)) return fail('Enter the litres filled.')
@@ -122,6 +143,15 @@ export default function RecordExpenseScreen() {
       }
       overlay={
         <>
+          <ActionSheet
+            open={photoMenu}
+            onClose={() => setPhotoMenu(false)}
+            title="Photo of the bill"
+            actions={[
+              { label: 'Take a photo', onSelect: () => addBill(true) },
+              { label: 'Choose a photo', onSelect: () => addBill(false) },
+            ]}
+          />
           <BottomSheet open={sheet !== null} onClose={() => setSheet(null)} detent={sheet === 'category' ? 'large' : 'medium'} title={{ category: 'Category', mode: 'Paid by', date: 'Date', vehicle: 'Vehicle' }[sheet ?? 'category']}>
             {sheet === 'category' ? (
               <OptionList label="Category" value={categoryId || null} onChange={(value) => (setCategoryId(value), setSheet(null))} options={active.map((row) => ({ value: row._id, label: row.name }))} />
@@ -178,6 +208,13 @@ export default function RecordExpenseScreen() {
                 ]}
               />
               {mode !== 'cash' ? <MobileTextField label="Reference (optional)" value={reference} onChangeText={setReference} hint="Cheque number or the UTR of the payment." maxLength={60} /> : null}
+              <ListGroup
+                header="Bill (optional)"
+                items={[
+                  ...bills.map((bill, index) => ({ title: bill.name || `Photo ${index + 1}`, subtitle: 'Tap to take it off', onPress: () => setBills(bills.filter((_, at) => at !== index)) })),
+                  ...(bills.length < 3 ? [{ title: uploading ? 'Adding the photo…' : 'Add a photo of the bill', onPress: uploading ? undefined : () => setPhotoMenu(true) }] : []),
+                ]}
+              />
             </>
           ) : (
             <>

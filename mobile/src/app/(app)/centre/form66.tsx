@@ -1,17 +1,21 @@
 import { useRouter } from 'expo-router'
-import { ClipboardCheck, FileText } from 'lucide-react-native'
+import { ClipboardCheck, FileText, FileUp } from 'lucide-react-native'
 import { useState } from 'react'
 
 import { ApiError } from '@/lib/api'
+import { TEXT, pickDocument } from '@/lib/pickFile'
 import { sharePdf } from '@/lib/sharePdf'
 import { CardSkeleton, LoadFailed } from '@/portal/states'
 import { centreService } from '@/services/centreService'
+import { uploadService } from '@/services/uploadService'
 import { useForm66Dates, useForm66Subjects } from '@/staff/centreQueries'
+import { useStaff } from '@/staff/useStaff'
 import { ChipRail, ListGroup, MobileScreen, NavBar, StatusView, Surface, haptic, useToast } from '@/ui'
 
 /**
- * Form 66 (the website's Form 66): the attendance sheets the board sent, by exam day, as PDFs to
- * print: the whole day or one subject. The board's files are imported on the website.
+ * Form 66 (the website's Form 66): import the board's Form 66 text file from Files, then the
+ * attendance sheets by exam day as PDFs to print: the whole day or one subject. A file replaces
+ * the records of the days it has.
  */
 export default function CentreForm66Screen() {
   const router = useRouter()
@@ -22,6 +26,25 @@ export default function CentreForm66Screen() {
   const date = picked ?? list[list.length - 1] ?? null
   const subjects = useForm66Subjects(date)
   const [making, setMaking] = useState<string | null>(null)
+  const staff = useStaff()
+  const [importing, setImporting] = useState(false)
+
+  const importFile = async () => {
+    const picked = await pickDocument(TEXT)
+    if (!picked) return
+    setImporting(true)
+    try {
+      const result = await uploadService.form66(picked)
+      haptic.success()
+      await dates.refetch()
+      toast(`${result.count ?? 0} candidates on ${result.dateCount ?? 0} ${result.dateCount === 1 ? 'day' : 'days'} imported`)
+    } catch (failure) {
+      haptic.error()
+      toast(failure instanceof ApiError ? failure.message : "Form 66 wasn't imported. Try again.", 'danger')
+    } finally {
+      setImporting(false)
+    }
+  }
 
   const share = async (subjectCode?: string) => {
     if (!date || making) return
@@ -44,7 +67,13 @@ export default function CentreForm66Screen() {
     <MobileScreen
       refreshing={dates.isRefetching || subjects.isRefetching}
       onRefresh={() => (dates.refetch(), subjects.refetch())}
-      nav={<NavBar title="Form 66" back={{ label: 'Centre', onPress: router.back }} />}
+      nav={
+        <NavBar
+          title="Form 66"
+          back={{ label: 'Centre', onPress: router.back }}
+          actions={staff.can('exam.conduct.write') ? [{ label: importing ? 'Importing…' : 'Import the board’s file', icon: FileUp, onPress: () => !importing && importFile() }] : undefined}
+        />
+      }
     >
       {dates.isPending ? (
         <CardSkeleton rows={4} />
@@ -52,7 +81,7 @@ export default function CentreForm66Screen() {
         <LoadFailed what="Form 66" error={dates.error} onRetry={dates.refetch} />
       ) : !list.length ? (
         <Surface padded={false}>
-          <StatusView compact kind="empty" icon={ClipboardCheck} title="No Form 66 yet" body="The board's Form 66 files are imported on the website." />
+          <StatusView compact kind="empty" icon={ClipboardCheck} title="No Form 66 yet" body="Import the board's Form 66 text file with the button at the top." />
         </Surface>
       ) : (
         <>

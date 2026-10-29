@@ -4,9 +4,7 @@ import {
   CreditCard,
   FileText,
   Landmark,
-  Settings,
   Trophy,
-  Users,
   type LucideIcon,
 } from 'lucide-react-native'
 
@@ -89,30 +87,18 @@ export const WEB_MODULES: WebModule[] = [
     pages: [{ feature: 'exmcl_performas', path: '/exmcl/performas' }],
   },
   {
-    label: 'Board exam imports',
-    anyOf: ['exam.setup.write', 'exam.candidates.write', 'exam.conduct.write'],
-    reason: 'Importing the board’s datesheet, candidates and Form 66 files, and the seating plan layout (the centre itself is in the app)',
+    label: 'Seating plan layout',
+    anyOf: ['exam.conduct.write'],
+    reason: 'Bench layouts, which rooms sit on which day, and the seating, sticker and slip designs (the centre and its imports are in the app)',
     icon: ClipboardList,
     tile: 3,
     pages: [
-      { feature: 'centre_details', path: '/centre-details' },
-      { feature: 'datesheets', path: '/datesheets' },
-    ],
-  },
-  {
-    label: 'Student imports',
-    anyOf: ['stdnt.students.write'],
-    reason: 'Importing students from a spreadsheet (waits for the file picker in the app)',
-    icon: Users,
-    tile: 1,
-    pages: [
-      { feature: 'stdnt_classes', path: '/stdnt/classes' },
-      { feature: 'stdnt_students', path: '/stdnt/students' },
+      { feature: 'seatingplan', path: '/seatingplan' },
+      { feature: 'examrooms', path: '/examrooms' },
     ],
   },
   { label: 'Salary structures', reason: 'Each person’s pay, allowances and deductions (PF, ESI, PT) across the staff list', icon: Landmark, tile: 3, pages: [{ feature: 'cpitl_payroll', path: '/cpitl/dashboard' }], anyOf: ['cpitl.finance.payroll'] },
   { label: 'Activity extras', reason: 'House and club logos, house teachers, council posts and printing certificates', icon: Trophy, tile: 1, pages: [{ feature: 'actvt_activities', path: '/actvt/houses' }], anyOf: ['actvt.activities.write'] },
-  { label: 'School logo', reason: 'Uploading the logo image (waits for the photo picker in the app)', icon: Settings, tile: 4, pages: [{ feature: 'account_settings', path: '/account-settings' }], anyOf: ['core.school.write'] },
   { label: 'Paying for Capabble', reason: 'Paying invoices and changing the plan (the app shows them; app stores keep payment for the plan on the website)', icon: CreditCard, tile: 3, pages: [{ feature: 'billing', path: '/billing' }], anyOf: ['core.billing.manage'] },
 ]
 
