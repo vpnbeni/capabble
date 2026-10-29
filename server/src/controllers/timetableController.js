@@ -1382,8 +1382,86 @@ const setClassPeriods = sendMutation((state, req) => {
   state.periodAllocation[row.id] = next;
 });
 
+/** Leaves only a teacher's class entries that still have subjects, and teachers that still have entries. */
+const pruneAllocations = (state) => {
+  state.teacherSubjectAllocations = state.teacherSubjectAllocations
+    .map((entry) => ({ ...entry, assignments: entry.assignments.filter((row) => row.subjects.length > 0) }))
+    .filter((entry) => entry.assignments.length > 0);
+};
+
+/**
+ * PUT /timetable/state/teacher-allocation/:classId { subjects: { [name]: teacherId[] } }: who teaches each
+ * named subject in one class-section (other subjects and classes stay). A teacher given a subject they
+ * don't list yet gets it added, as the website's Departments page shows teachers by the subjects they teach.
+ */
+const setClassTeachers = sendMutation((state, req) => {
+  const row = state.classes.find((entry) => entry.id === req.params.classId);
+  if (!row) throw httpError(404, 'That class-section is no longer in the timetable.');
+  const input = isPlainObject(req.body?.subjects) ? req.body.subjects : null;
+  if (!input) throw httpError(400, 'Send the teachers for each subject.');
+  Object.entries(input).forEach(([rawName, rawIds]) => {
+    const subject = row.subjects.find((name) => sameName(name, rawName));
+    if (!subject) {
+      throw httpError(400, `${toTrimmedString(rawName)} isn’t one of ${row.className}-${row.section}’s subjects.`);
+    }
+    const ids = [...new Set((Array.isArray(rawIds) ? rawIds : []).map(toTrimmedString).filter(Boolean))];
+    ids.forEach((id) => {
+      if (!state.teachers.some((teacher) => teacher.id === id)) {
+        throw httpError(400, 'One of those teachers is no longer in the timetable.');
+      }
+    });
+    // Off for everyone first, then on for the ones named.
+    state.teacherSubjectAllocations.forEach((entry) => {
+      entry.assignments.forEach((assignment) => {
+        if (assignment.classId !== row.id) return;
+        assignment.subjects = assignment.subjects.filter((name) => !sameName(name, subject));
+      });
+    });
+    ids.forEach((id) => {
+      const teacher = state.teachers.find((entry) => entry.id === id);
+      if (!teacher.subjects.some((name) => sameName(name, subject))) teacher.subjects.push(subject);
+      let entry = state.teacherSubjectAllocations.find((item) => item.teacherId === id);
+      if (!entry) {
+        entry = { teacherId: id, teacherName: teacher.name, assignments: [] };
+        state.teacherSubjectAllocations.push(entry);
+      }
+      entry.teacherName = teacher.name;
+      let assignment = entry.assignments.find((item) => item.classId === row.id);
+      if (!assignment) {
+        assignment = { classId: row.id, className: row.className, section: row.section, subjects: [] };
+        entry.assignments.push(assignment);
+      }
+      assignment.subjects.push(subject);
+    });
+  });
+  pruneAllocations(state);
+});
+
+/**
+ * PUT /timetable/state/teachers/:id/subjects { subjects: string[] }: the subjects a teacher can teach.
+ * A subject taken away also leaves the classes they taught it in, as on the website.
+ */
+const setTeacherSubjects = sendMutation((state, req) => {
+  const teacher = state.teachers.find((entry) => entry.id === req.params.id);
+  if (!teacher) throw httpError(404, 'That teacher is no longer in the timetable.');
+  if (!Array.isArray(req.body?.subjects)) throw httpError(400, 'Send the subjects.');
+  const known = new Map(state.subjects.map((subject) => [subject.name.toLowerCase(), subject.name]));
+  const picked = req.body.subjects.map((name) => known.get(toTrimmedString(name).toLowerCase())).filter(Boolean);
+  const subjects = [...new Set(picked)];
+  teacher.subjects = subjects;
+  const entry = state.teacherSubjectAllocations.find((item) => item.teacherId === teacher.id);
+  if (entry) {
+    entry.assignments.forEach((assignment) => {
+      assignment.subjects = assignment.subjects.filter((name) => subjects.some((kept) => sameName(kept, name)));
+    });
+  }
+  pruneAllocations(state);
+});
+
 module.exports = {
   addClassSection,
+  setClassTeachers,
+  setTeacherSubjects,
   updateClassSection,
   removeClassSection,
   addTimetableSubject,

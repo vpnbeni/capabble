@@ -12,8 +12,7 @@ const keys = {
 }
 
 /** The published timetable (classes, teachers, bell timings and grid): changes a few times a term. */
-export const useSchoolTimetable = (enabled = true) =>
-  useQuery({ queryKey: keys.school, queryFn: timetableService.school, staleTime: 10 * 60 * 1000, enabled })
+export const useSchoolTimetable = (enabled = true) => useQuery({ queryKey: keys.school, queryFn: timetableService.school, staleTime: 10 * 60 * 1000, enabled })
 
 /** One class's or teacher's week from Monday, with the school's days off. */
 export const useTargetWeek = (target: TimetableTarget, monday: string) => {
@@ -51,10 +50,11 @@ const useWrite = <T, R>(fn: (input: T) => Promise<R>) => {
 export const useSaveBellTimings = () => useWrite(timetableService.saveBellTimings)
 export const useSetClassPeriods = () => useWrite(({ classId, subjects }: { classId: string; subjects: Record<string, number> }) => timetableService.setClassPeriods(classId, subjects))
 export const useAddClassSection = () => useWrite(timetableService.addClassSection)
-export const useUpdateClassSection = () =>
-  useWrite(({ id, input }: { id: string; input: Parameters<typeof timetableService.updateClassSection>[1] }) => timetableService.updateClassSection(id, input))
+export const useUpdateClassSection = () => useWrite(({ id, input }: { id: string; input: Parameters<typeof timetableService.updateClassSection>[1] }) => timetableService.updateClassSection(id, input))
 export const useRemoveClassSection = () => useWrite(timetableService.removeClassSection)
 export const useAddTimetableSubject = () => useWrite(timetableService.addSubject)
+export const useSetClassTeachers = () => useWrite(({ classId, subjects }: { classId: string; subjects: Record<string, string[]> }) => timetableService.setClassTeachers(classId, subjects))
+export const useSetTeacherSubjects = () => useWrite(({ teacherId, subjects }: { teacherId: string; subjects: string[] }) => timetableService.setTeacherSubjects(teacherId, subjects))
 export const useGenerateTimetable = () => useWrite(timetableService.generate)
 export const usePublishVersion = () => useWrite(timetableService.publish)
 export const useArchiveVersion = () => useWrite(timetableService.archive)

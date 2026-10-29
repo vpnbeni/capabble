@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router'
-import { BellRing, CalendarCog, Clock, Plus, Sparkles } from 'lucide-react-native'
+import { BellRing, CalendarCog, Clock, Plus, Sparkles, Users } from 'lucide-react-native'
 import { useMemo, useState } from 'react'
 
 import { ApiError } from '@/lib/api'
@@ -28,7 +28,15 @@ const TIME = /^([01]\d|2[0-3]):[0-5]\d$/
 const ROW_FIELDS: RecordField[] = [
   { key: 'label', label: 'Name', kind: 'text', placeholder: '1st or Lunch', required: true },
   { key: 'duration', label: 'Minutes', kind: 'number', placeholder: '40', required: true },
-  { key: 'type', label: 'Kind', kind: 'choice', options: [{ value: 'period', label: 'A period' }, { value: 'break', label: 'A break' }] },
+  {
+    key: 'type',
+    label: 'Kind',
+    kind: 'choice',
+    options: [
+      { value: 'period', label: 'A period' },
+      { value: 'break', label: 'A break' },
+    ],
+  },
 ]
 const START_FIELDS: RecordField[] = [{ key: 'startTime', label: 'School starts at', kind: 'text', placeholder: '08:00', hint: '24-hour time, like 08:00.', required: true }]
 
@@ -124,7 +132,14 @@ export default function TimetableSetupScreen() {
   const doRemoveRow = async () => {
     const index = rowSheet?.index
     if (index === undefined) return
-    if (await saveRows(rows.filter((_, i) => i !== index), undefined, `${rows[index].label} removed`)) setRowSheet(null)
+    if (
+      await saveRows(
+        rows.filter((_, i) => i !== index),
+        undefined,
+        `${rows[index].label} removed`,
+      )
+    )
+      setRowSheet(null)
   }
 
   const doSaveStart = async (_: RecordValues, all: RecordValues) => {
@@ -164,8 +179,7 @@ export default function TimetableSetupScreen() {
       else if (what === 'remove') {
         await removeVersion.mutateAsync(version._id)
         setConflicts(null)
-      }
-      else {
+      } else {
         const bytes = what === 'classes' ? await timetableService.classPdf(version._id) : await timetableService.teacherPdf(version._id)
         await sharePdf(bytes, `${version.name} ${what === 'classes' ? 'classes' : 'teachers'}.pdf`)
         return
@@ -178,30 +192,76 @@ export default function TimetableSetupScreen() {
   }
 
   const timedRows = rows.map((row, index) => {
-    const from = addMinutes(bells.data?.startTime ?? '08:00', rows.slice(0, index).reduce((sum, entry) => sum + entry.duration, 0))
+    const from = addMinutes(
+      bells.data?.startTime ?? '08:00',
+      rows.slice(0, index).reduce((sum, entry) => sum + entry.duration, 0),
+    )
     return { row, from, to: addMinutes(from, row.duration) }
   })
 
-  const actionBar = !canWrite
-    ? undefined
-    : tab === 'periods' && changed
-      ? <ActionBar icon={CalendarCog} summary={`${total} periods a week`} detail={chosen ? classLabel(chosen.className, chosen.section) : undefined} label={setPeriods.isPending ? 'Saving…' : 'Save'} onPress={doSavePeriods} />
-      : tab === 'versions'
-        ? <ActionBar icon={Sparkles} summary="Generate from the setup" detail="A draft; the published one stays until you publish" label={generate.isPending ? 'Working…' : 'Generate'} onPress={() => setGenerating(true)} />
-        : undefined
+  const actionBar = !canWrite ? undefined : tab === 'periods' && changed ? (
+    <ActionBar
+      icon={CalendarCog}
+      summary={`${total} periods a week`}
+      detail={chosen ? classLabel(chosen.className, chosen.section) : undefined}
+      label={setPeriods.isPending ? 'Saving…' : 'Save'}
+      onPress={doSavePeriods}
+    />
+  ) : tab === 'versions' ? (
+    <ActionBar
+      icon={Sparkles}
+      summary="Generate from the setup"
+      detail="A draft; the published one stays until you publish"
+      label={generate.isPending ? 'Working…' : 'Generate'}
+      onPress={() => setGenerating(true)}
+    />
+  ) : undefined
 
   return (
     <MobileScreen
       refreshing={bells.isRefetching || setup.isRefetching || versions.isRefetching}
       onRefresh={() => (bells.refetch(), setup.refetch(), versions.refetch())}
-      nav={<NavBar title="Timetable setup" back={{ label: 'Timetables', onPress: router.back }} />}
+      nav={
+        <NavBar
+          title="Timetable setup"
+          back={{ label: 'Timetables', onPress: router.back }}
+          actions={[{ icon: Users, label: 'Who teaches what', onPress: () => router.push('/timetables/teachers') }]}
+        />
+      }
       actionBar={actionBar}
       overlay={
         <>
-          <RecordSheet open={Boolean(rowSheet)} onClose={() => setRowSheet(null)} title={rowSheet?.index !== undefined ? rows[rowSheet.index]?.label ?? 'Row' : 'Add a period or break'} fields={ROW_FIELDS} initial={rowValues} isNew={rowSheet?.index === undefined} saving={saveBells.isPending} error={error} onSave={doSaveRow} onRemove={rowSheet?.index !== undefined ? doRemoveRow : undefined} removeLabel="Remove from the day" />
-          <RecordSheet open={startSheet} onClose={() => setStartSheet(false)} title="School starts at" fields={START_FIELDS} initial={startValues} isNew={false} saving={saveBells.isPending} error={error} onSave={doSaveStart} />
+          <RecordSheet
+            open={Boolean(rowSheet)}
+            onClose={() => setRowSheet(null)}
+            title={rowSheet?.index !== undefined ? (rows[rowSheet.index]?.label ?? 'Row') : 'Add a period or break'}
+            fields={ROW_FIELDS}
+            initial={rowValues}
+            isNew={rowSheet?.index === undefined}
+            saving={saveBells.isPending}
+            error={error}
+            onSave={doSaveRow}
+            onRemove={rowSheet?.index !== undefined ? doRemoveRow : undefined}
+            removeLabel="Remove from the day"
+          />
+          <RecordSheet
+            open={startSheet}
+            onClose={() => setStartSheet(false)}
+            title="School starts at"
+            fields={START_FIELDS}
+            initial={startValues}
+            isNew={false}
+            saving={saveBells.isPending}
+            error={error}
+            onSave={doSaveStart}
+          />
           <BottomSheet open={choosingClass} onClose={() => setChoosingClass(false)} title="Class" detent="large">
-            <OptionList label="Class" value={chosen?.id ?? ''} onChange={(value) => (setClassId(value), setCounts(null), setChoosingClass(false))} options={classes.map((row) => ({ value: row.id, label: classLabel(row.className, row.section), meta: `${row.subjects.length} subjects` }))} />
+            <OptionList
+              label="Class"
+              value={chosen?.id ?? ''}
+              onChange={(value) => (setClassId(value), setCounts(null), setChoosingClass(false))}
+              options={classes.map((row) => ({ value: row.id, label: classLabel(row.className, row.section), meta: `${row.subjects.length} subjects` }))}
+            />
           </BottomSheet>
           <Dialog
             open={generating}
@@ -271,7 +331,11 @@ export default function TimetableSetupScreen() {
           <LoadFailed what="Bell timings" error={bells.error} onRetry={bells.refetch} />
         ) : (
           <>
-            <ListGroup items={[{ title: 'School starts at', value: formatTime(bells.data.startTime), icon: Clock, tile: 4 as const, onPress: canWrite ? () => (setError(null), setStartSheet(true)) : undefined }]} />
+            <ListGroup
+              items={[
+                { title: 'School starts at', value: formatTime(bells.data.startTime), icon: Clock, tile: 4 as const, onPress: canWrite ? () => (setError(null), setStartSheet(true)) : undefined },
+              ]}
+            />
             <ListGroup
               header="The day"
               footer={canWrite ? 'Removing or adding a period changes the timetable’s periods: generate again after.' : undefined}
@@ -307,7 +371,15 @@ export default function TimetableSetupScreen() {
                 footer={total > setup.data.periodsPerWeek ? `More than the ${setup.data.periodsPerWeek} periods in a week: some won't fit.` : undefined}
                 items={chosen.subjects.map((name) => ({
                   title: name,
-                  accessory: <NumberCell label={`${name} periods a week`} value={draft[name] ?? ''} disabled={!canWrite} onChangeText={(value: string) => setCounts({ ...draft, [name]: value.replace(/[^0-9]/g, '') })} maxLength={2} />,
+                  accessory: (
+                    <NumberCell
+                      label={`${name} periods a week`}
+                      value={draft[name] ?? ''}
+                      disabled={!canWrite}
+                      onChangeText={(value: string) => setCounts({ ...draft, [name]: value.replace(/[^0-9]/g, '') })}
+                      maxLength={2}
+                    />
+                  ),
                 }))}
               />
             ) : (
@@ -342,7 +414,13 @@ export default function TimetableSetupScreen() {
               header="Versions"
               items={versions.data.map((row) => ({
                 title: row.name,
-                subtitle: [row.publishedAt ? `published ${formatDate(row.publishedAt)}` : row.generatedAt ? `made ${formatDate(row.generatedAt)}` : null, row.conflictCount ? `${row.conflictCount} didn't fit` : null].filter(Boolean).join(' · ') || undefined,
+                subtitle:
+                  [
+                    row.publishedAt ? `published ${formatDate(row.publishedAt)}` : row.generatedAt ? `made ${formatDate(row.generatedAt)}` : null,
+                    row.conflictCount ? `${row.conflictCount} didn't fit` : null,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ') || undefined,
                 badge: STATUS[row.status] ?? { label: row.status, tone: 'neutral' as const },
                 lines: 2 as const,
                 onPress: () => setOpen(row),

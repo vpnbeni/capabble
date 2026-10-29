@@ -50,6 +50,11 @@ export interface TimetableSetup {
   subjects: { id: string; name: string }[]
   periodsPerWeek: number
   periodAllocation: Record<string, Record<string, number>>
+  /** Who can teach what (`subjects`), and who teaches which subjects in which class-section. */
+  teachers: { id: string; name: string; shortName?: string; subjects: string[] }[]
+  teacherSubjectAllocations: { teacherId: string; teacherName: string; assignments: { classId: string; className: string; section: string; subjects: string[] }[] }[]
+  /** Sections of a class taught a subject together: their periods count once in a teacher's load. */
+  commonPeriods: { className: string; subject: string; sections: string[] }[]
   updatedAt: string | null
 }
 
@@ -92,6 +97,10 @@ export const timetableService = {
   updateClassSection: (id: string, input: { floor?: string; incharge?: string; subjects?: string[] }) => api.patch<TimetableSetup>(`/timetable/state/class-sections/${encodeURIComponent(id)}`, input),
   /** Refused while teachers, periods or timetable cells use it. */
   removeClassSection: (id: string) => api.delete<TimetableSetup>(`/timetable/state/class-sections/${encodeURIComponent(id)}`),
+  /** Who teaches each named subject in one class-section; a teacher not listing the subject gets it. */
+  setClassTeachers: (classId: string, subjects: Record<string, string[]>) => api.put<TimetableSetup>(`/timetable/state/teacher-allocation/${encodeURIComponent(classId)}`, { subjects }),
+  /** The subjects a teacher can teach; one taken away also leaves the classes they taught it in. */
+  setTeacherSubjects: (teacherId: string, subjects: string[]) => api.put<TimetableSetup>(`/timetable/state/teachers/${encodeURIComponent(teacherId)}/subjects`, { subjects }),
   addSubject: (name: string) => api.post<TimetableSetup>('/timetable/state/subjects', { name }),
   /** Works out a new draft timetable from the saved setup, and what didn't fit. */
   generate: (name: string) => api.post<{ version: TimetableVersion; conflictReport: Conflict[] }>('/timetable/generate', { name }),

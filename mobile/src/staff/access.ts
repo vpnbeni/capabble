@@ -68,13 +68,10 @@ export const WEB_MODULES: WebModule[] = [
   {
     label: 'Timetable grid',
     anyOf: ['timetable.timetable.write'],
-    reason: 'Who teaches what in every class, and editing every class’s week at once',
+    reason: 'Editing a class’s hand-made week, period by period',
     icon: CalendarClock,
     tile: 4,
-    pages: [
-      { feature: 'timetable_period_allocation', path: '/time-table/period-distribution' },
-      { feature: 'timetable_class_wise', path: '/time-table/class-wise' },
-    ],
+    pages: [{ feature: 'timetable_class_wise', path: '/time-table/class-wise' }],
   },
   {
     label: 'Exam print designs',

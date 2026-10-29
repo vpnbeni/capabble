@@ -8,6 +8,8 @@ const {
   removeClassSection,
   addTimetableSubject,
   setClassPeriods,
+  setClassTeachers,
+  setTeacherSubjects,
   upsertTimetableState,
   getBellTimings,
   upsertBellTimings,
@@ -41,6 +43,8 @@ router.post('/state/class-sections', addClassSection);
 router.route('/state/class-sections/:id').patch(updateClassSection).delete(removeClassSection);
 router.post('/state/subjects', addTimetableSubject);
 router.put('/state/period-allocation/:classId', setClassPeriods);
+router.put('/state/teacher-allocation/:classId', setClassTeachers);
+router.put('/state/teachers/:id/subjects', setTeacherSubjects);
 router.route('/bell-timings').get(getBellTimings).put(upsertBellTimings);
 router.route('/bell-timings/versions').get(getBellTimingVersions).post(createBellTimingVersion);
 router.route('/bell-timings/versions/:id').get(getBellTimingVersion).delete(deleteBellTimingVersion);

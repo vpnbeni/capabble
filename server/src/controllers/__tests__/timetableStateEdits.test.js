@@ -59,6 +59,23 @@ const seed = () => {
     matrixSections: [{ id: 'ms-1', name: 'A' }],
     matrixSelection: { 'mc-1': { 'ms-1': true } },
     periodAllocation: { 'tc-1': { English: 6 } },
+    teachers: [
+      {
+        id: 't-1', name: 'Ms Rao', shortName: 'RAO', subjects: ['English']
+      },
+      {
+        id: 't-2', name: 'Mr Sen', shortName: 'SEN', subjects: []
+      }
+    ],
+    teacherSubjectAllocations: [
+      {
+        teacherId: 't-1',
+        teacherName: 'Ms Rao',
+        assignments: [{
+          classId: 'tc-1', className: '7th', section: 'A', subjects: ['English']
+        }]
+      }
+    ],
     timetableGrid: {}
   };
 };
@@ -98,5 +115,36 @@ describe('timetable state versions and one-change edits', () => {
   test('a class\'s periods keep only its own subjects', async () => {
     await run(ctrl.setClassPeriods, { params: { classId: 'tc-1' }, body: { subjects: { English: 7, Maths: 5 } } });
     expect(store.doc.periodAllocation['tc-1']).toEqual({ English: 7 });
+  });
+
+  test('a class\'s teachers for a subject replace the old ones and give the new teacher the subject', async () => {
+    const res = await run(ctrl.setClassTeachers, {
+      params: { classId: 'tc-1' },
+      body: { subjects: { english: ['t-2'] } }
+    });
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(store.doc.teacherSubjectAllocations).toEqual([{
+      teacherId: 't-2',
+      teacherName: 'Mr Sen',
+      assignments: [{
+        classId: 'tc-1', className: '7th', section: 'A', subjects: ['English']
+      }]
+    }]);
+    expect(store.doc.teachers.find((row) => row.id === 't-2').subjects).toEqual(['English']);
+  });
+
+  test('a subject the class doesn\'t take or an unknown teacher is refused', async () => {
+    const params = { classId: 'tc-1' };
+    const maths = await run(ctrl.setClassTeachers, { params, body: { subjects: { Maths: ['t-1'] } } });
+    expect(maths.status).toHaveBeenCalledWith(400);
+    const nobody = await run(ctrl.setClassTeachers, { params, body: { subjects: { English: ['t-9'] } } });
+    expect(nobody.status).toHaveBeenCalledWith(400);
+    expect(store.doc.teacherSubjectAllocations[0].teacherId).toBe('t-1');
+  });
+
+  test('taking a subject from a teacher also takes it from their classes', async () => {
+    await run(ctrl.setTeacherSubjects, { params: { id: 't-1' }, body: { subjects: ['Maths'] } });
+    expect(store.doc.teachers.find((row) => row.id === 't-1').subjects).toEqual(['Maths']);
+    expect(store.doc.teacherSubjectAllocations).toEqual([]);
   });
 });
