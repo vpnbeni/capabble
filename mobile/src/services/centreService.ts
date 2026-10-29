@@ -46,13 +46,20 @@ export const CENTRE_FIELDS = [
   'dispatchSlipInsuredAmount',
 ] as const satisfies readonly (keyof CentreDetails)[]
 
+export type BenchType = 'single' | 'double' | 'triple'
+export interface BenchRow {
+  benchCount: number
+  benchType: BenchType
+}
+export const SEATS_PER_BENCH: Record<BenchType, number> = { single: 1, double: 2, triple: 3 }
+
 export interface ExamRoom {
   _id: string
   roomNo: string
   roomName?: string
   floor?: string
   capacity: number
-  seatingLayout?: { rows?: { benchCount: number; benchType: string }[] }
+  seatingLayout?: { rows?: BenchRow[] }
   allocatedExamDates?: string[]
   allocationOrderByDate?: Record<string, number>
   assetLocationId?: string | null
@@ -63,6 +70,11 @@ export interface RoomInput {
   roomName?: string
   floor?: string
   capacity?: number
+  /** Rows of benches (1 to 50 a row); the server sets the seats from it. */
+  seatingLayout?: { rows: BenchRow[] }
+  /** Sent together: every day the room is used, and its place in the filling order on each. */
+  allocatedExamDates?: string[]
+  allocationOrderByDate?: Record<string, number>
 }
 
 export interface AssetRoom {
@@ -201,6 +213,14 @@ export const centreService = {
   assetRooms: () => api.get<AssetRoom[]>('/seating-plan/rooms/asets-candidates', undefined, { raw: true }),
   /** The locations to use for exams; rooms from the others stop being exam rooms. */
   syncAssetRooms: (locationIds: string[]) => api.post<unknown>('/seating-plan/rooms/sync-from-asets', { locationIds }),
+
+  /** auto: the server picks each day's rooms in room-number order; manual: the days ticked on each room. */
+  allocationMode: async () => ((await api.get<{ mode?: string }>('/seating-plan/room-allocation-mode')).mode === 'manual' ? 'manual' : 'auto') as 'auto' | 'manual',
+  setAllocationMode: (mode: 'auto' | 'manual') => api.put<{ mode: string }>('/seating-plan/room-allocation-mode', { mode }),
+  /** Same seats every day, or a new seating each day. */
+  seatingMode: async () =>
+    ((await api.get<{ mode?: string }>('/seating-plan/seating-plan-mode')).mode === 'same_across_days' ? 'same_across_days' : 'different_per_day') as 'same_across_days' | 'different_per_day',
+  setSeatingMode: (mode: 'same_across_days' | 'different_per_day') => api.put<{ mode: string }>('/seating-plan/seating-plan-mode', { mode }),
 
   papers: () => api.get<CentrePaper[]>('/centre-datesheet/entries'),
   seatingPdf: (paperId: string, format: SeatingFormat) => requestBytes(`/seating-plan/generate/${format}/${paperId}`),

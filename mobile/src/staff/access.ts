@@ -72,15 +72,12 @@ export const WEB_MODULES: WebModule[] = [
     pages: [{ feature: 'exmcl_performas', path: '/exmcl/performas' }],
   },
   {
-    label: 'Seating plan layout',
+    label: 'Seating print formats',
     anyOf: ['exam.conduct.write'],
-    reason: 'Bench layouts, which rooms sit on which day, and the seating, sticker and slip designs (the centre and its imports are in the app)',
+    reason: 'Column widths and row heights of the printed seating forms, dragged into shape on a sample table (printing them is in the app)',
     icon: ClipboardList,
     tile: 3,
-    pages: [
-      { feature: 'seatingplan', path: '/seatingplan' },
-      { feature: 'examrooms', path: '/examrooms' },
-    ],
+    pages: [{ feature: 'seatingplan', path: '/seatingplan' }],
   },
 ]
 

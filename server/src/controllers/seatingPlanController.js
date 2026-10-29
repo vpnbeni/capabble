@@ -422,11 +422,11 @@ exports.upsertTemplateSettings = async (req, res) => {
       if (typeof req.body?.seatingPlanMode === 'string') {
         existing.seatingPlanMode = payload.seatingPlanMode;
       }
-      existing.mainGate = payload.mainGate;
-      existing.cbseCopy = payload.cbseCopy;
-      existing.roomFolderSlip = payload.roomFolderSlip;
-      existing.roomDoorSlip = payload.roomDoorSlip;
-      existing.functionaryDutyList = payload.functionaryDutyList;
+      // Only the formats sent change: the website's seating page saves four of the five, and
+      // replacing all of them reset the duty list format to its default.
+      ['mainGate', 'cbseCopy', 'roomFolderSlip', 'roomDoorSlip', 'functionaryDutyList'].forEach((key) => {
+        if (req.body?.[key] !== undefined) existing[key] = payload[key];
+      });
       await existing.save();
       return res.json({
         success: true,

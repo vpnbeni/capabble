@@ -24,8 +24,8 @@ const valuesOf = (room: ExamRoom): RecordValues => ({ roomNo: room.roomNo, roomN
 
 /**
  * The centre's exam rooms (the website's Exam room/hall): number, name, floor and seats; add,
- * change or remove one, or take the school's rooms from the asset register. Bench layouts and
- * which rooms are used on which day are set on the website with the seating plan.
+ * change or remove one, lay out its benches, or take the school's rooms from the asset register.
+ * Which rooms are used on which day is under Rooms by day.
  */
 export default function CentreRoomsScreen() {
   const router = useRouter()
@@ -40,6 +40,7 @@ export default function CentreRoomsScreen() {
   const [adding, setAdding] = useState(false)
   const [editing, setEditing] = useState<{ room: ExamRoom; values: RecordValues } | null>(null)
   const [removing, setRemoving] = useState<ExamRoom | null>(null)
+  const [menu, setMenu] = useState<ExamRoom | null>(null)
   const [syncing, setSyncing] = useState(false)
   const [picked, setPicked] = useState<string[] | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -166,6 +167,19 @@ export default function CentreRoomsScreen() {
             removeLabel="Remove this room"
           />
           <ActionSheet
+            open={Boolean(menu)}
+            onClose={() => setMenu(null)}
+            title={menu ? `Room ${menu.roomNo}` : ''}
+            actions={
+              menu
+                ? [
+                    { label: 'Change the details', onSelect: () => (setMenu(null), setError(null), setEditing({ room: menu, values: valuesOf(menu) })) },
+                    { label: hasLayout(menu) ? 'Change the benches' : 'Lay out the benches', onSelect: () => (setMenu(null), router.push({ pathname: '/centre/layout', params: { id: menu._id } })) },
+                  ]
+                : []
+            }
+          />
+          <ActionSheet
             open={Boolean(removing)}
             onClose={() => setRemoving(null)}
             title={removing ? `Remove room ${removing.roomNo}?` : ''}
@@ -213,12 +227,12 @@ export default function CentreRoomsScreen() {
         <LoadFailed what="Rooms" error={rooms.error} onRetry={rooms.refetch} />
       ) : list.length ? (
         <ListGroup
-          footer={canWrite ? 'Tap a room to change it. Bench layouts and which rooms sit on which day are set with the seating plan on the website.' : undefined}
+          footer={canWrite ? 'Tap a room to change it or lay out its benches.' : undefined}
           items={list.map((room) => ({
             title: `Room ${room.roomNo}${room.roomName ? ` · ${room.roomName}` : ''}`,
             subtitle: [room.floor, `${room.capacity} seats`, hasLayout(room) ? 'benches laid out' : null].filter(Boolean).join(' · '),
             lines: 2 as const,
-            onPress: canWrite ? () => (setError(null), setEditing({ room, values: valuesOf(room) })) : undefined,
+            onPress: canWrite ? () => setMenu(room) : undefined,
           }))}
         />
       ) : (

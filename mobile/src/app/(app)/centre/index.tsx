@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { useRouter, type Href } from 'expo-router'
-import { Building2, ClipboardCheck, DoorOpen, FileStack, FileUp, Printer, UserCheck } from 'lucide-react-native'
+import { Building2, CalendarCheck, ClipboardCheck, DoorOpen, FileStack, FileUp, Printer, UserCheck } from 'lucide-react-native'
 import { useState } from 'react'
 
 import { ApiError } from '@/lib/api'
@@ -81,6 +81,15 @@ export default function CentreScreen() {
             lines: 2 as const,
             chevron: true,
             onPress: go('/centre/rooms'),
+          },
+          {
+            title: 'Rooms by day',
+            subtitle: 'Which rooms each exam day uses, and whether seats stay the same',
+            icon: CalendarCheck,
+            tile: 2 as const,
+            lines: 2 as const,
+            chevron: true,
+            onPress: go('/centre/allocation'),
           },
         ]
       : []),
