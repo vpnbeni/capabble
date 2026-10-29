@@ -159,5 +159,5 @@ export const api = {
     request<T>(path, { ...options, method: 'PATCH', body: body ?? {} }),
   delete: <T>(path: string, params?: RequestOptions['params']) => request<T>(path, { method: 'DELETE', params }),
   /** A file upload (see lib/pickFile). Several import routes answer with fields next to `data`, so this returns the whole body. */
-  upload: <T>(path: string, form: FormData) => request<T>(path, { method: 'POST', body: form, raw: true }),
+  upload: <T>(path: string, form: FormData, method: 'POST' | 'PUT' = 'POST') => request<T>(path, { method, body: form, raw: true }),
 }

@@ -3,7 +3,6 @@ import {
   ClipboardList,
   FileText,
   Landmark,
-  Trophy,
   type LucideIcon,
 } from 'lucide-react-native'
 
@@ -97,7 +96,6 @@ export const WEB_MODULES: WebModule[] = [
     ],
   },
   { label: 'Salary structures', reason: 'Each person’s pay, allowances and deductions (PF, ESI, PT) across the staff list', icon: Landmark, tile: 3, pages: [{ feature: 'cpitl_payroll', path: '/cpitl/dashboard' }], anyOf: ['cpitl.finance.payroll'] },
-  { label: 'Activity extras', reason: 'House and club logos, house teachers, council posts and printing certificates', icon: Trophy, tile: 1, pages: [{ feature: 'actvt_activities', path: '/actvt/houses' }], anyOf: ['actvt.activities.write'] },
 ]
 
 /** The website path a login would open for a module, or null when they can't use any of its pages. */

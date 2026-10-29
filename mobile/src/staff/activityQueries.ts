@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
-import { activityService, type SetupKind } from '@/services/activityService'
+import type { PickedFile } from '@/lib/pickFile'
+import { activityService, type CouncilApplication, type House, type PostInput, type Council, type SetupKind } from '@/services/activityService'
 
 import { staffKeys } from './queries'
 
@@ -23,6 +24,20 @@ export const useAddPoints = () => useWrite(activityService.addPoints)
 export const useAddCertificate = () => useWrite(activityService.addCertificate)
 
 export const useSetupRecords = (kind: SetupKind) => useQuery({ queryKey: [...all, 'setup', kind], queryFn: () => activityService.setupList(kind) })
-export const useSaveSetupRecord = () =>
-  useWrite(({ kind, id, input }: { kind: SetupKind; id?: string; input: Record<string, string> }) => activityService.setupSave(kind, id, input))
+export const useSaveSetupRecord = () => useWrite(({ kind, id, input }: { kind: SetupKind; id?: string; input: Record<string, string> }) => activityService.setupSave(kind, id, input))
 export const useRemoveSetupRecord = () => useWrite(({ kind, id }: { kind: SetupKind; id: string }) => activityService.setupRemove(kind, id))
+
+export const useCouncil = (id: string) => useQuery({ queryKey: [...all, 'council', id], queryFn: () => activityService.council(id), enabled: Boolean(id) })
+export const useUpdateHouse = () => useWrite(({ id, input }: { id: string; input: Partial<Pick<House, 'teachers' | 'councilMembers'>> }) => activityService.updateHouse(id, input))
+export const useActivityImage = () =>
+  useWrite(({ kind, id, field, picked }: { kind: 'houses' | 'clubs'; id: string; field: 'logo' | 'flag'; picked: PickedFile | null }) =>
+    picked ? activityService.uploadImage(kind, id, field, picked) : activityService.clearLogo(kind, id),
+  )
+export const useSavePost = () =>
+  useWrite(({ council, id, input }: { council: Council; id?: string; input: PostInput }) => (id ? activityService.updatePost(id, input) : activityService.addPost(council, input)))
+export const useRemovePost = () => useWrite(activityService.removePost)
+export const useAddApplication = () =>
+  useWrite(({ postId, student }: { postId: string; student: Parameters<typeof activityService.addApplication>[1] }) => activityService.addApplication(postId, student))
+export const useSetApplication = () => useWrite(({ id, status }: { id: string; status: CouncilApplication['status'] }) => activityService.setApplication(id, status))
+export const useRemoveApplication = () => useWrite(activityService.removeApplication)
+export const useRemoveCertificate = () => useWrite(activityService.removeCertificate)
