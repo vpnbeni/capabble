@@ -89,9 +89,9 @@ export const WEB_MODULES: WebModule[] = [
     pages: [{ feature: 'exmcl_performas', path: '/exmcl/performas' }],
   },
   {
-    label: 'Board exam centre',
+    label: 'Board exam imports',
     anyOf: ['exam.setup.write', 'exam.candidates.write', 'exam.conduct.write'],
-    reason: 'Datesheet and candidate imports, seating, Form 66 and dispatch',
+    reason: 'Importing the board’s datesheet, candidates and Form 66 files, and the seating plan layout (the centre itself is in the app)',
     icon: ClipboardList,
     tile: 3,
     pages: [
