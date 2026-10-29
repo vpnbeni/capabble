@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router'
-import { Award, Flag, Medal, Trophy, Users } from 'lucide-react-native'
+import { Award, Flag, Medal, Settings2, Trophy, Users } from 'lucide-react-native'
 import { useState } from 'react'
 import { View } from 'react-native'
 
@@ -110,7 +110,7 @@ export default function ActivitiesScreen() {
     <MobileScreen
       refreshing={ranking.isRefetching}
       onRefresh={() => (ranking.refetch(), houses.refetch())}
-      nav={<NavBar title="Activities" back={{ label: 'Back', onPress: router.back }} />}
+      nav={<NavBar title="Activities" back={{ label: 'Back', onPress: router.back }} actions={staff.can('actvt.activities.write') ? [{ icon: Settings2, label: 'Set up', onPress: () => router.push('/activities-setup') }] : []} />}
       actionBar={
         canWrite && view === 'houses' && houses.data?.length ? (
           <ActionBar icon={Trophy} summary={standings[0] ? `${standings[0].houseName} leads` : 'House points'} detail={standings[0] ? `${standings[0].totalPoints} points` : undefined} label="Award points" onPress={() => (reset(), setSheet('points'))} />

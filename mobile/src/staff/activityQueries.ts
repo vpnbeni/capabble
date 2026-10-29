@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
-import { activityService } from '@/services/activityService'
+import { activityService, type SetupKind } from '@/services/activityService'
 
 import { staffKeys } from './queries'
 
@@ -21,3 +21,8 @@ const useWrite = <T, R>(fn: (input: T) => Promise<R>) => {
 
 export const useAddPoints = () => useWrite(activityService.addPoints)
 export const useAddCertificate = () => useWrite(activityService.addCertificate)
+
+export const useSetupRecords = (kind: SetupKind) => useQuery({ queryKey: [...all, 'setup', kind], queryFn: () => activityService.setupList(kind) })
+export const useSaveSetupRecord = () =>
+  useWrite(({ kind, id, input }: { kind: SetupKind; id?: string; input: Record<string, string> }) => activityService.setupSave(kind, id, input))
+export const useRemoveSetupRecord = () => useWrite(({ kind, id }: { kind: SetupKind; id: string }) => activityService.setupRemove(kind, id))
