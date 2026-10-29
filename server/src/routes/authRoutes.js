@@ -6,6 +6,7 @@ const {
   logout,
   refreshToken,
   getMe,
+  stopViewAs,
   updateProfile,
   changePassword,
   forgotPassword,
@@ -129,6 +130,7 @@ router.post(
 router.use(protect);
 
 router.get('/me', getMe);
+router.delete('/view-as', stopViewAs);
 router.put('/me', validateJoi(updateProfileSchema), updateProfile);
 router.put('/change-password', validateJoi(changePasswordSchema), changePassword);
 

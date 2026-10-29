@@ -9,6 +9,7 @@ const { audienceFor, AUDIENCE } = require('../rbac/session');
 const { resolvePermissionSet, PermissionSet } = require('../rbac/permissions');
 const { ensureUserIndexes } = require('../rbac/userIndexes');
 const { getPlatformModels } = require('../tenancy/platformModels');
+const { readViewAs, viewAsRefusal, isBlockedWrite } = require('../rbac/viewAs');
 
 const unauthorized = (res, message = 'Not authorized to access this route') => {
   return res.status(401).json({
@@ -88,6 +89,38 @@ const authenticateTenant = async (req) => {
   return { user, audience, source };
 };
 
+/**
+ * If an administrator is viewing as someone (see rbac/viewAs), run the request
+ * as that person and refuse writes. An expired or invalid claim is ignored and
+ * the request runs as the administrator.
+ */
+const resolveViewAs = async (req) => {
+  const claim = req.rbac?.isAdmin ? readViewAs(req, req.user) : null;
+  if (!claim) return null;
+
+  const User = getTenantUserModel(req);
+  const target = await User.findById(claim.targetId).select('-password');
+  if (viewAsRefusal(req.user, target)) return null;
+
+  const admin = req.user;
+  const audience = audienceFor(target);
+  req.user = target;
+  req.auth = {
+    ...req.auth,
+    audience,
+    viewAs: { by: admin, expiresAt: claim.expiresAt }
+  };
+  req.rbac = audience === AUDIENCE.STAFF
+    ? await resolvePermissionSet(target, req.models?.Role)
+    : new PermissionSet();
+
+  if (isBlockedWrite(req)) {
+    const name = target.name || target.email || 'this person';
+    return { blocked: `You're viewing as ${name}. Stop viewing to make changes.` };
+  }
+  return { target };
+};
+
 const protectTenant = asyncHandler(async (req, res, next) => {
   // Already authenticated by the tenant access gate.
   if (req.auth?.authenticated && req.user) return next();
@@ -107,6 +140,17 @@ const protectTenant = asyncHandler(async (req, res, next) => {
   req.rbac = result.audience === AUDIENCE.STAFF
     ? await resolvePermissionSet(result.user, req.models?.Role)
     : new PermissionSet();
+
+  const viewAs = await resolveViewAs(req);
+  if (viewAs?.blocked) {
+    return res.status(403).json({
+      success: false,
+      error: viewAs.blocked,
+      message: viewAs.blocked,
+      errorCode: 'view_as_read_only'
+    });
+  }
+
   setRequestContext({ user: req.user });
   return next();
 });

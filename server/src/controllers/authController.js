@@ -14,6 +14,7 @@ const {
 } = require('../rbac/session');
 const { buildAuthUserPayload } = require('../rbac/userPayload');
 const { recordAuthEvent } = require('../rbac/audit');
+const { clearViewAsCookie } = require('../rbac/viewAs');
 const eventBus = require('../events/eventBus');
 const EVENTS = require('../events/eventNames');
 const { ensureUserIndexes } = require('../rbac/userIndexes');
@@ -330,10 +331,32 @@ const getMe = asyncHandler(async (req, res) => {
     buildBillingSnapshot(req.tenant?.slug),
   ]);
   payload.billing = billing;
+  const viewAs = req.auth?.viewAs;
+  if (viewAs) {
+    // The person may still owe a password change; that is theirs to make, not the viewer's.
+    payload.mustChangePassword = false;
+    payload.viewAs = {
+      by: { _id: viewAs.by._id, name: viewAs.by.name || '', email: viewAs.by.email || null },
+      expiresAt: viewAs.expiresAt
+    };
+  }
 
   res.status(HTTP_STATUS.OK).json(
     generateResponse(true, 'User profile fetched successfully', payload)
   );
+});
+
+// @desc    Stop viewing as someone (see rbac/viewAs) and go back to your own login
+// @route   DELETE /api/auth/view-as
+// @access  Private
+const stopViewAs = asyncHandler(async (req, res) => {
+  const viewAs = req.auth?.viewAs;
+  clearViewAsCookie(res);
+  if (viewAs) {
+    await recordAuthEvent(req, { event: 'view_as_ended', actor: viewAs.by, target: req.user });
+  }
+  const message = viewAs ? 'Back to your own login.' : 'Not viewing as anyone.';
+  res.status(HTTP_STATUS.OK).json(generateResponse(true, message));
 });
 
 // @desc    Update own profile (display name only; email/login ID are set by the school)
@@ -749,6 +772,7 @@ module.exports = {
   logout,
   refreshToken,
   getMe,
+  stopViewAs,
   updateProfile,
   changePassword,
   forgotPassword,

@@ -10,7 +10,6 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { useTheme } from '@/theme/ThemeProvider'
 import { fontFamily, radius, size, space } from '@/theme/tokens'
@@ -20,6 +19,7 @@ import { haptic } from './haptics'
 import { KeyboardRevealProvider, useKeyboardAwareScroll } from './keyboard'
 import { PressScale, useReduceMotion } from './motion'
 import { Icon } from './primitives'
+import { useWindowInsets } from './states'
 import { Text } from './Text'
 
 /**
@@ -73,7 +73,7 @@ type BottomSheetProps = {
  */
 export function BottomSheet({ open, onClose, title, description, detent = 'medium', footer, children }: BottomSheetProps) {
   const { colors, shadows } = useTheme()
-  const insets = useSafeAreaInsets()
+  const insets = useWindowInsets()
   const { height: screenHeight } = useWindowDimensions()
   const { mounted, progress, reduceMotion } = usePresence(open)
   const [current, setCurrent] = useState(detent)
@@ -207,7 +207,7 @@ type ActionSheetProps = {
 /** 2–6 actions on one thing, with Cancel set apart: the phone's replacement for the "…" Menu. */
 export function ActionSheet({ open, onClose, title, message, actions, cancelLabel = 'Cancel' }: ActionSheetProps) {
   const { colors } = useTheme()
-  const insets = useSafeAreaInsets()
+  const insets = useWindowInsets()
   const { height: screenHeight } = useWindowDimensions()
   const { mounted, progress, reduceMotion } = usePresence(open)
   if (!mounted) return null

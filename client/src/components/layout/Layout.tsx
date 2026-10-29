@@ -4,6 +4,7 @@ import { OverlayShell } from '@/components/ui/overlays'
 import Sidebar from './Sidebar'
 import Header from './Header'
 import BillingBanner from './BillingBanner'
+import ViewAsBanner from '@/components/access/ViewAsBanner'
 import { AttndMatrixModeProvider } from '@/contexts/AttndMatrixModeContext'
 import { CommandPaletteProvider } from '@/components/commandPalette/CommandPaletteProvider'
 
@@ -184,6 +185,7 @@ const Layout: React.FC = () => {
           isMobileNav={isMobile}
           onToggleSidebar={() => (isMobile ? setIsMobileNavOpen((prev) => !prev) : setIsSidebarCollapsed((prev) => !prev))}
         />
+        <ViewAsBanner />
         <BillingBanner />
 
         {/* Page Content */}

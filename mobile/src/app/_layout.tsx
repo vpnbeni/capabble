@@ -47,7 +47,7 @@ function RootStack() {
   const { scheme, colors, setSchoolColor } = useTheme()
   const schoolColor = session.status === 'signedIn' ? session.user.tenant?.brandColor || null : null
 
-  usePushNotifications(status === 'signedIn' && !mustSetPassword ? session.user : null, session.school?.slug ?? null)
+  usePushNotifications(session.status === 'signedIn' && !mustSetPassword && !session.user.viewAs ? session.user : null, session.school?.slug ?? null)
 
   useEffect(() => {
     if (status !== 'loading') SplashScreen.hideAsync()

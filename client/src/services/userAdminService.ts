@@ -199,6 +199,10 @@ const userAdminService = {
   async signOutEverywhere(id: string): Promise<void> {
     await api.post(`/users/${id}/sign-out`)
   },
+  /** Administrators: see the panel or portal as this person, read-only, for 30 minutes. */
+  async startViewAs(id: string): Promise<void> {
+    await api.post(`/users/${id}/view-as`, {}, { _silent: true } as any)
+  },
   async bulkPortal(payload: {
     kind: 'parent' | 'student'
     className?: string

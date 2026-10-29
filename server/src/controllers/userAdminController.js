@@ -26,6 +26,7 @@ const {
 } = require('../rbac/permissions');
 const { revokeAllSessions } = require('../rbac/session');
 const { recordAuthEvent } = require('../rbac/audit');
+const { viewAsRefusal, startViewAs, VIEW_AS_MINUTES } = require('../rbac/viewAs');
 const { ensureUserIndexes } = require('../rbac/userIndexes');
 const { isPlaceholderEmail, realEmailOrEmpty } = require('../utils/placeholderEmail');
 const { sortClassNames, sortSectionNames } = require('../utils/sortSections');
@@ -564,6 +565,23 @@ const signOutEverywhere = handle(async (req, res) => {
   res.json({ success: true, message: 'Signed out on every device.' });
 });
 
+// POST /api/users/:id/view-as
+// Administrators only: see the panel or portal as this person, read-only (rbac/viewAs).
+const startViewingAs = handle(async (req, res) => {
+  if (!req.rbac?.isAdmin) throw httpError(403, 'Only an administrator can view as someone else.', 'permission_denied');
+  const { User } = getModels(req);
+  const target = await User.findById(req.params.id);
+  const refusal = viewAsRefusal(req.user, target);
+  if (refusal) throw httpError(refusal.status, refusal.message, refusal.code);
+  const expiresAt = startViewAs(res, { admin: req.user, target, tenantSlug: req.tenant?.slug });
+  await recordAuthEvent(req, { event: 'view_as_started', target, details: { minutes: VIEW_AS_MINUTES } });
+  res.json({
+    success: true,
+    message: `Viewing as ${target.name || target.email || target.username}.`,
+    data: { kind: target.kind || USER_KINDS.STAFF, expiresAt }
+  });
+});
+
 // POST /api/users/bulk-portal
 const bulkCreatePortalLogins = handle(async (req, res) => {
   const { User, Student } = getModels(req);
@@ -898,6 +916,7 @@ module.exports = {
   updateUser,
   resetUserPassword,
   signOutEverywhere,
+  startViewingAs,
   bulkCreatePortalLogins,
   listStaffCandidates,
   listStudentCandidates,

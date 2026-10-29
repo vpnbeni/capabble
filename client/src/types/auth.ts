@@ -59,6 +59,14 @@ export interface User {
   featureToggles?: Record<string, boolean> | null
   /** brandColor: the school's colour (#rrggbb), empty for Capabble blue. */
   tenant?: { slug: string; name: string; brandColor?: string } | null
+  /** Set while an administrator is viewing as this person (read-only). */
+  viewAs?: ViewAsInfo | null
+}
+
+export interface ViewAsInfo {
+  /** The administrator doing the viewing. */
+  by: { _id: string; name: string; email: string | null }
+  expiresAt: string
 }
 
 // Login credentials interface

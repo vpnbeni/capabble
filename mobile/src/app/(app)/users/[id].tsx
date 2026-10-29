@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import { KeyRound, LogOut, ShieldCheck, UserX } from 'lucide-react-native'
+import { Eye, KeyRound, LogOut, ShieldCheck, UserX } from 'lucide-react-native'
 import { useState } from 'react'
 import { View } from 'react-native'
 
@@ -7,6 +7,7 @@ import { ApiError } from '@/lib/api'
 import { classLabel, formatDate } from '@/lib/format'
 import { CardSkeleton, LoadFailed } from '@/portal/states'
 import type { Delivery } from '@/services/usersService'
+import { useSession } from '@/session/SessionProvider'
 import { CredentialResult } from '@/staff/CredentialResult'
 import { loginBadge } from '@/staff/loginUi'
 import { useLogin, useResetPassword, useRoles, useSignOutEverywhere, useUpdateLogin } from '@/staff/userQueries'
@@ -30,8 +31,14 @@ export default function LoginScreen() {
   const [resetting, setResetting] = useState(false)
   const [turningOff, setTurningOff] = useState(false)
   const [delivery, setDelivery] = useState<Delivery | null>(null)
+  const [confirmViewAs, setConfirmViewAs] = useState(false)
+  const [startingViewAs, setStartingViewAs] = useState(false)
+  const { startViewAs } = useSession()
   const self = data?._id === staff.user?._id
   const badge = data ? loginBadge(data) : undefined
+  // Administrators only, never as another administrator or a turned-off login (the server checks the same).
+  const canViewAs = Boolean(staff.user?.isAdmin) && !self && Boolean(data?.isActive) && !data?.roles.some((role) => role.key === 'administrator')
+  const shortName = data ? (data.name || data.loginId).split(' ').filter((part) => !/^(mr|mrs|ms|dr)\.?$/i.test(part))[0] || data.name : ''
 
   const fail = (error: unknown) => {
     haptic.error()
@@ -79,6 +86,22 @@ export default function LoginScreen() {
     }
   }
 
+  const viewAs = async () => {
+    if (!data) return
+    setConfirmViewAs(false)
+    setStartingViewAs(true)
+    try {
+      await startViewAs(data._id)
+      haptic.medium()
+      if (router.canDismiss()) router.dismissAll()
+      router.replace('/')
+    } catch (error) {
+      fail(error)
+    } finally {
+      setStartingViewAs(false)
+    }
+  }
+
   if (delivery && data) {
     return (
       <MobileScreen nav={<NavBar title="Password reset" back={{ label: 'Login', onPress: () => setDelivery(null) }} />}>
@@ -94,6 +117,13 @@ export default function LoginScreen() {
       nav={<NavBar title="Login" back={{ label: 'Users', onPress: router.back }} />}
       overlay={
         <>
+          <ActionSheet
+            open={confirmViewAs}
+            onClose={() => setConfirmViewAs(false)}
+            title={`View as ${data?.name || 'this person'}?`}
+            message="You see the app as they do. Nothing can be changed while viewing. It ends after 30 minutes or when you stop, and it's recorded in their activity."
+            actions={[{ label: `View as ${shortName}`, icon: Eye, onSelect: viewAs }]}
+          />
           <ActionSheet
             open={resetting}
             onClose={() => setResetting(false)}
@@ -176,6 +206,7 @@ export default function LoginScreen() {
           <ListGroup
             items={[
               ...(data.kind === 'staff' && !self ? [{ title: 'Change roles', icon: ShieldCheck, tile: 4 as const, onPress: () => setEditingRoles(data.roles.map((role) => role.key)) }] : []),
+              ...(canViewAs ? [{ title: startingViewAs ? 'Opening…' : `View as ${shortName}`, subtitle: 'See what they see, read-only', icon: Eye, tile: 4 as const, onPress: () => setConfirmViewAs(true) }] : []),
               { title: 'Reset password', icon: KeyRound, tile: 4 as const, onPress: () => setResetting(true) },
               { title: 'Sign out everywhere', icon: LogOut, tile: 4 as const, onPress: async () => {
                 try {

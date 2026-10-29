@@ -9,6 +9,7 @@ import { logout } from '@/redux/slices/authSlice'
 import type { AppDispatch } from '@/redux/store'
 import { useTheme } from '@/utils/theme'
 import NotificationBell from '@/components/notifications/NotificationBell'
+import ViewAsBanner from '@/components/access/ViewAsBanner'
 import { usePortal } from './PortalContext'
 import type { PortalSection } from './portalService'
 import './portal.css'
@@ -90,6 +91,7 @@ const PortalLayout: React.FC = () => {
         <NotificationBell audience="portal" viewAllPath="/portal/notifications" />
         <Menu items={accountItems} label="Account" />
       </header>
+      <ViewAsBanner />
 
       <div className="pt-body">
         <nav className="pt-nav" aria-label="Portal">

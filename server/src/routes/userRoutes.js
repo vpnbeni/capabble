@@ -21,5 +21,6 @@ router.get('/:id', ctrl.getUser);
 router.patch('/:id', ctrl.updateUser);
 router.post('/:id/reset-password', ctrl.resetUserPassword);
 router.post('/:id/sign-out', ctrl.signOutEverywhere);
+router.post('/:id/view-as', ctrl.startViewingAs);
 
 module.exports = router;

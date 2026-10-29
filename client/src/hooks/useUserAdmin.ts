@@ -119,6 +119,9 @@ export const useSignOutEverywhere = () => {
   return useMutation({ mutationFn: (id: string) => userAdminService.signOutEverywhere(id), onSuccess: invalidate })
 }
 
+export const useStartViewAs = () =>
+  useMutation({ mutationFn: (id: string) => userAdminService.startViewAs(id) })
+
 export const useBulkPortalLogins = () => {
   const invalidate = useInvalidateUsers()
   return useMutation({ mutationFn: userAdminService.bulkPortal, onSuccess: invalidate })
