@@ -16,6 +16,7 @@ import { PrincipalToday } from '@/staff/PrincipalToday'
 import { TeacherToday } from '@/staff/TeacherToday'
 import { TodayDuties } from '@/staff/TodayDuties'
 import { TodayMeetings } from '@/staff/TodayMeetings'
+import { DriverToday } from '@/staff/DriverToday'
 import { useBell } from '@/staff/useBell'
 import { useStaff } from '@/staff/useStaff'
 import { radius, size, space } from '@/theme/tokens'
@@ -188,6 +189,7 @@ function StaffHome() {
   const { mode } = useStaff()
   if (mode === 'teacher') return <TeacherToday />
   if (mode === 'glance') return <PrincipalToday />
+  if (mode === 'crew') return <DriverToday />
   return <OtherStaffToday />
 }
 

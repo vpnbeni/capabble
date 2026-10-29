@@ -75,6 +75,10 @@ export const schoolToday = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'A
 export const schoolTimeNow = () =>
   new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date())
 
+/** A moment as the school's clock shows it: "7:02 am". */
+export const formatClock = (d: Date | string | number | null | undefined) =>
+  d ? formatTime(new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date(d))) : '—'
+
 /** Minutes from 'HH:MM' a to b. */
 export const minutesBetween = (a: string, b: string) => {
   const toMin = (t: string) => {

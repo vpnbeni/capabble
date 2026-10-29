@@ -13,10 +13,12 @@ import type { TileIndex } from '@/ui'
  * - `teacher`: linked to a staff record, or marks student attendance: Today · Classes · Attendance · Calendar · More
  * - `staff`: everyone else (office, accounts, library, clinic): Today · Calendar · More
  */
-export type StaffMode = 'glance' | 'teacher' | 'staff'
+export type StaffMode = 'glance' | 'teacher' | 'crew' | 'staff'
 
 export const staffModeFor = (user: User, perms: Permissions): StaffMode => {
   if (perms.can('clndr.events.approve')) return 'glance'
+  // Bus drivers and conductors have a staff record but no classes: their day is the bus.
+  if (perms.canUse('trnst_crew') && perms.can('trnst.trips.operate') && !perms.can('attnd.students.write')) return 'crew'
   if (user.teacher || perms.can('attnd.students.write')) return 'teacher'
   return 'staff'
 }
@@ -25,6 +27,7 @@ export const staffModeFor = (user: User, perms: Permissions): StaffMode => {
 export const STAFF_TABS: Record<StaffMode, string[]> = {
   glance: ['index', 'approvals', 'students', 'calendar', 'more'],
   teacher: ['index', 'classes', 'registers', 'calendar', 'more'],
+  crew: ['index', 'calendar', 'more'],
   staff: ['index', 'calendar', 'more'],
 }
 
