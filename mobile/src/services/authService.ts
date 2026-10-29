@@ -23,6 +23,8 @@ export interface User {
   kind: UserKind
   roles: { key: string; name: string }[]
   isAdmin: boolean
+  /** The school owner, where the platform turned on switching users for testing. */
+  canSwitchUsers?: boolean
   permissions: { key: string; scope: 'all' | 'assigned' }[]
   linkedStudents: LinkedStudent[]
   /** Staff: the staff record linked to this login (their timetable and classes come from it). */
@@ -33,7 +35,8 @@ export interface User {
   /** brandColor: the school's colour (#rrggbb), empty for Capabble blue. */
   tenant?: { slug: string; name: string; brandColor?: string } | null
   /** Set while an administrator is viewing as this person (read-only, see server rbac/viewAs). */
-  viewAs?: { by: { _id: string; name: string; email: string | null }; expiresAt: string } | null
+  /** mode view: read-only; switch: the school owner acts as this person (testing). */
+  viewAs?: { by: { _id: string; name: string; email: string | null }; mode: 'view' | 'switch'; expiresAt: string } | null
 }
 
 export interface School {

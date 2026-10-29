@@ -60,6 +60,9 @@ const EVENT_LABEL: Record<string, string> = {
   sessions_revoked: 'Signed out everywhere',
   view_as_started: 'An administrator started viewing as them',
   view_as_ended: 'An administrator stopped viewing as them',
+  switch_started: 'The school owner switched to them',
+  switch_ended: 'The school owner switched back',
+  switched_user_action: 'Change made by the school owner while switched',
 }
 
 const ALL_SECTIONS = '*'

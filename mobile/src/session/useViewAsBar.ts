@@ -19,11 +19,14 @@ export function useViewAsBar() {
     if (stopping || !user) return
     setStopping(true)
     const viewedId = user._id
+    const switched = viewAs?.mode === 'switch'
     try {
       await stopViewAs()
       if (router.canDismiss()) router.dismissAll()
       router.replace('/')
-      router.push({ pathname: '/users/[id]', params: { id: viewedId } })
+      // A switch started from the users list goes back to it; View as started on the person's screen.
+      if (switched) router.push('/users')
+      else router.push({ pathname: '/users/[id]', params: { id: viewedId } })
     } catch {
       // Still viewing (offline): the bar stays and they can try again.
     } finally {
@@ -49,7 +52,7 @@ export function useViewAsBar() {
   const name = user.name || user.email || user.username || 'this person'
   return {
     tone: 'warning' as const,
-    title: `Viewing as ${name} · read-only`,
-    action: { label: stopping ? 'Stopping…' : 'Stop', onPress: stop, busy: stopping },
+    title: viewAs.mode === 'switch' ? `Switched to ${name}` : `Viewing as ${name} · read-only`,
+    action: { label: stopping ? 'Stopping…' : viewAs.mode === 'switch' ? 'Switch back' : 'Stop', onPress: stop, busy: stopping },
   }
 }

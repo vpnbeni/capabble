@@ -102,6 +102,7 @@ export interface TenantCreatePayload {
 export interface TenantUpdatePayload {
   name?: string
   adminEmail?: string
+  allowUserSwitching?: boolean
 }
 
 export interface RolloutInitiatePayload {

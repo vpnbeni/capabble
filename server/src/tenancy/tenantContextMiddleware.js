@@ -121,6 +121,7 @@ const tenantContextMiddleware = async (req, res, next) => {
       slug: tenantRecord.slug,
       name: tenantRecord.name,
       adminEmail: tenantRecord.adminEmail,
+      allowUserSwitching: Boolean(tenantRecord.allowUserSwitching),
       metadata: tenantRecord.metadata || {},
       dbName: tenantRecord.dbName,
       status: tenantRecord.status,

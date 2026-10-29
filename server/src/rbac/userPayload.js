@@ -1,5 +1,6 @@
 const { roleTemplates } = require('./catalog');
 const { getRoleKeys, customRoleId, isPortalUser, resolvePermissionSet } = require('./permissions');
+const { canSwitchUsers } = require('./viewAs');
 
 /** Human-readable role list for a user. */
 const describeRoles = async (user, RoleModel) => {
@@ -68,6 +69,8 @@ const buildAuthUserPayload = async (user, { models = {}, tenant = null, rbac = n
     createdAt: user.createdAt,
     roles: portal ? [] : await describeRoles(user, models.Role),
     isAdmin: Boolean(permissionSet?.isAdmin),
+    // The school owner, where the platform turned on switching for testing (rbac/viewAs).
+    canSwitchUsers: canSwitchUsers(tenant, user),
     permissions: permissionSet ? permissionSet.toJSON() : [],
     linkedStudents: portal ? await describeLinkedStudents(user, models.Student) : [],
     teacher: user.teacher || null,

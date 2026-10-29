@@ -65,6 +65,7 @@ const publicSchoolDirectoryLookupParamSchema = Joi.object({
 const updateTenantSchema = Joi.object({
   name: Joi.string().min(2).max(120).optional(),
   adminEmail: Joi.string().email().optional(),
+  allowUserSwitching: Joi.boolean().optional(),
 }).min(1);
 
 const deleteTenantSchema = Joi.object({

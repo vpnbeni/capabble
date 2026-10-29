@@ -26,7 +26,7 @@ const person = (id, extra) => ({
   ...extra
 });
 const people = {
-  [adminId]: person(adminId, { name: 'Head', roles: ['administrator'] }),
+  [adminId]: person(adminId, { name: 'Head', email: 'head@alpha.test', roles: ['administrator'] }),
   [teacherId]: person(teacherId, { name: 'Anuj', roles: ['exam_coordinator'] }),
   [parentId]: person(parentId, { name: 'Parent', kind: 'parent', linkedStudents: [] }),
   [otherAdminId]: person(otherAdminId, { name: 'Other head', roles: ['administrator'] })
@@ -47,20 +47,25 @@ const accessToken = (id) => jwt.sign(
   process.env.JWT_SECRET,
   { expiresIn: '5m' }
 );
-const viewAsToken = ({ admin = adminId, target = teacherId, tenantSlug = 'alpha', expiresIn = '30m' } = {}) => jwt.sign(
-  { scope: 'view_as', tenantSlug, adminId: String(admin), targetId: String(target) },
+const viewAsToken = ({
+  admin = adminId, target = teacherId, tenantSlug = 'alpha', expiresIn = '30m', mode
+} = {}) => jwt.sign(
+  { scope: 'view_as', mode, tenantSlug, adminId: String(admin), targetId: String(target) },
   process.env.JWT_SECRET,
   { expiresIn }
 );
 
-const buildReq = ({ as = adminId, viewAs, method = 'GET', url = '/api/students' } = {}) => ({
+const buildReq = ({
+  as = adminId, viewAs, method = 'GET', url = '/api/students', tenant = { slug: 'alpha' }
+} = {}) => ({
   method,
   originalUrl: url,
   headers: { 'x-requested-with': 'XMLHttpRequest' },
   cookies: { cb_at: accessToken(as), ...(viewAs ? { [VIEW_AS_COOKIE]: viewAs } : {}) },
-  tenant: { slug: 'alpha' },
+  tenant,
   auth: null,
   models: {
+    AuthAuditLog: { create: jest.fn().mockResolvedValue({}) },
     User: {
       findById: jest.fn((id) => ({ select: jest.fn().mockResolvedValue(people[id] || null) })),
       db: { name: 'test-db' },
@@ -133,6 +138,50 @@ describe('view as: requests', () => {
     const req = buildReq({ viewAs: viewAsToken({ target: otherAdminId }) });
     await run(req);
     expect(String(req.user._id)).toBe(String(adminId));
+  });
+});
+
+describe('switch user (testing)', () => {
+  const ownerTenant = { slug: 'alpha', adminEmail: 'head@alpha.test', allowUserSwitching: true };
+  const switchToken = (target = teacherId) => viewAsToken({ target, mode: 'switch' });
+
+  it('lets the school owner act as the person and records each change', async () => {
+    const req = buildReq({ viewAs: switchToken(), tenant: ownerTenant, method: 'POST', url: '/api/attendance' });
+    const { passed } = await run(req);
+    expect(passed).toBe(true);
+    expect(String(req.user._id)).toBe(String(teacherId));
+    expect(req.auth.viewAs.mode).toBe('switch');
+    expect(req.models.AuthAuditLog.create).toHaveBeenCalledWith(expect.objectContaining({
+      event: 'switched_user_action',
+      details: { method: 'POST', path: '/attendance' }
+    }));
+  });
+
+  it('may switch to another administrator', async () => {
+    const req = buildReq({ viewAs: switchToken(otherAdminId), tenant: ownerTenant });
+    await run(req);
+    expect(String(req.user._id)).toBe(String(otherAdminId));
+  });
+
+  it('still refuses password changes and phone registration', async () => {
+    const password = await run(buildReq({
+      viewAs: switchToken(), tenant: ownerTenant, method: 'PUT', url: '/api/auth/change-password'
+    }));
+    expect(password.passed).toBe(false);
+    const phone = await run(buildReq({
+      viewAs: switchToken(), tenant: ownerTenant, method: 'POST', url: '/api/devices'
+    }));
+    expect(phone.passed).toBe(false);
+  });
+
+  it('is ignored when the school has switching off or the viewer is not the owner', async () => {
+    const off = buildReq({ viewAs: switchToken(), tenant: { ...ownerTenant, allowUserSwitching: false } });
+    await run(off);
+    expect(String(off.user._id)).toBe(String(adminId));
+    const otherTenant = { ...ownerTenant, adminEmail: 'someone@alpha.test' };
+    const otherOwner = buildReq({ viewAs: switchToken(), tenant: otherTenant });
+    await run(otherOwner);
+    expect(String(otherOwner.user._id)).toBe(String(adminId));
   });
 });
 

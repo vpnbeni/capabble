@@ -220,6 +220,23 @@ export function TenantsPage({ navigateTo, currentPath }: TenantsPageProps) {
     }
   }
 
+  const handleSwitchingChange = async (tenant: Tenant, allowUserSwitching: boolean) => {
+    setLoading(true)
+    setError('')
+    try {
+      const updated = await tenantAdminApi.update(tenant._id, { allowUserSwitching })
+      setSelectedTenant((prev) => (prev && prev._id === updated._id ? updated : prev))
+      refreshSuccess(allowUserSwitching ? 'Switching users turned on' : 'Switching users turned off')
+    } catch (err: unknown) {
+      const response = typeof err === 'object' && err && 'response' in err
+        ? (err as { response?: { data?: { message?: string } } }).response
+        : undefined
+      setError(response?.data?.message || 'Failed to change switching users')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const handleStatusChange = async (tenant: Tenant) => {
     setLoading(true)
     setError('')
@@ -626,6 +643,25 @@ export function TenantsPage({ navigateTo, currentPath }: TenantsPageProps) {
                     )}
                   </div>
                 </div>
+              </div>
+
+              <div className="card">
+                <h2 className="card-title">Testing</h2>
+                <p style={{ marginTop: 0, marginBottom: 18, color: 'var(--text-secondary)' }}>
+                  Lets the school owner ({selectedTenant.adminEmail}) switch to any login in this school and act as
+                  them, on the website and in the app. Changes are saved as that person and recorded in their activity.
+                  Keep it off for real schools.
+                </p>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input
+                    type="checkbox"
+                    checked={Boolean(selectedTenant.allowUserSwitching)}
+                    disabled={loading}
+                    onChange={(event) => handleSwitchingChange(selectedTenant, event.target.checked)}
+                    style={{ width: 16, height: 16 }}
+                  />
+                  Allow switching users
+                </label>
               </div>
 
               <div className="card">

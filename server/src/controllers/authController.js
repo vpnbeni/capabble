@@ -337,6 +337,7 @@ const getMe = asyncHandler(async (req, res) => {
     payload.mustChangePassword = false;
     payload.viewAs = {
       by: { _id: viewAs.by._id, name: viewAs.by.name || '', email: viewAs.by.email || null },
+      mode: viewAs.mode,
       expiresAt: viewAs.expiresAt
     };
   }
@@ -353,7 +354,8 @@ const stopViewAs = asyncHandler(async (req, res) => {
   const viewAs = req.auth?.viewAs;
   clearViewAsCookie(res);
   if (viewAs) {
-    await recordAuthEvent(req, { event: 'view_as_ended', actor: viewAs.by, target: req.user });
+    const event = viewAs.mode === 'switch' ? 'switch_ended' : 'view_as_ended';
+    await recordAuthEvent(req, { event, actor: viewAs.by, target: req.user });
   }
   const message = viewAs ? 'Back to your own login.' : 'Not viewing as anyone.';
   res.status(HTTP_STATUS.OK).json(generateResponse(true, message));

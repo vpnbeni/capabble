@@ -82,6 +82,8 @@ export const usersService = {
   signOutEverywhere: (id: string) => api.post<unknown>(`${one(id)}/sign-out`, {}),
   /** Administrators: see the app as this person, read-only, for 30 minutes. */
   startViewAs: (id: string) => api.post<unknown>(`${one(id)}/view-as`, {}),
+  /** The school owner, testing only: act as this person for 30 minutes. */
+  switchTo: (id: string) => api.post<unknown>(`${one(id)}/switch`, {}),
   roles: () => api.get<Role[]>('/roles'),
   staffCandidates: (search: string) => api.get<StaffCandidate[]>('/users/candidates/staff', { search: search || undefined }),
   studentCandidates: (search: string) => api.get<StudentCandidate[]>('/users/candidates/students', { search: search || undefined }),

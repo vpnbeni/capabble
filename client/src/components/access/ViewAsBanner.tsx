@@ -18,7 +18,7 @@ export const reloadAsCurrentLogin = async (path: string) => {
   window.location.reload()
 }
 
-/** One line above every page while an administrator is viewing as someone. */
+/** One line above every page while an administrator is viewing as someone, or the owner switched to them. */
 const ViewAsBanner: React.FC = () => {
   const user = useSelector(selectUser)
   const viewAs = user?.viewAs
@@ -29,7 +29,8 @@ const ViewAsBanner: React.FC = () => {
     setStopping(true)
     try {
       await authService.stopViewAs()
-      await reloadAsCurrentLogin(`/settings/users/${user._id}`)
+      // A switch started from the users list goes back to it; View as started on the person's page.
+      await reloadAsCurrentLogin(viewAs?.mode === 'switch' ? '/settings/users' : `/settings/users/${user._id}`)
     } catch {
       setStopping(false)
       toast.error("Couldn't stop viewing. Check your connection and try again.")
@@ -53,6 +54,11 @@ const ViewAsBanner: React.FC = () => {
     ? user.roles.map((entry) => entry.name).join(', ')
     : user.kind === 'parent' ? 'Parent' : 'Student'
   const until = new Date(viewAs.expiresAt).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' })
+  const switched = viewAs.mode === 'switch'
+  const who = `${name}${role ? ` (${role})` : ''}`
+  const full = switched
+    ? `Switched to ${who}. Changes are saved as them. Ends at ${until}.`
+    : `Viewing as ${who}. Read-only: nothing can be changed. Ends at ${until}.`
 
   return (
     <div className="cb-app bl-shell-banner">
@@ -61,14 +67,14 @@ const ViewAsBanner: React.FC = () => {
         title={
           <>
             <span className="bl-shell-banner__full">
-              {`Viewing as ${name}${role ? ` (${role})` : ''}. Read-only: nothing can be changed. Ends at ${until}.`}
+              {full}
             </span>
-            <span className="bl-shell-banner__short">{`Viewing as ${name} · read-only`}</span>
+            <span className="bl-shell-banner__short">{switched ? `Switched to ${name}` : `Viewing as ${name} · read-only`}</span>
           </>
         }
       >
         <button type="button" className="cb-link" onClick={stop} disabled={stopping}>
-          {stopping ? 'Stopping…' : 'Stop viewing'}
+          {stopping ? 'Stopping…' : switched ? 'Switch back' : 'Stop viewing'}
         </button>
       </Banner>
     </div>

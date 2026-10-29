@@ -26,7 +26,14 @@ const {
 } = require('../rbac/permissions');
 const { revokeAllSessions } = require('../rbac/session');
 const { recordAuthEvent } = require('../rbac/audit');
-const { viewAsRefusal, startViewAs, VIEW_AS_MINUTES } = require('../rbac/viewAs');
+const {
+  viewAsRefusal,
+  switchRefusal,
+  canSwitchUsers,
+  startViewAs,
+  VIEW_AS_MINUTES,
+  MODES: VIEW_AS_MODES
+} = require('../rbac/viewAs');
 const { ensureUserIndexes } = require('../rbac/userIndexes');
 const { isPlaceholderEmail, realEmailOrEmpty } = require('../utils/placeholderEmail');
 const { sortClassNames, sortSectionNames } = require('../utils/sortSections');
@@ -582,6 +589,25 @@ const startViewingAs = handle(async (req, res) => {
   });
 });
 
+// POST /api/users/:id/switch
+// Testing only: the school owner, in a school where the platform turned it on, acts as this person (rbac/viewAs).
+const switchToUser = handle(async (req, res) => {
+  if (!canSwitchUsers(req.tenant, req.user)) {
+    throw httpError(403, 'Switching users isn’t turned on for this school.', 'switch_not_allowed');
+  }
+  const { User } = getModels(req);
+  const target = await User.findById(req.params.id);
+  const refusal = switchRefusal(req.user, target);
+  if (refusal) throw httpError(refusal.status, refusal.message, refusal.code);
+  const expiresAt = startViewAs(res, { admin: req.user, target, tenantSlug: req.tenant?.slug, mode: VIEW_AS_MODES.SWITCH });
+  await recordAuthEvent(req, { event: 'switch_started', target, details: { minutes: VIEW_AS_MINUTES } });
+  res.json({
+    success: true,
+    message: `Switched to ${target.name || target.email || target.username}.`,
+    data: { kind: target.kind || USER_KINDS.STAFF, expiresAt }
+  });
+});
+
 // POST /api/users/bulk-portal
 const bulkCreatePortalLogins = handle(async (req, res) => {
   const { User, Student } = getModels(req);
@@ -917,6 +943,7 @@ module.exports = {
   resetUserPassword,
   signOutEverywhere,
   startViewingAs,
+  switchToUser,
   bulkCreatePortalLogins,
   listStaffCandidates,
   listStudentCandidates,

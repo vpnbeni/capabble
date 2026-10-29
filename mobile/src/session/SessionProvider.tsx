@@ -23,6 +23,8 @@ type Session = SessionState & {
   updateUser: (user: User) => void
   /** Administrators: see the app as this login, read-only (`user.viewAs` is set until it ends). */
   startViewAs: (loginId: string) => Promise<void>
+  /** The school owner, testing only: act as this login (`user.viewAs.mode` is 'switch'). */
+  switchTo: (loginId: string) => Promise<void>
   /** Back to your own login; also runs when the 30 minutes are up. */
   stopViewAs: () => Promise<void>
 }
@@ -93,6 +95,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     await reloadUser()
   }, [reloadUser])
 
+  const switchTo = useCallback(async (loginId: string) => {
+    await usersService.switchTo(loginId)
+    await reloadUser()
+  }, [reloadUser])
+
   const stopViewAs = useCallback(async () => {
     try {
       await authService.stopViewAs()
@@ -105,7 +112,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     const school = state.school
     let kind = state.user?.kind
     if (state.user?.viewAs) {
-      // Writes are refused while viewing as someone: end that first so the phone's push can be unregistered.
+      // The phone's push belongs to the real login: end the view or switch first so it can be unregistered.
       await authService.stopViewAs().catch(() => {})
       kind = 'staff'
     }
@@ -131,8 +138,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const value = useMemo(
-    () => ({ ...state, signIn, signOut, forgetSchool, updateUser, startViewAs, stopViewAs }) as Session,
-    [state, signIn, signOut, forgetSchool, updateUser, startViewAs, stopViewAs],
+    () => ({ ...state, signIn, signOut, forgetSchool, updateUser, startViewAs, switchTo, stopViewAs }) as Session,
+    [state, signIn, signOut, forgetSchool, updateUser, startViewAs, switchTo, stopViewAs],
   )
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>
