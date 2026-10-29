@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router'
-import { CalendarRange, Fuel, Receipt } from 'lucide-react-native'
+import { Building2, CalendarRange, Ellipsis, Fuel, Receipt, Wallet, Zap } from 'lucide-react-native'
 import { useState } from 'react'
 
 import { ApiError } from '@/lib/api'
@@ -29,6 +29,12 @@ export default function ExpensesScreen() {
   const [voiding, setVoiding] = useState<Expense | null>(null)
   const [reason, setReason] = useState('')
   const [picking, setPicking] = useState(false)
+  const [menu, setMenu] = useState(false)
+  const more = [
+    ...(staff.canUse('cpitl_expenses') ? [{ label: 'Electricity', icon: Zap, onSelect: () => (setMenu(false), router.push('/expenses/electricity')) }] : []),
+    ...(staff.canUse('cpitl_expenses') ? [{ label: 'Building projects', icon: Building2, onSelect: () => (setMenu(false), router.push('/expenses/projects')) }] : []),
+    ...(staff.canUse('cpitl_payroll') && staff.can('cpitl.finance.payroll') ? [{ label: 'Payroll', icon: Wallet, onSelect: () => (setMenu(false), router.push('/payroll')) }] : []),
+  ]
   // The last twelve months, this one first.
   const months = Array.from({ length: 12 }, (_, index) => {
     const date = new Date(`${monthStart(schoolToday())}T00:00:00Z`)
@@ -68,12 +74,13 @@ export default function ExpensesScreen() {
         <NavBar
           title="Expenses"
           back={{ label: 'Back', onPress: router.back }}
-          actions={[{ icon: CalendarRange, label: 'Choose month', onPress: () => setPicking(true) }]}
+          actions={[{ icon: CalendarRange, label: 'Choose month', onPress: () => setPicking(true) }, ...(more.length ? [{ icon: Ellipsis, label: 'More', onPress: () => setMenu(true) }] : [])]}
         />
       }
       actionBar={canLog ? <ActionBar icon={Receipt} summary={formatINR(total)} detail={formatMonth(month.slice(0, 7))} label="Record an expense" onPress={() => router.push('/expenses/new')} /> : undefined}
       overlay={
         <>
+          <ActionSheet open={menu} onClose={() => setMenu(false)} title="Finance" actions={more} />
           <ActionSheet
             open={Boolean(open)}
             onClose={() => setOpen(null)}

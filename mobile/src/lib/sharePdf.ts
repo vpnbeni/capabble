@@ -18,3 +18,12 @@ export async function shareText(text: string, fileName: string, mimeType = 'text
   file.write(text)
   await Sharing.shareAsync(file.uri, { mimeType, dialogTitle: fileName })
 }
+
+/** Saves any file's bytes (a spreadsheet) to the cache and opens the share sheet. */
+export async function shareBytes(bytes: ArrayBuffer, fileName: string, mimeType: string) {
+  const file = new File(Paths.cache, fileName)
+  if (file.exists) file.delete()
+  file.create()
+  await file.write(new Uint8Array(bytes))
+  await Sharing.shareAsync(file.uri, { mimeType, dialogTitle: fileName })
+}
