@@ -1,4 +1,4 @@
-import { api } from '@/lib/api'
+import { api, requestBytes } from '@/lib/api'
 
 // The school's published timetable, as the website's Class wise and Teacher wise pages read it
 // (needs timetable.timetable.read). The phone works out one class's or teacher's week from it.
@@ -44,7 +44,64 @@ export interface SchoolDay {
   weekday: number
 }
 
+/** The working timetable as the timetable pages edit it (one per academic session). */
+export interface TimetableSetup {
+  classes: { id: string; className: string; section: string; floor: string; subjects: string[]; incharge?: string }[]
+  subjects: { id: string; name: string }[]
+  periodsPerWeek: number
+  periodAllocation: Record<string, Record<string, number>>
+  updatedAt: string | null
+}
+
+export interface BellTimings {
+  meta?: Record<string, string>
+  startTime: string
+  rows: BellRow[]
+}
+
+export interface TimetableVersion {
+  _id: string
+  name: string
+  status: 'draft' | 'published' | 'archived' | string
+  generatedAt?: string
+  publishedAt?: string | null
+  conflictCount?: number
+}
+
+export interface Conflict {
+  classId: string
+  className: string
+  subjectName: string
+  type: 'underallocated' | 'unfilled' | string
+  expected: number
+  actual: number
+  message: string
+}
+
+const versionPath = (id: string) => `/timetable/versions/${encodeURIComponent(id)}`
+
 export const timetableService = {
+  setup: () => api.get<TimetableSetup>('/timetable/state'),
+  bellTimings: () => api.get<BellTimings>('/timetable/bell-timings'),
+  /** Replaces the bell timings (only them): send what was loaded with the changes. */
+  saveBellTimings: (timings: BellTimings) => api.put<BellTimings>('/timetable/bell-timings', timings),
+  /** One class's periods a week per subject; the rest of the timetable is left alone. */
+  setClassPeriods: (classId: string, subjects: Record<string, number>) => api.put<TimetableSetup>(`/timetable/state/period-allocation/${encodeURIComponent(classId)}`, { subjects }),
+  addClassSection: (input: { className: string; section: string; floor?: string }) => api.post<TimetableSetup>('/timetable/state/class-sections', input),
+  /** Floor, class teacher, or the class's subjects (for every section of the class). */
+  updateClassSection: (id: string, input: { floor?: string; incharge?: string; subjects?: string[] }) => api.patch<TimetableSetup>(`/timetable/state/class-sections/${encodeURIComponent(id)}`, input),
+  /** Refused while teachers, periods or timetable cells use it. */
+  removeClassSection: (id: string) => api.delete<TimetableSetup>(`/timetable/state/class-sections/${encodeURIComponent(id)}`),
+  addSubject: (name: string) => api.post<TimetableSetup>('/timetable/state/subjects', { name }),
+  /** Works out a new draft timetable from the saved setup, and what didn't fit. */
+  generate: (name: string) => api.post<{ version: TimetableVersion; conflictReport: Conflict[] }>('/timetable/generate', { name }),
+  versions: () => api.get<TimetableVersion[]>('/timetable/versions'),
+  /** Teachers and families see the published one. */
+  publish: (id: string) => api.put<TimetableVersion>(`${versionPath(id)}/publish`, {}),
+  archive: (id: string) => api.put<TimetableVersion>(`${versionPath(id)}/archive`, {}),
+  removeVersion: (id: string) => api.delete<unknown>(versionPath(id)),
+  classPdf: (id: string) => requestBytes(`${versionPath(id)}/export/class-pdf`),
+  teacherPdf: (id: string) => requestBytes(`${versionPath(id)}/export/teacher-pdf`),
   school: async (): Promise<SchoolTimetable> => {
     const [state, versions] = await Promise.all([
       api.get<{ classes?: TimetableClass[]; teachers?: TimetableTeacher[]; bellTimings?: SchoolTimetable['bellTimings'] }>('/timetable/state'),

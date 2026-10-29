@@ -168,6 +168,26 @@ const timetableService = {
     return normalizeStatePayload(response.data?.data)
   },
 
+  /** The state with its version (its last save), which a save names so it can't undo a newer change. */
+  async getStateVersioned(): Promise<{ state: TimetableStatePayload; updatedAt: string | null }> {
+    const response = await api.get('/timetable/state')
+    return { state: normalizeStatePayload(response.data?.data), updatedAt: response.data?.data?.updatedAt ?? null }
+  },
+
+  /**
+   * Saves the whole state if it is still the version it was read at. Throws an error with
+   * `conflict: true` when someone (another tab, the app) saved since.
+   */
+  async saveStateVersioned(state: TimetableStatePayload, expectedUpdatedAt: string | null): Promise<{ state: TimetableStatePayload; updatedAt: string | null }> {
+    try {
+      const response = await api.put('/timetable/state', { ...state, expectedUpdatedAt }, { _silent: true } as any)
+      return { state: normalizeStatePayload(response.data?.data), updatedAt: response.data?.data?.updatedAt ?? null }
+    } catch (error: any) {
+      if (error?.response?.status === 409) throw Object.assign(new Error(error.response.data?.message || 'The timetable was changed somewhere else.'), { conflict: true })
+      throw error
+    }
+  },
+
   async saveState(
     state: TimetableStatePayload,
     options?: { silent?: boolean }

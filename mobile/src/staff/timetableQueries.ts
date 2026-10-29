@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { dayKeyAdd } from '@/lib/format'
 import { timetableService } from '@/services/timetableService'
@@ -33,3 +33,29 @@ export const useTargetWeek = (target: TimetableTarget, monday: string) => {
     },
   }
 }
+
+// Setting the timetable up: the working setup, bell timings and versions. Every write refreshes them
+// and the published timetable the week views read.
+const setupKeys = { all: [...staffKeys.all, 'timetable-setup'] as const }
+export const useTimetableSetup = () => useQuery({ queryKey: [...setupKeys.all, 'state'], queryFn: timetableService.setup })
+export const useBellTimings = () => useQuery({ queryKey: [...setupKeys.all, 'bells'], queryFn: timetableService.bellTimings })
+export const useTimetableVersions = () => useQuery({ queryKey: [...setupKeys.all, 'versions'], queryFn: timetableService.versions })
+
+const useWrite = <T, R>(fn: (input: T) => Promise<R>) => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: fn,
+    onSuccess: () => Promise.all([queryClient.invalidateQueries({ queryKey: setupKeys.all }), queryClient.invalidateQueries({ queryKey: keys.school })]),
+  })
+}
+export const useSaveBellTimings = () => useWrite(timetableService.saveBellTimings)
+export const useSetClassPeriods = () => useWrite(({ classId, subjects }: { classId: string; subjects: Record<string, number> }) => timetableService.setClassPeriods(classId, subjects))
+export const useAddClassSection = () => useWrite(timetableService.addClassSection)
+export const useUpdateClassSection = () =>
+  useWrite(({ id, input }: { id: string; input: Parameters<typeof timetableService.updateClassSection>[1] }) => timetableService.updateClassSection(id, input))
+export const useRemoveClassSection = () => useWrite(timetableService.removeClassSection)
+export const useAddTimetableSubject = () => useWrite(timetableService.addSubject)
+export const useGenerateTimetable = () => useWrite(timetableService.generate)
+export const usePublishVersion = () => useWrite(timetableService.publish)
+export const useArchiveVersion = () => useWrite(timetableService.archive)
+export const useRemoveVersion = () => useWrite(timetableService.removeVersion)

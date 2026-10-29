@@ -3,6 +3,11 @@ const { protect } = require('../middleware/auth');
 const {
   getMyTimetable,
   getTimetableState,
+  addClassSection,
+  updateClassSection,
+  removeClassSection,
+  addTimetableSubject,
+  setClassPeriods,
   upsertTimetableState,
   getBellTimings,
   upsertBellTimings,
@@ -31,6 +36,11 @@ router.get('/me', getMyTimetable);
 
 // ── Existing configuration endpoints ────────────────────────────────────────
 router.route('/state').get(getTimetableState).put(upsertTimetableState);
+// One change at a time (the app): each checks nobody saved in between.
+router.post('/state/class-sections', addClassSection);
+router.route('/state/class-sections/:id').patch(updateClassSection).delete(removeClassSection);
+router.post('/state/subjects', addTimetableSubject);
+router.put('/state/period-allocation/:classId', setClassPeriods);
 router.route('/bell-timings').get(getBellTimings).put(upsertBellTimings);
 router.route('/bell-timings/versions').get(getBellTimingVersions).post(createBellTimingVersion);
 router.route('/bell-timings/versions/:id').get(getBellTimingVersion).delete(deleteBellTimingVersion);

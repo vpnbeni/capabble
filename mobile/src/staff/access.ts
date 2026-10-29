@@ -70,9 +70,9 @@ export type WebModule = {
  */
 export const WEB_MODULES: WebModule[] = [
   {
-    label: 'Timetable setup',
+    label: 'Timetable grid',
     anyOf: ['timetable.timetable.write'],
-    reason: 'Periods per subject, bell timings and generating the timetable',
+    reason: 'Who teaches what in every class, and editing every class’s week at once',
     icon: CalendarClock,
     tile: 4,
     pages: [
@@ -100,9 +100,9 @@ export const WEB_MODULES: WebModule[] = [
     ],
   },
   {
-    label: 'Students and classes setup',
+    label: 'Student imports',
     anyOf: ['stdnt.students.write'],
-    reason: 'Importing students from a spreadsheet, classes and subjects',
+    reason: 'Importing students from a spreadsheet (waits for the file picker in the app)',
     icon: Users,
     tile: 1,
     pages: [

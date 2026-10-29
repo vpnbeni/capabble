@@ -1,19 +1,23 @@
 import { useRouter } from 'expo-router'
-import { CalendarClock, Users } from 'lucide-react-native'
+import { CalendarClock, CalendarCog, School, Users } from 'lucide-react-native'
 import { useState } from 'react'
 
 import { classLabel } from '@/lib/format'
 import { CardSkeleton, LoadFailed } from '@/portal/states'
 import { useSchoolTimetable } from '@/staff/timetableQueries'
+import { useStaff } from '@/staff/useStaff'
 import { Avatar, ListGroup, MobileScreen, NavBar, SearchBar, SegmentedControl, StatusView, Surface } from '@/ui'
 
 /**
  * Every class's and every teacher's timetable from the published one (the website's Class wise
- * and Teacher wise pages), for the principal and anyone who reads timetables.
+ * and Teacher wise pages), for the principal and anyone who reads timetables. Those who set the
+ * timetable up also get Classes and subjects, and Timetable setup.
  */
 export default function TimetablesScreen() {
   const router = useRouter()
   const school = useSchoolTimetable()
+  const staff = useStaff()
+  const canSetUp = staff.can('timetable.timetable.write')
   const [view, setView] = useState<'classes' | 'teachers'>('classes')
   const [query, setQuery] = useState('')
   const data = school.data
@@ -25,7 +29,20 @@ export default function TimetablesScreen() {
   const open = (type: 'class' | 'teacher', id: string, title: string) => router.push({ pathname: '/timetables/view', params: { type, id, title } })
 
   return (
-    <MobileScreen refreshing={school.isRefetching} onRefresh={school.refetch} nav={<NavBar title="Timetables" back={{ label: 'Back', onPress: router.back }} />}>
+    <MobileScreen refreshing={school.isRefetching} onRefresh={school.refetch} nav={
+        <NavBar
+          title="Timetables"
+          back={{ label: 'Back', onPress: router.back }}
+          actions={
+            canSetUp
+              ? [
+                  { icon: School, label: 'Classes and subjects', onPress: () => router.push('/timetables/classes') },
+                  { icon: CalendarCog, label: 'Timetable setup', onPress: () => router.push('/timetables/setup') },
+                ]
+              : []
+          }
+        />
+      }>
       <SegmentedControl
         label="Show"
         value={view}
