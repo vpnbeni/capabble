@@ -11,7 +11,7 @@ import { staffKeys } from '@/staff/queries'
 import { space } from '@/theme/tokens'
 import { ActionBar, ActionSheet, Avatar, Callout, MobileScreen, MobileTextField, NavBar, haptic, useToast } from '@/ui'
 
-type Form = { schoolName: string; tagline: string; address: string; contact: string; email: string; affiliationNo: string; udiseCode: string }
+type Form = { schoolName: string; tagline: string; address: string; contact: string; email: string; affiliationNo: string; udiseCode: string; brandColor: string }
 const fromProfile = (profile: SchoolProfile): Form => ({
   schoolName: profile.name,
   tagline: profile.tagline,
@@ -20,11 +20,12 @@ const fromProfile = (profile: SchoolProfile): Form => ({
   email: profile.email,
   affiliationNo: profile.affiliationNo,
   udiseCode: profile.udiseCode,
+  brandColor: profile.brandColor ?? '',
 })
 
 /**
- * The school's name, address and contact, as printed on receipts, report cards and emails. The
- * logo and colour stay on the website (an image upload and a brand choice at a desk).
+ * The school's name, address, contact and brand colour, as printed on receipts, report cards and
+ * emails. The logo is an image and waits for the app's photo picker.
  */
 export default function SchoolProfileScreen() {
   const router = useRouter()
@@ -49,6 +50,11 @@ export default function SchoolProfileScreen() {
     if (form && 'schoolName' in changes && form.schoolName.trim().length < 2) {
       haptic.error()
       setError("Enter the school's name.")
+      return
+    }
+    if (form && form.brandColor.trim() && !/^#[0-9a-f]{6}$/i.test(form.brandColor.trim())) {
+      haptic.error()
+      setError('Write the colour as # and six letters or digits, like #1F6FEB.')
       return
     }
     try {
@@ -103,6 +109,7 @@ export default function SchoolProfileScreen() {
             {field('email', 'Email', { type: 'email', maxLength: 120 })}
             {field('affiliationNo', 'Affiliation number', { maxLength: 60 })}
             {field('udiseCode', 'UDISE code', { maxLength: 20 })}
+            {field('brandColor', 'Brand colour (optional)', { maxLength: 7, autoCapitalize: 'characters', placeholder: '#1F6FEB', hint: 'Used on the school’s pages and emails. Empty: Capabble’s colour.' })}
           </View>
         </>
       )}

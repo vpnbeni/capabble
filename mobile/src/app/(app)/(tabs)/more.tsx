@@ -69,7 +69,9 @@ export default function MoreScreen() {
       ? [{ label: 'Syllabus', icon: BookCheck, tile: 4 as const, onPress: () => router.push('/coverage') }]
       : []),
     ...(isStaff && staff.can('core.users.manage') ? [{ label: 'Users', icon: KeyRound, tile: 4 as const, onPress: () => router.push('/users') }] : []),
-    ...(isStaff && staff.can('core.school.write') ? [{ label: 'School details', icon: School, tile: 4 as const, onPress: () => router.push('/school-profile') }] : []),
+    ...(isStaff && (staff.can('core.school.write') || staff.can('core.users.read') || (staff.canUse('cpitl_fees') && staff.can('cpitl.finance.settings')))
+      ? [{ label: 'School setup', icon: School, tile: 4 as const, onPress: () => router.push('/school-setup') }]
+      : []),
     ...(isStaff && staff.canUse('cpitl_fees')
       ? [{ label: 'Fee counter', icon: IndianRupee, tile: 3 as const, onPress: () => router.push('/counter') }]
       : []),

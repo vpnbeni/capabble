@@ -11,9 +11,11 @@ export interface SchoolProfile {
   contact: string
   email: string
   logoUrl: string
+  /** #RRGGBB, or empty for Capabble's colour. */
+  brandColor: string
 }
 
-export type SchoolProfileInput = Partial<{ schoolName: string; tagline: string; address: string; contact: string; email: string; affiliationNo: string; udiseCode: string }>
+export type SchoolProfileInput = Partial<{ schoolName: string; tagline: string; address: string; contact: string; email: string; affiliationNo: string; udiseCode: string; brandColor: string }>
 
 export const schoolProfileService = {
   get: () => api.get<SchoolProfile>('/school-profile'),
