@@ -2,24 +2,34 @@ import { type Href, useRouter } from 'expo-router'
 import { Bell, CheckCheck, ChevronDown } from 'lucide-react-native'
 
 import { formatRelative } from '@/lib/format'
-import { staffRouteFor } from '@/lib/notificationLinks'
+import { appRouteFor, staffRouteFor } from '@/lib/notificationLinks'
 import { CardSkeleton, LoadFailed } from '@/portal/states'
 import type { StaffNotification } from '@/services/notificationService'
+import { useSession } from '@/session/SessionProvider'
 import { useMarkNotificationRead, useNotifications } from '@/staff/queries'
 import { openWebsite } from '@/staff/useStaff'
 import { ListGroup, MobileButton, MobileScreen, NavBar, StatusView, Surface, SwipeRow, useToast } from '@/ui'
 
-/** Staff's notifications, newest first: tap opens the thing (in the app, or on the website) and marks it read. */
+/**
+ * The login's notifications, newest first: tap opens the thing (in the app, or for staff on the website)
+ * and marks it read. Families see what the school sent them: events and their changes, fees, notices.
+ */
 export default function NotificationsScreen() {
   const router = useRouter()
   const toast = useToast()
   const list = useNotifications()
   const mark = useMarkNotificationRead()
+  const session = useSession()
+  const family = session.status === 'signedIn' && session.user.kind !== 'staff'
   const items = list.data?.pages.flatMap((page) => page.items) ?? []
   const unread = list.data?.pages[0]?.unread ?? 0
 
   const open = (item: StaffNotification) => {
     if (!item.readAt) mark.mutate(item._id)
+    if (family && session.status === 'signedIn') {
+      if (item.link) router.push(appRouteFor(item.link, session.user.kind) as Href)
+      return
+    }
     const route = item.link ? staffRouteFor(item.link) : null
     if (route) router.push(route as Href)
     else if (item.link?.startsWith('/')) openWebsite(item.link)
@@ -53,7 +63,7 @@ export default function NotificationsScreen() {
         <LoadFailed what="Your notifications" error={list.error} onRetry={list.refetch} />
       ) : !items.length ? (
         <Surface padded={false}>
-          <StatusView compact kind="empty" icon={Bell} title="No notifications yet" body="Approvals, meetings and changes to your calendar show here." />
+          <StatusView compact kind="empty" icon={Bell} title="No notifications yet" body={family ? 'School events and their changes, fees and notices show here.' : 'Approvals, meetings and changes to your calendar show here.'} />
         </Surface>
       ) : (
         <>

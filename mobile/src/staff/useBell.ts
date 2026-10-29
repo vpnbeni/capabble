@@ -5,7 +5,7 @@ import type { NavAction } from '@/ui'
 
 import { useUnreadCount } from './queries'
 
-/** The bell for a staff Today nav bar: opens Notifications, with a dot while any are unread. */
+/** The bell for Today (staff) or Home (families): opens Notifications, with a dot while any are unread. */
 export function useBell(): NavAction {
   const router = useRouter()
   const unread = useUnreadCount()

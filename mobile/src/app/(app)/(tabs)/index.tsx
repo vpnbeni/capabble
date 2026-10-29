@@ -41,6 +41,7 @@ function FamilyHome() {
   const calendar = usePortalCalendar(today, dayKeyAdd(today, 30), has('calendar'))
   const notices = usePortalNotices(has('notices'))
   const user = session.status === 'signedIn' ? session.user : null
+  const bell = useBell()
 
   // The next things on the calendar for this child (or the whole family), soonest first.
   const coming = useMemo(() => {
@@ -82,6 +83,7 @@ function FamilyHome() {
           title={`Hi, ${firstName(user?.displayName || user?.name)}`}
           leading={school ? <Avatar name={school.name} src={school.logoUrl} size={24} square /> : undefined}
           accessory={<ChildSwitcher />}
+          actions={[bell]}
         />
       }
     >

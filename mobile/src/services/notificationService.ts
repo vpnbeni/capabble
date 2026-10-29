@@ -1,7 +1,8 @@
 import { api } from '@/lib/api'
 import type { Tone } from '@/theme/tokens'
 
-// Staff's own notifications (/api/notifications), the website's bell. Pinned to the signed-in login.
+// The signed-in login's own notifications, the website's bell: /api/notifications for staff,
+// /api/portal/notifications for parents and students (same shapes).
 
 export interface StaffNotification {
   _id: string
@@ -22,9 +23,11 @@ export interface NotificationPage {
   nextBefore: string | null
 }
 
+const base = (family: boolean) => (family ? '/portal/notifications' : '/notifications')
+
 export const notificationService = {
-  list: (before?: string) => api.get<NotificationPage>('/notifications', { before, limit: 30 }),
-  unreadCount: () => api.get<{ unread: number }>('/notifications/unread-count'),
-  markRead: (id: string) => api.post<unknown>(`/notifications/${encodeURIComponent(id)}/read`),
-  markAllRead: () => api.post<{ updated: number }>('/notifications/read-all'),
+  list: (family: boolean, before?: string) => api.get<NotificationPage>(base(family), { before, limit: 30 }),
+  unreadCount: (family: boolean) => api.get<{ unread: number }>(`${base(family)}/unread-count`),
+  markRead: (family: boolean, id: string) => api.post<unknown>(`${base(family)}/${encodeURIComponent(id)}/read`),
+  markAllRead: (family: boolean) => api.post<{ updated: number }>(`${base(family)}/read-all`),
 }

@@ -12,6 +12,7 @@ import { homeworkService, type HomeworkInput, type HomeworkStatus, type Submissi
 import { notificationService } from '@/services/notificationService'
 import { studentService, type StudentInput } from '@/services/studentService'
 import { staffService, type StaffInput, type NewEvent, type RosterStudent } from '@/services/staffService'
+import { useSession } from '@/session/SessionProvider'
 
 // React Query hooks for the staff app. Writes invalidate `staffKeys.all` parts they touch.
 
@@ -318,28 +319,43 @@ export const useSaveStudent = () => {
 export const useAlumni = (search: string, enabled = true) =>
   useQuery({ queryKey: [...studentKeys.all, 'alumni', search], queryFn: () => studentService.alumni(search), placeholderData: keepPreviousData, staleTime: 5 * 60 * 1000, enabled })
 
-// Notifications (the bell on Today).
+// Notifications (the bell on Today, and on a family's Home). Families read the portal's list.
 const notificationKeys = {
   all: [...staffKeys.all, 'notifications'] as const,
   count: [...staffKeys.all, 'notifications', 'count'] as const,
 }
+const useFamilyLogin = () => {
+  const session = useSession()
+  return session.status === 'signedIn' && session.user.kind !== 'staff'
+}
 
 /** Unread count for the bell: refreshed every minute while the app is open. */
-export const useUnreadCount = (enabled = true) =>
-  useQuery({ queryKey: notificationKeys.count, queryFn: notificationService.unreadCount, refetchInterval: 60_000, staleTime: 30_000, enabled })
+export const useUnreadCount = (enabled = true) => {
+  const family = useFamilyLogin()
+  return useQuery({
+    queryKey: [...notificationKeys.count, family],
+    queryFn: () => notificationService.unreadCount(family),
+    refetchInterval: 60_000,
+    staleTime: 30_000,
+    enabled,
+  })
+}
 
-export const useNotifications = () =>
-  useInfiniteQuery({
-    queryKey: notificationKeys.all,
-    queryFn: ({ pageParam }) => notificationService.list(pageParam || undefined),
+export const useNotifications = () => {
+  const family = useFamilyLogin()
+  return useInfiniteQuery({
+    queryKey: [...notificationKeys.all, 'list', family],
+    queryFn: ({ pageParam }) => notificationService.list(family, pageParam || undefined),
     initialPageParam: '',
     getNextPageParam: (last) => last.nextBefore ?? undefined,
   })
+}
 
 export const useMarkNotificationRead = () => {
+  const family = useFamilyLogin()
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (id: string | 'all') => (id === 'all' ? notificationService.markAllRead() : notificationService.markRead(id)),
+    mutationFn: (id: string | 'all') => (id === 'all' ? notificationService.markAllRead(family) : notificationService.markRead(family, id)),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: notificationKeys.all }),
   })
 }
