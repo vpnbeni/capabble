@@ -74,7 +74,10 @@ const feedHandlers = {
 
 const describe = (item) => {
   const parts = (item.parts || []).filter((part) => part.instructions)
-    .map((part) => `${part.child ? `For ${part.child.name}` : part.label || 'For you'}: ${part.instructions}`);
+    .map((part) => {
+      const forWhom = part.children?.length ? `For ${part.children.map((c) => c.name).join(' and ')}` : part.label;
+      return `${forWhom || 'For you'}: ${part.instructions}`;
+    });
   return [item.detail, ...parts].filter(Boolean).join('\n\n');
 };
 

@@ -9,7 +9,7 @@ const {
   scopeKey, eventTargetKeys, matchEvent, viewerContext, resolveRecipients
 } = require('../audience');
 const {
-  occurrences, prepareSegments, diffEvents, assertCanTarget, needsApproval, viewForViewer, eventItems
+  occurrences, prepareSegments, diffEvents, assertCanTarget, needsApproval, viewForViewer, eventItems, visibleEventsFilter, viewerParts
 } = require('../events');
 const templates = require('../../../notifications/templates');
 const { send } = require('../../../notifications/send');
@@ -377,6 +377,27 @@ describe('calendar items', () => {
     expect(items).toHaveLength(1);
     expect(items[0]).toMatchObject({ id: `event:${ID(500)}:2026-11-14`, layer: 'events', readOnly: true });
     expect(items[0].parts).toHaveLength(2);
+  });
+
+  it('shows a family one part per audience for both children, but consent per child', () => {
+    const segment = (key, response) => ({ key, label: key, response, attachments: [] });
+    const kids = [{ studentId: 'a', name: 'Aarav Beniwal' }, { studentId: 'd', name: 'Diya Beniwal' }];
+    const parts = viewerParts([
+      { segment: segment('party', 'rsvp'), child: kids[0] },
+      { segment: segment('party', 'rsvp'), child: kids[1] },
+      { segment: segment('trip', 'consent'), child: kids[0] },
+      { segment: segment('trip', 'consent'), child: kids[1] }
+    ]);
+    expect(parts).toHaveLength(3);
+    expect(parts[0]).toMatchObject({ segmentKey: 'party', child: null, children: kids });
+    expect(parts.slice(1).map((p) => p.child.studentId)).toEqual(['a', 'd']);
+  });
+
+  it('finds a staff member\'s own events even when they are only for families', () => {
+    const staff = visibleEventsFilter(['staff:all'], { kind: 'staff', userId: ID(7) }, '2026-11-01', '2026-11-30');
+    expect(staff.$and[1].$or).toContainEqual({ createdBy: ID(7) });
+    const parent = visibleEventsFilter(['parent:all'], { kind: 'parent', userId: ID(8) }, '2026-11-01', '2026-11-30');
+    expect(parent.$and[1].$or).not.toContainEqual({ createdBy: ID(8) });
   });
 });
 

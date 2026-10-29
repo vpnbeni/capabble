@@ -18,7 +18,8 @@ const trip = {
   visibility: 'segments',
   segments: prepareSegments([
     { key: 'consent', label: 'Parents of 7 B', personType: 'parent', scopes: [{ type: 'section', value: '7|B' }], response: 'consent', responseDeadline: '2026-11-15' },
-    { key: 'escort', label: 'Escorts', personType: 'staff', scopes: [{ type: 'user', value: ID(2) }], response: 'acknowledge' }
+    { key: 'escort', label: 'Escorts', personType: 'staff', scopes: [{ type: 'user', value: ID(2) }], response: 'acknowledge' },
+    { key: 'party', label: 'Families of 7 B', personType: 'parent', scopes: [{ type: 'section', value: '7|B' }], response: 'rsvp' }
   ])
 };
 
@@ -41,7 +42,14 @@ const models = () => ({
       if (!row) { row = { ...filter }; store.push(row); }
       Object.assign(row, update.$set);
       return query(row);
-    }
+    },
+    deleteMany: jest.fn((filter) => {
+      for (let i = store.length - 1; i >= 0; i -= 1) {
+        const row = store[i];
+        if (row.segmentKey === filter.segmentKey && String(row.userId) === String(filter.userId) && row.studentId !== '') store.splice(i, 1);
+      }
+      return query({});
+    })
   }
 });
 
@@ -87,5 +95,31 @@ describe('replies', () => {
     const items = [{ eventId: trip._id, parts: [{ segmentKey: 'consent', response: 'consent', child: { studentId: ID(12) } }, { segmentKey: 'consent', response: 'consent', child: { studentId: ID(13) } }] }];
     await attachResponses(models(), ID(1), items);
     expect(items[0].parts.map((p) => p.myResponse?.value || null)).toEqual(['given', null]);
+  });
+
+  it('takes one RSVP per family, so two children do not double the headcount', async () => {
+    const answer = await respond(parentReq(), trip._id, { segmentKey: 'party', studentId: ID(12), value: 'yes', count: 3 }, { timeZone: 'UTC' });
+    expect(answer).toMatchObject({ studentId: null, value: 'yes', count: 3 });
+    await respond(parentReq(), trip._id, { segmentKey: 'party', studentId: ID(13), value: 'yes', count: 3 }, { timeZone: 'UTC' });
+    expect(store.filter((row) => row.segmentKey === 'party')).toHaveLength(1);
+    const party = (await tracker(models(), trip)).find((entry) => entry.key === 'party');
+    expect(party).toMatchObject({ expected: 1, headcount: 3, counts: { yes: 1 } });
+    expect(party.responded[0].child).toBe('Riya Shah and Kabir Shah');
+    expect(await pendingRecipients(models(), trip, 'party')).toEqual([]);
+  });
+
+  it('replaces older per-child RSVPs with the family answer', async () => {
+    store.push({ segmentKey: 'party', userId: ID(1), studentId: ID(12), value: 'yes', count: 2 });
+    store.push({ segmentKey: 'party', userId: ID(1), studentId: ID(13), value: 'yes', count: 2 });
+    expect((await tracker(models(), trip)).find((entry) => entry.key === 'party')).toMatchObject({ expected: 1, headcount: 2 });
+    await respond(parentReq(), trip._id, { segmentKey: 'party', value: 'no' }, { timeZone: 'UTC' });
+    expect(store.filter((row) => row.segmentKey === 'party')).toEqual([expect.objectContaining({ studentId: '', value: 'no' })]);
+  });
+
+  it('shows the family answer on a part covering both children', async () => {
+    store.push({ eventId: trip._id, segmentKey: 'party', userId: ID(1), studentId: '', value: 'yes', count: 3 });
+    const items = [{ eventId: trip._id, parts: [{ segmentKey: 'party', response: 'rsvp', child: null, children: [{ studentId: ID(12) }, { studentId: ID(13) }] }] }];
+    await attachResponses(models(), ID(1), items);
+    expect(items[0].parts[0].myResponse).toMatchObject({ value: 'yes', count: 3 });
   });
 });

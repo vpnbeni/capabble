@@ -80,7 +80,7 @@ call `onChange(value)` and are controlled (no `defaultValue`).
 | `SwipeRow` | `title, subtitle, meta, unread, actions[{label,icon,tone,onPress}], defaultRevealed, onPress, divider` | Notices and messages inside a `ListGroup`; the title takes up to two lines. Every swipe action is also on the detail screen and in accessibility actions |
 | `DetailList` | `items[{label,value,wide,numeric}], columns: 1 \| 2` | A record's facts, label above value; "—" when missing |
 | `StatTiles` | `items[{label,value,detail,tone,icon,tile,onPress}]` | Principal/teacher glance: ≤4, each opens its list. Two-up; stacked rows (label left, number right) on a small phone or with larger text |
-| `WeekStrip` | `days[{date,weekday,day,today,off,dots}], value, onChange, onWeekChange` | Calendar and timetable day picker; swipe for the next week |
+| `WeekStrip` | `days[{date,weekday,day,today,off,dots}], value, onChange, onWeekChange, heading` | Calendar and timetable day picker; swipe for the next week. `heading {label, onPress}` adds a row above the days with previous/next week arrows; tapping the label opens a `MonthPicker` in a `BottomSheet` to jump further |
 | `Agenda` | `groups[{label,off,items[{time,end,title,meta,color,badge,onPress}]}], empty` | What's on by day; titles take up to three lines |
 | `Timeline` | `items[{time,title,detail,state: done \| current \| upcoming,badge}], compact` | Bus stops, a day's periods, a request's progress |
 | `MonthPicker` | `value, onChange, today, min, label` | Picking one day, in a `BottomSheet` opened from a date row. Previous/next month arrows; chosen day `accent-strong`, today ringed, days before `min` dimmed. Not in the design system yet: added to our kit |

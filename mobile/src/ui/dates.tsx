@@ -1,4 +1,4 @@
-import { Check, ChevronLeft, ChevronRight } from 'lucide-react-native'
+import { Check, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react-native'
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { Animated, PanResponder, Pressable, StyleSheet, View } from 'react-native'
 import Svg, { Circle } from 'react-native-svg'
@@ -44,11 +44,13 @@ type WeekStripProps = {
   onChange: (date: string) => void
   /** Swiping the strip asks for the previous (-1) or next (1) week. */
   onWeekChange?: (step: -1 | 1) => void
+  /** A row above the days ("26 Oct – 1 Nov"): tapping it opens a month to jump to; arrows step a week. */
+  heading?: { label: string; onPress?: () => void }
   label?: string
 }
 
 /** Seven days across the top of the calendar or timetable, with dots for what's on. */
-export function WeekStrip({ days, value, onChange, onWeekChange, label = 'Choose a day' }: WeekStripProps) {
+export function WeekStrip({ days, value, onChange, onWeekChange, heading, label = 'Choose a day' }: WeekStripProps) {
   const { colors } = useTheme()
   const swipe = useRef(onWeekChange)
   useLayoutEffect(() => {
@@ -58,7 +60,9 @@ export function WeekStrip({ days, value, onChange, onWeekChange, label = 'Choose
   // eslint-disable-next-line react-hooks/refs
   const [pan] = useState(() =>
     PanResponder.create({
-      onMoveShouldSetPanResponder: (_, gesture) => !!swipe.current && Math.abs(gesture.dx) > 12 && Math.abs(gesture.dx) > Math.abs(gesture.dy) * 2,
+      // Capture phase: a sideways drag that starts on a day wins over the day's press and the page's scroll.
+      onMoveShouldSetPanResponderCapture: (_, gesture) => !!swipe.current && Math.abs(gesture.dx) > 12 && Math.abs(gesture.dx) > Math.abs(gesture.dy) * 2,
+      onPanResponderTerminationRequest: () => false,
       onPanResponderRelease: (_, gesture) => {
         if (Math.abs(gesture.dx) > 50) {
           haptic.selection()
@@ -68,7 +72,12 @@ export function WeekStrip({ days, value, onChange, onWeekChange, label = 'Choose
     }),
   )
 
-  return (
+  const step = (delta: -1 | 1) => {
+    haptic.selection()
+    onWeekChange?.(delta)
+  }
+
+  const strip = (
     <View accessibilityRole="tablist" accessibilityLabel={label} style={styles.week} {...pan.panHandlers}>
       {days.map((day) => {
         const active = day.date === value
@@ -100,6 +109,48 @@ export function WeekStrip({ days, value, onChange, onWeekChange, label = 'Choose
           </Pressable>
         )
       })}
+    </View>
+  )
+  if (!heading) return strip
+
+  return (
+    <View style={{ gap: space['space-2'] }}>
+      <View style={styles.pickerHead}>
+        <Pressable
+          accessibilityRole={heading.onPress ? 'button' : 'header'}
+          accessibilityLabel={heading.onPress ? `${heading.label}, choose a date` : heading.label}
+          disabled={!heading.onPress}
+          onPress={heading.onPress}
+          hitSlop={8}
+          style={({ pressed }) => [styles.weekHeading, pressed && { opacity: 0.6 }]}
+        >
+          <Text variant="m-headline" numeric numberOfLines={1} maxFontSizeMultiplier={1.3} style={{ flexShrink: 1 }}>
+            {heading.label}
+          </Text>
+          {heading.onPress ? <Icon icon={ChevronDown} size={18} color={colors['accent-strong']} /> : null}
+        </Pressable>
+        {onWeekChange ? (
+          <View style={{ flexDirection: 'row', gap: 4 }}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Previous week"
+              onPress={() => step(-1)}
+              style={({ pressed }) => [styles.pickerArrow, pressed && { backgroundColor: colors['fill-pressed'] }]}
+            >
+              <Icon icon={ChevronLeft} size={22} color={colors['accent-strong']} />
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Next week"
+              onPress={() => step(1)}
+              style={({ pressed }) => [styles.pickerArrow, pressed && { backgroundColor: colors['fill-pressed'] }]}
+            >
+              <Icon icon={ChevronRight} size={22} color={colors['accent-strong']} />
+            </Pressable>
+          </View>
+        ) : null}
+      </View>
+      {strip}
     </View>
   )
 }
@@ -537,6 +588,7 @@ const styles = StyleSheet.create({
   tlTitle: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: space['space-2'] },
   gridRow: { flexDirection: 'row', gap: 4 },
   pickerHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space['space-2'] },
+  weekHeading: { flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 1, minHeight: 44 },
   pickerArrow: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   gridHead: { flex: 1, textAlign: 'center', paddingBottom: 2 },
   gridCell: { flex: 1, aspectRatio: 1 },

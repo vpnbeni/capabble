@@ -5,7 +5,7 @@ import { Badge, Button, DetailList, EmptyState, Sheet, Skeleton, formatDayKey, f
 import { useEventView } from '@/hooks/useCalendar'
 import { usePermissions } from '@/hooks/usePermissions'
 import type { CalendarItem, CalendarPart } from '@/services/calendarService'
-import { CATEGORY_LABELS, LAYER_LABELS, ROLE_LABELS, STATUS_LABELS } from './calendarUi'
+import { CATEGORY_LABELS, LAYER_LABELS, ROLE_LABELS, STATUS_LABELS, partFor } from './calendarUi'
 import ReplyControls from './ReplyControls'
 import './calendar.css'
 
@@ -20,7 +20,7 @@ const whenText = (item: { startDate: string; endDate: string; allDay: boolean; s
 const PartBlock: React.FC<{ part: CalendarPart; eventId?: string }> = ({ part, eventId }) => (
   <div className="cl-part">
     <div className="cl-part__head">
-      <span className="cb-strong">{part.child ? `For ${part.child.name}` : part.label || 'For you'}</span>
+      <span className="cb-strong">{partFor(part)}</span>
       {part.role && part.role !== 'attendee' ? <Badge tone="info" dot={false}>{ROLE_LABELS[part.role]}</Badge> : null}
     </div>
     {part.instructions ? <p className="cl-part__text">{part.instructions}</p> : null}

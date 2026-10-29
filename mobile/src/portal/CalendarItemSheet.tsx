@@ -8,7 +8,7 @@ import type { CalendarItem, CalendarPart, ResponseValue } from '@/services/calen
 import { space } from '@/theme/tokens'
 import { Badge, BottomSheet, Callout, DetailList, haptic, ListGroup, MobileButton, SegmentedControl, Skeleton, StatusView, Stepper, Surface, Text } from '@/ui'
 
-import { ANSWER_LABELS, ANSWER_TONE, CATEGORY_LABELS, LAYER_LABELS, ROLE_LABELS, STATUS_LABELS } from './calendarUi'
+import { ANSWER_LABELS, ANSWER_TONE, CATEGORY_LABELS, LAYER_LABELS, ROLE_LABELS, STATUS_LABELS, partFor } from './calendarUi'
 import { useCalendarEvent, useCalendarReply } from '@/calendar/source'
 
 const whenText = (item: CalendarItem) => {
@@ -125,7 +125,7 @@ function PartBlock({ part, eventId }: { part: CalendarPart; eventId?: string }) 
     <Surface>
       <View style={styles.partHead}>
         <Text variant="m-headline" style={{ flexShrink: 1 }}>
-          {part.child ? `For ${part.child.name}` : part.label || 'For you'}
+          {partFor(part)}
         </Text>
         {part.role && part.role !== 'attendee' ? <Badge label={ROLE_LABELS[part.role]} tone="info" dot={false} /> : null}
       </View>
@@ -151,6 +151,9 @@ function ReplyControls({ eventId, part }: { eventId: string; part: CalendarPart 
   const [count, setCount] = useState(current?.count || 1)
   const closed = Boolean(part.responseDeadline && schoolToday() > part.responseDeadline)
   const deadline = part.responseDeadline ? ` by ${formatDayKey(part.responseDeadline, { weekday: 'short' })}` : ''
+  // One answer covers all the family's children in this audience, so ask about the family.
+  const family = (part.children?.length ?? 0) > 1
+  const question = family ? 'Will your family come?' : 'Will you come?'
 
   const reply = async (value: ResponseValue) => {
     setError(null)
@@ -239,9 +242,9 @@ function ReplyControls({ eventId, part }: { eventId: string; part: CalendarPart 
 
   return (
     <View style={{ gap: space['space-3'] }}>
-      <Text variant="label">{`Will you come?${deadline ? ` Reply${deadline}.` : ''}`}</Text>
+      <Text variant="label">{`${question}${deadline ? ` Reply${deadline}.` : ''}`}</Text>
       <SegmentedControl
-        label="Will you come?"
+        label={question}
         value={rsvp}
         onChange={setRsvp}
         options={[
@@ -250,7 +253,7 @@ function ReplyControls({ eventId, part }: { eventId: string; part: CalendarPart 
           { value: 'maybe', label: 'Maybe' },
         ]}
       />
-      {rsvp === 'yes' ? <Stepper label="People coming" hint="Including you" value={count} onChange={setCount} min={1} max={20} /> : null}
+      {rsvp === 'yes' ? <Stepper label="People coming" hint={family ? 'Your whole family, with you' : 'Including you'} value={count} onChange={setCount} min={1} max={20} /> : null}
       <MobileButton fullWidth loading={send.isPending} onPress={() => reply(rsvp)}>
         Send answer
       </MobileButton>

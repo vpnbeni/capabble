@@ -11,7 +11,7 @@ import type { CalendarItem } from '@/services/calendarTypes'
 import { useMyEvents } from '@/staff/queries'
 import { useStaff } from '@/staff/useStaff'
 import { useTheme } from '@/theme/ThemeProvider'
-import { Agenda, ChipRail, ListGroup, MobileScreen, NavBar, StatusView, Surface, WeekStrip, type WeekDay } from '@/ui'
+import { Agenda, BottomSheet, ChipRail, ListGroup, MobileScreen, MonthPicker, NavBar, StatusView, Surface, WeekStrip, type WeekDay } from '@/ui'
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const weekdayOf = (key: string) => new Date(`${key}T00:00:00.000Z`).getUTCDay()
@@ -32,6 +32,7 @@ export default function CalendarScreen() {
   const [selected, setSelected] = useState(linked.date || today)
   const [child, setChild] = useState('all')
   const [open, setOpen] = useState<CalendarItem | null>(null)
+  const [picking, setPicking] = useState(false)
 
   // Six weeks from the Monday of the chosen week: the strip, then the agenda after the chosen day.
   const from = weekStart(selected)
@@ -85,6 +86,7 @@ export default function CalendarScreen() {
   const shown = open ?? linkedItem
   const openItem = shown ? (data?.items.find((item) => item.id === shown.id) ?? shown) : null
   const [monthName, year] = formatMonth(monthOf(selected)).split(' ')
+  const weekLabel = `${formatDayKey(from)} – ${formatDayKey(dayKeyAdd(from, 6))}`
 
   return (
     <MobileScreen
@@ -105,7 +107,21 @@ export default function CalendarScreen() {
           ]}
         />
       }
-      overlay={<CalendarItemSheet item={openItem} onClose={close} />}
+      overlay={
+        <>
+          <CalendarItemSheet item={openItem} onClose={close} />
+          <BottomSheet open={picking} onClose={() => setPicking(false)} title="Go to a date">
+            <MonthPicker
+              value={selected}
+              today={schoolDay}
+              onChange={(date) => {
+                setSelected(date)
+                setPicking(false)
+              }}
+            />
+          </BottomSheet>
+        </>
+      }
     >
       {sent.length ? (
         <ListGroup
@@ -125,7 +141,14 @@ export default function CalendarScreen() {
       {canCreate ? (
         <ListGroup items={[{ title: 'Your events', subtitle: 'Edit, see replies, send reminders, cancel', icon: CalendarDays, tile: 1, onPress: () => router.push('/events') }]} />
       ) : null}
-      <WeekStrip days={week} value={selected} onChange={setSelected} onWeekChange={(step) => setSelected(dayKeyAdd(selected, step * 7))} label="Choose a day" />
+      <WeekStrip
+        days={week}
+        value={selected}
+        onChange={setSelected}
+        onWeekChange={(step) => setSelected(dayKeyAdd(selected, step * 7))}
+        heading={{ label: weekLabel, onPress: () => setPicking(true) }}
+        label="Choose a day"
+      />
       {children.length > 1 ? (
         <ChipRail
           label="Whose dates"
@@ -150,7 +173,7 @@ export default function CalendarScreen() {
                 compact
                 kind="empty"
                 title={`Nothing on from ${selected === schoolDay ? 'today' : formatDayKey(selected, { weekday: 'short' })}`}
-                body="Swipe the week or pick another day."
+                body="Swipe the week, or tap the dates above to jump to another month."
               />
             </Surface>
           }
