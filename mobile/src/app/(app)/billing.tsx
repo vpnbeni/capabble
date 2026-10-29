@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { useRouter } from 'expo-router'
-import { CreditCard, FileText } from 'lucide-react-native'
+import { Building2, CreditCard, FileText } from 'lucide-react-native'
 import { useState } from 'react'
 
 import { ApiError } from '@/lib/api'
@@ -9,6 +9,7 @@ import { sharePdf } from '@/lib/sharePdf'
 import { CardSkeleton, LoadFailed } from '@/portal/states'
 import { billingService, type BillingPdf } from '@/services/billingService'
 import { staffKeys } from '@/staff/queries'
+import { useStaff } from '@/staff/useStaff'
 import { Callout, ChipRail, ListGroup, MobileScreen, NavBar, StatusView, Surface, haptic, useToast } from '@/ui'
 
 type Tab = 'invoices' | 'payments' | 'credit'
@@ -47,12 +48,14 @@ const keys = [...staffKeys.all, 'billing'] as const
 
 /**
  * The school's Capabble plan (the website's Billing), to look up: the plan and its state, what is
- * due next, and every invoice, receipt and credit note as a PDF to the share sheet. Paying and
- * changing the plan are done on the website.
+ * due next, every invoice, receipt and credit note as a PDF to the share sheet, and the billing
+ * details on invoices. Paying and changing the plan are not here and nothing points to them: the
+ * stores' rules on paying for the service itself (see services/billingService.ts).
  */
 export default function BillingScreen() {
   const router = useRouter()
   const toast = useToast()
+  const staff = useStaff()
   const me = useQuery({ queryKey: [...keys, 'me'], queryFn: billingService.me })
   const [tab, setTab] = useState<Tab>('invoices')
   const invoices = useQuery({ queryKey: [...keys, 'invoices'], queryFn: billingService.invoices })
@@ -79,6 +82,9 @@ export default function BillingScreen() {
   const state = sub ? (STATE[sub.state] ?? { label: sub.state, tone: 'neutral' as Tone }) : null
   const due = (me.data?.openInvoices ?? []).reduce((sum, invoice) => sum + invoice.outstandingPaise, 0)
   const next = me.data?.upcomingRenewal
+  const dueBy = (me.data?.openInvoices ?? []).map((invoice) => invoice.dueAt).sort()[0]
+  const account = me.data?.account
+  const canEdit = staff.can('core.billing.manage')
 
   const tabList = tab === 'invoices' ? invoices : tab === 'payments' ? payments : credits
 
@@ -96,12 +102,11 @@ export default function BillingScreen() {
         <>
           {due > 0 ? (
             <Callout tone="warning" title={`${rupees(due)} due`}>
-              Pay it on the website, under Billing.
+              {dueBy ? `Due by ${formatDate(dueBy)}.` : 'Due now.'}
             </Callout>
           ) : null}
           <ListGroup
             header="Your plan"
-            footer="Paying and changing the plan are done on the website."
             items={
               sub && state
                 ? [
@@ -124,9 +129,25 @@ export default function BillingScreen() {
                     ...(sub.graceEndsAt && sub.state === 'past_due_grace' ? [{ title: 'Pay by', value: formatDate(sub.graceEndsAt) }] : []),
                     ...(sub.items.length ? [{ title: 'Modules', subtitle: sub.items.map((item) => item.name).join(', '), lines: 3 }] : []),
                   ]
-                : [{ title: 'No plan yet', subtitle: 'Choose one on the website.', lines: 2 }]
+                : [{ title: 'No plan yet' }]
             }
           />
+          {account ? (
+            <ListGroup
+              header="On your invoices"
+              items={[
+                {
+                  title: account.legalName || account.tenantName,
+                  subtitle: [account.gstin ? `GSTIN ${account.gstin}` : 'No GSTIN', account.billingEmail].filter(Boolean).join(' · '),
+                  lines: 2,
+                  icon: Building2,
+                  tile: 3 as const,
+                  chevron: canEdit,
+                  onPress: canEdit ? () => router.push('/billing-details') : undefined,
+                },
+              ]}
+            />
+          ) : null}
         </>
       )}
       <ChipRail

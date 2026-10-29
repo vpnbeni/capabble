@@ -143,3 +143,119 @@ published to `preview`.
 Found, not fixed (server, needs a deploy): admit cards take the class's latest internal datesheet without checking
 which exam it belongs to (`admitCardController.js`, the `DateSheet.findOne({ class, examType: 'internal' })`), so a
 class with datesheets for two exams can print the wrong papers on an admit card.
+
+# Plan, part 2: the last six rows (29 Oct 2026, approved the same day)
+
+After slice 13, More → "On the website" holds six rows. Checked against the web pages in `client/src`, their
+services and the server routes. Each row below says what the phone does, what stays on the website and why.
+
+## What the code says
+
+- **Timetable grid.** `/time-table/period-distribution` has no teachers on it: it is periods per subject per class,
+  which slice 7 already does. "Who teaches what" is really the Departments page (`/time-table/departments`):
+  `teachers[].subjects` (what a teacher can teach) and `teacherSubjectAllocations[]` (teacher → class → subjects),
+  saved only through the whole-state PUT; a teacher's load is shown, never enforced. `/time-table/class-wise` edits the
+  hand-made `timetableGrid` (class → day → period → subject and teacher name), checks teacher clashes in the browser
+  and has no swap. It is separate from generated versions: generating never touches it, a version is read only
+  everywhere, and the week views read the published version, falling back to this grid when nothing is published
+  (`modules/timetable/teacherSchedule.js`). No one-change endpoint exists for either; the server only blanks a clashing
+  teacher quietly (`normalizeTimetableGrid`).
+- **Exam print designs.** Each of the three designs (`GET`/`PUT /admit-cards/design`, `/award-list/design`,
+  `/report-card/design`, stored on the school profile) is mostly a form: page size, orientation, copies per sheet,
+  header and field toggles, instruction texts, which columns print, signatures, the report card's school texts,
+  labels and text styles. On top sits a free-position layer, `canvasItems` (text, images, boxes and lines placed and
+  sized by dragging, up to 40), plus the report card's column widths dragged in the preview. The PUT replaces the whole
+  design, so the phone sends `canvasItems` back untouched. `POST /admit-cards` and `POST /award-list` accept an unsaved
+  `design`, so the phone can preview a draft as the real PDF; report cards print only from the saved design.
+  Signatures upload through `POST /admit-cards/design/signature/:role`.
+- **Seating plan layout.** A room's layout is rows of benches (`{rows: [{benchCount, benchType: single|double|triple}]}`,
+  `PUT /seating-plan/rooms/:id {seatingLayout}`; the server sets the seats from it). Which rooms sit on which day is
+  per room (`allocatedExamDates`, `allocationOrderByDate`) with a mode (`/room-allocation-mode`, auto or manual) and
+  the seating mode (`/seating-plan-mode`, same every day or different). The four print formats (main gate,
+  invigilator slip, room door slip, board copy) hold only column widths, row heights and font sizes, set by dragging
+  edges on a sample table, saved whole by `PUT /seating-plan/template-settings`.
+- **Salary structures** are on `/cpitl/salary` (not the dashboard). One record per person:
+  `components[]` (earning or deduction; fixed, % of basic or % of gross; BASIC required), `options` (PF on, PF wage
+  cap, ESI auto or off, monthly TDS), `effectiveFrom`, a revision log when gross changes. `PUT /cpitl/salary/staff/:teacherId`
+  replaces `components` whole; `POST /salary/preview` works the totals out without saving; `POST
+  /salary/staff/bulk-revise` raises several people by % or amount with a preview. School-wide: `GET`/`PUT
+  /salary/settings` (PF and ESI rates and limits, PT slabs; partial) and the component list (`/salary/components`).
+  All behind `cpitl.finance.payroll`. No server change needed.
+- **Activity extras.** Logos and flags go as multipart on the house or club PUT (`logo`, `flag`, `clearLogo`); arrays
+  (`teachers`, `councilMembers`) are replaced whole and every PUT sets `isActive` from the body, so the phone sends the
+  record as loaded with its change. Council posts (`POST`/`PUT`/`DELETE /actvt/council-posts`; listed through
+  `/councils/:id/details`; a post on a house council is made on every house council) are filled by students applying
+  (`POST /council-registrations`) and the in-charge accepting or rejecting (`PUT /council-registrations/:id`, refused
+  when the seats are full). Certificates are records typed one name at a time and printed by the browser
+  (`window.print()`): no server PDF, but `utils/pdfGenerator.js` (payslips use it) makes one easy. The actvt routes
+  check only the module toggle, no permission.
+- **Paying for Capabble.** Paying is a Razorpay payment link made by `POST /billing/me/pay-now` (Razorpay also emails
+  it to the school's billing address); changing the plan is `POST /billing/me/subscription` (adds modules now with a
+  prorated invoice, the rest from renewal); the billing profile (legal name, GSTIN, address) is `POST /billing/me/profile`.
+
+## Paying for Capabble: decided, not in the app, and no link to it either
+
+The school buys Capabble, a cloud service used inside the app. Both stores treat that as a digital purchase:
+
+- **Apple** (App Review Guidelines 3.1.1(a) and 3.1.3): outside the United States storefront, an app "may not include
+  buttons, external links, or other calls to action" that lead to buying other than through in-app purchase.
+  3.1.3(c) (enterprise services, sold to organisations for their staff and students) lets such an app give access
+  to what was already bought; it does not allow buying or linking to buy. Telling the school outside the app (email)
+  is allowed.
+- **Google Play** (Payments policy): "cloud software and services (such as … business productivity software)" need
+  Play billing, and an app "may not lead users to a payment method other than Google Play's billing system",
+  including "directly linking to a webpage that could lead to an alternate payment method". India's alternative
+  billing still means joining Google's programme and paying its fee.
+
+So the app neither pays nor changes the plan, and it must not link to the page that does. The current app breaks this
+in two places: the "Paying for Capabble" row opens `/billing` on the website, and Billing says "Pay it on the website,
+under Billing." Slice 14 removes both. Razorpay already emails each invoice's payment link to the school, which is
+the allowed way to reach them. What the app keeps or gains is account management, which both stores allow: the plan,
+invoices, receipts and credit notes (slice 12), and the billing details on the invoices (legal name, GSTIN, address).
+
+## Slices 14 onward, most used first (the store-rule fix first)
+
+| # | Slice | Who, how often | Phone shape | Endpoints reused (server change) |
+|---|---|---|---|---|
+| 14 | Billing: store rules | Administrator | Remove "Paying for Capabble" from `WEB_MODULES`; Billing's due callout and footer state the facts only ("₹35,400 due by 3 Nov", no "pay on the website"); Billing details (legal name, GSTIN, billing email, address) editable for `core.billing.manage` | `GET /billing/me`, `POST /billing/me/profile` |
+| 15 | Activity extras | Activities in-charge, after every event and at term start | Certificates: record them for an event (pick the event, then students from a class list, or type names; role such as participant or winner) and share one or a batch as a PDF. Houses: house teachers (pick from staff), council members, logo and flag (photo picker, already in the build). Clubs: logo. Councils → posts (title, seats, who can apply, open or close applications) and the applications for each post (accept or reject; full posts say so) | `/actvt/certificates`, `/houses/:id`, `/clubs/:id` (multipart), `/council-posts`, `/councils/:id/details`, `/council-registrations/:id`. Server: certificate PDF (`templates/actvt-certificate.html` from the web's print layout, `POST /actvt/certificates/pdf` with ids) |
+| 16 | Who teaches what | Timetable in-charge, at term start and when staff change | Two ways in, one change at a time: a class → each of its subjects with its teacher(s); a teacher → what they can teach and their classes, with their periods a week against their load. Removing a subject a teacher can teach drops it from their classes, as on the website (the confirm says so) | Server: `PUT /timetable/state/teacher-allocation/class/:classId` and `PUT /state/teachers/:id/subjects`, through `mutateState` (version-checked like slice 7) |
+| 17 | A class's week | Timetable in-charge, on changes | One class, one day at a time: each period with its subject and teacher; tap to set (subject, then a teacher; teachers busy then in another class are shown as busy and can't be picked), clear, or swap with another period of that class. Only for schools that keep a hand-made timetable: the screen says when a published version is what everyone sees (that one is read only, as on the website) | Server: `PUT`/`DELETE /timetable/state/grid/:classId/:day/:slot`, `POST /state/grid/:classId/swap`, clash checked on the server (409 naming the busy class) |
+| 18 | Salary structures | Accounts, on joining and once a year | Staff list with each person's net pay (or "No salary yet"); one person: earnings and deductions (fixed, % of basic or % of gross), PF and its wage cap, ESI, monthly TDS, from which date, a note, with gross, deductions and net worked out by the server as you type; revise several people by % or amount with a before and after list; settings: PF and ESI rates and limits, PT slabs; salary components (add, edit, archive) | `/cpitl/salary/staff`, `/staff/:teacherId`, `/preview`, `/staff/bulk-revise`, `/settings`, `/components` |
+| 19 | Seating plan layout | Exam coordinator, before each exam season | Rooms (board exam centre and internal exams): a room's benches as rows (benches in the row, single, double or triple; seats worked out); same seating every day or different; rooms by day, one exam day at a time: tick rooms in the order they fill, "3 of 5 rooms" against what the day needs, or leave it automatic | `/seating-plan/rooms/:id`, `/seating-plan-mode`, `/room-allocation-mode` |
+| 20 | Exam print designs (the form part) | Exam coordinator, once a year | For each of admit card, award list and report card: page and copies, what the header shows, which fields or columns print, instruction texts, signatures (admit card: upload the principal's and exam in-charge's), the report card's school texts, labels, text styles (font, size, bold) and column widths as numbers. "See a sample" makes the real PDF from the unsaved draft (admit card, award list) or after saving (report card). Saves send the whole design with the placed items untouched | `GET`/`PUT /admit-cards/design`, `/award-list/design`, `/report-card/design`, `/admit-cards/design/signature/:role`, `POST /admit-cards`, `/award-list`, `GET /report-card/bulk` |
+
+Every slice: gated with `useStaff()` on what the server checks (activities: the module toggle plus
+`actvt.activities.write`, as the app already does; timetable: `timetable.timetable.write`; salary:
+`cpitl.finance.payroll`; seating and designs: `exam.conduct.write` / `exam.setup.write`; billing details:
+`core.billing.manage`), and its `WEB_MODULES` row removed or cut down to what is left.
+
+## What stays on the website after slice 20, and why
+
+| Stays | Why |
+|---|---|
+| Placed items on the print designs (`canvasItems`: free text, images, boxes and lines placed and sized by dragging on the page) | Placing things by hand on a printed page needs the page at full size and a pointer; at 360dp an A4 page is a third of its width and a finger covers the item. The rest of each design is in the app (slice 20) |
+| Seating plan print formats (column widths, row heights and font sizes of four printed tables) | They have no other settings: they exist to be dragged into shape against a sample table at print size. Numbers without that table would be guesses; printing them is in the app (slice 10) |
+
+So "On the website" ends with one row, "Print layouts", holding those two, for `exam.setup.write` / `exam.conduct.write`.
+
+## Questions for approval (part 2)
+
+1. The order: billing fix, activity extras, who teaches what, a class's week, salary structures, seating plan layout,
+   exam print designs.
+2. Server changes (need a push and `deploy-stage` before checking on stage): the certificate PDF (slice 15) and the
+   timetable one-change endpoints (slices 16 and 17), with tests like slice 7's.
+3. Slice 17 edits only the hand-made timetable, like the website. Changing a period in a published version is done
+   today by generating again; editing a version's grid on the phone would be new work for the website too. Leave it?
+4. Checking roles: the administrator again for activities, timetable, seating and designs (no other logins on
+   stage), the accountant's permission via a role check on the screens, unless you want test logins made.
+
+Found, not fixed: the website's seating format autosave sends the settings without `functionaryDutyList`, and the
+server replaces all formats on save, so it may reset that list to its defaults (`SeatingPlan.tsx` ~286,
+`seatingPlanController.js` ~408). To check when slice 19 is built.
+
+## Done, part 2 (approved 29 Oct 2026: order as written, server changes, no editing a published version, checked as the administrator)
+
+| Slice | What | Code | Checked on stage |
+|---|---|---|---|
+| 14 | Billing and the store rules: the "Paying for Capabble" row (a link to the website's payment page) is gone from "On the website"; Billing's due callout says only the amount and the date ("Due by 3 Nov 2026"), with no pointer to paying elsewhere, and "No plan yet" no longer says where to choose one. New: "On your invoices" on Billing (legal name, GSTIN, billing email) opens Billing details for `core.billing.manage`: legal name, GSTIN (checked; it fixes the state), billing email, address, PIN code (6 digits), state from a list (decides CGST and SGST or IGST), for invoices issued from then on. The GST state list moved to `packages/shared/src/gstStates.ts`, used by the website and the app | `billing.tsx`, `billing-details.tsx`, `services/billingService.ts`, `staff/access.ts`; `packages/shared/src/gstStates.ts`, client `services/billingService.ts`, `pages/Billing.tsx` | Admin with the screen's calls (`POST /billing/me/profile`): "06ABC" refused ("GSTIN is not valid"), Talao Road, Jhajjar 124103, Haryana saved and put back to empty. Teacher: refused (403, `core.billing.manage`) and the row doesn't open for her. Not looked at in the 360dp preview (signing in there needs a password typed into the page) |

@@ -1,7 +1,9 @@
 import { api, requestBytes } from '@/lib/api'
 
-// The school's Capabble plan (/api/billing/me), the website's Billing page, read only. Money is in
-// paise. Paying and changing the plan stay on the website.
+// The school's Capabble plan (/api/billing/me), the website's Billing page: read only apart from the
+// billing details printed on invoices. Money is in paise. Paying and changing the plan are not in the
+// app, and nothing in it may point to where they are done (App Store 3.1.1(a) and 3.1.3, Play's
+// Payments policy: see docs/requirements/mobile-staff-setup-next.md).
 
 export interface BillingSubscription {
   state: string
@@ -49,8 +51,21 @@ export interface CreditNote {
   refundPaise: number
 }
 
+export interface BillingProfile {
+  billingEmail: string
+  legalName: string
+  gstin: string | null
+  addressLine1: string
+  addressLine2: string
+  city: string
+  postalCode: string
+  stateCode: string | null
+}
+
+export type BillingAccount = BillingProfile & { tenantName: string }
+
 export interface BillingMe {
-  account?: { tenantName: string; billingEmail: string; legalName: string; gstin: string | null }
+  account?: BillingAccount
   subscription?: BillingSubscription | null
   openInvoices?: BillingInvoice[]
   upcomingRenewal?: { totalPaise: number; dueAt: string } | null
@@ -64,5 +79,6 @@ export const billingService = {
   invoices: () => api.get<BillingInvoice[]>('/billing/me/invoices'),
   payments: () => api.get<BillingPayment[]>('/billing/me/payments'),
   creditNotes: () => api.get<CreditNote[]>('/billing/me/credit-notes'),
+  saveProfile: (profile: BillingProfile) => api.post<BillingAccount>('/billing/me/profile', profile),
   pdf: (kind: BillingPdf, id: string) => requestBytes(`/billing/me/${kind}/${encodeURIComponent(id)}/pdf`),
 }

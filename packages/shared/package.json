@@ -10,6 +10,7 @@
     "./schoolAccent": "./src/schoolAccent.ts",
     "./staffTypes": "./src/staffTypes.ts",
     "./roadPath": "./src/roadPath.ts",
-    "./vehicleArt": "./src/vehicleArt.ts"
+    "./vehicleArt": "./src/vehicleArt.ts",
+    "./gstStates": "./src/gstStates.ts"
   }
 }
