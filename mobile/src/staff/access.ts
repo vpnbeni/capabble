@@ -1,5 +1,4 @@
 import {
-  Bus,
   CalendarClock,
   ClipboardList,
   CreditCard,
@@ -113,7 +112,6 @@ export const WEB_MODULES: WebModule[] = [
   },
   { label: 'Finance setup', reason: 'Fee structures, budgets and salary structures', icon: Landmark, tile: 3, pages: [{ feature: 'cpitl_dashboard', path: '/cpitl/dashboard' }], anyOf: ['cpitl.finance.manage_structures', 'cpitl.finance.budgets', 'cpitl.finance.payroll', 'cpitl.finance.settings'] },
   { label: 'Activity extras', reason: 'House and club logos, house teachers, council posts and printing certificates', icon: Trophy, tile: 1, pages: [{ feature: 'actvt_activities', path: '/actvt/houses' }], anyOf: ['actvt.activities.write'] },
-  { label: 'Transport setup', reason: 'Routes, stops and buses', icon: Bus, tile: 2, pages: [{ feature: 'trnst_transport', path: '/trnst' }], anyOf: ['trnst.transport.write'] },
   { label: 'School setup', reason: 'Roles and permissions, school email, online payments and logo', icon: Settings, tile: 4, pages: [{ feature: 'account_settings', path: '/account-settings' }], anyOf: ['core.school.write', 'core.users.manage'] },
   { label: 'Billing', reason: 'Your Capabble plan and invoices', icon: CreditCard, tile: 3, pages: [{ feature: 'billing', path: '/billing' }], anyOf: ['core.billing.read'] },
 ]

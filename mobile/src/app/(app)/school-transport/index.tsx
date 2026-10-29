@@ -1,18 +1,61 @@
 import { useRouter } from 'expo-router'
-import { Bus, Footprints, Phone, Route as RouteIcon } from 'lucide-react-native'
-import { useState } from 'react'
+import { Bus, Footprints, Pencil, Phone, Route as RouteIcon } from 'lucide-react-native'
+import { useMemo, useState } from 'react'
 import { Linking } from 'react-native'
 
+import { ApiError } from '@/lib/api'
 import { classLabel, formatDate, schoolToday } from '@/lib/format'
 import { CardSkeleton, LoadFailed } from '@/portal/states'
-import { busTitle, many, type OwnWay, type Trip, type Vehicle } from '@/services/transportService'
-import { useBuses, useOwnWay, useRiders, useRoutes, useTrips } from '@/staff/transportQueries'
-import { ActionSheet, ChipRail, Hero, ListGroup, MobileScreen, NavBar, StatusView, Surface } from '@/ui'
+import { busTitle, many, type OwnWay, type Trip, type Vehicle, type VehicleRecord } from '@/services/transportService'
+import { RecordSheet, type RecordField, type RecordValues } from '@/staff/RecordSheet'
+import { useBuses, useOwnWay, useRiders, useRoutes, useSaveRoute, useSaveVehicle, useTrips } from '@/staff/transportQueries'
+import { useStaff } from '@/staff/useStaff'
+import { ActionBar, ActionSheet, ChipRail, Hero, ListGroup, MobileScreen, NavBar, StatusView, Surface, haptic, useToast } from '@/ui'
 
 type Show = 'today' | 'routes' | 'buses' | 'own'
 type Call = { title: string; message?: string; people: { label: string; phone?: string }[] }
 
 const STALE_AFTER_SECONDS = 120
+const BUS_FIELDS: RecordField[] = [
+  { key: 'busNo', label: 'Bus number', kind: 'text', placeholder: '7', required: true },
+  { key: 'registrationNumber', label: 'Registration', kind: 'text', placeholder: 'HR 14 AB 1234', required: true },
+  { key: 'capacity', label: 'Seats', kind: 'number', placeholder: '40' },
+  { key: 'driverName', label: 'Driver (optional)', kind: 'text' },
+  { key: 'driverPhone', label: 'Driver’s phone (optional)', kind: 'text' },
+  { key: 'conductorName', label: 'Conductor (optional)', kind: 'text' },
+  { key: 'conductorPhone', label: 'Conductor’s phone (optional)', kind: 'text' },
+  { key: 'vehicleType', label: 'Kind', kind: 'choice', options: ['Bus', 'Mini Bus', 'Van', 'Winger', 'Car', 'Auto', 'Other'].map((value) => ({ value, label: value })) },
+  {
+    key: 'status',
+    label: 'Running',
+    kind: 'choice',
+    options: [
+      { value: 'active', label: 'Running' },
+      { value: 'maintenance', label: 'Being fixed' },
+      { value: 'inactive', label: 'Not running' },
+    ],
+  },
+  { key: 'insuranceExpiry', label: 'Insurance till', kind: 'date' },
+  { key: 'fitnessExpiry', label: 'Fitness till', kind: 'date' },
+]
+const ROUTE_FIELDS: RecordField[] = [
+  { key: 'name', label: 'Name', kind: 'text', placeholder: 'Sector 6 and Old City', required: true },
+  { key: 'code', label: 'Short code (optional)', kind: 'text', placeholder: 'R1' },
+]
+const busValues = (bus?: VehicleRecord): RecordValues =>
+  Object.fromEntries(
+    BUS_FIELDS.map((field) => [
+      field.key,
+      bus?.[field.key as keyof VehicleRecord] == null
+        ? field.key === 'vehicleType'
+          ? 'Bus'
+          : field.key === 'status'
+            ? 'active'
+            : ''
+        : String(bus[field.key as keyof VehicleRecord]).slice(0, field.kind === 'date' ? 10 : undefined),
+    ]),
+  )
+
 const dial = (phone: string) => Linking.openURL(`tel:${phone.replace(/\s+/g, '')}`)
 const clock = (iso: string) => new Date(iso).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' })
 
@@ -33,7 +76,8 @@ const papersDue = (vehicle: Vehicle, today: string) => {
 /**
  * School transport for the office: today's trips (who is on board, the crew to call), routes with
  * their stops and students, the buses and their papers, and students who come on their own.
- * Setting routes and buses up stays on the website; the live map waits for the location build.
+ * The transport office adds and changes buses and routes (a route's stops on its page); the live
+ * map waits for the location build.
  */
 export default function SchoolTransportScreen() {
   const router = useRouter()
@@ -45,6 +89,42 @@ export default function SchoolTransportScreen() {
   const buses = useBuses(show === 'buses')
   const own = useOwnWay(show === 'own')
   const [call, setCall] = useState<Call | null>(null)
+  const toast = useToast()
+  const staff = useStaff()
+  const canWrite = staff.can('trnst.transport.write')
+  const saveVehicle = useSaveVehicle()
+  const saveRoute = useSaveRoute()
+  const [busSheet, setBusSheet] = useState<{ bus?: VehicleRecord } | null>(null)
+  const [busMenu, setBusMenu] = useState<VehicleRecord | null>(null)
+  const [addingRoute, setAddingRoute] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const busInitial = useMemo(() => busValues(busSheet?.bus), [busSheet])
+  const routeInitial = useMemo<RecordValues>(() => ({ name: '', code: '' }), [])
+
+  // A bus save sends the whole bus back: the record as loaded, then what was typed.
+  const doSaveBus = async (_: RecordValues, all: RecordValues) => {
+    try {
+      await saveVehicle.mutateAsync({ ...(busSheet?.bus ?? {}), ...all, capacity: Number(all.capacity) || 40, insuranceExpiry: all.insuranceExpiry || null, fitnessExpiry: all.fitnessExpiry || null })
+      haptic.success()
+      setBusSheet(null)
+      toast(busSheet?.bus ? 'Bus saved' : `${busTitle(all.busNo)} added`)
+    } catch (failure) {
+      haptic.error()
+      setError(failure instanceof ApiError ? failure.message : "The bus wasn't saved. Try again.")
+    }
+  }
+
+  const doAddRoute = async (_: RecordValues, all: RecordValues) => {
+    try {
+      const route = await saveRoute.mutateAsync({ input: { name: all.name, code: all.code, shift: 'both', vehicleId: null, stops: [] } })
+      haptic.success()
+      setAddingRoute(false)
+      router.push({ pathname: '/school-transport/[id]', params: { id: route._id } })
+    } catch (failure) {
+      haptic.error()
+      setError(failure instanceof ApiError ? failure.message : "The route wasn't added. Try again.")
+    }
+  }
 
   const onRoad = (trips.data ?? []).filter((trip) => trip.status === 'active').length
   const riding = (riders.data ?? []).filter((row) => row.assignment)
@@ -59,21 +139,72 @@ export default function SchoolTransportScreen() {
       ],
     })
 
-  const callGuardian = (row: OwnWay) => (row.guardianPhone ? setCall({ title: row.name, message: row.commuteMode, people: [{ label: `Call the guardian (${row.guardianPhone})`, phone: row.guardianPhone }] }) : undefined)
+  const callGuardian = (row: OwnWay) =>
+    row.guardianPhone ? setCall({ title: row.name, message: row.commuteMode, people: [{ label: `Call the guardian (${row.guardianPhone})`, phone: row.guardianPhone }] }) : undefined
 
   return (
     <MobileScreen
       refreshing={trips.isRefetching || routes.isRefetching}
       onRefresh={() => (trips.refetch(), routes.refetch(), riders.refetch(), buses.refetch(), own.refetch())}
       nav={<NavBar title="Transport" back={{ label: 'Back', onPress: router.back }} />}
+      actionBar={
+        canWrite && show === 'buses' ? (
+          <ActionBar icon={Bus} summary={many(buses.data?.length ?? 0, 'bus', 'buses')} detail="Seats, crew and papers" label="Add a bus" onPress={() => (setError(null), setBusSheet({}))} />
+        ) : canWrite && show === 'routes' ? (
+          <ActionBar
+            icon={RouteIcon}
+            summary={many(routes.data?.length ?? 0, 'route')}
+            detail="Stops in order, with their times"
+            label="Add a route"
+            onPress={() => (setError(null), setAddingRoute(true))}
+          />
+        ) : undefined
+      }
       overlay={
-        <ActionSheet
-          open={Boolean(call)}
-          onClose={() => setCall(null)}
-          title={call?.title ?? ''}
-          message={call?.message}
-          actions={(call?.people ?? []).filter((person) => person.phone).map((person) => ({ label: person.label, icon: Phone, onSelect: () => (setCall(null), dial(person.phone!)) }))}
-        />
+        <>
+          <RecordSheet
+            open={Boolean(busSheet)}
+            onClose={() => setBusSheet(null)}
+            title={busSheet?.bus ? busTitle(busSheet.bus.busNo) : 'Add a bus'}
+            fields={BUS_FIELDS}
+            initial={busInitial}
+            isNew={!busSheet?.bus}
+            saving={saveVehicle.isPending}
+            error={error}
+            onSave={doSaveBus}
+          />
+          <RecordSheet
+            open={addingRoute}
+            onClose={() => setAddingRoute(false)}
+            title="Add a route"
+            fields={ROUTE_FIELDS}
+            initial={routeInitial}
+            isNew
+            saving={saveRoute.isPending}
+            error={error}
+            onSave={doAddRoute}
+          />
+          <ActionSheet
+            open={Boolean(busMenu)}
+            onClose={() => setBusMenu(null)}
+            title={busMenu ? busTitle(busMenu.busNo) : ''}
+            actions={
+              busMenu
+                ? [
+                    { label: 'Call the crew', icon: Phone, onSelect: () => (setBusMenu(null), callCrew(busMenu)) },
+                    { label: 'Edit bus', icon: Pencil, onSelect: () => (setBusMenu(null), setError(null), setBusSheet({ bus: busMenu })) },
+                  ]
+                : []
+            }
+          />
+          <ActionSheet
+            open={Boolean(call)}
+            onClose={() => setCall(null)}
+            title={call?.title ?? ''}
+            message={call?.message}
+            actions={(call?.people ?? []).filter((person) => person.phone).map((person) => ({ label: person.label, icon: Phone, onSelect: () => (setCall(null), dial(person.phone!)) }))}
+          />
+        </>
       }
     >
       <Hero
@@ -141,7 +272,7 @@ export default function SchoolTransportScreen() {
           />
         ) : (
           <Surface padded={false}>
-            <StatusView compact kind="empty" icon={RouteIcon} title="No routes yet" body="Routes and their stops are set up on the website." />
+            <StatusView compact kind="empty" icon={RouteIcon} title="No routes yet" body={canWrite ? 'Add a route, then its stops in order.' : 'Routes the school sets up show here.'} />
           </Surface>
         )
       ) : show === 'buses' ? (
@@ -151,7 +282,7 @@ export default function SchoolTransportScreen() {
           <LoadFailed what="Buses" error={buses.error} onRetry={buses.refetch} />
         ) : buses.data.length ? (
           <ListGroup
-            footer="Tap a bus to call its crew."
+            footer={canWrite ? 'Tap a bus to call its crew or change it.' : 'Tap a bus to call its crew.'}
             items={buses.data.map((vehicle) => ({
               title: busTitle(vehicle.busNo),
               subtitle: [
@@ -163,16 +294,21 @@ export default function SchoolTransportScreen() {
               ]
                 .filter(Boolean)
                 .join(' · '),
-              badge: vehicle.status !== 'active' ? { label: vehicle.status === 'maintenance' ? 'Being fixed' : 'Not running', tone: 'warning' as const } : papersDue(vehicle, today) ? { label: 'Papers due', tone: 'warning' as const } : undefined,
+              badge:
+                vehicle.status !== 'active'
+                  ? { label: vehicle.status === 'maintenance' ? 'Being fixed' : 'Not running', tone: 'warning' as const }
+                  : papersDue(vehicle, today)
+                    ? { label: 'Papers due', tone: 'warning' as const }
+                    : undefined,
               icon: Bus,
               tile: 2,
               lines: 3,
-              onPress: () => callCrew(vehicle),
+              onPress: () => (canWrite ? setBusMenu(vehicle) : callCrew(vehicle)),
             }))}
           />
         ) : (
           <Surface padded={false}>
-            <StatusView compact kind="empty" icon={Bus} title="No buses yet" body="Buses are added on the website." />
+            <StatusView compact kind="empty" icon={Bus} title="No buses yet" body={canWrite ? 'Add the school’s buses with their crew.' : 'The school’s buses show here.'} />
           </Surface>
         )
       ) : own.isPending ? (

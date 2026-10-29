@@ -89,10 +89,48 @@ export const busTitle = (busNo?: string) => {
 /** "1 student", "3 students". */
 export const many = (n: number, one: string, more = `${one}s`) => `${n} ${n === 1 ? one : more}`
 
+/** A bus as the server stores it: a save sends all of it back (missing fields reset to defaults). */
+export type VehicleRecord = Vehicle & { make?: string; model?: string; color?: string; notes?: string; driverId?: string | null; conductorId?: string | null }
+
+/** A route as the server takes it: the stops go whole, each keeping its id (students point at it). */
+export interface RouteInput {
+  name: string
+  code?: string
+  shift: 'morning' | 'afternoon' | 'both'
+  startPoint?: string
+  endPoint?: string
+  distanceKm?: number
+  vehicleId: string | null
+  stops: { _id?: string; name: string; landmark?: string; pickupTime?: string; dropTime?: string; sequence: number; lat?: number | null; lng?: number | null }[]
+}
+
+/** Everything a route save needs, from the route as it is now. */
+export const routeInput = (route: Route): RouteInput => ({
+  name: route.name,
+  code: route.code ?? '',
+  shift: (['morning', 'afternoon', 'both'] as string[]).includes(route.shift) ? (route.shift as RouteInput['shift']) : 'both',
+  startPoint: route.startPoint ?? '',
+  endPoint: route.endPoint ?? '',
+  distanceKm: route.distanceKm ?? 0,
+  vehicleId: route.vehicleId?._id ?? null,
+  stops: [...route.stops]
+    .sort((a, b) => a.sequence - b.sequence)
+    .map((stop, index) => {
+      const raw = stop as Stop & { lat?: number | null; lng?: number | null }
+      return { _id: stop._id, name: stop.name, landmark: stop.landmark ?? '', pickupTime: stop.pickupTime ?? '', dropTime: stop.dropTime ?? '', sequence: index + 1, lat: raw.lat ?? null, lng: raw.lng ?? null }
+    }),
+})
+
 export const transportService = {
+  /** Whole record: pass the bus as loaded with the changes on top. */
+  saveVehicle: (vehicle: Partial<VehicleRecord>) => {
+    const { _id, ...rest } = vehicle
+    return _id ? api.put<VehicleRecord>(`/trnst/vehicles/${encodeURIComponent(_id)}`, rest) : api.post<VehicleRecord>('/trnst/vehicles', rest)
+  },
+  saveRoute: (id: string | undefined, input: RouteInput) => (id ? api.put<Route>(`/trnst/routes/${encodeURIComponent(id)}`, input) : api.post<Route>('/trnst/routes', input)),
   trips: async () => (await api.get<{ date: string; trips: Trip[] }>('/trnst/trips')).trips,
   routes: () => api.get<Route[]>('/trnst/routes'),
-  vehicles: () => api.get<Vehicle[]>('/trnst/vehicles'),
+  vehicles: () => api.get<VehicleRecord[]>('/trnst/vehicles'),
   riders: async (routeId?: string) => (await api.get<{ rows: Rider[] }>('/trnst/assignments', { routeId: routeId || undefined })).rows,
   ownWay: async () => (await api.get<{ records: OwnWay[] }>('/trnst/self-students')).records,
   /** Puts one student on a route (and stop); replaces only that student's assignment. */

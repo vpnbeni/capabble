@@ -19,3 +19,6 @@ const useWrite = <T, R>(fn: (input: T) => Promise<R>) => {
 
 export const useAssignRider = () => useWrite(transportService.assign)
 export const useRemoveRider = () => useWrite(transportService.remove)
+
+export const useSaveVehicle = () => useWrite(transportService.saveVehicle)
+export const useSaveRoute = () => useWrite(({ id, input }: { id?: string; input: Parameters<typeof transportService.saveRoute>[1] }) => transportService.saveRoute(id, input))
