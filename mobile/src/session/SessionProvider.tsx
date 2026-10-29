@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 
-import { setSessionEndedHandler, setTenantSlug } from '@/lib/api'
+import { setSessionEndedHandler, setStaffSession, setTenantSlug } from '@/lib/api'
 import { unregisterFromPush } from '@/lib/push'
 import { storage } from '@/lib/storage'
 import { authService, type School, type User } from '@/services/authService'
@@ -31,6 +31,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const endSession = useCallback(
     (school: School | null) => {
       queryClient.clear()
+      setStaffSession(false)
       setState({ status: 'signedOut', user: null, school })
     },
     [queryClient],
@@ -49,6 +50,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setTenantSlug(school.slug)
       try {
         const user = await authService.me()
+        setStaffSession(user.kind === 'staff')
         if (!cancelled) setState({ status: 'signedIn', user, school })
       } catch {
         if (!cancelled) setState({ status: 'signedOut', user: null, school })
@@ -67,6 +69,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const signIn = useCallback(async (school: School, identifier: string, password: string) => {
     setTenantSlug(school.slug)
     const { user } = await authService.login(identifier, password)
+    setStaffSession(user.kind === 'staff')
     await storage.set(SCHOOL_KEY, JSON.stringify(school))
     setState({ status: 'signedIn', user, school })
   }, [])
@@ -86,6 +89,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const forgetSchool = useCallback(async () => {
     await storage.remove(SCHOOL_KEY)
     setTenantSlug(null)
+    setStaffSession(false)
     setState({ status: 'signedOut', user: null, school: null })
   }, [])
 

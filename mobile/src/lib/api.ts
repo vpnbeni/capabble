@@ -28,6 +28,20 @@ export const setTenantSlug = (slug: string | null) => {
   tenantSlug = slug
 }
 
+// Staff requests name the academic session, as the website does (it sends the session the user
+// works in; the app works in the current one: April to March). Records saved without one belong
+// to no session, so session-filtered pages and totals miss them. The family portal sends none,
+// as on the website.
+let staffSession = false
+export const setStaffSession = (on: boolean) => {
+  staffSession = on
+}
+const currentSessionLabel = () => {
+  const [year, month] = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date()).split('-').map(Number)
+  const start = month <= 3 ? year - 1 : year
+  return `${start}-${start + 1}`
+}
+
 export const getTenantSlug = () => tenantSlug
 
 /** Called once when the session can't be refreshed (signed out elsewhere, password changed). */
@@ -61,6 +75,7 @@ const send = async (path: string, options: RequestOptions) => {
     'X-Requested-With': 'XMLHttpRequest',
   }
   if (tenantSlug) headers['x-tenant-slug'] = tenantSlug
+  if (staffSession) headers['x-academic-session'] = currentSessionLabel()
   if (options.body !== undefined) headers['Content-Type'] = 'application/json'
 
   return fetch(buildUrl(path, options.baseUrl ?? API_BASE_URL, options.params), {
