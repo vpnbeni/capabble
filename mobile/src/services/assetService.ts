@@ -128,6 +128,77 @@ export const placeOf = (asset: Pick<Asset, 'locationId' | 'locationPath'>) => {
 
 const id = (value: string) => encodeURIComponent(value)
 
+export interface AssetCategory {
+  _id: string
+  name: string
+  code: string
+  trackingModeDefault?: 'individual' | 'consumable'
+}
+
+export interface AssetVendor {
+  _id: string
+  name: string
+  contactPerson?: string
+  phone?: string
+  email?: string
+  gstin?: string
+}
+
+export interface AssetPurchase {
+  _id: string
+  title: string
+  itemName?: string
+  vendorId?: { _id: string; name: string } | null
+  categoryId?: { _id: string; name: string; code: string } | null
+  locationId?: { _id: string; name: string } | null
+  quantity: number
+  unitCost: number
+  totalCost: number
+  warrantyMonths?: number
+  trackingMode: 'individual' | 'consumable'
+  status: 'Draft' | 'Requested' | 'Ordered' | 'Received' | 'Cancelled'
+  receiptDate?: string | null
+  createdAt: string
+}
+
+export type AuditItemState = 'Verified' | 'Missing' | 'Damaged' | 'Wrong Location' | 'Not Found' | 'Unverified'
+
+export interface AssetAudit {
+  _id: string
+  title: string
+  status: 'In Progress' | 'Closed' | string
+  startedAt?: string
+  closedAt?: string | null
+  summary?: { expected: number; found: number; missing: number; damaged: number; wrongLocation: number; unverified: number }
+  createdAt: string
+}
+
+export interface AuditItem {
+  _id: string
+  state: AuditItemState
+  scannedCode?: string
+  verifiedAt?: string | null
+  assetId?: { _id: string; assetId: string; name: string; locationPath?: string } | null
+  expectedLocationId?: { name: string; path?: string } | null
+}
+
+export type ReportRow = { _id: string | null; count: number; value: number; name?: string; code?: string; path?: string }
+
+export interface NewAsset {
+  name: string
+  categoryId: string
+  locationId?: string
+  vendorId?: string
+  brand?: string
+  model?: string
+  serialNumber?: string
+  purchaseCost?: number
+  currentValue?: number
+  condition?: string
+  status?: AssetStatus
+  quantity?: number
+}
+
 export const assetService = {
   summary: () => api.get<AssetSummary>('/asets/dashboard'),
   assets: async (filter: { q?: string; locationId?: string; status?: string }) => {
@@ -148,5 +219,30 @@ export const assetService = {
   stock: () => api.get<StockItem[]>('/asets/stock'),
   adjustStock: (stockId: string, input: { type: 'receipt' | 'issue'; quantity: number; notes?: string }) => api.post<{ item: StockItem }>(`/asets/stock/${id(stockId)}/adjust`, input),
   disposals: () => api.get<Disposal[]>('/asets/disposals'),
+  /** One asset; with a quantity above one, that many alike (each gets its own asset ID). */
+  addAsset: (input: NewAsset) => ((input.quantity ?? 1) > 1 ? api.post<unknown>('/asets/assets/bulk', input) : api.post<Asset>('/asets/assets', input)),
+  categories: () => api.get<AssetCategory[]>('/asets/categories'),
+  saveCategory: (input: { _id?: string; name: string; code: string; trackingModeDefault?: string }) =>
+    input._id ? api.put<AssetCategory>(`/asets/categories/${id(input._id)}`, input) : api.post<AssetCategory>('/asets/categories', input),
+  vendors: () => api.get<AssetVendor[]>('/asets/vendors'),
+  /** Changes only the fields sent. */
+  saveVendor: (input: Partial<AssetVendor> & { name: string }) => (input._id ? api.put<AssetVendor>(`/asets/vendors/${id(input._id)}`, input) : api.post<AssetVendor>('/asets/vendors', input)),
+  /** A place inside another (campus › block › floor › room); the server checks the order. */
+  addLocation: (input: { name: string; type: string; parentId?: string; roomType?: string; isStore?: boolean }) => api.post<AssetLocation>('/asets/locations', input),
+  renameLocation: (locationId: string, name: string) => api.put<AssetLocation>(`/asets/locations/${id(locationId)}`, { name }),
+  purchases: () => api.get<AssetPurchase[]>('/asets/procurement'),
+  addPurchase: (input: { title: string; itemName: string; categoryId?: string; vendorId?: string; locationId?: string; quantity: number; unitCost: number; warrantyMonths?: number; trackingMode: 'individual' | 'consumable'; status: 'Ordered' }) =>
+    api.post<AssetPurchase>('/asets/procurement', input),
+  /** Makes the assets (or the stock item) the purchase is for. */
+  receivePurchase: (purchaseId: string) => api.post<{ generatedCount: number }>(`/asets/procurement/${id(purchaseId)}/receive`, {}),
+  audits: () => api.get<AssetAudit[]>('/asets/audits'),
+  audit: (auditId: string) => api.get<{ audit: AssetAudit; items: AuditItem[] }>(`/asets/audits/${id(auditId)}`),
+  startAudit: (input: { title: string; scopeType: 'Full' | 'Location' | 'Category'; locationId?: string; categoryId?: string }) => api.post<AssetAudit>('/asets/audits', input),
+  /** By asset ID, barcode or tag; an asset not on the list is added to it. */
+  checkAsset: (auditId: string, code: string) => api.post<unknown>(`/asets/audits/${id(auditId)}/scan`, { code }),
+  /** Missing marks the asset lost and Damaged marks it damaged. */
+  markAuditItem: (auditId: string, itemId: string, state: AuditItemState) => api.put<unknown>(`/asets/audits/${id(auditId)}/items/${id(itemId)}`, { state }),
+  closeAudit: (auditId: string) => api.post<AssetAudit>(`/asets/audits/${id(auditId)}/close`, {}),
+  report: async <T = ReportRow>(type: 'by-category' | 'by-location' | 'register') => (await api.get<{ rows: T[] }>(`/asets/reports/${type}`)).rows,
   approveDisposal: (disposalId: string) => api.post<Disposal>(`/asets/disposals/${id(disposalId)}/approve`, {}),
 }

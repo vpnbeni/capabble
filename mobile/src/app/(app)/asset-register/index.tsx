@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router'
-import { Boxes, Package, Search, Trash2, Wrench } from 'lucide-react-native'
+import { BarChart3, Boxes, ClipboardCheck, Ellipsis, Package, PackagePlus, Search, Settings2, ShoppingCart, Trash2, Wrench } from 'lucide-react-native'
 import { useState } from 'react'
 import { View } from 'react-native'
 
@@ -11,7 +11,7 @@ import { useAdjustStock, useApproveDisposal, useAssetLocations, useAssetStock, u
 import { LocationChooser } from '@/staff/LocationChooser'
 import { useStaff } from '@/staff/useStaff'
 import { space } from '@/theme/tokens'
-import { BottomSheet, Callout, ChipRail, Dialog, Hero, ListGroup, MobileButton, MobileScreen, MobileTextField, NavBar, OptionList, SearchBar, SegmentedControl, StatusView, Surface, haptic, useToast } from '@/ui'
+import { ActionSheet, BottomSheet, Callout, ChipRail, Dialog, Hero, ListGroup, MobileButton, MobileScreen, MobileTextField, NavBar, OptionList, SearchBar, SegmentedControl, StatusView, Surface, haptic, useToast } from '@/ui'
 
 type Show = 'assets' | 'problems' | 'stock' | 'disposals'
 
@@ -22,13 +22,22 @@ const assetCode = (row: Maintenance | Disposal) => (row.assetId && typeof row.as
 
 /**
  * The school's things: find an asset by name or ID, or by the room it is in; problems reported
- * and their progress; consumable stock in and out; disposals waiting for approval. Adding assets,
- * purchases and audits stay on the website.
+ * and their progress; consumable stock in and out; disposals waiting for approval. More leads to
+ * adding assets, purchases, audits, reports and setting up categories, vendors and places.
  */
 export default function AssetsScreen() {
   const router = useRouter()
   const toast = useToast()
+  const [menu, setMenu] = useState(false)
   const staff = useStaff()
+  const go = (path: '/asset-register/add' | '/asset-register/purchases' | '/asset-register/audit' | '/asset-register/reports' | '/asset-register/setup') => () => (setMenu(false), router.push(path))
+  const more = [
+    ...(staff.can('asets.assets.create') ? [{ label: 'Add an asset', icon: PackagePlus, onSelect: go('/asset-register/add') }] : []),
+    ...(staff.can('asets.assets.procure') ? [{ label: 'Purchases', icon: ShoppingCart, onSelect: go('/asset-register/purchases') }] : []),
+    ...(staff.can('asets.assets.audit') ? [{ label: 'Audit', icon: ClipboardCheck, onSelect: go('/asset-register/audit') }] : []),
+    ...(staff.can('asets.assets.report') ? [{ label: 'Reports', icon: BarChart3, onSelect: go('/asset-register/reports') }] : []),
+    ...(staff.can('asets.assets.edit') ? [{ label: 'Set up', icon: Settings2, onSelect: go('/asset-register/setup') }] : []),
+  ]
   const [show, setShow] = useState<Show>('assets')
   const [query, setQuery] = useState('')
   const [locationId, setLocationId] = useState('')
@@ -115,9 +124,10 @@ export default function AssetsScreen() {
     <MobileScreen
       refreshing={summary.isRefetching || assets.isRefetching || problems.isRefetching}
       onRefresh={() => (summary.refetch(), assets.refetch(), problems.refetch(), stock.refetch(), disposals.refetch())}
-      nav={<NavBar title="Assets" back={{ label: 'Back', onPress: router.back }} />}
+      nav={<NavBar title="Assets" back={{ label: 'Back', onPress: router.back }} actions={more.length ? [{ icon: Ellipsis, label: 'More', onPress: () => setMenu(true) }] : []} />}
       overlay={
         <>
+          <ActionSheet open={menu} onClose={() => setMenu(false)} title="Assets" actions={more} />
           <BottomSheet open={picking} onClose={() => setPicking(false)} detent="large" title="Place">
             <LocationChooser value={locationId} anyLabel="Everywhere" onChange={(value) => (setLocationId(value), setPicking(false))} />
           </BottomSheet>
