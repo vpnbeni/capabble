@@ -1,5 +1,4 @@
 import {
-  ClipboardList,
   FileText,
   type LucideIcon,
 } from 'lucide-react-native'
@@ -57,27 +56,22 @@ export type WebModule = {
 }
 
 /**
- * Desk work that stays on the website, for More → "On the website": school setup, bulk imports,
- * print layouts and generating timetables (reasons in docs/requirements/mobile-staff-plan.md).
- * Everything a person checks, approves, marks or records is in the app; don't add day-to-day work
- * here. Each opens the first page of the module this login may see. Labels never use module codes.
+ * What stays on the website, for More → "On the website": only laying out printed forms by hand
+ * (reasons in docs/requirements/mobile-staff-setup-next.md). Everything else staff do is in the
+ * app; don't add to this. Each opens the first page of the module this login may see. Labels never
+ * use module codes. Paying for Capabble is never linked from the app (app store rules).
  */
 export const WEB_MODULES: WebModule[] = [
   {
-    label: 'Exam print designs',
-    anyOf: ['exam.setup.write'],
-    reason: 'Laying out admit cards, report cards and award lists; printing them is in the app',
+    label: 'Print layouts',
+    anyOf: ['exam.setup.write', 'exam.conduct.write'],
+    reason: 'Placing text, pictures and lines by hand on an exam form, and the seating forms’ column widths; everything else about printing is in the app',
     icon: FileText,
     tile: 5,
-    pages: [{ feature: 'exmcl_performas', path: '/exmcl/performas' }],
-  },
-  {
-    label: 'Seating print formats',
-    anyOf: ['exam.conduct.write'],
-    reason: 'Column widths and row heights of the printed seating forms, dragged into shape on a sample table (printing them is in the app)',
-    icon: ClipboardList,
-    tile: 3,
-    pages: [{ feature: 'seatingplan', path: '/seatingplan' }],
+    pages: [
+      { feature: 'exmcl_performas', path: '/exmcl/performas' },
+      { feature: 'seatingplan', path: '/seatingplan' },
+    ],
   },
 ]
 

@@ -146,7 +146,7 @@ export default function MoreScreen() {
       {webModules.length ? (
         <ListGroup
           header="On the website"
-          footer="Setup and printing are done at a computer. Opens in your browser; sign in there with the same login."
+          footer="Laying out a printed form by hand needs a computer. Opens in your browser; sign in there with the same login."
           items={webModules.map(({ module, path }) => ({
             title: module.label,
             subtitle: module.reason,

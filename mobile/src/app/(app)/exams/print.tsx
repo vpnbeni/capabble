@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import { FileText, Printer } from 'lucide-react-native'
+import { FileText, Palette, Printer } from 'lucide-react-native'
 import { useMemo, useState } from 'react'
 
 import { ApiError } from '@/lib/api'
@@ -20,14 +20,19 @@ const KINDS: Record<Kind, { label: string; meta: string; file: string }> = {
   report: { label: 'Report cards', meta: 'Every student’s report card for this exam', file: 'Report cards' },
 }
 
-const fileName = (...parts: string[]) => `${parts.join(' ').replace(/[^a-zA-Z0-9 ._-]+/g, '-').replace(/\s+/g, ' ').trim()}.pdf`
+const fileName = (...parts: string[]) =>
+  `${parts
+    .join(' ')
+    .replace(/[^a-zA-Z0-9 ._-]+/g, '-')
+    .replace(/\s+/g, ' ')
+    .trim()}.pdf`
 
 const sheetExamId = (sheet: ExamDatesheet) => (typeof sheet.examId === 'string' ? sheet.examId : sheet.examId?._id)
 
 /**
  * Printing for one exam (the website's Admit cards, Award list and Report card pages): choose what,
- * then a class, and the PDF opens in the share sheet (print, save to Files, WhatsApp). Designs are
- * set on the website; "own classes only" logins see their classes.
+ * then a class, and the PDF opens in the share sheet (print, save to Files, WhatsApp). Exam setup
+ * logins change the design too; "own classes only" logins see their classes.
  */
 export default function ExamPrintScreen() {
   const router = useRouter()
@@ -97,13 +102,13 @@ export default function ExamPrintScreen() {
               setAwardFor(null)
               if (!row) return
               const paper = awardPapers[Number(value)]
-              const name = paper && typeof paper.subject === 'object' ? paper.subject?.name ?? '' : ''
+              const name = paper && typeof paper.subject === 'object' ? (paper.subject?.name ?? '') : ''
               make(row, 'award', name, paper ? String(paper.examDate).slice(0, 10) : '')
             }}
             options={[
               ...awardPapers.map((paper, index) => ({
                 value: String(index),
-                label: typeof paper.subject === 'object' ? paper.subject?.name ?? 'Subject' : 'Subject',
+                label: typeof paper.subject === 'object' ? (paper.subject?.name ?? 'Subject') : 'Subject',
                 meta: formatDate(paper.examDate),
               })),
               { value: 'blank', label: 'Without a subject', meta: 'Write the subject and date by hand' },
@@ -131,6 +136,21 @@ export default function ExamPrintScreen() {
               options={allowed.map((value) => ({ value, label: KINDS[value].label, meta: KINDS[value].meta }))}
             />
           ) : null}
+          {staff.can('exam.setup.write') ? (
+            <ListGroup
+              items={[
+                {
+                  title: `${KINDS[kind].label}: the design`,
+                  subtitle: 'What is printed, the words, signatures and paper',
+                  icon: Palette,
+                  tile: 6 as const,
+                  lines: 2 as const,
+                  chevron: true,
+                  onPress: () => router.push({ pathname: '/exams/design', params: { kind } }),
+                },
+              ]}
+            />
+          ) : null}
           {sections.isPending ? (
             <CardSkeleton rows={5} />
           ) : sections.isError ? (
@@ -138,7 +158,7 @@ export default function ExamPrintScreen() {
           ) : sections.data?.length ? (
             <ListGroup
               header={`${KINDS[kind].label} · choose a class`}
-              footer="The PDF opens in the share sheet: print it, save it or send it. Designs are set on the website."
+              footer="The PDF opens in the share sheet: print it, save it or send it."
               items={sections.data.map((row) => {
                 const busy = making === `${row.className}|${row.section}`
                 return {
