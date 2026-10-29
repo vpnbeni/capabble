@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router'
-import { BadgeCheck, Ellipsis, Landmark, Play, Wallet } from 'lucide-react-native'
+import { BadgeCheck, BadgeIndianRupee, Ellipsis, Landmark, Play, Wallet } from 'lucide-react-native'
 import { useState } from 'react'
 import { View } from 'react-native'
 
@@ -46,7 +46,7 @@ type Confirm = 'finalize' | 'reopen' | 'remove' | null
  * A month's payroll (the website's Finance → Payroll): start the month (pay is worked out from each
  * person's salary and the days they were away), change a draft payslip's unpaid days, arrears or
  * deductions, finalize, mark it paid (that records the salary expense), reopen; share the payslips
- * and the bank sheet. Salary structures stay on the website.
+ * and the bank sheet. Each person's salary is under Salaries.
  */
 export default function PayrollScreen() {
   const router = useRouter()
@@ -154,29 +154,53 @@ export default function PayrollScreen() {
   }
 
   const menuActions = [
-    ...(data && data.status !== 'draft' ? [{ label: 'Share payslips', onSelect: () => share('payslips') }, { label: 'Share bank sheet', icon: Landmark, onSelect: () => share('bank') }] : []),
+    ...(data && data.status !== 'draft'
+      ? [
+          { label: 'Share payslips', onSelect: () => share('payslips') },
+          { label: 'Share bank sheet', icon: Landmark, onSelect: () => share('bank') },
+        ]
+      : []),
     ...(canRun && startable.length ? [{ label: 'Run another month', icon: Play, onSelect: () => (setMenu(false), setStarting(true)) }] : []),
     ...(canRun && data && data.status !== 'draft' ? [{ label: 'Reopen as draft', onSelect: () => (setMenu(false), setConfirm('reopen')) }] : []),
     ...(canRun && data?.status === 'draft' ? [{ label: 'Delete draft', tone: 'danger' as const, onSelect: () => (setMenu(false), setConfirm('remove')) }] : []),
   ]
 
-  const actionBar = !canRun
-    ? undefined
-    : !runs.data?.length || !data
-      ? startable.length && !runs.isPending
-        ? <ActionBar icon={Play} summary={`Payroll for ${formatMonth(startable[0])}`} detail="Worked out from salaries and days away" label="Run payroll" onPress={() => doStart(startable[0])} />
-        : undefined
-      : data.status === 'draft'
-        ? <ActionBar icon={BadgeCheck} summary={`${formatINR(data.totals.net)} for ${data.totals.staff} staff`} detail="Check the payslips, then finalize" label="Finalize" onPress={() => setConfirm('finalize')} />
-        : data.status === 'finalized'
-          ? <ActionBar icon={Wallet} summary={`${formatINR(data.totals.net)} to pay`} detail={formatMonth(data.month)} label="Mark paid" onPress={() => (setError(null), setPaying({ paidOn: schoolToday(), mode: 'bank_transfer', reference: '', picking: null }))} />
-          : undefined
+  const actionBar = !canRun ? undefined : !runs.data?.length || !data ? (
+    startable.length && !runs.isPending ? (
+      <ActionBar icon={Play} summary={`Payroll for ${formatMonth(startable[0])}`} detail="Worked out from salaries and days away" label="Run payroll" onPress={() => doStart(startable[0])} />
+    ) : undefined
+  ) : data.status === 'draft' ? (
+    <ActionBar
+      icon={BadgeCheck}
+      summary={`${formatINR(data.totals.net)} for ${data.totals.staff} staff`}
+      detail="Check the payslips, then finalize"
+      label="Finalize"
+      onPress={() => setConfirm('finalize')}
+    />
+  ) : data.status === 'finalized' ? (
+    <ActionBar
+      icon={Wallet}
+      summary={`${formatINR(data.totals.net)} to pay`}
+      detail={formatMonth(data.month)}
+      label="Mark paid"
+      onPress={() => (setError(null), setPaying({ paidOn: schoolToday(), mode: 'bank_transfer', reference: '', picking: null }))}
+    />
+  ) : undefined
 
   return (
     <MobileScreen
       refreshing={runs.isRefetching || run.isRefetching}
       onRefresh={() => (runs.refetch(), run.refetch())}
-      nav={<NavBar title="Payroll" back={{ label: 'Back', onPress: router.back }} actions={menuActions.length ? [{ icon: Ellipsis, label: sharing ? 'Working…' : 'More', onPress: () => setMenu(true) }] : []} />}
+      nav={
+        <NavBar
+          title="Payroll"
+          back={{ label: 'Back', onPress: router.back }}
+          actions={[
+            ...(canRun ? [{ icon: BadgeIndianRupee, label: 'Salaries', onPress: () => router.push('/salaries') }] : []),
+            ...(menuActions.length ? [{ icon: Ellipsis, label: sharing ? 'Working…' : 'More', onPress: () => setMenu(true) }] : []),
+          ]}
+        />
+      }
       actionBar={actionBar}
       overlay={
         <>
@@ -218,12 +242,40 @@ export default function PayrollScreen() {
               </MobileButton>
             }
           >
-            {error ? <Callout tone="danger" title="Not saved">{error}</Callout> : null}
+            {error ? (
+              <Callout tone="danger" title="Not saved">
+                {error}
+              </Callout>
+            ) : null}
             {slip ? (
               <View style={{ gap: space['space-4'] }}>
-                <MobileTextField label="Unpaid days" hint="Days away without paid leave." type="number" value={slip.lop} onChangeText={(lop) => setSlip({ ...slip, lop: lop.replace(/[^0-9.]/g, '') })} maxLength={4} returnKeyType="next" />
-                <MobileTextField label="Arrears" type="number" prefix="₹" value={slip.arrears} onChangeText={(arrears) => setSlip({ ...slip, arrears: arrears.replace(/[^0-9.]/g, '') })} maxLength={8} returnKeyType="next" />
-                <MobileTextField label="Other deduction" type="number" prefix="₹" value={slip.other} onChangeText={(other) => setSlip({ ...slip, other: other.replace(/[^0-9.]/g, '') })} maxLength={8} returnKeyType="next" />
+                <MobileTextField
+                  label="Unpaid days"
+                  hint="Days away without paid leave."
+                  type="number"
+                  value={slip.lop}
+                  onChangeText={(lop) => setSlip({ ...slip, lop: lop.replace(/[^0-9.]/g, '') })}
+                  maxLength={4}
+                  returnKeyType="next"
+                />
+                <MobileTextField
+                  label="Arrears"
+                  type="number"
+                  prefix="₹"
+                  value={slip.arrears}
+                  onChangeText={(arrears) => setSlip({ ...slip, arrears: arrears.replace(/[^0-9.]/g, '') })}
+                  maxLength={8}
+                  returnKeyType="next"
+                />
+                <MobileTextField
+                  label="Other deduction"
+                  type="number"
+                  prefix="₹"
+                  value={slip.other}
+                  onChangeText={(other) => setSlip({ ...slip, other: other.replace(/[^0-9.]/g, '') })}
+                  maxLength={8}
+                  returnKeyType="next"
+                />
                 <MobileTextField label="Note (optional)" value={slip.remarks} onChangeText={(remarks) => setSlip({ ...slip, remarks })} maxLength={200} />
               </View>
             ) : null}
@@ -241,11 +293,20 @@ export default function PayrollScreen() {
               )
             }
           >
-            {error && !paying?.picking ? <Callout tone="danger" title="Not marked">{error}</Callout> : null}
+            {error && !paying?.picking ? (
+              <Callout tone="danger" title="Not marked">
+                {error}
+              </Callout>
+            ) : null}
             {paying?.picking === 'date' ? (
               <MonthPicker value={paying.paidOn} today={schoolToday()} onChange={(paidOn) => setPaying({ ...paying, paidOn, picking: null })} />
             ) : paying?.picking === 'mode' ? (
-              <OptionList label="Paid by" value={paying.mode} onChange={(mode) => setPaying({ ...paying, mode, picking: null })} options={(Object.keys(MODE_LABELS) as PaymentMode[]).map((value) => ({ value, label: MODE_LABELS[value] }))} />
+              <OptionList
+                label="Paid by"
+                value={paying.mode}
+                onChange={(mode) => setPaying({ ...paying, mode, picking: null })}
+                options={(Object.keys(MODE_LABELS) as PaymentMode[]).map((value) => ({ value, label: MODE_LABELS[value] }))}
+              />
             ) : paying ? (
               <View style={{ gap: space['space-4'] }}>
                 <ListGroup
@@ -254,7 +315,13 @@ export default function PayrollScreen() {
                     { title: 'Paid by', value: MODE_LABELS[paying.mode], onPress: () => setPaying({ ...paying, picking: 'mode' }) },
                   ]}
                 />
-                <MobileTextField label="Reference (optional)" placeholder="UTR or cheque number" value={paying.reference} onChangeText={(reference) => setPaying({ ...paying, reference })} maxLength={80} />
+                <MobileTextField
+                  label="Reference (optional)"
+                  placeholder="UTR or cheque number"
+                  value={paying.reference}
+                  onChangeText={(reference) => setPaying({ ...paying, reference })}
+                  maxLength={80}
+                />
               </View>
             ) : null}
           </BottomSheet>
@@ -272,11 +339,19 @@ export default function PayrollScreen() {
         <LoadFailed what="Payroll" error={runs.error} onRetry={runs.refetch} />
       ) : !runs.data?.length ? (
         <Surface padded={false}>
-          <StatusView compact kind="empty" icon={Wallet} title="No payroll run yet" body={canRun ? 'Run a month: pay is worked out from each person’s salary.' : 'Months the accounts office runs show here to check.'} />
+          <StatusView
+            compact
+            kind="empty"
+            icon={Wallet}
+            title="No payroll run yet"
+            body={canRun ? 'Run a month: pay is worked out from each person’s salary.' : 'Months the accounts office runs show here to check.'}
+          />
         </Surface>
       ) : (
         <>
-          {runs.data.length > 1 ? <ChipRail label="Month" value={month ?? ''} onChange={setPicked} items={runs.data.slice(0, 12).map((row) => ({ id: row.month, label: formatMonth(row.month) }))} /> : null}
+          {runs.data.length > 1 ? (
+            <ChipRail label="Month" value={month ?? ''} onChange={setPicked} items={runs.data.slice(0, 12).map((row) => ({ id: row.month, label: formatMonth(row.month) }))} />
+          ) : null}
           {run.isPending ? (
             <CardSkeleton rows={4} />
           ) : run.isError || !data ? (
@@ -298,12 +373,23 @@ export default function PayrollScreen() {
                   .sort((a, b) => String(a.snapshot?.name).localeCompare(String(b.snapshot?.name)))
                   .map((row) => ({
                     title: row.snapshot?.name ?? row.staffKey,
-                    subtitle: [row.snapshot?.designation, `${row.paidDays} days paid`, row.lopDays ? `${row.lopDays} unpaid` : null, row.arrears ? `arrears ${formatINR(row.arrears)}` : null].filter(Boolean).join(' · '),
+                    subtitle: [row.snapshot?.designation, `${row.paidDays} days paid`, row.lopDays ? `${row.lopDays} unpaid` : null, row.arrears ? `arrears ${formatINR(row.arrears)}` : null]
+                      .filter(Boolean)
+                      .join(' · '),
                     value: formatINR(row.net),
                     lines: 2 as const,
                     onPress:
                       canRun && data.status === 'draft'
-                        ? () => (setError(null), setSlip({ row, lop: String(row.lopDays || ''), arrears: row.arrears ? String(row.arrears) : '', other: row.otherDeduction ? String(row.otherDeduction) : '', remarks: row.remarks ?? '' }))
+                        ? () => (
+                            setError(null),
+                            setSlip({
+                              row,
+                              lop: String(row.lopDays || ''),
+                              arrears: row.arrears ? String(row.arrears) : '',
+                              other: row.otherDeduction ? String(row.otherDeduction) : '',
+                              remarks: row.remarks ?? '',
+                            })
+                          )
                         : undefined,
                   }))}
               />

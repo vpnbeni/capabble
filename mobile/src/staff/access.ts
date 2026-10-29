@@ -1,7 +1,6 @@
 import {
   ClipboardList,
   FileText,
-  Landmark,
   type LucideIcon,
 } from 'lucide-react-native'
 
@@ -83,7 +82,6 @@ export const WEB_MODULES: WebModule[] = [
       { feature: 'examrooms', path: '/examrooms' },
     ],
   },
-  { label: 'Salary structures', reason: 'Each person’s pay, allowances and deductions (PF, ESI, PT) across the staff list', icon: Landmark, tile: 3, pages: [{ feature: 'cpitl_payroll', path: '/cpitl/dashboard' }], anyOf: ['cpitl.finance.payroll'] },
 ]
 
 /** The website path a login would open for a module, or null when they can't use any of its pages. */
