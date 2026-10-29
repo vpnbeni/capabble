@@ -1458,8 +1458,80 @@ const setTeacherSubjects = sendMutation((state, req) => {
   pruneAllocations(state);
 });
 
+/* The hand-made timetable (the website's Class wise page): class → weekday → period index → cell.
+ * Generated versions are separate and never change here. */
+const GRID_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+/** The class-section, the weekday as stored and the period index, or a 400/404 saying what is wrong. */
+const gridPlace = (state, classId, day, slot) => {
+  const row = state.classes.find((entry) => entry.id === classId);
+  if (!row) throw httpError(404, 'That class-section is no longer in the timetable.');
+  const weekday = GRID_DAYS.find((name) => sameName(name, day));
+  if (!weekday) throw httpError(400, 'Choose a day from Monday to Saturday.');
+  const periodsPerDay = Math.floor((Number(state.periodsPerWeek) || 0) / GRID_DAYS.length);
+  const index = Number.parseInt(String(slot), 10);
+  if (!Number.isInteger(index) || index < 0 || index >= periodsPerDay) {
+    throw httpError(400, `Choose a period from 1 to ${periodsPerDay}.`);
+  }
+  return { row, weekday, index: String(index) };
+};
+
+/** Refuses a teacher who has another class at that day and period (names compared as the website does). */
+const refuseClash = (state, classId, weekday, index, teacher) => {
+  if (!teacher) return;
+  const busy = state.classes.find((entry) => entry.id !== classId
+    && sameName(state.timetableGrid[entry.id]?.[weekday]?.[index]?.teacher || '', teacher));
+  if (busy) {
+    const when = `${weekday}, period ${Number(index) + 1}`;
+    throw httpError(409, `${teacher} teaches ${busy.className}-${busy.section} then (${when}).`);
+  }
+};
+
+const gridCell = (state, classId, weekday) => {
+  state.timetableGrid[classId] = state.timetableGrid[classId] || {};
+  state.timetableGrid[classId][weekday] = state.timetableGrid[classId][weekday] || {};
+  return state.timetableGrid[classId][weekday];
+};
+
+/** PUT /timetable/state/grid/:classId/:day/:slot { subject, teacher? }: one period of a class's week. */
+const setGridCell = sendMutation((state, req) => {
+  const { row, weekday, index } = gridPlace(state, req.params.classId, req.params.day, req.params.slot);
+  const subject = row.subjects.find((name) => sameName(name, req.body?.subject || ''));
+  if (!subject) throw httpError(400, `Choose one of ${row.className}-${row.section}’s subjects.`);
+  const teacherName = toTrimmedString(req.body?.teacher);
+  const teacher = teacherName ? state.teachers.find((entry) => sameName(entry.name, teacherName)) : null;
+  if (teacherName && !teacher) throw httpError(400, 'That teacher is no longer in the timetable.');
+  refuseClash(state, row.id, weekday, index, teacher?.name);
+  gridCell(state, row.id, weekday)[index] = { subject, teacher: teacher?.name || '' };
+});
+
+/** DELETE /timetable/state/grid/:classId/:day/:slot: empties one period. */
+const clearGridCell = sendMutation((state, req) => {
+  const { row, weekday, index } = gridPlace(state, req.params.classId, req.params.day, req.params.slot);
+  if (state.timetableGrid[row.id]?.[weekday]) delete state.timetableGrid[row.id][weekday][index];
+});
+
+/** POST /timetable/state/grid/:classId/swap { a: { day, slot }, b: { day, slot } }: two periods of a class swap. */
+const swapGridCells = sendMutation((state, req) => {
+  const a = gridPlace(state, req.params.classId, req.body?.a?.day, req.body?.a?.slot);
+  const b = gridPlace(state, req.params.classId, req.body?.b?.day, req.body?.b?.slot);
+  const cellA = state.timetableGrid[a.row.id]?.[a.weekday]?.[a.index] || null;
+  const cellB = state.timetableGrid[b.row.id]?.[b.weekday]?.[b.index] || null;
+  refuseClash(state, a.row.id, b.weekday, b.index, cellA?.teacher);
+  refuseClash(state, a.row.id, a.weekday, a.index, cellB?.teacher);
+  const dayA = gridCell(state, a.row.id, a.weekday);
+  const dayB = gridCell(state, a.row.id, b.weekday);
+  if (cellB) dayA[a.index] = cellB;
+  else delete dayA[a.index];
+  if (cellA) dayB[b.index] = cellA;
+  else delete dayB[b.index];
+});
+
 module.exports = {
   addClassSection,
+  setGridCell,
+  clearGridCell,
+  swapGridCells,
   setClassTeachers,
   setTeacherSubjects,
   updateClassSection,

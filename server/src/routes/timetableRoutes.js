@@ -10,6 +10,9 @@ const {
   setClassPeriods,
   setClassTeachers,
   setTeacherSubjects,
+  setGridCell,
+  clearGridCell,
+  swapGridCells,
   upsertTimetableState,
   getBellTimings,
   upsertBellTimings,
@@ -45,6 +48,8 @@ router.post('/state/subjects', addTimetableSubject);
 router.put('/state/period-allocation/:classId', setClassPeriods);
 router.put('/state/teacher-allocation/:classId', setClassTeachers);
 router.put('/state/teachers/:id/subjects', setTeacherSubjects);
+router.route('/state/grid/:classId/:day/:slot').put(setGridCell).delete(clearGridCell);
+router.post('/state/grid/:classId/swap', swapGridCells);
 router.route('/bell-timings').get(getBellTimings).put(upsertBellTimings);
 router.route('/bell-timings/versions').get(getBellTimingVersions).post(createBellTimingVersion);
 router.route('/bell-timings/versions/:id').get(getBellTimingVersion).delete(deleteBellTimingVersion);

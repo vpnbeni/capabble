@@ -1,5 +1,4 @@
 import {
-  CalendarClock,
   ClipboardList,
   FileText,
   Landmark,
@@ -65,14 +64,6 @@ export type WebModule = {
  * here. Each opens the first page of the module this login may see. Labels never use module codes.
  */
 export const WEB_MODULES: WebModule[] = [
-  {
-    label: 'Timetable grid',
-    anyOf: ['timetable.timetable.write'],
-    reason: 'Editing a class’s hand-made week, period by period',
-    icon: CalendarClock,
-    tile: 4,
-    pages: [{ feature: 'timetable_class_wise', path: '/time-table/class-wise' }],
-  },
   {
     label: 'Exam print designs',
     anyOf: ['exam.setup.write'],

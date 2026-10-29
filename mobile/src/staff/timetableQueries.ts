@@ -54,6 +54,12 @@ export const useUpdateClassSection = () => useWrite(({ id, input }: { id: string
 export const useRemoveClassSection = () => useWrite(timetableService.removeClassSection)
 export const useAddTimetableSubject = () => useWrite(timetableService.addSubject)
 export const useSetClassTeachers = () => useWrite(({ classId, subjects }: { classId: string; subjects: Record<string, string[]> }) => timetableService.setClassTeachers(classId, subjects))
+export const useSetGridCell = () =>
+  useWrite(({ classId, day, slot, cell }: { classId: string; day: string; slot: number; cell: { subject: string; teacher: string } | null }) =>
+    cell ? timetableService.setGridCell(classId, day, slot, cell) : timetableService.clearGridCell(classId, day, slot),
+  )
+export const useSwapGridCells = () =>
+  useWrite(({ classId, a, b }: { classId: string; a: { day: string; slot: number }; b: { day: string; slot: number } }) => timetableService.swapGridCells(classId, a, b))
 export const useSetTeacherSubjects = () => useWrite(({ teacherId, subjects }: { teacherId: string; subjects: string[] }) => timetableService.setTeacherSubjects(teacherId, subjects))
 export const useGenerateTimetable = () => useWrite(timetableService.generate)
 export const usePublishVersion = () => useWrite(timetableService.publish)

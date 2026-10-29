@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router'
-import { BellRing, CalendarCog, Clock, Plus, Sparkles, Users } from 'lucide-react-native'
+import { BellRing, CalendarCog, CalendarDays, Clock, Plus, Sparkles, Users } from 'lucide-react-native'
 import { useMemo, useState } from 'react'
 
 import { ApiError } from '@/lib/api'
@@ -225,7 +225,10 @@ export default function TimetableSetupScreen() {
         <NavBar
           title="Timetable setup"
           back={{ label: 'Timetables', onPress: router.back }}
-          actions={[{ icon: Users, label: 'Who teaches what', onPress: () => router.push('/timetables/teachers') }]}
+          actions={[
+            { icon: Users, label: 'Who teaches what', onPress: () => router.push('/timetables/teachers') },
+            { icon: CalendarDays, label: 'A class’s week', onPress: () => router.push('/timetables/week') },
+          ]}
         />
       }
       actionBar={actionBar}

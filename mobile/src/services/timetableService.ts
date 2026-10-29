@@ -55,6 +55,8 @@ export interface TimetableSetup {
   teacherSubjectAllocations: { teacherId: string; teacherName: string; assignments: { classId: string; className: string; section: string; subjects: string[] }[] }[]
   /** Sections of a class taught a subject together: their periods count once in a teacher's load. */
   commonPeriods: { className: string; subject: string; sections: string[] }[]
+  /** The hand-made week (the website's Class wise page), separate from generated versions. */
+  timetableGrid: TimetableGrid
   updatedAt: string | null
 }
 
@@ -101,6 +103,13 @@ export const timetableService = {
   setClassTeachers: (classId: string, subjects: Record<string, string[]>) => api.put<TimetableSetup>(`/timetable/state/teacher-allocation/${encodeURIComponent(classId)}`, { subjects }),
   /** The subjects a teacher can teach; one taken away also leaves the classes they taught it in. */
   setTeacherSubjects: (teacherId: string, subjects: string[]) => api.put<TimetableSetup>(`/timetable/state/teachers/${encodeURIComponent(teacherId)}/subjects`, { subjects }),
+  /** One period of a class's hand-made week; refused when the teacher has another class then. */
+  setGridCell: (classId: string, day: string, slot: number, cell: { subject: string; teacher: string }) =>
+    api.put<TimetableSetup>(`/timetable/state/grid/${encodeURIComponent(classId)}/${day}/${slot}`, cell),
+  clearGridCell: (classId: string, day: string, slot: number) => api.delete<TimetableSetup>(`/timetable/state/grid/${encodeURIComponent(classId)}/${day}/${slot}`),
+  /** Two periods of one class change places (each teacher checked at the new time). */
+  swapGridCells: (classId: string, a: { day: string; slot: number }, b: { day: string; slot: number }) =>
+    api.post<TimetableSetup>(`/timetable/state/grid/${encodeURIComponent(classId)}/swap`, { a, b }),
   addSubject: (name: string) => api.post<TimetableSetup>('/timetable/state/subjects', { name }),
   /** Works out a new draft timetable from the saved setup, and what didn't fit. */
   generate: (name: string) => api.post<{ version: TimetableVersion; conflictReport: Conflict[] }>('/timetable/generate', { name }),

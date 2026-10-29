@@ -147,4 +147,63 @@ describe('timetable state versions and one-change edits', () => {
     expect(store.doc.teachers.find((row) => row.id === 't-1').subjects).toEqual(['Maths']);
     expect(store.doc.teacherSubjectAllocations).toEqual([]);
   });
+
+  describe('the hand-made week', () => {
+    beforeEach(() => {
+      store.doc.periodsPerWeek = 42;
+      store.doc.classes.push({
+        id: 'tc-2', className: '3rd', section: 'B', floor: 'Ground Floor', subjects: ['English']
+      });
+      store.doc.timetableGrid = { 'tc-2': { Monday: { 0: { subject: 'English', teacher: 'Ms Rao' } } } };
+    });
+
+    test('a teacher busy in another class then is refused, a free period is set', async () => {
+      const busy = await run(ctrl.setGridCell, {
+        params: { classId: 'tc-1', day: 'monday', slot: '0' },
+        body: { subject: 'English', teacher: 'ms rao' }
+      });
+      expect(busy.status).toHaveBeenCalledWith(409);
+      expect(body(busy).message).toMatch(/3rd-B/);
+      const free = await run(ctrl.setGridCell, {
+        params: { classId: 'tc-1', day: 'monday', slot: '1' },
+        body: { subject: 'english', teacher: 'ms rao' }
+      });
+      expect(free.status).toHaveBeenCalledWith(200);
+      expect(store.doc.timetableGrid['tc-1'].Monday['1']).toEqual({ subject: 'English', teacher: 'Ms Rao' });
+    });
+
+    test('a period past the day or a subject the class doesn\'t take is refused', async () => {
+      const late = await run(ctrl.setGridCell, {
+        params: { classId: 'tc-1', day: 'Monday', slot: '7' },
+        body: { subject: 'English' }
+      });
+      expect(late.status).toHaveBeenCalledWith(400);
+      const maths = await run(ctrl.setGridCell, {
+        params: { classId: 'tc-1', day: 'Monday', slot: '2' },
+        body: { subject: 'Maths' }
+      });
+      expect(maths.status).toHaveBeenCalledWith(400);
+    });
+
+    test('swapping moves both periods and checks the teacher at the new time', async () => {
+      store.doc.timetableGrid['tc-1'] = { Tuesday: { 0: { subject: 'English', teacher: 'Ms Rao' } } };
+      const clash = await run(ctrl.swapGridCells, {
+        params: { classId: 'tc-1' },
+        body: { a: { day: 'Tuesday', slot: 0 }, b: { day: 'Monday', slot: 0 } }
+      });
+      expect(clash.status).toHaveBeenCalledWith(409);
+      const moved = await run(ctrl.swapGridCells, {
+        params: { classId: 'tc-1' },
+        body: { a: { day: 'Tuesday', slot: 0 }, b: { day: 'Wednesday', slot: 3 } }
+      });
+      expect(moved.status).toHaveBeenCalledWith(200);
+      expect(store.doc.timetableGrid['tc-1'].Tuesday['0']).toBeUndefined();
+      expect(store.doc.timetableGrid['tc-1'].Wednesday['3']).toEqual({ subject: 'English', teacher: 'Ms Rao' });
+    });
+
+    test('clearing empties one period', async () => {
+      await run(ctrl.clearGridCell, { params: { classId: 'tc-2', day: 'Monday', slot: '0' } });
+      expect(store.doc.timetableGrid['tc-2'].Monday['0']).toBeUndefined();
+    });
+  });
 });
