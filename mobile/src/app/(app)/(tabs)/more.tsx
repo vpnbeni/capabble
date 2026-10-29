@@ -1,6 +1,6 @@
 import Constants from 'expo-constants'
 import { useRouter } from 'expo-router'
-import { Award, Building2, Layers, Boxes, Bus, BookCheck, Library, Trophy, Receipt, Wallet, School, BookOpen, CalendarClock, IndianRupee, CalendarRange, ClipboardList, CalendarDays, CalendarOff, Contact, HeartPulse, KeyRound, NotebookPen, UserCheck, Users } from 'lucide-react-native'
+import { Award, Building2, CreditCard, Layers, Boxes, Bus, BookCheck, Library, Trophy, Receipt, Wallet, School, BookOpen, CalendarClock, IndianRupee, CalendarRange, ClipboardList, CalendarDays, CalendarOff, Contact, HeartPulse, KeyRound, NotebookPen, UserCheck, Users } from 'lucide-react-native'
 import { useState } from 'react'
 
 import { PORTAL_MODULES } from '@/portal/modules'
@@ -72,6 +72,7 @@ export default function MoreScreen() {
     ...(isStaff && (staff.can('core.school.write') || staff.can('core.users.read') || (staff.canUse('cpitl_fees') && staff.can('cpitl.finance.settings')))
       ? [{ label: 'School setup', icon: School, tile: 4 as const, onPress: () => router.push('/school-setup') }]
       : []),
+    ...(isStaff && staff.canUse('billing') && staff.can('core.billing.read') ? [{ label: 'Billing', icon: CreditCard, tile: 3 as const, onPress: () => router.push('/billing') }] : []),
     ...(isStaff && staff.canUse('cpitl_fees')
       ? [{ label: 'Fee counter', icon: IndianRupee, tile: 3 as const, onPress: () => router.push('/counter') }]
       : []),

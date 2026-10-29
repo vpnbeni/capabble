@@ -113,7 +113,7 @@ export const WEB_MODULES: WebModule[] = [
   { label: 'Salary structures', reason: 'Each person’s pay, allowances and deductions (PF, ESI, PT) across the staff list', icon: Landmark, tile: 3, pages: [{ feature: 'cpitl_payroll', path: '/cpitl/dashboard' }], anyOf: ['cpitl.finance.payroll'] },
   { label: 'Activity extras', reason: 'House and club logos, house teachers, council posts and printing certificates', icon: Trophy, tile: 1, pages: [{ feature: 'actvt_activities', path: '/actvt/houses' }], anyOf: ['actvt.activities.write'] },
   { label: 'School logo', reason: 'Uploading the logo image (waits for the photo picker in the app)', icon: Settings, tile: 4, pages: [{ feature: 'account_settings', path: '/account-settings' }], anyOf: ['core.school.write'] },
-  { label: 'Billing', reason: 'Your Capabble plan and invoices', icon: CreditCard, tile: 3, pages: [{ feature: 'billing', path: '/billing' }], anyOf: ['core.billing.read'] },
+  { label: 'Paying for Capabble', reason: 'Paying invoices and changing the plan (the app shows them; app stores keep payment for the plan on the website)', icon: CreditCard, tile: 3, pages: [{ feature: 'billing', path: '/billing' }], anyOf: ['core.billing.manage'] },
 ]
 
 /** The website path a login would open for a module, or null when they can't use any of its pages. */

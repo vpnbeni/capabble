@@ -31,7 +31,7 @@ export default function SchoolSetupScreen() {
       ? [
           {
             title: 'School email',
-            subtitle: mail.data ? (mail.data.enabled ? `Sending from ${mail.data.fromEmail}` : 'Off: sent from Capabble’s events address') : 'The school’s own mail account',
+            subtitle: mail.data ? (mail.data.enabled ? `Sending from ${mail.data.fromEmail}` : 'Off') : 'The school’s own mail account',
             icon: Mail,
             tile: 2 as const,
             lines: 2 as const,
