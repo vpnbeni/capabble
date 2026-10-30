@@ -105,7 +105,11 @@ const corsOptions = {
   credentials: true,
   optionsSuccessStatus: 200
 };
-app.use(cors(corsOptions));
+const corsMiddleware = cors(corsOptions);
+// School fee checkout pages are browser navigations: Razorpay posts the parent back to the
+// callback from its own origin, which the CORS allow-list would turn into a JSON error page.
+// Nothing there reads cookies, so it is safe to leave out of CORS.
+app.use((req, res, next) => (req.path.startsWith('/api/school-payments/') ? next() : corsMiddleware(req, res, next)));
 
 // Rate limiting
 const parseBooleanEnv = (value, fallback = false) => {

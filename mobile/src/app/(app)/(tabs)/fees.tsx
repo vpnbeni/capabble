@@ -1,9 +1,9 @@
 import { useRouter } from 'expo-router'
-import * as Linking from 'expo-linking'
 import { CreditCard, Receipt } from 'lucide-react-native'
 import { useState } from 'react'
 
 import { formatDate, formatINR } from '@/lib/format'
+import { openCheckout } from '@/lib/openCheckout'
 import { sharePdf } from '@/lib/sharePdf'
 import { ChildSwitcher } from '@/portal/ChildSwitcher'
 import { usePortal } from '@/portal/PortalProvider'
@@ -79,7 +79,7 @@ export default function FeesScreen() {
     setPaySheet(true)
   }
 
-  // Razorpay Checkout runs on a page in the browser (no native SDK in this build); the page sends the parent back here.
+  // Razorpay Checkout runs on our page in a browser sheet over the app (no native SDK in this build).
   const startPayment = async () => {
     if (!child || !chosen.length || starting) return
     setStarting(true)
@@ -88,7 +88,7 @@ export default function FeesScreen() {
       const order = await portalService.startPayment(child.studentId, chosen)
       setPaySheet(false)
       router.push({ pathname: '/fee-payment/[orderId]', params: { orderId: order.orderId, student: child.studentId, url: order.checkoutUrl } })
-      await Linking.openURL(order.checkoutUrl)
+      await openCheckout(order.checkoutUrl)
     } catch (error) {
       setPayError(error instanceof Error ? error.message : "Couldn't start the payment. Try again.")
     } finally {
