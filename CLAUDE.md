@@ -141,6 +141,7 @@ npm run android          # live API on Android
 npm run mobile-stage     # stage API, QR code only
 npm run mobile-live      # live API, QR code only
 npm run mobile           # the API in mobile/.env.local, or this Mac's server on port 5000
+npm run android-info     # newest stage and live APK download links on EAS
 ```
 
 ### Client-specific (from /client)
