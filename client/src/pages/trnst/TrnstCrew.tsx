@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import toast from 'react-hot-toast'
 import { useQueryClient } from '@tanstack/react-query'
-import { Bus, CheckCircle2, MapPinOff, Play, Square, Undo2, XCircle } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Bus, CheckCircle2, ChevronRight, MapPinOff, Play, Square, Undo2, XCircle } from 'lucide-react'
 import trnstService, {
   type BoardingEvent,
   type BoardingResult,
@@ -157,6 +158,8 @@ const ScanResult: React.FC<{ result: { ok: boolean; title: string; detail: strin
 )
 
 const OnTrip: React.FC<{ trip: CrewTrip; vehicle?: CrewVehicle; onEnded: () => void }> = ({ trip, vehicle, onEnded }) => {
+  const navigate = useNavigate()
+  const openStudent = (student: RosterStudent) => navigate(`/trnst/crew/student/${trip._id}/${student.studentId}`)
   const { can } = usePermissions()
   const queryClient = useQueryClient()
   const canOperate = can('trnst.trips.operate')
@@ -399,6 +402,13 @@ const OnTrip: React.FC<{ trip: CrewTrip; vehicle?: CrewVehicle; onEnded: () => v
                                 </Button>
                               </span>
                             )}
+                            <Button
+                              size="sm"
+                              variant="tertiary"
+                              icon={ChevronRight}
+                              aria-label={`Open ${student.name}: class teacher and parents to call`}
+                              onClick={() => openStudent(student)}
+                            />
                           </li>
                         )
                       })}

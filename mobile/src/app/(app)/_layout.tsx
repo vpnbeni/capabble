@@ -31,6 +31,7 @@ export default function AppLayout() {
             <Stack.Screen name="student/[id]" />
             <Stack.Screen name="notifications" />
             <Stack.Screen name="crew-trip" />
+            <Stack.Screen name="crew-student" />
             <Stack.Screen name="staff-attendance" />
             <Stack.Screen name="staff-directory" />
           </Stack>

@@ -610,6 +610,10 @@ const Header: React.FC<HeaderProps> = ({ isSidebarCollapsed, isMobileNav = false
           assignments: { title: 'Student routes', subtitle: 'The route and stop each student uses.' },
           crew: { title: 'Bus crew', subtitle: 'Run a trip, share the bus location and mark students.' },
         }
+        // A student opened from the crew list: back to the crew screen.
+        if (subPage === 'crew' && segments[2] === 'student') {
+          return { pageTitle: 'Student', pageSubtitle: 'On your bus: class, stop and who to call.', showBackButton: true, backTo: '/trnst/crew' }
+        }
         const info = titleMap[subPage] || { title: 'Transport', subtitle: 'School transport.' }
         return {
           pageTitle: info.title,

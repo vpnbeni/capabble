@@ -12,6 +12,10 @@ export const useCrew = (enabled = true) => useQuery({ queryKey: [...all, 'me'], 
 export const useRoster = (tripId?: string) =>
   useQuery({ queryKey: [...all, 'roster', tripId], queryFn: () => crewService.roster(tripId as string), enabled: Boolean(tripId), refetchInterval: 20_000 })
 
+/** One student on the trip's route, with the class teacher and family to call. */
+export const useCrewStudent = (tripId?: string, studentId?: string) =>
+  useQuery({ queryKey: [...all, 'student', tripId, studentId], queryFn: () => crewService.student(tripId as string, studentId as string), enabled: Boolean(tripId && studentId) })
+
 const useWrite = <T, R>(fn: (input: T) => Promise<R>) => {
   const queryClient = useQueryClient()
   return useMutation({ mutationFn: fn, onSuccess: () => queryClient.invalidateQueries({ queryKey: all }) })

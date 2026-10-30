@@ -230,6 +230,14 @@ export type RosterStudent = {
   marks: Partial<Record<BoardingEvent, { at: string; method: 'scan' | 'manual' }>>
 }
 
+/** One student on the crew's route: class, stop, class teacher and family to call. */
+export type CrewStudentCard = {
+  student: { studentId: string; name: string; rollNumber: string; className: string; section: string; profileImage: string | null }
+  stop: { name: string; pickupTime?: string; dropTime?: string } | null
+  classTeacher: { name: string; phone: string } | null
+  family: Array<{ relation: 'Father' | 'Mother' | 'Guardian' | 'Parent'; name: string; phone: string }>
+}
+
 export type Roster = {
   trip: CrewTrip
   route: { _id: string; name: string; code: string } | null
@@ -325,6 +333,11 @@ const markBoarding = async (
   return response.data.data as BoardingResult
 }
 
+const getCrewStudent = async (tripId: string, studentId: string) => {
+  const response = await api.get(`/trnst/crew/trips/${tripId}/students/${studentId}`, silent)
+  return response.data.data as CrewStudentCard
+}
+
 const unmarkBoarding = async (tripId: string, studentId: string, event: BoardingEvent) =>
   api.delete(`/trnst/crew/trips/${tripId}/boarding/${studentId}/${event}`, silent)
 
@@ -353,6 +366,7 @@ const trnstService = {
   getRoster,
   markBoarding,
   unmarkBoarding,
+  getCrewStudent,
 }
 
 export default trnstService

@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import { MapPin, Phone, UserX } from 'lucide-react-native'
+import { Info, MapPin, Phone, UserX } from 'lucide-react-native'
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { AppState, Linking } from 'react-native'
@@ -91,6 +91,9 @@ export default function CrewTripScreen() {
     setAsking(false)
   }
   const help = running && sharing !== 'sharing' && sharing !== 'checking' ? SHARING_HELP[sharing] : null
+
+  const openStudent = (student: RosterStudent) =>
+    trip && router.push({ pathname: '/crew-student', params: { tripId: trip._id, studentId: student.studentId } })
 
   const record = (student: RosterStudent, event: BoardingEvent) => {
     if (!trip || !running) return
@@ -210,9 +213,11 @@ export default function CrewTripScreen() {
                         unread={running && !markedMain && !student.marks.absent}
                         title={student.name}
                         subtitle={statusOf(student) ?? `Class ${classLabel(student.className, student.section)} · tap when ${pickup ? 'on the bus' : 'dropped'}`}
-                        onPress={running && !markedMain ? () => record(student, main) : undefined}
+                        // Tap marks a student still to mark; a marked one (or any after the trip) opens their page.
+                        onPress={running && !markedMain ? () => record(student, main) : () => openStudent(student)}
                         actions={[
                           ...(running && !student.marks.absent ? [{ label: 'Absent', icon: UserX, tone: 'neutral' as const, onPress: () => record(student, 'absent') }] : []),
+                          { label: 'Details', icon: Info, tone: 'neutral' as const, onPress: () => openStudent(student) },
                           ...(student.guardianPhone ? [{ label: 'Call parent', icon: Phone, tone: 'accent' as const, onPress: () => Linking.openURL(`tel:${student.guardianPhone}`) }] : []),
                         ]}
                       />

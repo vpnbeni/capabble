@@ -414,3 +414,27 @@ describe('TRNST road path', () => {
     expect(result.body.data).toMatchObject({ vehicleType: 'Auto', roadPath: { distanceM: 4321, durationS: 610 } });
   });
 });
+
+describe('crew student card contacts', () => {
+  const { familyContacts } = require('../../../controllers/trnst/crewController');
+
+  it('puts the school phone on the father when he is the guardian', () => {
+    expect(familyContacts({
+      fatherName: 'Vinod Dalal', motherName: 'Suman Dalal', guardianName: 'Vinod Dalal', guardianPhone: '9812000001'
+    })).toEqual([
+      { relation: 'Father', name: 'Vinod Dalal', phone: '9812000001' },
+      { relation: 'Mother', name: 'Suman Dalal', phone: '' }
+    ]);
+  });
+
+  it('puts it on the mother, or on a separate guardian', () => {
+    expect(familyContacts({ fatherName: 'A', motherName: 'B', guardianName: 'b', guardianPhone: '9' })[1])
+      .toEqual({ relation: 'Mother', name: 'B', phone: '9' });
+    expect(familyContacts({ fatherName: 'A', guardianName: 'Uncle C', guardianPhone: '9' }))
+      .toEqual([{ relation: 'Father', name: 'A', phone: '' }, { relation: 'Guardian', name: 'Uncle C', phone: '9' }]);
+  });
+
+  it('still gives a number when no names are on the record', () => {
+    expect(familyContacts({ guardianPhone: '9' })).toEqual([{ relation: 'Parent', name: '', phone: '9' }]);
+  });
+});

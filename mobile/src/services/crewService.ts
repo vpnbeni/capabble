@@ -64,11 +64,21 @@ export interface Roster {
   counts: { assigned: number; boarded: number; dropped: number; absent: number }
 }
 
+/** One student on the crew's route: class, stop, class teacher and family to call. */
+export interface CrewStudentCard {
+  student: { studentId: string; name: string; rollNumber: string; className: string; section: string; profileImage: string | null }
+  stop: { name: string; pickupTime?: string; dropTime?: string } | null
+  classTeacher: { name: string; phone: string } | null
+  family: { relation: 'Father' | 'Mother' | 'Guardian' | 'Parent'; name: string; phone: string }[]
+}
+
 export const crewService = {
   me: () => api.get<{ today: string; vehicles: CrewVehicle[]; trips: CrewTrip[] }>('/trnst/crew/me'),
   /** Starts the trip, or resumes it when this bus is already on it. */
   start: (input: { routeId: string; direction: Direction }) => api.post<CrewTrip>('/trnst/crew/trips', input),
   end: (tripId: string) => api.post<CrewTrip>(`/trnst/crew/trips/${encodeURIComponent(tripId)}/end`),
+  student: (tripId: string, studentId: string) =>
+    api.get<CrewStudentCard>(`/trnst/crew/trips/${encodeURIComponent(tripId)}/students/${encodeURIComponent(studentId)}`),
   roster: (tripId: string) => api.get<Roster>(`/trnst/crew/trips/${encodeURIComponent(tripId)}/roster`),
   /** Marks one student; families get a notification for on the bus and dropped. */
   mark: (tripId: string, input: { studentId: string; event: BoardingEvent }) =>
