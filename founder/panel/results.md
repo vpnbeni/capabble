@@ -1,0 +1,64 @@
+# Buyer panel: Capabble, a modular cloud school ERP for Indian K-12 schools
+
+**0 buy · 20 pass** (0% buy) out of 20 simulated buyers. Seed 981133, so the same cards can be dealt again.
+
+These are simulated buyers, not customers. Use this to find objections and weak spots, then confirm the big ones with real people before you spend.
+
+## By segment
+
+| group | buyers | buy rate |
+| --- | ---: | ---: |
+| Principal of a mid-size private CBSE school (600-1,200 students) | 8 | 0% |
+| Owner/trustee of a small private school (300-600 students, fees under Rs 3,000 a month) | 6 | 0%  (thin) |
+| Administrator or accounts head at a large school or a 2-3 school trust (1,200-2,000+ students) | 4 | 0%  (thin) |
+| Exam-centre superintendent / senior teacher at a school that is a CBSE board exam centre | 2 | 0%  (thin) |
+
+## By buying behaviour
+
+| group | buyers | buy rate |
+| --- | ---: | ---: |
+| Price-first negotiator | 3 | 0%  (thin) |
+| Already on an incumbent ERP | 5 | 0%  (thin) |
+| Excel + WhatsApp + Tally | 5 | 0%  (thin) |
+| Wants a person to set it up | 3 | 0%  (thin) |
+| Exam-season pain buyer | 2 | 0%  (thin) |
+| Asks the network | 2 | 0%  (thin) |
+
+## By income
+
+| group | buyers | buy rate |
+| --- | ---: | ---: |
+| $926,000 to $1,631,000 | 7 | 0%  (thin) |
+| $1,631,000 and up | 7 | 0%  (thin) |
+| under $926,000 | 6 | 0%  (thin) |
+
+## Why they pass
+
+| reason | buyers | in their words |
+| --- | ---: | --- |
+| habit | 9 | "Our current ERP works well enough, and moving fees, attendance and report cards to new software in the middle of the session could go wrong right when parents are watching. Even at half price, Rs 30,000 plus GST is over my Rs 25,000 limit, so it goes to the trust chairman, and I can't defend that to him for something we don't need right now." (P001) · "We already pay our AMC to a vendor whose people come and sort things out, and years of fee and student records sit in that system. Rs 30,000 is not the problem. The problem is moving all that data and retraining office staff who can barely use the software they have now, all for a 14-day trial I would have to run myself online." (P002) |
+| trust | 7 | "The price is not the problem, half price for the first year is fair for my school. But I will not put all my students' and fee data with a new company I have never met, at least not in the middle of fee collection, and nobody has come to the school to show me anything." (P007) · "The price is fine, but I've never heard of Capabble and nobody from them has come to the school to show me. Sign up online and import our own data in a 14-day trial? My office staff won't manage that alone, and I'm not taking Rs 30,000 to the trust chairman for software I haven't seen running at a school like ours." (P008) |
+| convenience | 2 | "Sign up online and run a trial with my own data? Who is going to put in 450 students and train my office staff? If nobody comes to the school, it will sit unused like the last software, and we only need fees and attendance anyway, not 14 modules." (P004) · "The price is fine for a school our size, but this is sign up online and do it yourself. My office staff are not comfortable with computers, and I don't have time to run a 14-day trial and type in 900 students' data myself after answering parents on WhatsApp till midnight." (P017) |
+| timing | 2 | "Nothing is on fire this week, and I only switch software when board exams or the new session force my hand. Even the Rs 30,000 launch price plus GST goes over my Rs 25,000 limit, so it means a meeting with the trust chairman for 14 modules when we really use fees and attendance." (P006) · "It's end of October, nothing is on fire, and our Excel sheets and fee register are working well enough for now. I'd look at the exam-centre module in January when the CBSE centre work starts to hurt, not sign up for all 14 modules today." (P019) |
+
+## Why they buy
+
+| reason | buyers | in their words |
+| --- | ---: | --- |
+
+## What would flip a no
+
+- A free on-site demo at our school, with you migrating our existing data for us, a switch timed for the new session in April, and a fixed multi-year per-student price that keeps it under Rs 25,000 a year so I can sign without the chairman.
+- If someone from Capabble came to the school, migrated our existing fee and student data for free and trained the office staff in person, I would try only the timetable module first, since teachers fight over it every April.
+- A principal from a nearby CBSE school I know telling me they have run their fees and timetable on it for a full year without trouble, plus someone coming to set it up and import our Tally data for us.
+- A person visiting the school to import our student and fee data and train the office staff, with a simple fees-plus-attendance package at a fixed yearly price.
+- Another CBSE exam-centre school nearby that ran a full board exam season on the exam-centre module without trouble, so I could buy only that module for about Rs 5,000 to 8,000 alongside our current ERP.
+- A principal from another CBSE school nearby showing me it worked through their board exams, and a fees plus attendance bundle under Rs 25,000 that I can sign for myself before the session starts.
+- Someone visits the school and gives a demo, a few nearby CBSE schools I can call who are already using it, and a written promise that I can export all my data anytime, plus a little extra discount on top of the launch price.
+- Seeing it running at a nearby CBSE school our size, and a person who comes to our campus to import the data and train the staff, with that included in the price.
+- Someone visiting the school to load our student and fee data and train the office staff in Hindi, with a principal I know who already uses it, and setup done outside fee collection season.
+- If they migrated all our fee and student history from our current ERP for free, ran it alongside the old one until session start in April, and showed me two or three schools our size in North India using it for fees.
+- Two or three CBSE schools of our size nearby that have run it for a full year and whose principals tell me fees and report cards worked without trouble, plus a person who comes to help migrate our data outside fee season.
+- A principal from a nearby CBSE school telling me they ran their exam centre on it, plus someone coming to our school to load our data and train the office staff.
+
+20 buyers gave all four price answers. Run founder-pricing's van_westendorp.py on the answers folder.

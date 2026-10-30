@@ -1,0 +1,13 @@
+{
+  "id": "P010",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "habit",
+  "reason": "We already pay our AMC to an ERP that holds years of fee and student data, and it works well enough. I am not moving fees and records across mid-session for a new vendor I have never heard of, and a 14-day trial tells me nothing about how it handles a full fee cycle across 1,500+ students.",
+  "objection": "Migration risk. If fee records or receipts go wrong during the switch, parents are on my WhatsApp at midnight and the accounts don't reconcile. I don't know who this company is or whether they will still be around in three years to support us.",
+  "would_change_my_mind": "If they migrated all our fee and student history from our current ERP for free, ran it alongside the old one until session start in April, and showed me two or three schools our size in North India using it for fees.",
+  "price_too_cheap": 40000,
+  "price_cheap": 120000,
+  "price_expensive": 250000,
+  "price_too_expensive": 350000
+}

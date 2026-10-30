@@ -1,0 +1,13 @@
+{
+  "id": "P017",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "convenience",
+  "reason": "The price is fine for a school our size, but this is sign up online and do it yourself. My office staff are not comfortable with computers, and I don't have time to run a 14-day trial and type in 900 students' data myself after answering parents on WhatsApp till midnight.",
+  "objection": "Who will come to the school, train my staff and enter our data? Nothing here says anyone will. If it sits half-set-up, I've paid for software nobody uses.",
+  "would_change_my_mind": "A person visits the school, imports our student and fee data, and trains the office staff and teachers on-site before we start paying, even if that costs extra.",
+  "price_too_cheap": 15000,
+  "price_cheap": 30000,
+  "price_expensive": 90000,
+  "price_too_expensive": 150000
+}

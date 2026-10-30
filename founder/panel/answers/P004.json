@@ -1,0 +1,13 @@
+{
+  "id": "P004",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "convenience",
+  "reason": "Sign up online and run a trial with my own data? Who is going to put in 450 students and train my office staff? If nobody comes to the school, it will sit unused like the last software, and we only need fees and attendance anyway, not 14 modules.",
+  "objection": "Nobody comes to the school to set it up, import our records and train the accountant and teachers. A website sign-up and a free trial mean my staff have to do it themselves, and they won't.",
+  "would_change_my_mind": "A person visiting the school to import our student and fee data and train the office staff, with a simple fees-plus-attendance package at a fixed yearly price.",
+  "price_too_cheap": 3000,
+  "price_cheap": 10000,
+  "price_expensive": 25000,
+  "price_too_expensive": 45000
+}

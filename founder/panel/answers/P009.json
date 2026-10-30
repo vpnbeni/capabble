@@ -1,0 +1,13 @@
+{
+  "id": "P009",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "habit",
+  "reason": "Our fees run in Tally and notices go on WhatsApp, and it works well enough. I am not paying Rs 30,000 to Rs 60,000 a year for software my office staff will not use, and a 14-day trial is no use when nobody has time to enter our data.",
+  "objection": "Who will train my staff and enter our data? My office staff are not comfortable with computers, and a website signup does not tell me anyone will come to the school to set it up.",
+  "would_change_my_mind": "Someone visiting the school to load our student and fee data and train the office staff in Hindi, with a principal I know who already uses it, and setup done outside fee collection season.",
+  "price_too_cheap": 5000,
+  "price_cheap": 15000,
+  "price_expensive": 30000,
+  "price_too_expensive": 50000
+}

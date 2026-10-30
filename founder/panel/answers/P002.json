@@ -1,0 +1,13 @@
+{
+  "id": "P002",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "habit",
+  "reason": "We already pay our AMC to a vendor whose people come and sort things out, and years of fee and student records sit in that system. Rs 30,000 is not the problem. The problem is moving all that data and retraining office staff who can barely use the software they have now, all for a 14-day trial I would have to run myself online.",
+  "objection": "Who will move our old fee and student data across and sit with my office clerks until they can use it? Nothing here says anyone will come to the school. If fee collection gets stuck in April, I have nobody to call.",
+  "would_change_my_mind": "If someone from Capabble came to the school, migrated our existing fee and student data for free and trained the office staff in person, I would try only the timetable module first, since teachers fight over it every April.",
+  "price_too_cheap": 10000,
+  "price_cheap": 25000,
+  "price_expensive": 60000,
+  "price_too_expensive": 90000
+}

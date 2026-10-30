@@ -1,0 +1,13 @@
+{
+  "id": "P007",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "trust",
+  "reason": "The price is not the problem, half price for the first year is fair for my school. But I will not put all my students' and fee data with a new company I have never met, at least not in the middle of fee collection, and nobody has come to the school to show me anything.",
+  "objection": "A new company with a small team. If it shuts down after one year, what happens to my fee records and student data? Who will come to the school when the office staff cannot make it work?",
+  "would_change_my_mind": "Someone visits the school and gives a demo, a few nearby CBSE schools I can call who are already using it, and a written promise that I can export all my data anytime, plus a little extra discount on top of the launch price.",
+  "price_too_cheap": 10000,
+  "price_cheap": 25000,
+  "price_expensive": 50000,
+  "price_too_expensive": 80000
+}

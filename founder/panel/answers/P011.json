@@ -1,0 +1,13 @@
+{
+  "id": "P011",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "trust",
+  "reason": "I have never heard of Capabble and nobody in my network, not the neighbouring principals and not our chairman, uses it. For 1,500 students across our schools, moving fees, payroll and report cards onto an unknown launch-stage vendor in the middle of a quarter's fee collection is not a risk I will take on my own say-so.",
+  "objection": "Whether a new company will still be around and supporting us in three years, and whether it really handles CBSE registration and report card formats properly, not just the exam-centre part. If fee data or payroll goes wrong, it lands on my desk, not theirs.",
+  "would_change_my_mind": "Two or three CBSE schools of our size nearby that have run it for a full year and whose principals tell me fees and report cards worked without trouble, plus a person who comes to help migrate our data outside fee season.",
+  "price_too_cheap": 25000,
+  "price_cheap": 80000,
+  "price_expensive": 220000,
+  "price_too_expensive": 400000
+}

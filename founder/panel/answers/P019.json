@@ -1,0 +1,13 @@
+{
+  "id": "P019",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "timing",
+  "reason": "It's end of October, nothing is on fire, and our Excel sheets and fee register are working well enough for now. I'd look at the exam-centre module in January when the CBSE centre work starts to hurt, not sign up for all 14 modules today.",
+  "objection": "I already pay for some software or manage in Excel, and moving fees and student data to a new company I've never heard of means my staff learning everything again. If it breaks in March in the middle of board exams, who do I call?",
+  "would_change_my_mind": "Seeing the seating plan, invigilator duty and Form 66 part work on my own centre's data, plus a school near me that ran its board exam centre on it without trouble.",
+  "price_too_cheap": 5000,
+  "price_cheap": 15000,
+  "price_expensive": 40000,
+  "price_too_expensive": 70000
+}

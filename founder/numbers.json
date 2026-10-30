@@ -1,0 +1,23 @@
+{
+  "business": "Capabble school ERP (unit = one paying school for one month; 'per day' fields mean paying schools in that month)",
+  "unit": "school-month",
+  "price": 4000,
+  "variable": [
+    {"label": "Razorpay fee ~2% + GST on fee (ESTIMATE, on Rs 4,000)", "cost": 94},
+    {"label": "Hosting share: tenant MongoDB storage/backup, push, email (ESTIMATE)", "cost": 200},
+    {"label": "Support + onboarding time, ~2 h/month at Rs 400/h (ESTIMATE)", "cost": 800}
+  ],
+  "fixed_monthly": [
+    {"label": "Founder draw (ESTIMATE - replace with real)", "cost": 100000},
+    {"label": "One implementation/sales person (ESTIMATE)", "cost": 35000},
+    {"label": "Travel for on-site demos and onboarding (ESTIMATE)", "cost": 15000},
+    {"label": "Base infra: EC2, MongoDB cluster, Vercel, Neon, SMTP, domains (ESTIMATE)", "cost": 12000}
+  ],
+  "startup": [
+    {"label": "Launch marketing: print, events, principal meet-ups (ESTIMATE)", "cost": 50000},
+    {"label": "Legal, trademark, terms review (ESTIMATE)", "cost": 20000}
+  ],
+  "days_per_month": 1,
+  "plan_per_day": 40,
+  "ramp_per_day": [2, 4, 6, 9, 12, 15, 18, 22, 26, 30, 35, 40]
+}

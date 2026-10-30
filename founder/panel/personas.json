@@ -1,0 +1,222 @@
+[
+ {
+  "id": "P001",
+  "name": "Ravi",
+  "age": 43,
+  "segment": "Principal of a mid-size private CBSE school (600-1,200 students)",
+  "income": 1247000,
+  "behaviour": "Price-first negotiator",
+  "behaviour_how": "Asks every vendor for a discount and a free demo at the school; compares per-student price.",
+  "objection": "Our current ERP works well enough; switching mid-session is risky",
+  "habit": "the trust chairman signs off any spend above Rs 25,000"
+ },
+ {
+  "id": "P002",
+  "name": "Kofi",
+  "age": 36,
+  "segment": "Owner/trustee of a small private school (300-600 students, fees under Rs 3,000 a month)",
+  "income": 2925000,
+  "behaviour": "Already on an incumbent ERP",
+  "behaviour_how": "Pays a yearly AMC to an established school ERP vendor; switching means migrating years of fee and student data.",
+  "objection": "Who will train my staff and enter our data? My office staff are not comfortable with computers",
+  "habit": "teachers complain about the timetable every April"
+ },
+ {
+  "id": "P003",
+  "name": "Rohan",
+  "age": 52,
+  "segment": "Administrator or accounts head at a large school or a 2-3 school trust (1,200-2,000+ students)",
+  "income": 986000,
+  "behaviour": "Excel + WhatsApp + Tally",
+  "behaviour_how": "Runs fees in Tally or Excel, sends notices on WhatsApp groups, has never paid for school software.",
+  "objection": "Rs 60,000 a year plus GST is a lot when we already pay for software or use Excel for free",
+  "habit": "teachers complain about the timetable every April"
+ },
+ {
+  "id": "P004",
+  "name": "Lucia",
+  "age": 56,
+  "segment": "Owner/trustee of a small private school (300-600 students, fees under Rs 3,000 a month)",
+  "income": 1631000,
+  "behaviour": "Wants a person to set it up",
+  "behaviour_how": "Will only buy if someone comes to the school, trains the staff and imports the data.",
+  "objection": "We only need fees and attendance, not 14 modules",
+  "habit": "parents message you on WhatsApp late at night"
+ },
+ {
+  "id": "P005",
+  "name": "Quinn",
+  "age": 40,
+  "segment": "Exam-centre superintendent / senior teacher at a school that is a CBSE board exam centre",
+  "income": 839000,
+  "behaviour": "Already on an incumbent ERP",
+  "behaviour_how": "Pays a yearly AMC to an established school ERP vendor; switching means migrating years of fee and student data.",
+  "objection": "Rs 60,000 a year plus GST is a lot when we already pay for software or use Excel for free",
+  "habit": "parents message you on WhatsApp late at night"
+ },
+ {
+  "id": "P006",
+  "name": "Jonah",
+  "age": 42,
+  "segment": "Principal of a mid-size private CBSE school (600-1,200 students)",
+  "income": 1456000,
+  "behaviour": "Exam-season pain buyer",
+  "behaviour_how": "Buys tools when a deadline hurts: board exams, timetable at session start, report cards.",
+  "objection": "We only need fees and attendance, not 14 modules",
+  "habit": "the trust chairman signs off any spend above Rs 25,000"
+ },
+ {
+  "id": "P007",
+  "name": "Pablo",
+  "age": 56,
+  "segment": "Owner/trustee of a small private school (300-600 students, fees under Rs 3,000 a month)",
+  "income": 2959000,
+  "behaviour": "Price-first negotiator",
+  "behaviour_how": "Asks every vendor for a discount and a free demo at the school; compares per-student price.",
+  "objection": "A new company with a small team - what if it shuts down and we lose our data?",
+  "habit": "fee collection season at the start of each quarter keeps the office busy for weeks"
+ },
+ {
+  "id": "P008",
+  "name": "Freya",
+  "age": 40,
+  "segment": "Principal of a mid-size private CBSE school (600-1,200 students)",
+  "income": 849000,
+  "behaviour": "Wants a person to set it up",
+  "behaviour_how": "Will only buy if someone comes to the school, trains the staff and imports the data.",
+  "objection": "I need to see it working at a school like ours first",
+  "habit": "the trust chairman signs off any spend above Rs 25,000"
+ },
+ {
+  "id": "P009",
+  "name": "Elle",
+  "age": 57,
+  "segment": "Principal of a mid-size private CBSE school (600-1,200 students)",
+  "income": 1401000,
+  "behaviour": "Excel + WhatsApp + Tally",
+  "behaviour_how": "Runs fees in Tally or Excel, sends notices on WhatsApp groups, has never paid for school software.",
+  "objection": "Who will train my staff and enter our data? My office staff are not comfortable with computers",
+  "habit": "fee collection season at the start of each quarter keeps the office busy for weeks"
+ },
+ {
+  "id": "P010",
+  "name": "Fatima",
+  "age": 47,
+  "segment": "Administrator or accounts head at a large school or a 2-3 school trust (1,200-2,000+ students)",
+  "income": 740000,
+  "behaviour": "Already on an incumbent ERP",
+  "behaviour_how": "Pays a yearly AMC to an established school ERP vendor; switching means migrating years of fee and student data.",
+  "objection": "Our current ERP works well enough; switching mid-session is risky",
+  "habit": "parents message you on WhatsApp late at night"
+ },
+ {
+  "id": "P011",
+  "name": "Elena",
+  "age": 48,
+  "segment": "Administrator or accounts head at a large school or a 2-3 school trust (1,200-2,000+ students)",
+  "income": 926000,
+  "behaviour": "Asks the network",
+  "behaviour_how": "Asks principals of nearby schools and the trust's chairman what they use before deciding.",
+  "objection": "Can it handle CBSE requirements like registration, report cards and board-exam centre work?",
+  "habit": "fee collection season at the start of each quarter keeps the office busy for weeks"
+ },
+ {
+  "id": "P012",
+  "name": "Olivia",
+  "age": 59,
+  "segment": "Exam-centre superintendent / senior teacher at a school that is a CBSE board exam centre",
+  "income": 613000,
+  "behaviour": "Asks the network",
+  "behaviour_how": "Asks principals of nearby schools and the trust's chairman what they use before deciding.",
+  "objection": "Who will train my staff and enter our data? My office staff are not comfortable with computers",
+  "habit": "the trust chairman signs off any spend above Rs 25,000"
+ },
+ {
+  "id": "P013",
+  "name": "Arjun",
+  "age": 38,
+  "segment": "Principal of a mid-size private CBSE school (600-1,200 students)",
+  "income": 1265000,
+  "behaviour": "Excel + WhatsApp + Tally",
+  "behaviour_how": "Runs fees in Tally or Excel, sends notices on WhatsApp groups, has never paid for school software.",
+  "objection": "We only need fees and attendance, not 14 modules",
+  "habit": "you get two or three calls a month from software and ed-tech salespeople"
+ },
+ {
+  "id": "P014",
+  "name": "Ben",
+  "age": 52,
+  "segment": "Principal of a mid-size private CBSE school (600-1,200 students)",
+  "income": 1743000,
+  "behaviour": "Already on an incumbent ERP",
+  "behaviour_how": "Pays a yearly AMC to an established school ERP vendor; switching means migrating years of fee and student data.",
+  "objection": "We only need fees and attendance, not 14 modules",
+  "habit": "you spend part of every March running the school as a CBSE board exam centre"
+ },
+ {
+  "id": "P015",
+  "name": "Liam",
+  "age": 45,
+  "segment": "Owner/trustee of a small private school (300-600 students, fees under Rs 3,000 a month)",
+  "income": 1978000,
+  "behaviour": "Excel + WhatsApp + Tally",
+  "behaviour_how": "Runs fees in Tally or Excel, sends notices on WhatsApp groups, has never paid for school software.",
+  "objection": "I need to see it working at a school like ours first",
+  "habit": "the trust chairman signs off any spend above Rs 25,000"
+ },
+ {
+  "id": "P016",
+  "name": "Iris",
+  "age": 35,
+  "segment": "Owner/trustee of a small private school (300-600 students, fees under Rs 3,000 a month)",
+  "income": 2620000,
+  "behaviour": "Already on an incumbent ERP",
+  "behaviour_how": "Pays a yearly AMC to an established school ERP vendor; switching means migrating years of fee and student data.",
+  "objection": "Rs 60,000 a year plus GST is a lot when we already pay for software or use Excel for free",
+  "habit": "the trust chairman signs off any spend above Rs 25,000"
+ },
+ {
+  "id": "P017",
+  "name": "Darius",
+  "age": 40,
+  "segment": "Principal of a mid-size private CBSE school (600-1,200 students)",
+  "income": 787000,
+  "behaviour": "Wants a person to set it up",
+  "behaviour_how": "Will only buy if someone comes to the school, trains the staff and imports the data.",
+  "objection": "Who will train my staff and enter our data? My office staff are not comfortable with computers",
+  "habit": "parents message you on WhatsApp late at night"
+ },
+ {
+  "id": "P018",
+  "name": "Rafael",
+  "age": 57,
+  "segment": "Administrator or accounts head at a large school or a 2-3 school trust (1,200-2,000+ students)",
+  "income": 782000,
+  "behaviour": "Excel + WhatsApp + Tally",
+  "behaviour_how": "Runs fees in Tally or Excel, sends notices on WhatsApp groups, has never paid for school software.",
+  "objection": "I need to see it working at a school like ours first",
+  "habit": "parents message you on WhatsApp late at night"
+ },
+ {
+  "id": "P019",
+  "name": "Grace",
+  "age": 49,
+  "segment": "Owner/trustee of a small private school (300-600 students, fees under Rs 3,000 a month)",
+  "income": 2812000,
+  "behaviour": "Exam-season pain buyer",
+  "behaviour_how": "Buys tools when a deadline hurts: board exams, timetable at session start, report cards.",
+  "objection": "Rs 60,000 a year plus GST is a lot when we already pay for software or use Excel for free",
+  "habit": "you spend part of every March running the school as a CBSE board exam centre"
+ },
+ {
+  "id": "P020",
+  "name": "Clara",
+  "age": 51,
+  "segment": "Principal of a mid-size private CBSE school (600-1,200 students)",
+  "income": 1621000,
+  "behaviour": "Price-first negotiator",
+  "behaviour_how": "Asks every vendor for a discount and a free demo at the school; compares per-student price.",
+  "objection": "Can it handle CBSE requirements like registration, report cards and board-exam centre work?",
+  "habit": "fee collection season at the start of each quarter keeps the office busy for weeks"
+ }
+]

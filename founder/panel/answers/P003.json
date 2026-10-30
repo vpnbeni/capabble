@@ -1,0 +1,13 @@
+{
+  "id": "P003",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "habit",
+  "reason": "Our fees run fine in Tally and Excel, notices go on WhatsApp, and we have never paid for school software. I am not taking Rs 60,000 plus GST to the trustees for something new from a company I have never heard of, half-price offer or not.",
+  "objection": "Migrating 1,500-plus students' data and retraining staff mid-session is a big headache, and if this new company shuts down or the fee module does not match our Tally ledgers, I am the one who answers to the trustees.",
+  "would_change_my_mind": "A principal from a nearby CBSE school I know telling me they have run their fees and timetable on it for a full year without trouble, plus someone coming to set it up and import our Tally data for us.",
+  "price_too_cheap": 5000,
+  "price_cheap": 15000,
+  "price_expensive": 40000,
+  "price_too_expensive": 75000
+}

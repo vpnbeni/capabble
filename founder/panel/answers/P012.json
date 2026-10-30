@@ -1,0 +1,13 @@
+{
+  "id": "P012",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "trust",
+  "reason": "I have never heard of Capabble and no principal I know uses it, so I will not put it before the chairman. The exam-centre module is tempting because Form 66 and dispatch are such a headache, but a website sign-up does not tell me who will sit with my office staff and enter our data.",
+  "objection": "Who will train my staff and enter our data? My office clerks are not comfortable with computers, and a 14-day trial is no use if nobody comes to the school to set it up. If it fails during board exams, the blame falls on me.",
+  "would_change_my_mind": "A principal from a nearby CBSE school telling me they ran their exam centre on it, plus someone coming to our school to load our data and train the office staff.",
+  "price_too_cheap": 2000,
+  "price_cheap": 5000,
+  "price_expensive": 20000,
+  "price_too_expensive": 50000
+}

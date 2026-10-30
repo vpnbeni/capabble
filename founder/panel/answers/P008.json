@@ -1,0 +1,13 @@
+{
+  "id": "P008",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "trust",
+  "reason": "The price is fine, but I've never heard of Capabble and nobody from them has come to the school to show me. Sign up online and import our own data in a 14-day trial? My office staff won't manage that alone, and I'm not taking Rs 30,000 to the trust chairman for software I haven't seen running at a school like ours.",
+  "objection": "Nobody will come to the school to set it up, train my teachers and accountant and move our student and fee data across. If that doesn't happen it sits unused and I'm the one answering to the chairman.",
+  "would_change_my_mind": "Seeing it running at a nearby CBSE school our size, and a person who comes to our campus to import the data and train the staff, with that included in the price.",
+  "price_too_cheap": 10000,
+  "price_cheap": 30000,
+  "price_expensive": 80000,
+  "price_too_expensive": 150000
+}

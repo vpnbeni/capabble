@@ -1,0 +1,38 @@
+{
+  "business": "Capabble, a modular cloud school ERP for Indian K-12 schools",
+  "target": "the person who decides on school software at a private CBSE-affiliated school in North India with 300 to 2,000 students (principal, owner/trustee or school administrator). NOTE: every money amount in this brief is in Indian rupees (INR), even where a $ sign is printed, and your own income is your personal yearly salary or draw in rupees",
+  "where": "North India (Haryana, Delhi NCR, Punjab, UP)",
+  "age": [32, 62],
+  "segments": [
+    {"name": "Principal of a mid-size private CBSE school (600-1,200 students)", "share": 0.40, "income": [700000, 1800000]},
+    {"name": "Owner/trustee of a small private school (300-600 students, fees under Rs 3,000 a month)", "share": 0.30, "income": [900000, 3000000]},
+    {"name": "Administrator or accounts head at a large school or a 2-3 school trust (1,200-2,000+ students)", "share": 0.20, "income": [600000, 1500000]},
+    {"name": "Exam-centre superintendent / senior teacher at a school that is a CBSE board exam centre", "share": 0.10, "income": [500000, 1100000]}
+  ],
+  "behaviours": [
+    {"name": "Already on an incumbent ERP", "share": 0.25, "how": "Pays a yearly AMC to an established school ERP vendor; switching means migrating years of fee and student data."},
+    {"name": "Excel + WhatsApp + Tally", "share": 0.25, "how": "Runs fees in Tally or Excel, sends notices on WhatsApp groups, has never paid for school software."},
+    {"name": "Price-first negotiator", "share": 0.15, "how": "Asks every vendor for a discount and a free demo at the school; compares per-student price."},
+    {"name": "Wants a person to set it up", "share": 0.15, "how": "Will only buy if someone comes to the school, trains the staff and imports the data."},
+    {"name": "Exam-season pain buyer", "share": 0.10, "how": "Buys tools when a deadline hurts: board exams, timetable at session start, report cards."},
+    {"name": "Asks the network", "share": 0.10, "how": "Asks principals of nearby schools and the trust's chairman what they use before deciding."}
+  ],
+  "objections": [
+    "Rs 60,000 a year plus GST is a lot when we already pay for software or use Excel for free",
+    "Who will train my staff and enter our data? My office staff are not comfortable with computers",
+    "A new company with a small team - what if it shuts down and we lose our data?",
+    "Will parents actually use the app, and is it in Hindi?",
+    "Our current ERP works well enough; switching mid-session is risky",
+    "We only need fees and attendance, not 14 modules",
+    "Can it handle CBSE requirements like registration, report cards and board-exam centre work?",
+    "I need to see it working at a school like ours first"
+  ],
+  "habits": [
+    "fee collection season at the start of each quarter keeps the office busy for weeks",
+    "you spend part of every March running the school as a CBSE board exam centre",
+    "the trust chairman signs off any spend above Rs 25,000",
+    "you get two or three calls a month from software and ed-tech salespeople",
+    "teachers complain about the timetable every April",
+    "parents message you on WhatsApp late at night"
+  ]
+}

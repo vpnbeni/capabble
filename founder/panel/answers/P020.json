@@ -1,0 +1,13 @@
+{
+  "id": "P020",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason_code": "trust",
+  "reason": "The price is fine, maybe even low, but I don't hand my school's student and fee data to a name I've never heard of because a website says so. Nobody has come to the school to show it to my office staff, and it's the middle of the session. I might start the trial, but I won't pay this month.",
+  "objection": "Will it really do CBSE registration, report cards in the board format and exam-centre work without problems, and will someone pick up the phone during fee collection week when the office is jammed? I can't tell any of that from an online sign-up.",
+  "would_change_my_mind": "A free demo at my school with my office staff, plus the name of a CBSE school near us that has used it for a full session, and a better price on the per-student charge above 500.",
+  "price_too_cheap": 20000,
+  "price_cheap": 40000,
+  "price_expensive": 90000,
+  "price_too_expensive": 150000
+}

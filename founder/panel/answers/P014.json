@@ -1,0 +1,13 @@
+{
+  "id": "P014",
+  "buys": false,
+  "purchases_first_month": 0,
+  "reason": "We already pay our ERP vendor's AMC and years of fee and student records sit in it, so I am not moving all that for a new name, even at half price. We only need fees and attendance working; the other modules don't matter to me.",
+  "reason_code": "habit",
+  "objection": "Migrating years of fee ledgers and student data from a new company I have never heard of, and finding out mid-session that something is wrong with fee receipts in front of parents.",
+  "would_change_my_mind": "If they took our data off the old ERP for us at no cost and ran it in parallel through one fee cycle, or if a principal I know in our area was already using it. The exam-centre module alone might interest me closer to March if it works without replacing our ERP.",
+  "price_too_cheap": 15000,
+  "price_cheap": 30000,
+  "price_expensive": 70000,
+  "price_too_expensive": 110000
+}
