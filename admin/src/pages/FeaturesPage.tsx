@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { featuresAdminApi } from '../services/platformApi'
 import type { TenantFeaturePage, TenantWithFeatureSummary } from '../types/platform'
 import { Dialog } from '../components/Dialog'
+import { Switch } from '../components/Switch'
 import { MODULE_REGISTRY } from '@capabble/modules'
 import { ChevronRight, LayoutGrid, Search } from '../components/icons'
 
@@ -64,32 +65,6 @@ const errorMessage = (err: unknown, fallback: string) =>
   (err as { response?: { data?: { message?: string } } })?.response?.data?.message || fallback
 
 const isOn = (toggles: Record<string, boolean>, key: string) => toggles[key] !== false
-
-/** Design-system switch; `mixed` shows a module with some pages on. */
-function Switch({ checked, mixed = false, label, disabled, onChange }: {
-  checked: boolean
-  mixed?: boolean
-  label: string
-  disabled?: boolean
-  onChange: (next: boolean) => void
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={mixed ? 'mixed' : checked}
-      aria-label={label}
-      disabled={disabled}
-      className={`cb-switch__track${checked ? ' is-on' : ''}${mixed ? ' is-mixed' : ''}`}
-      onClick={(event) => {
-        event.stopPropagation()
-        onChange(mixed ? true : !checked)
-      }}
-    >
-      <span className="cb-switch__thumb" />
-    </button>
-  )
-}
 
 export function FeaturesPage() {
   const [pages, setPages] = useState<TenantFeaturePage[]>([])

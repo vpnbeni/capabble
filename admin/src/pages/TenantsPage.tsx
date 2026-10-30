@@ -3,6 +3,7 @@ import { Dialog } from '../components/Dialog'
 import { tenantAdminApi } from '../services/platformApi'
 import type { PlatformAdmin, Tenant } from '../types/platform'
 import { StatusBadge } from '../components/StatusBadge'
+import { Switch } from '../components/Switch'
 import { Building2, ChevronLeft, ChevronRight, Plus } from '../components/icons'
 
 /** "Closure requested · delete after 19 Jan 2027" while a school's closure request is pending. */
@@ -652,16 +653,15 @@ export function TenantsPage({ navigateTo, currentPath }: TenantsPageProps) {
                   them, on the website and in the app. Changes are saved as that person and recorded in their activity.
                   Keep it off for real schools.
                 </p>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <input
-                    type="checkbox"
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <Switch
                     checked={Boolean(selectedTenant.allowUserSwitching)}
+                    label="Allow switching users"
                     disabled={loading}
-                    onChange={(event) => handleSwitchingChange(selectedTenant, event.target.checked)}
-                    style={{ width: 16, height: 16 }}
+                    onChange={(next) => handleSwitchingChange(selectedTenant, next)}
                   />
-                  Allow switching users
-                </label>
+                  <span>Allow switching users</span>
+                </div>
               </div>
 
               <div className="card">
