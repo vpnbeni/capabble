@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import { Info, MapPin, Phone, UserX } from 'lucide-react-native'
+import { Check, MapPin, Phone, UserX } from 'lucide-react-native'
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { AppState, Linking } from 'react-native'
@@ -36,8 +36,8 @@ const SHARING_HELP: Record<Exclude<Sharing, 'sharing' | 'checking'>, { title: st
 }
 
 /**
- * One trip's students, stop by stop. Tap a student to mark them on the bus (morning) or dropped at
- * their stop (afternoon); swipe for absent or to call the parent. "End trip" when the last stop is done.
+ * One trip's students, stop by stop. Tap a student to open them; their button marks them on the bus
+ * (morning) or dropped at their stop (afternoon); swipe for absent or to call the parent. "End trip" when the last stop is done.
  */
 export default function CrewTripScreen() {
   const router = useRouter()
@@ -212,12 +212,18 @@ export default function CrewTripScreen() {
                         divider={index > 0}
                         unread={running && !markedMain && !student.marks.absent}
                         title={student.name}
-                        subtitle={statusOf(student) ?? `Class ${classLabel(student.className, student.section)} · tap when ${pickup ? 'on the bus' : 'dropped'}`}
-                        // Tap marks a student still to mark; a marked one (or any after the trip) opens their page.
-                        onPress={running && !markedMain ? () => record(student, main) : () => openStudent(student)}
+                        subtitle={statusOf(student) ?? classLabel(student.className, student.section)}
+                        // Tap opens the student; the row's button marks them, so details never wait on a mark.
+                        onPress={() => openStudent(student)}
+                        accessory={
+                          running && !markedMain && !student.marks.absent ? (
+                            <MobileButton size="small" variant="tinted" icon={Check} onPress={() => record(student, main)}>
+                              {pickup ? 'Board' : 'Drop'}
+                            </MobileButton>
+                          ) : undefined
+                        }
                         actions={[
                           ...(running && !student.marks.absent ? [{ label: 'Absent', icon: UserX, tone: 'neutral' as const, onPress: () => record(student, 'absent') }] : []),
-                          { label: 'Details', icon: Info, tone: 'neutral' as const, onPress: () => openStudent(student) },
                           ...(student.guardianPhone ? [{ label: 'Call parent', icon: Phone, tone: 'accent' as const, onPress: () => Linking.openURL(`tel:${student.guardianPhone}`) }] : []),
                         ]}
                       />

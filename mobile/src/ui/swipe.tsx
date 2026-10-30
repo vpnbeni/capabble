@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react-native'
-import { useLayoutEffect, useRef, useState } from 'react'
+import { type ReactNode, useLayoutEffect, useRef, useState } from 'react'
 import { Animated, PanResponder, Pressable, StyleSheet, View } from 'react-native'
 
 import { useTheme } from '@/theme/ThemeProvider'
@@ -22,6 +22,8 @@ type SwipeRowProps = {
   actions?: SwipeAction[]
   defaultRevealed?: boolean
   onPress?: () => void
+  /** One small control at the end (a `MobileButton size="small"`), for the row's quick action while the tap opens it. */
+  accessory?: ReactNode
   /** Hairline above the row (all but the first in a card). */
   divider?: boolean
 }
@@ -34,7 +36,7 @@ const TRAY_PAD = 8
  * A list row that reveals up to two actions when swiped left (Mail-style). The text narrows to make
  * room; past halfway the actions snap open; tapping the row closes them. Put rows in a ListGroup.
  */
-export function SwipeRow({ title, subtitle, meta, unread, actions = [], defaultRevealed, onPress, divider }: SwipeRowProps) {
+export function SwipeRow({ title, subtitle, meta, unread, actions = [], defaultRevealed, onPress, accessory, divider }: SwipeRowProps) {
   const { colors } = useTheme()
   const reduceMotion = useReduceMotion()
   const shown = actions.slice(0, 2)
@@ -118,6 +120,7 @@ export function SwipeRow({ title, subtitle, meta, unread, actions = [], defaultR
           ) : null}
         </View>
       </Pressable>
+      {accessory ? <View style={styles.accessory}>{accessory}</View> : null}
       {full ? (
         <Animated.View style={[styles.actions, { width }]}>
           <View style={[styles.tray, { width: full }]}>
@@ -154,6 +157,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'stretch' },
   rule: { position: 'absolute', top: 0, left: 28, right: 0, height: StyleSheet.hairlineWidth, zIndex: 1 },
   main: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'flex-start', gap: space['space-2'], paddingVertical: space['space-3'], paddingLeft: 10, paddingRight: space['space-4'] },
+  accessory: { justifyContent: 'center', paddingRight: space['space-4'] },
   unread: { width: 10, height: 10, borderRadius: 5, marginTop: 6 },
   line: { flexDirection: 'row', alignItems: 'baseline', gap: space['space-2'] },
   actions: { overflow: 'hidden', alignItems: 'flex-end' },
