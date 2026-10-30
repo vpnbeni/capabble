@@ -12,7 +12,9 @@ jest.mock('../../services/billingServiceClient', () => ({ getTenantEntitlement: 
 const mongoose = require('mongoose');
 const User = require('../../models/User');
 const { login, buildLoginQuery } = require('../../controllers/authController');
-const { updateUser, createUser, listClassCandidates } = require('../../controllers/userAdminController');
+const {
+  updateUser, createUser, listClassCandidates, listUsers
+} = require('../../controllers/userAdminController');
 const { PermissionSet } = require('../permissions');
 
 const createRes = () => {
@@ -212,5 +214,40 @@ describe('class pickers for bulk logins', () => {
   it('flags parents who would be skipped for having no guardian email', async () => {
     const { data } = await run('parent', []);
     expect(data.classOptions[1]).toMatchObject({ total: 3, withoutLogin: 3, missingGuardianEmail: 2 });
+  });
+});
+
+describe('finding logins', () => {
+  const chain = (rows) => {
+    const q = {};
+    ['select', 'sort', 'skip', 'limit'].forEach((name) => { q[name] = () => q; });
+    q.lean = () => Promise.resolve(rows);
+    return q;
+  };
+  const childId = new mongoose.Types.ObjectId();
+  const run = async (kind, search) => {
+    const req = {
+      query: { kind, search },
+      tenant: { slug: 'alpha' },
+      models: {
+        User: { find: jest.fn(() => chain([])), countDocuments: jest.fn().mockResolvedValue(0) },
+        Student: { find: jest.fn(() => chain([{ _id: childId }])) }
+      }
+    };
+    listUsers(req, createRes(), jest.fn());
+    await flush();
+    return req.models;
+  };
+
+  it('finds a parent by the child\'s name', async () => {
+    const models = await run('parent', 'Pranav');
+    expect(models.Student.find).toHaveBeenCalledWith({ name: /Pranav/i });
+    const filter = models.User.find.mock.calls[0][0];
+    expect(filter.$and[1].$or).toContainEqual({ 'linkedStudents.student': { $in: [childId] } });
+  });
+
+  it('searches staff without looking at students', async () => {
+    const models = await run('staff', 'Pranav');
+    expect(models.Student.find).not.toHaveBeenCalled();
   });
 });

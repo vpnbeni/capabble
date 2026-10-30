@@ -363,7 +363,14 @@ const listUsers = handle(async (req, res) => {
   const search = String(req.query.search || '').trim().slice(0, 80);
   if (search) {
     const pattern = new RegExp(escapeRegex(search), 'i');
-    and.push({ $or: [{ name: pattern }, { email: pattern }, { username: pattern }, { 'linkedStudents.rollNumber': pattern }] });
+    const or = [{ name: pattern }, { email: pattern }, { username: pattern }, { 'linkedStudents.rollNumber': pattern }];
+    // Family logins are found by their child's name too ("Pranav" finds Pranav's father).
+    const { Student } = getModels(req);
+    if (Student && kind !== USER_KINDS.STAFF) {
+      const children = await Student.find({ name: pattern }).select('_id').limit(500).lean();
+      if (children.length) or.push({ 'linkedStudents.student': { $in: children.map((child) => child._id) } });
+    }
+    and.push({ $or: or });
   }
 
   const filter = and.length ? { $and: and } : {};

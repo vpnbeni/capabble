@@ -156,7 +156,7 @@ const UsersAndAccess: React.FC = () => {
         <Card flush>
           <CardToolbar>
             <FilterBar
-              search={{ value: search, onChange: (value) => { setSearch(value); setPage(1) }, placeholder: 'Search name, email or login ID' }}
+              search={{ value: search, onChange: (value) => { setSearch(value); setPage(1) }, placeholder: kind === 'staff' ? 'Search name, email or login ID' : "Search name, child's name or email" }}
               chips={STATUS_CHIPS.map((chip) => ({ ...chip, active: chip.id === status }))}
               onChipClick={(id) => { setStatus(id as UserListParams['status']); setPage(1) }}
               actions={

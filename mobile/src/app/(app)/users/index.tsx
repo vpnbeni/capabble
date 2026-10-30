@@ -3,14 +3,25 @@ import { KeyRound, UserPlus } from 'lucide-react-native'
 import { useState } from 'react'
 
 import { ApiError } from '@/lib/api'
+import { classLabel } from '@/lib/format'
 
 import { CardSkeleton, LoadFailed } from '@/portal/states'
-import type { LoginKind } from '@/services/usersService'
+import type { Login, LoginKind } from '@/services/usersService'
 import { loginBadge } from '@/staff/loginUi'
 import { useSession } from '@/session/SessionProvider'
 import { useLogins } from '@/staff/userQueries'
 import { useStaff } from '@/staff/useStaff'
 import { ActionBar, Avatar, ListGroup, MobileButton, MobileScreen, NavBar, SearchBar, SegmentedControl, StatusView, Surface, haptic, useFixedColumn, useToast } from '@/ui'
+
+/** "Father of Pranav Dalal (1st-A)"; a student login: "Pranav Dalal, 1st-A". */
+const childrenLine = (login: Login, kind: LoginKind) => {
+  const children = login.linkedStudents.filter((link) => link.name || link.rollNumber)
+  if (!children.length) return kind === 'parent' ? 'No child linked' : undefined
+  const names = children.map((link) => `${link.name || link.rollNumber}${link.className ? ` (${classLabel(link.className, link.section)})` : ''}`).join(', ')
+  if (kind === 'student') return names
+  const relation = children[0].relation ? children[0].relation[0].toUpperCase() + children[0].relation.slice(1) : 'Parent'
+  return `${relation} of ${names}`
+}
 
 /** Every login of the school: staff, parents and students. Administrators create and fix them here. */
 export default function UsersScreen() {
@@ -60,7 +71,13 @@ export default function UsersScreen() {
           { value: 'student', label: 'Students' },
         ]}
       />
-      <SearchBar label="Search logins" placeholder="Name, email or login ID" value={query} onChange={setQuery} onCancel={() => setQuery('')} />
+      <SearchBar
+        label="Search logins"
+        placeholder={kind === 'staff' ? 'Name, email or login ID' : "Name, child's name or email"}
+        value={query}
+        onChange={setQuery}
+        onCancel={() => setQuery('')}
+      />
       {logins.isPending ? (
         <CardSkeleton rows={5} />
       ) : logins.isError ? (
@@ -71,10 +88,8 @@ export default function UsersScreen() {
             const switchable = canSwitch && login._id !== staff.user?._id && login.isActive
             return {
               title: login.name || login.loginId,
-              subtitle: [
-                login.loginId,
-                kind === 'staff' ? login.roles.map((role) => role.name).join(', ') : login.linkedStudents.map((link) => link.name).filter(Boolean).join(', '),
-              ]
+              // Families: whose parent this is comes first, so the child's name isn't cut off by a long login ID.
+              subtitle: (kind === 'staff' ? [login.loginId, login.roles.map((role) => role.name).join(', ')] : [childrenLine(login, kind), login.loginId])
                 .filter(Boolean)
                 .join(' · '),
               lines: 2,
