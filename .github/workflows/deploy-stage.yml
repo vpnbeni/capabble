@@ -1,0 +1,38 @@
+# Runs ~/deploy-stage.sh on EC2 after every push to `stage` that touches the server.
+# Setup and secrets: deploy/ec2/ci-deploy.sh.
+name: Deploy stage server
+
+on:
+  push:
+    branches: [stage]
+    paths:
+      - 'server/**'
+      - '.github/workflows/deploy-stage.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-stage
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Deploy over SSH
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+          EC2_KNOWN_HOSTS: ${{ secrets.EC2_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$EC2_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$EC2_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          ssh -i ~/.ssh/deploy_key \
+            -o StrictHostKeyChecking=yes \
+            -o ServerAliveInterval=30 \
+            "ubuntu@$EC2_HOST" stage

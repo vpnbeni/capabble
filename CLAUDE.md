@@ -264,6 +264,16 @@ The system uses a **database-per-tenant** isolation strategy:
 ### Naming (must follow)
 - The product and company name is **Capabble** (`capabble` in identifiers, package names, DB names, storage keys, folders, emails). Older names of this project are retired and must never be written again in code, copy, config, scripts or docs. `npm run check:names` (part of `npm run lint`) fails if they appear.
 
+### Product thinking (must follow for any UI work, without being asked)
+Capabble must explain itself. A school clerk or principal should understand every screen on first sight, without training. Before building or changing a screen, think like the product owner: what does this person already know, what do they need to understand first, and what is the one next step?
+- **Show the state first, the form second.** A settings or integration screen opens on a preview card: what the thing is, whether it is set up and working (status Badge), and what it gives the school. Never land on a raw form.
+- **Not set up yet = explain + one call to action.** Name the feature, say the benefit in one line, list the 2–4 steps it takes (`.cb-steps`), and give one primary button ("Set up Razorpay", "Connect school email"). The form opens in a `Sheet` (or `Dialog` for ≤4 fields).
+- **Set up = summary card.** After saving, the same card shows what is configured (DetailList), its health (last checked, last used) and the immediate controls (on/off `Switch`, "Check the keys"); editing reopens the sheet. The user should see the effect of what they just did.
+- **Guide inside the form.** Group fields into numbered sections in the order the user will do them, say where to find each value in the other system, prefill or generate what we can, and check it works on save with a plain-words result.
+- **One primary action per view; everything else is quieter.** Hide what a role can't use and say who can ("Ask an administrator…").
+- **No dead ends.** Every empty, off, failed or waiting state says why and what to do next.
+- Apply this everywhere (web and the app), not only where it was pointed out. If an existing screen breaks these rules while you are working on it, fix it or flag it.
+
 ### Design system (must follow for any UI work)
 - Before building or changing UI in `/client`, read `client/src/components/ui/DESIGN.md`. It is the condensed Capabble design system mapped to our kit (`@/components/ui`): voice, colour/status rules, component props, page recipes, and the patterns that were rejected.
 - Don't fetch the design system artifact (claude.ai/artifact/LyYegFLHJxi1rNpnkaqHjH) for routine work. Open it only to resync `DESIGN.md` (asked by the user, or a needed piece isn't covered); then update `DESIGN.md` and its version line in the same change.

@@ -135,7 +135,7 @@ Toasts: `react-hot-toast` (`toast.success`, `toast.error`); the `Toaster` is in 
 `.cb-stats` (4-col stat row) · `.cb-grid-8-4` · `.cb-grid-6-6` · `.cb-grid-3` · `.cb-stack` (vertical gap 24) ·
 `.cb-form-section` + `.cb-form-section__title` · `.cb-form-grid` (2-col; `--3`; child `.is-wide` spans) ·
 `.cb-logo-field` › `.cb-logo-preview` (img, never cropped) + `.cb-logo-field__body` (label, hint, Button): logo uploads; not in the artifact yet ·
-`.cb-check-grid` · `.cb-progress-list` (`--grid`) · `.cb-card-actions` · `.cb-table-state` (+ `.cb-spinner`, loading) ·
+`.cb-steps` (numbered `<ol>` of how a feature gets set up; each `<li>` wraps a `<span>` with the step and a `.cb-steps__hint`; not in the artifact yet) · `.cb-check-grid` · `.cb-progress-list` (`--grid`) · `.cb-card-actions` · `.cb-table-state` (+ `.cb-spinner`, loading) ·
 text: `.cb-muted` `.cb-subtle` `.cb-strong` `.cb-subhead` `.cb-section-title` `.cb-link` `.cb-visually-hidden`.
 
 ## Page recipes
@@ -143,6 +143,7 @@ text: `.cb-muted` `.cb-subtle` `.cb-strong` `.cb-subhead` `.cb-section-title` `.
 - **List page** (`pages/asets/AsetsAssets.tsx`, `pages/acdmc/AcdmcLessonPlan.tsx`): `Page` › `Card flush` › `CardToolbar` › `FilterBar` (search, status chips with counts, compact Selects, primary action) › `DataTable` (empty state for "no data" vs "no matches", `Pagination` footer) + create/edit `Sheet` + danger `Dialog`.
 - **Detail page** (`AsetsAssetDetail.tsx`, `AcdmcWorkDetail.tsx`): summary `Card` (title, subtitle, action = status Badge + one primary + `Menu`) with `DetailList`, then `Tabs` and section cards. Loading/not-found use `Card` + `EmptyState`. Back button via Header.tsx.
 - **Overview** (`AsetsDashboard.tsx`, `AcdmcOverview.tsx`): `.cb-stats` with ≤4 StatCards, then `.cb-grid-8-4` cards with `Progress` rows / plain lists, each with a compact EmptyState.
+- **Settings / integration** (`pages/settings/SchoolPayments.tsx`): never land on a raw form. Not set up: `Card` (name, one-line benefit, `neutral` "Not connected" Badge) › `.cb-steps` › one primary "Set up …" button that opens the form in a `Sheet` with numbered `.cb-form-section`s. Set up: the same card becomes a summary (status Badge, on/off `Switch`, `DetailList` of what's saved and its health, "Check …" + "Edit …" buttons reopening the sheet).
 - **Data**: service in `services/<module>Service.ts`, React Query hooks in `hooks/use<Module>.ts`, invalidate the module key on writes.
 
 ## Mobile
