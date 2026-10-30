@@ -3,6 +3,7 @@
 ## Positioning (recommended)
 For **the superintendent and principal of a CBSE board-exam centre school in North India**, who dread February–April paperwork (seating, duties, Form 66, dispatch), **Capabble Exam Centre** is the exam-centre software that **we set up for you from CBSE's own PDFs**, unlike general school ERPs, which treat board-exam centre work as a side feature and leave you with spreadsheets.
 (Alternatives considered: "the school ERP a one-person office can run" and "fees + attendance under Rs 25,000". Both are weaker: they fight incumbents head on.)
+Caveat from `competitors.md`: **Schoolites** already sells "Board Exam Compliance and Exam Center Management" (price hidden, demo-led), so the gap is narrower than "nobody does it". Capabble's edge has to be CBSE-PDF import, Form 66 and done-for-you setup, sold standalone next to any ERP.
 Evidence: exam-season and exam-centre buyers (P005, P012, P014, P019) were the only ones who named a concrete module they'd buy. Every buyer asked for done-for-you setup and nearby references.
 
 ## Channels (pick 3)
