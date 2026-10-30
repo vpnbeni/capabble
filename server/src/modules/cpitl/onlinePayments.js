@@ -35,6 +35,15 @@ const apiUrl = () => String(process.env.API_URL || `http://localhost:${process.e
 
 const modeOf = (keyId) => (String(keyId || '').startsWith('rzp_live_') ? 'live' : 'test');
 
+// Capabble's own Razorpay account (the billing module) must never take a school's fees.
+const PLATFORM_KEY_MESSAGE = 'These are Capabble\'s Razorpay keys, not your school\'s. '
+  + 'Use the keys from your school\'s own Razorpay account, so fees go to the school\'s bank account.';
+
+const isPlatformKey = (keyId) => {
+  const platformKeyId = String(process.env.RAZORPAY_KEY_ID || '').trim();
+  return Boolean(platformKeyId) && String(keyId || '').trim() === platformKeyId;
+};
+
 const webhookUrlFor = (slug) => `${apiUrl()}/school-payments/webhook/${encodeURIComponent(slug)}`;
 
 // ---------------------------------------------------------------------------
@@ -69,7 +78,7 @@ const loadSettings = (models) => models.SchoolPaymentSettings?.findOne({ key: 'd
 
 /** The school's credentials when payments are on and complete, else null. */
 const credentialsOf = (settings) => {
-  if (!settings?.enabled || !settings.keyId) return null;
+  if (!settings?.enabled || !settings.keyId || isPlatformKey(settings.keyId)) return null;
   const keySecret = open(settings.keySecret);
   const webhookSecret = open(settings.webhookSecret);
   if (!keySecret || !webhookSecret) return null;
@@ -97,20 +106,24 @@ const call = async (label, fn) => {
   }
 };
 
-const settingsView = (settings, slug) => ({
-  enabled: Boolean(settings?.enabled),
-  provider: 'razorpay',
-  keyId: settings?.keyId || '',
-  mode: settings?.keyId ? modeOf(settings.keyId) : null,
-  hasKeySecret: Boolean(settings?.keySecret?.data),
-  hasWebhookSecret: Boolean(settings?.webhookSecret?.data),
-  connected: isConnected(settings),
-  webhookUrl: webhookUrlFor(slug),
-  lastTestAt: settings?.lastTestAt || null,
-  lastTestOk: settings?.lastTestOk ?? null,
-  lastError: settings?.lastError || '',
-  lastWebhookAt: settings?.lastWebhookAt || null
-});
+const settingsView = (settings, slug) => {
+  const view = {
+    enabled: Boolean(settings?.enabled),
+    provider: 'razorpay',
+    keyId: settings?.keyId || '',
+    mode: settings?.keyId ? modeOf(settings.keyId) : null,
+    hasKeySecret: Boolean(settings?.keySecret?.data),
+    hasWebhookSecret: Boolean(settings?.webhookSecret?.data),
+    connected: isConnected(settings),
+    webhookUrl: webhookUrlFor(slug),
+    lastTestAt: settings?.lastTestAt || null,
+    lastTestOk: settings?.lastTestOk ?? null,
+    lastError: settings?.lastError || '',
+    lastWebhookAt: settings?.lastWebhookAt || null
+  };
+  // Saved before this check existed: show why payments stopped.
+  return isPlatformKey(view.keyId) ? { ...view, lastTestOk: false, lastError: PLATFORM_KEY_MESSAGE } : view;
+};
 
 /** Save Settings → Payments. Empty secrets keep the stored ones. */
 const saveSettings = async (models, value, userId) => {
@@ -123,6 +136,7 @@ const saveSettings = async (models, value, userId) => {
     throw httpError('Enter the key ID from Razorpay → Account & Settings → API keys. '
       + 'It starts with rzp_test_ or rzp_live_.');
   }
+  if (isPlatformKey(keyId)) throw httpError(PLATFORM_KEY_MESSAGE);
   if (keyChanged && keyId && doc.keySecret?.data && !value.keySecret) {
     throw httpError('Enter the key secret that goes with the new key ID.');
   }
@@ -150,6 +164,7 @@ const testSettings = async (models) => {
   const settings = await loadSettings(models);
   const keySecret = open(settings?.keySecret);
   if (!settings?.keyId || !keySecret) throw httpError('Save the key ID and key secret first.');
+  if (isPlatformKey(settings.keyId)) throw httpError(PLATFORM_KEY_MESSAGE);
   try {
     await clientFactory({ keyId: settings.keyId, keySecret }).orders.all({ count: 1 });
     settings.lastTestOk = true;
@@ -428,6 +443,7 @@ const orderView = (order) => ({
 
 module.exports = {
   KEY_ID_PATTERN,
+  isPlatformKey,
   apiUrl,
   modeOf,
   webhookUrlFor,
