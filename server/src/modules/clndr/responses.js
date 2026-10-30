@@ -1,15 +1,21 @@
 /**
  * Replies to calendar events: acknowledge, RSVP and consent.
  *
- * An audience (segment) can ask its people for a reply. Parents reply once per
- * child the audience covers; everyone else replies for themselves. Only the
+ * An audience (segment) can ask its people for a reply. A family replies once
+ * per audience to an RSVP or acknowledgement, however many of its children it
+ * covers (so one family's "3 coming" counts once); consent is given per child.
+ * Everyone else replies for themselves. Only the
  * person themselves can reply, and only to an audience that reaches them —
  * checked with the same audience rules as viewing.
  */
 const schoolDate = require('../../utils/schoolDate');
-const { VALUES_FOR } = require('./constants');
+const { VALUES_FOR, familyReply } = require('./constants');
 const { viewerContext, matchEvent, resolveRecipients } = require('./audience');
 const { httpError } = require('./events');
+
+const joinNames = (names = []) => (names.length > 1
+  ? `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`
+  : names[0] || '');
 
 const keyOf = (eventId, segmentKey, studentId = '') => `${eventId}:${segmentKey}:${studentId || ''}`;
 
@@ -33,8 +39,13 @@ const attachResponses = async (models, userId, items) => {
   items.forEach((item) => {
     (item.parts || []).forEach((part) => {
       if (!part.response || part.response === 'none') return;
+      // A family answer has no child; older ones were saved per child, so fall back to those.
+      const keys = familyReply(part.response)
+        ? ['', ...(part.children || []).map((child) => child.studentId)]
+        : [part.child?.studentId];
+      const found = keys.map((studentId) => mine.get(keyOf(item.eventId, part.segmentKey, studentId))).find(Boolean);
       // eslint-disable-next-line no-param-reassign
-      part.myResponse = mine.get(keyOf(item.eventId, part.segmentKey, part.child?.studentId)) || null;
+      part.myResponse = found || null;
     });
   });
   return items;
@@ -50,10 +61,15 @@ const respond = async (req, eventId, body, { timeZone = schoolDate.DEFAULT_TIME_
   if (!event || event.status !== 'published') throw httpError(404, 'Event not found.');
   const viewer = await viewerContext(req);
   const { segments } = matchEvent(event, viewer);
-  const match = segments.find((entry) => entry.segment.key === body.segmentKey
-    && String(entry.child?.studentId || '') === String(body.studentId || ''));
+  const inSegment = segments.filter((entry) => entry.segment.key === body.segmentKey);
+  const family = inSegment.length > 0 && familyReply(inSegment[0].segment.response);
+  const match = family
+    ? inSegment[0]
+    : inSegment.find((entry) => String(entry.child?.studentId || '') === String(body.studentId || ''));
   if (!match) throw httpError(403, 'This event does not ask you for a reply.');
-  const { segment, child } = match;
+  const { segment } = match;
+  const child = family ? null : match.child;
+  const familyNames = family ? inSegment.map((entry) => entry.child?.name).filter(Boolean) : [];
   if (!segment.response || segment.response === 'none') {
     throw httpError(400, 'This event does not ask for a reply.');
   }
@@ -79,10 +95,16 @@ const respond = async (req, eventId, body, { timeZone = schoolDate.DEFAULT_TIME_
       note,
       respondedAt: now,
       userName: req.user.name || req.user.email || '',
-      studentName: child?.name || ''
+      studentName: child?.name || familyNames.join(', ')
     },
     $push: { history: { $each: [{ value: body.value, count, note, at: now }], $slice: -20 } }
   }, { upsert: true, new: true, setDefaultsOnInsert: true }).lean();
+  if (family) {
+    // Answers saved per child before family replies would count the family twice.
+    await CalendarResponse.deleteMany({
+      eventId: event._id, segmentKey: segment.key, userId: req.user._id, studentId: { $ne: '' }
+    });
+  }
   return {
     segmentKey: segment.key,
     studentId: doc.studentId || null,
@@ -108,13 +130,23 @@ const tracker = async (models, event) => {
   const answered = new Map(rows.map((row) => [
     keyOf(event._id, row.segmentKey, `${row.userId}:${row.studentId}`), row
   ]));
+  // A family's answer, or (saved before family replies) the latest of its per-child answers.
+  const familyRow = (segmentKey, userId, childIds) => answered.get(keyOf(event._id, segmentKey, `${userId}:`))
+    || childIds.map((id) => answered.get(keyOf(event._id, segmentKey, `${userId}:${id}`))).filter(Boolean)
+      .sort((a, b) => new Date(b.respondedAt) - new Date(a.respondedAt))[0];
   return asking.map((segment) => {
+    const family = segment.personType !== 'staff' && familyReply(segment.response);
     const expected = [];
     recipients.forEach(({ user, segments }) => {
       const hit = segments.find((s) => s.key === segment.key);
       if (!hit) return;
-      // Family logins answer per child (a student login's child is themselves).
-      if (segment.personType !== 'staff' && hit.childIds?.length) {
+      if (family && hit.childIds?.length) {
+        // One answer per family login, for all its children in this audience.
+        expected.push({
+          user, studentId: '', child: joinNames(hit.children), childIds: hit.childIds
+        });
+      } else if (segment.personType !== 'staff' && hit.childIds?.length) {
+        // Consent: per child (a student login's child is themselves).
         hit.childIds.forEach((studentId, i) => expected.push({ user, studentId, child: hit.children[i] || '' }));
       } else {
         expected.push({ user, studentId: '', child: '' });
@@ -122,8 +154,12 @@ const tracker = async (models, event) => {
     });
     const responded = [];
     const pending = [];
-    expected.forEach(({ user, studentId, child }) => {
-      const row = answered.get(keyOf(event._id, segment.key, `${user._id}:${studentId}`));
+    expected.forEach(({
+      user, studentId, child, childIds
+    }) => {
+      const row = childIds
+        ? familyRow(segment.key, user._id, childIds)
+        : answered.get(keyOf(event._id, segment.key, `${user._id}:${studentId}`));
       if (row) {
         responded.push({
           name: user.name || row.userName,
@@ -169,6 +205,11 @@ const pendingRecipients = async (models, event, segmentKey = null) => {
       .map((hit) => {
         const segment = segments.find((s) => s.key === hit.key);
         if (!segment) return null;
+        if (segment.personType !== 'staff' && familyReply(segment.response) && hit.childIds?.length) {
+          const answeredFamily = done.has(`${hit.key}:${user._id}:`)
+            || hit.childIds.some((id) => done.has(`${hit.key}:${user._id}:${id}`));
+          return answeredFamily ? null : { key: hit.key, children: hit.children, childIds: hit.childIds };
+        }
         if (segment.personType !== 'staff' && hit.childIds?.length) {
           const idx = hit.childIds
             .map((id, i) => (done.has(`${hit.key}:${user._id}:${id}`) ? -1 : i))

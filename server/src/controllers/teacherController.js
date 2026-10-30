@@ -182,6 +182,9 @@ const buildGeneratedImportEmail = (employeeId, rowNumber, batchToken) => {
 // @desc    Get all teachers
 // @route   GET /api/teachers
 // @access  Private
+const TEACHER_LITE_FIELDS = 'name employeeId designation dutyType department mobileNo phone email '
+  + 'profileImage isActive';
+
 const getTeachers = asyncHandler(async (req, res) => {
   const { page, limit, skip } = getPaginationParams(req);
   const {
@@ -197,8 +200,11 @@ const getTeachers = asyncHandler(async (req, res) => {
     joiningDateTo,
     schoolName,
     dutyType,
+    lite,
     sort = '-createdAt',
   } = req.query;
+  // A staff directory (the phone app) needs names and numbers, never bank or ID details.
+  const isLite = lite === true || lite === 'true';
 
   // Build filter object
   const filter = {};
@@ -282,8 +288,9 @@ const getTeachers = asyncHandler(async (req, res) => {
   const totalCount = await Teacher.countDocuments(filter);
 
   // Get teachers with pagination
-  const teachers = await Teacher.find(filter)
-    .populate('subjects', 'name code class')
+  let query = Teacher.find(filter);
+  query = isLite ? query.select(TEACHER_LITE_FIELDS) : query.populate('subjects', 'name code class');
+  const teachers = await query
     .sort(buildSortObject(sort))
     .skip(skip)
     .limit(limit)

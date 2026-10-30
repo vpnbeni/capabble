@@ -306,6 +306,82 @@ const markBoarding = asyncHandler(async (req, res) => {
   });
 });
 
+const sameText = (a, b) => String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase();
+
+/** The class teacher of a class-section, from the timetable (its class in-charge), with a phone to call. */
+const classTeacherFor = async (models, className, section) => {
+  const { TimetableState, Teacher } = models;
+  if (!TimetableState) return null;
+  const state = await TimetableState.findOne({}).sort({ updatedAt: -1 }).select('classes teachers').lean();
+  const cls = (state?.classes || [])
+    .find((row) => sameText(row.className, className) && sameText(row.section, section));
+  if (!cls?.incharge) return null;
+  const listed = (state.teachers || [])
+    .find((row) => sameText(row.name, cls.incharge) || sameText(row.id, cls.incharge));
+  const staff = Teacher
+    ? await Teacher.findOne(isId(listed?.id) ? { _id: listed.id } : { name: listed?.name || cls.incharge })
+      .select('name mobileNo phone').lean()
+    : null;
+  return { name: staff?.name || listed?.name || cls.incharge, phone: staff?.mobileNo || staff?.phone || '' };
+};
+
+/** Father, mother and guardian with names; the guardian's phone (the one the school keeps) goes on whoever it is. */
+const familyContacts = (student) => {
+  const phone = student.guardianPhone || '';
+  const isParent = [student.fatherName, student.motherName].some((name) => sameText(name, student.guardianName));
+  const guardian = student.guardianName && !isParent ? student.guardianName : '';
+  const phoneOwner = guardian || (sameText(student.guardianName, student.motherName) ? 'mother' : 'father');
+  const people = [
+    student.fatherName && { relation: 'Father', name: student.fatherName, phone: phoneOwner === 'father' ? phone : '' },
+    student.motherName && { relation: 'Mother', name: student.motherName, phone: phoneOwner === 'mother' ? phone : '' },
+    guardian && { relation: 'Guardian', name: guardian, phone }
+  ].filter(Boolean);
+  // No names on the record: still give the crew the number to call.
+  return people.length || !phone ? people : [{ relation: 'Parent', name: '', phone }];
+};
+
+const stopOf = (stop, assignment) => {
+  if (stop) return publicStop(stop);
+  return assignment.stopName ? { name: assignment.stopName } : null;
+};
+
+// GET /api/trnst/crew/trips/:id/students/:studentId — one student on this trip's route, for the crew:
+// class, stop, class teacher and parents to call. Never a student who isn't on the route.
+const getStudentCard = asyncHandler(async (req, res) => {
+  const trip = await loadMyTrip(req, res, { activeOnly: false });
+  if (!trip) return null;
+  const { Student, TransportAssignment, TransportRoute } = req.models;
+  const { studentId } = req.params;
+  if (!isId(studentId)) return fail(res, 404, 'Student not found.');
+  const assignment = await TransportAssignment.findOne({ studentId, routeId: trip.routeId, isActive: true })
+    .select('stopId stopName shift').lean();
+  if (!assignment) return fail(res, 404, 'This student is not on this route.');
+  const [student, route] = await Promise.all([
+    Student.findById(studentId)
+      .select('name rollNumber class section profileImage fatherName motherName guardianName guardianPhone')
+      .lean(),
+    TransportRoute.findById(trip.routeId).select('stops').lean()
+  ]);
+  if (!student) return fail(res, 404, 'Student not found.');
+  const stop = (route?.stops || []).find((row) => String(row._id) === String(assignment.stopId || ''));
+  return res.json({
+    success: true,
+    data: {
+      student: {
+        studentId: String(student._id),
+        name: student.name,
+        rollNumber: student.rollNumber,
+        className: student.class,
+        section: student.section,
+        profileImage: student.profileImage || null
+      },
+      stop: stopOf(stop, assignment),
+      classTeacher: await classTeacherFor(req.models, student.class, student.section),
+      family: familyContacts(student)
+    }
+  });
+});
+
 // DELETE /api/trnst/crew/trips/:id/boarding/:studentId/:event — undo a wrong mark
 const unmarkBoarding = asyncHandler(async (req, res) => {
   if (!req.rbac?.has(P.MARK)) return fail(res, 403, 'You do not have permission to mark students.');
@@ -325,5 +401,7 @@ module.exports = {
   getRoster,
   markBoarding,
   unmarkBoarding,
+  getStudentCard,
+  familyContacts,
   buildRoster
 };

@@ -54,6 +54,7 @@ import { getCurrentUser } from '@/redux/slices/authSlice'
 import type { AppDispatch } from '@/redux/store'
 import { PlanFields, rupees, rupeesExact, usePlanSelection } from '@/components/billing/PlanSelection'
 import '@/components/billing/billing.css'
+import { GSTIN_PATTERN } from '@capabble/shared/gstStates'
 
 
 /** A period [start, end) ends the day before `end`. */
@@ -732,8 +733,6 @@ const QuoteBox: React.FC<{ quote: Quote; afterTrial?: boolean }> = ({ quote, aft
     </div>
   )
 }
-
-const GSTIN_PATTERN = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/
 
 const ProfileSheet: React.FC<{ account: BillingAccount; onClose: () => void }> = ({ account, onClose }) => {
   const save = useUpdateBillingProfile()

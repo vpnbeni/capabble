@@ -136,6 +136,17 @@ const calendarFor = async (req, { from, to, layers = null, portal = false }) => 
     const evItems = eventItems(events, viewer, from, to, { isWorking, canManage, portal })
       .filter((entry) => want(entry.layer));
     await attachResponses(models, viewer.userId, evItems);
+    // An announced holiday is both a school-day rule and an event: show only the event,
+    // which carries the instructions and replies.
+    const announced = new Set(events
+      .filter((event) => event.schoolDayRuleId && evItems.some((entry) => entry.eventId === String(event._id)))
+      .map((event) => String(event.schoolDayRuleId)));
+    if (announced.size) {
+      for (let i = items.length - 1; i >= 0; i -= 1) {
+        const ruleId = items[i].source === 'school_days' && items[i].id.split(':')[1];
+        if (ruleId && announced.has(ruleId)) items.splice(i, 1);
+      }
+    }
     items.push(...evItems);
   }
 

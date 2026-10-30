@@ -11,6 +11,8 @@ export interface Tenant {
   name: string
   dbName: string
   adminEmail: string
+  /** Testing only: the school owner (adminEmail's login) may switch to any login and act as them. */
+  allowUserSwitching?: boolean
   /** closed: the school closed its workspace; deleted: its data was purged (record kept for audit). */
   status: 'active' | 'suspended' | 'closed' | 'deleted'
   /** Set when the school asked to close its workspace (pending while canceledAt is empty). */

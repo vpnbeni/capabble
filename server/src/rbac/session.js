@@ -75,6 +75,8 @@ const setRefreshCookie = (res, token, { rememberMe, expiresAt }) => {
 const clearSessionCookies = (res) => {
   res.clearCookie(ACCESS_COOKIE, { ...baseCookieOptions(), path: '/' });
   res.clearCookie(REFRESH_COOKIE, { ...baseCookieOptions(), path: REFRESH_COOKIE_PATH });
+  // A "view as" claim (rbac/viewAs) never outlives the session.
+  res.clearCookie('cb_va', { ...baseCookieOptions(), path: '/' });
   // Cookies from the previous auth scheme.
   res.clearCookie('token', { path: '/' });
   res.clearCookie('refreshToken', { path: '/' });

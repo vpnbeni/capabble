@@ -48,6 +48,8 @@ export interface User {
   role: string
   roles: Array<{ key: string; name: string }>
   isAdmin: boolean
+  /** The school owner, where the platform turned on switching users for testing. */
+  canSwitchUsers?: boolean
   permissions: PermissionGrant[]
   linkedStudents: LinkedStudent[]
   mustChangePassword: boolean
@@ -59,6 +61,16 @@ export interface User {
   featureToggles?: Record<string, boolean> | null
   /** brandColor: the school's colour (#rrggbb), empty for Capabble blue. */
   tenant?: { slug: string; name: string; brandColor?: string } | null
+  /** Set while an administrator is viewing as this person (read-only). */
+  viewAs?: ViewAsInfo | null
+}
+
+export interface ViewAsInfo {
+  /** The administrator doing the viewing. */
+  by: { _id: string; name: string; email: string | null }
+  /** view: read-only; switch: changes are saved as this person (testing). */
+  mode: 'view' | 'switch'
+  expiresAt: string
 }
 
 // Login credentials interface

@@ -3,12 +3,13 @@ import { classLabel } from '@/utils/classLabel'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useDispatch } from 'react-redux'
 import type { LucideIcon } from 'lucide-react'
-import { Bell, Bus, CalendarCheck, CalendarClock, CalendarDays, CalendarRange, GraduationCap, Home, IndianRupee, KeyRound, LogOut, Menu as MenuIcon, Monitor, Moon, Sun, UserRound } from 'lucide-react'
+import { Bell, BookOpenCheck, Bus, CalendarCheck, CalendarClock, CalendarDays, CalendarRange, GraduationCap, Home, IndianRupee, KeyRound, LogOut, Menu as MenuIcon, Monitor, Moon, Sun, UserRound } from 'lucide-react'
 import { Avatar, Menu, Select, type MenuItem } from '@/components/ui'
 import { logout } from '@/redux/slices/authSlice'
 import type { AppDispatch } from '@/redux/store'
 import { useTheme } from '@/utils/theme'
 import NotificationBell from '@/components/notifications/NotificationBell'
+import ViewAsBanner from '@/components/access/ViewAsBanner'
 import { usePortal } from './PortalContext'
 import type { PortalSection } from './portalService'
 import './portal.css'
@@ -25,6 +26,7 @@ const NAV: NavEntry[] = [
   { to: '/portal/calendar', label: 'Calendar', icon: CalendarRange, section: 'calendar' },
   { to: '/portal/attendance', label: 'Attendance', icon: CalendarCheck, section: 'attendance' },
   { to: '/portal/timetable', label: 'Timetable', icon: CalendarDays, section: 'timetable' },
+  { to: '/portal/homework', label: 'Homework', icon: BookOpenCheck, section: 'homework' },
   { to: '/portal/results', label: 'Results', icon: GraduationCap, section: 'results' },
   { to: '/portal/fees', label: 'Fees', icon: IndianRupee, section: 'fees' },
   { to: '/portal/notices', label: 'Notices', icon: Bell, section: 'notices' },
@@ -89,6 +91,7 @@ const PortalLayout: React.FC = () => {
         <NotificationBell audience="portal" viewAllPath="/portal/notifications" />
         <Menu items={accountItems} label="Account" />
       </header>
+      <ViewAsBanner />
 
       <div className="pt-body">
         <nav className="pt-nav" aria-label="Portal">

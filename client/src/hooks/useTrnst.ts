@@ -8,6 +8,7 @@ export const trnstKeys = {
   trip: (id: string) => [...trnstKeys.all, 'trip', id] as const,
   crewMe: () => [...trnstKeys.all, 'crew', 'me'] as const,
   roster: (tripId: string) => [...trnstKeys.all, 'crew', 'roster', tripId] as const,
+  crewStudent: (tripId: string, studentId: string) => [...trnstKeys.all, 'crew', 'student', tripId, studentId] as const,
 }
 
 // Phones send a point about every 10 s, so refreshing faster shows nothing new.
@@ -29,6 +30,13 @@ export const useTrip = (id?: string | null) =>
   })
 
 export const useCrewMe = () => useQuery({ queryKey: trnstKeys.crewMe(), queryFn: trnstService.getCrewMe })
+
+export const useCrewStudent = (tripId?: string, studentId?: string) =>
+  useQuery({
+    queryKey: trnstKeys.crewStudent(tripId || '', studentId || ''),
+    queryFn: () => trnstService.getCrewStudent(tripId as string, studentId as string),
+    enabled: Boolean(tripId && studentId),
+  })
 
 export const useRoster = (tripId?: string | null) =>
   useQuery({

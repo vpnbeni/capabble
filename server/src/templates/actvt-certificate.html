@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Certificates</title>
+    <style>
+      @page { size: A4 landscape; margin: 0; }
+      * { box-sizing: border-box; }
+      body { margin: 0; font-family: Georgia, 'Times New Roman', serif; color: #0f172a; }
+      .page { width: 297mm; height: 210mm; padding: 12mm; page-break-after: always; }
+      .page:last-child { page-break-after: auto; }
+      .frame { height: 100%; border: 10px solid #4338ca; padding: 14mm 22mm; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+      .school { display: flex; align-items: center; gap: 4mm; font-family: Arial, Helvetica, sans-serif; font-size: 13px; font-weight: bold; letter-spacing: 3px; text-transform: uppercase; color: #4338ca; }
+      .school img { width: 16mm; height: 16mm; object-fit: contain; }
+      h1 { margin: 9mm 0 0; font-size: 38px; }
+      .lead { margin: 10mm 0 0; font-size: 16px; color: #475569; }
+      .name { margin: 4mm 0 0; font-size: 32px; font-weight: bold; }
+      .class { margin: 2mm 0 0; font-family: Arial, Helvetica, sans-serif; font-size: 13px; color: #64748b; }
+      .text { margin: 8mm 0 0; max-width: 200mm; font-size: 16px; line-height: 1.6; color: #475569; }
+      .text b { color: #1e293b; }
+      .foot { margin-top: 18mm; width: 100%; max-width: 220mm; display: flex; justify-content: space-between; font-family: Arial, Helvetica, sans-serif; font-size: 13px; color: #64748b; text-align: left; }
+      .foot .right { text-align: right; }
+      .foot b { display: block; color: #1e293b; margin-bottom: 1mm; }
+    </style>
+  </head>
+  <body>
+    {{#each certificates}}
+    <div class="page">
+      <div class="frame">
+        <div class="school">{{#if @root.school.logoUrl}}<img src="{{@root.school.logoUrl}}" alt="" />{{/if}}{{@root.school.name}}</div>
+        <h1>{{title}}</h1>
+        <p class="lead">This is to certify that</p>
+        <p class="name">{{participantName}}</p>
+        {{#if classLabel}}<p class="class">Class {{classLabel}}</p>{{/if}}
+        <p class="text">
+          has participated as <b>{{role}}</b>{{#if eventTitle}} in <b>{{eventTitle}}</b>{{/if}}{{#if houseName}} representing <b>{{houseName}}</b>{{/if}}.
+        </p>
+        <div class="foot">
+          <div><b>{{issuedOn}}</b>Date of issue</div>
+          <div class="right"><b>Activity in-charge</b>Authorised signatory</div>
+        </div>
+      </div>
+    </div>
+    {{/each}}
+  </body>
+</html>

@@ -28,6 +28,20 @@ export const setTenantSlug = (slug: string | null) => {
   tenantSlug = slug
 }
 
+// Staff requests name the academic session, as the website does (it sends the session the user
+// works in; the app works in the current one: April to March). Records saved without one belong
+// to no session, so session-filtered pages and totals miss them. The family portal sends none,
+// as on the website.
+let staffSession = false
+export const setStaffSession = (on: boolean) => {
+  staffSession = on
+}
+const currentSessionLabel = () => {
+  const [year, month] = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date()).split('-').map(Number)
+  const start = month <= 3 ? year - 1 : year
+  return `${start}-${start + 1}`
+}
+
 export const getTenantSlug = () => tenantSlug
 
 /** Called once when the session can't be refreshed (signed out elsewhere, password changed). */
@@ -43,6 +57,8 @@ type RequestOptions = {
   baseUrl?: string
   /** Don't try to refresh the session on a 401 (sign-in, refresh itself). */
   skipRefresh?: boolean
+  /** Return the whole response body, for the few endpoints that put fields next to `data`. */
+  raw?: boolean
 }
 
 const buildUrl = (path: string, base: string, params?: RequestOptions['params']) => {
@@ -59,12 +75,15 @@ const send = async (path: string, options: RequestOptions) => {
     'X-Requested-With': 'XMLHttpRequest',
   }
   if (tenantSlug) headers['x-tenant-slug'] = tenantSlug
-  if (options.body !== undefined) headers['Content-Type'] = 'application/json'
+  if (staffSession) headers['x-academic-session'] = currentSessionLabel()
+  // A file upload sends its form as it is; fetch sets the multipart boundary.
+  const isForm = typeof FormData !== 'undefined' && options.body instanceof FormData
+  if (options.body !== undefined && !isForm) headers['Content-Type'] = 'application/json'
 
   return fetch(buildUrl(path, options.baseUrl ?? API_BASE_URL, options.params), {
     method: options.method ?? 'GET',
     headers,
-    body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+    body: options.body === undefined ? undefined : isForm ? (options.body as FormData) : JSON.stringify(options.body),
     credentials: 'include',
   })
 }
@@ -113,13 +132,32 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
 
   if (!response.ok) throw await readError(response)
   const body = await response.json()
-  return body.data as T
+  return (options.raw ? body : body.data) as T
+}
+
+/** A file the API sends back (a receipt, a report card, an ID card PDF), as bytes. */
+export async function requestBytes(path: string, options: Omit<RequestOptions, 'raw'> = {}): Promise<ArrayBuffer> {
+  let response: Response
+  try {
+    response = await send(path, options)
+  } catch {
+    throw new ApiError("You're offline. Check your connection and try again.", 0, 'network')
+  }
+  if (response.status === 401 && !options.skipRefresh && (await refreshSession())) response = await send(path, options)
+  if (response.status === 401) onSessionEnded?.()
+  if (!response.ok) throw await readError(response)
+  return response.arrayBuffer()
 }
 
 export const api = {
-  get: <T>(path: string, params?: RequestOptions['params']) => request<T>(path, { params }),
+  get: <T>(path: string, params?: RequestOptions['params'], options?: Omit<RequestOptions, 'method' | 'body' | 'params'>) => request<T>(path, { ...options, params }),
   post: <T>(path: string, body?: unknown, options?: Omit<RequestOptions, 'method' | 'body'>) =>
     request<T>(path, { ...options, method: 'POST', body: body ?? {} }),
   put: <T>(path: string, body?: unknown, options?: Omit<RequestOptions, 'method' | 'body'>) =>
     request<T>(path, { ...options, method: 'PUT', body: body ?? {} }),
+  patch: <T>(path: string, body?: unknown, options?: Omit<RequestOptions, 'method' | 'body'>) =>
+    request<T>(path, { ...options, method: 'PATCH', body: body ?? {} }),
+  delete: <T>(path: string, params?: RequestOptions['params']) => request<T>(path, { method: 'DELETE', params }),
+  /** A file upload (see lib/pickFile). Several import routes answer with fields next to `data`, so this returns the whole body. */
+  upload: <T>(path: string, form: FormData, method: 'POST' | 'PUT' = 'POST') => request<T>(path, { method, body: form, raw: true }),
 }

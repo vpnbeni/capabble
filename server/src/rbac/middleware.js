@@ -42,7 +42,7 @@ const routeAccessGate = (req, res, next) => {
   // Account endpoints (me, logout, change password) are open to any signed-in user.
   if (path === '/auth' || path.startsWith('/auth/')) return next();
 
-  if (req.user?.mustChangePassword) {
+  if (req.user?.mustChangePassword && !req.auth?.viewAs) {
     return forbidden(res, 'Set a new password to continue.', { errorCode: 'password_change_required' });
   }
 

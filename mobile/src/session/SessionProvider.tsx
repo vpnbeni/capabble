@@ -1,10 +1,12 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 
-import { setSessionEndedHandler, setTenantSlug } from '@/lib/api'
+import { setSessionEndedHandler, setStaffSession, setTenantSlug } from '@/lib/api'
+import { stopSharing } from '@/lib/busLocation'
 import { unregisterFromPush } from '@/lib/push'
 import { storage } from '@/lib/storage'
 import { authService, type School, type User } from '@/services/authService'
+import { usersService } from '@/services/usersService'
 
 const SCHOOL_KEY = 'capabble.school'
 
@@ -20,6 +22,12 @@ type Session = SessionState & {
   forgetSchool: () => Promise<void>
   /** Replace the signed-in user with the server's latest copy (after a password change). */
   updateUser: (user: User) => void
+  /** Administrators: see the app as this login, read-only (`user.viewAs` is set until it ends). */
+  startViewAs: (loginId: string) => Promise<void>
+  /** The school owner, testing only: act as this login (`user.viewAs.mode` is 'switch'). */
+  switchTo: (loginId: string) => Promise<void>
+  /** Back to your own login; also runs when the 30 minutes are up. */
+  stopViewAs: () => Promise<void>
 }
 
 const SessionContext = createContext<Session | null>(null)
@@ -31,6 +39,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const endSession = useCallback(
     (school: School | null) => {
       queryClient.clear()
+      setStaffSession(false)
       setState({ status: 'signedOut', user: null, school })
     },
     [queryClient],
@@ -49,6 +58,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setTenantSlug(school.slug)
       try {
         const user = await authService.me()
+        setStaffSession(user.kind === 'staff')
         if (!cancelled) setState({ status: 'signedIn', user, school })
       } catch {
         if (!cancelled) setState({ status: 'signedOut', user: null, school })
@@ -67,14 +77,49 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const signIn = useCallback(async (school: School, identifier: string, password: string) => {
     setTenantSlug(school.slug)
     const { user } = await authService.login(identifier, password)
+    setStaffSession(user.kind === 'staff')
     await storage.set(SCHOOL_KEY, JSON.stringify(school))
     setState({ status: 'signedIn', user, school })
   }, [])
 
+  // Ask who the session belongs to now (after starting or stopping "view as"), dropping every
+  // cached screen so nothing of the previous person's stays on show.
+  const reloadUser = useCallback(async () => {
+    queryClient.clear()
+    const user = await authService.me()
+    setStaffSession(user.kind === 'staff')
+    setState((current) => (current.status === 'signedIn' ? { ...current, user } : current))
+  }, [queryClient])
+
+  const startViewAs = useCallback(async (loginId: string) => {
+    await usersService.startViewAs(loginId)
+    await reloadUser()
+  }, [reloadUser])
+
+  const switchTo = useCallback(async (loginId: string) => {
+    await usersService.switchTo(loginId)
+    await reloadUser()
+  }, [reloadUser])
+
+  const stopViewAs = useCallback(async () => {
+    try {
+      await authService.stopViewAs()
+    } finally {
+      await reloadUser()
+    }
+  }, [reloadUser])
+
   const signOut = useCallback(async () => {
     const school = state.school
-    // Stop pushes to this phone first, while the session can still say so.
-    if (state.user) await unregisterFromPush(state.user.kind)
+    let kind = state.user?.kind
+    if (state.user?.viewAs) {
+      // The phone's push belongs to the real login: end the view or switch first so it can be unregistered.
+      await authService.stopViewAs().catch(() => {})
+      kind = 'staff'
+    }
+    // Stop pushes to this phone first, while the session can still say so; a bus trip stops sharing too.
+    if (kind) await unregisterFromPush(kind)
+    await stopSharing().catch(() => {})
     try {
       await authService.logout()
     } catch {
@@ -86,6 +131,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const forgetSchool = useCallback(async () => {
     await storage.remove(SCHOOL_KEY)
     setTenantSlug(null)
+    setStaffSession(false)
     setState({ status: 'signedOut', user: null, school: null })
   }, [])
 
@@ -94,8 +140,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const value = useMemo(
-    () => ({ ...state, signIn, signOut, forgetSchool, updateUser }) as Session,
-    [state, signIn, signOut, forgetSchool, updateUser],
+    () => ({ ...state, signIn, signOut, forgetSchool, updateUser, startViewAs, switchTo, stopViewAs }) as Session,
+    [state, signIn, signOut, forgetSchool, updateUser, startViewAs, switchTo, stopViewAs],
   )
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>

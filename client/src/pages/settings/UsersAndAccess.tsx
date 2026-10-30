@@ -1,7 +1,10 @@
 import React, { useMemo, useState } from 'react'
 import { classLabel } from '@/utils/classLabel'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { ShieldCheck, UserPlus, Users, SearchX } from 'lucide-react'
+import { ArrowLeftRight, ShieldCheck, UserPlus, Users, SearchX } from 'lucide-react'
+import toast from 'react-hot-toast'
+import { useSelector } from 'react-redux'
+import { selectUser } from '@/redux/slices/authSlice'
 import {
   Badge,
   Button,
@@ -16,12 +19,13 @@ import {
   Tabs,
   type DataTableColumn,
 } from '@/components/ui'
-import { useManagedUsers } from '@/hooks/useUserAdmin'
+import { useManagedUsers, useSwitchTo } from '@/hooks/useUserAdmin'
 import { usePermissions } from '@/hooks/usePermissions'
 import { useSchoolProfile } from '@/hooks/useSchoolProfile'
 import type { CredentialDelivery, ManagedUser, UserListParams } from '@/services/userAdminService'
 import type { UserKind } from '@/types/auth'
-import { CredentialDialog, lastSignIn, LoginStatusBadge } from '@/components/access/AccessUi'
+import { CredentialDialog, errorMessage, lastSignIn, LoginStatusBadge } from '@/components/access/AccessUi'
+import { reloadAsCurrentLogin } from '@/components/access/ViewAsBanner'
 import CreateLoginSheet from '@/components/access/CreateLoginSheet'
 import BulkPortalSheet from '@/components/access/BulkPortalSheet'
 
@@ -46,6 +50,21 @@ const UsersAndAccess: React.FC = () => {
   const canManage = can('core.users.manage')
   const { data: school } = useSchoolProfile()
   const schoolName = String(school?.name || '')
+  const me = useSelector(selectUser)
+  const switchTo = useSwitchTo()
+  const [switchingId, setSwitchingId] = useState<string | null>(null)
+
+  // Testing only: the school owner, where the platform turned it on (Admin portal → school → Testing).
+  const beginSwitch = async (user: ManagedUser) => {
+    setSwitchingId(user._id)
+    try {
+      await switchTo.mutateAsync(user._id)
+      await reloadAsCurrentLogin(user.kind === 'staff' ? '/' : '/portal')
+    } catch (error) {
+      setSwitchingId(null)
+      toast.error(errorMessage(error))
+    }
+  }
 
   const kind = (TABS.some((tab) => tab.id === params.get('tab')) ? params.get('tab') : 'staff') as UserKind
   const [status, setStatus] = useState<UserListParams['status']>('')
@@ -97,6 +116,27 @@ const UsersAndAccess: React.FC = () => {
           }]),
     { key: 'lastLogin', header: 'Last sign-in', mobile: 'hidden', render: (user) => lastSignIn(user.lastLogin) },
     { key: 'status', header: 'Status', mobile: 'aside', render: (user) => <LoginStatusBadge user={user} /> },
+    ...(me?.canSwitchUsers
+      ? [{
+          key: 'switch',
+          header: '',
+          headerLabel: 'Switch user',
+          interactive: true,
+          align: 'right' as const,
+          render: (user: ManagedUser) => (user._id !== me._id && user.isActive ? (
+            <Button
+              size="sm"
+              variant="secondary"
+              icon={ArrowLeftRight}
+              loading={switchingId === user._id}
+              disabled={Boolean(switchingId)}
+              onClick={() => beginSwitch(user)}
+            >
+              Switch
+            </Button>
+          ) : null),
+        }]
+      : []),
   ]
 
   const changeTab = (id: string) => {
@@ -116,7 +156,7 @@ const UsersAndAccess: React.FC = () => {
         <Card flush>
           <CardToolbar>
             <FilterBar
-              search={{ value: search, onChange: (value) => { setSearch(value); setPage(1) }, placeholder: 'Search name, email or login ID' }}
+              search={{ value: search, onChange: (value) => { setSearch(value); setPage(1) }, placeholder: kind === 'staff' ? 'Search name, email or login ID' : "Search name, child's name or email" }}
               chips={STATUS_CHIPS.map((chip) => ({ ...chip, active: chip.id === status }))}
               onChipClick={(id) => { setStatus(id as UserListParams['status']); setPage(1) }}
               actions={

@@ -1,6 +1,7 @@
 import { CircleAlert, Eye, EyeOff, Minus, Plus, Search, X, type LucideIcon } from 'lucide-react-native'
 import { useRef, useState, type ComponentRef, type Ref } from 'react'
 import { Pressable, StyleSheet, TextInput, View, type TextInputProps } from 'react-native'
+import { previewTextStyle, useFontScale } from './preview'
 
 import { useTheme } from '@/theme/ThemeProvider'
 import { fontFamily, radius, space } from '@/theme/tokens'
@@ -81,7 +82,7 @@ export function MobileTextField({ ref, label, hint, error, type = 'text', prefix
             setFocused(false)
             onBlur?.(event)
           }}
-          style={[styles.input, multiline && styles.multiInput, { color: colors.ink }, style]}
+          style={previewTextStyle([styles.input, multiline && styles.multiInput, { color: colors.ink }, style])}
         />
         {type === 'password' ? (
           <Pressable
@@ -227,7 +228,7 @@ export function SearchBar({ placeholder, value, onChange, onCancel, label }: Sea
           autoCorrect={false}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
-          style={[styles.searchInput, { color: colors.ink }]}
+          style={previewTextStyle([styles.searchInput, { color: colors.ink }])}
         />
         {value ? (
           <Pressable accessibilityRole="button" accessibilityLabel="Clear search" hitSlop={13} onPress={() => onChange('')} style={[styles.clear, { backgroundColor: colors['ink-subtle'] }]}>
@@ -314,8 +315,66 @@ export function Stepper({ value, onChange, min = 0, max = 99, label, hint }: Ste
   )
 }
 
+type NumberCellProps = Omit<TextInputProps, 'editable' | 'keyboardType'> & {
+  ref?: Ref<MobileTextFieldRef>
+  /** Accessible name: "Aarav Beniwal, marks". */
+  label: string
+  /** Shown in a red ring; the row says what to fix. */
+  invalid?: boolean
+  disabled?: boolean
+  /** Base width before the text size grows it (default 76). */
+  width?: number
+}
+
+/**
+ * A compact number box at the end of a list row (marks against a student). 44pt tall, a fixed
+ * column that grows with the text size like `useFixedColumn`, numeric keyboard, Return moves on.
+ * Like `MobileTextField`, it scrolls itself above the keyboard. The row (a `ListItem`) carries the
+ * visible label; put what to fix in the row's subtitle.
+ */
+export function NumberCell({ ref, label, invalid, disabled, width = 76, style, onFocus, onBlur, ...props }: NumberCellProps) {
+  const { colors } = useTheme()
+  const revealOnFocus = useRevealOnFocus()
+  const [focused, setFocused] = useState(false)
+  const fontScale = useFontScale()
+  const side = Math.ceil(width * Math.min(Math.max(fontScale, 1), 1.3))
+  const outline = invalid ? colors['danger-solid'] : focused ? colors['focus-ring'] : colors['border-control']
+  return (
+    <View
+      style={[
+        styles.cell,
+        { width: side, backgroundColor: disabled ? colors['surface-sunken'] : colors.surface, boxShadow: `inset 0 0 0 ${focused || invalid ? 2 : 1}px ${outline}` },
+      ]}
+    >
+      <TextInput
+        ref={ref}
+        accessibilityLabel={label}
+        keyboardType="decimal-pad"
+        inputMode="decimal"
+        placeholderTextColor={colors['ink-subtle']}
+        selectionColor={colors['accent-strong']}
+        editable={!disabled}
+        maxFontSizeMultiplier={1.3}
+        {...props}
+        onFocus={(event) => {
+          setFocused(true)
+          revealOnFocus()
+          onFocus?.(event)
+        }}
+        onBlur={(event) => {
+          setFocused(false)
+          onBlur?.(event)
+        }}
+        style={previewTextStyle([styles.cellInput, { color: colors.ink }, style], 1.3)}
+      />
+    </View>
+  )
+}
+
 const styles = StyleSheet.create({
   field: { gap: 6 },
+  cell: { height: 44, borderRadius: 10, justifyContent: 'center' },
+  cellInput: { height: 44, paddingHorizontal: 10, textAlign: 'center', fontFamily: fontFamily[500], fontSize: 16, paddingVertical: 0 },
   label: { fontSize: 14, lineHeight: 20 },
   box: { flexDirection: 'row', alignItems: 'center', gap: space['space-2'], minHeight: 50, paddingHorizontal: 14, borderRadius: 12 },
   multiBox: { alignItems: 'flex-start', paddingVertical: 13 },

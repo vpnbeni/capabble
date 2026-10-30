@@ -224,6 +224,38 @@ const needsApproval = (rbac, segments) => !rbac.hasAny(TRUSTED)
 const SAFE_ATTACHMENT = (a) => ({ name: a.name, url: a.url });
 
 /** The parts of an event one viewer may see: shared fields plus their own segments. */
+/**
+ * The viewer's parts of an event. A parent with two children in one audience sees it once
+ * ("For Aarav and Diya") and replies once for the family; consent stays one part per child.
+ */
+const viewerParts = (segments) => {
+  const parts = [];
+  const byKey = new Map();
+  segments.forEach(({ segment, child }) => {
+    const who = child ? { studentId: child.studentId, name: child.name } : null;
+    const shared = segment.response !== 'consent' && byKey.get(segment.key);
+    if (shared) {
+      if (who) shared.children.push(who);
+      shared.child = null;
+      return;
+    }
+    const part = {
+      segmentKey: segment.key,
+      label: segment.label,
+      role: segment.role,
+      instructions: segment.instructions,
+      attachments: (segment.attachments || []).map(SAFE_ATTACHMENT),
+      response: segment.response,
+      responseDeadline: segment.responseDeadline || null,
+      child: who,
+      children: who ? [who] : []
+    };
+    if (segment.response !== 'consent') byKey.set(segment.key, part);
+    parts.push(part);
+  });
+  return parts;
+};
+
 const viewForViewer = (event, viewer, { canManage = false } = {}) => {
   const { visible, segments } = matchEvent(event, viewer);
   const isCreator = viewer.userId && String(event.createdBy) === viewer.userId;
@@ -247,16 +279,7 @@ const viewForViewer = (event, viewer, { canManage = false } = {}) => {
     attachments: (event.attachments || []).map(SAFE_ATTACHMENT),
     recurring: Boolean(event.recurrence?.freq),
     createdByName: viewer.kind === 'staff' ? event.createdByName || '' : '',
-    parts: segments.map(({ segment, child }) => ({
-      segmentKey: segment.key,
-      label: segment.label,
-      role: segment.role,
-      instructions: segment.instructions,
-      attachments: (segment.attachments || []).map(SAFE_ATTACHMENT),
-      response: segment.response,
-      responseDeadline: segment.responseDeadline || null,
-      child: child ? { studentId: child.studentId, name: child.name } : null
-    })),
+    parts: viewerParts(segments),
     canEdit: canManage || Boolean(isCreator)
   };
 };
@@ -292,6 +315,8 @@ const eventItems = (events, viewer, from, to, { isWorking, canManage = false, po
 const visibleEventsFilter = (viewerKeys, viewer, from, to) => {
   const audience = [{ targetKeys: { $in: viewerKeys } }, { visibility: 'whole_school' }];
   if (viewer.kind === 'staff') audience.push({ visibility: 'all_staff' });
+  // Staff see the events they made on their own calendar, even when sent only to families.
+  if (viewer.kind === 'staff' && viewer.userId) audience.push({ createdBy: viewer.userId });
   return {
     status: 'published',
     startDate: { $lte: to },
@@ -313,6 +338,7 @@ module.exports = {
   assertCanTarget,
   needsApproval,
   viewForViewer,
+  viewerParts,
   eventItems,
   visibleEventsFilter,
   eventTargetKeys

@@ -6,6 +6,8 @@ import { ChildSwitcher } from '@/portal/ChildSwitcher'
 import { usePortal } from '@/portal/PortalProvider'
 import { usePortalTimetable } from '@/portal/queries'
 import { CardSkeleton, LoadFailed, NoChild } from '@/portal/states'
+import { useSession } from '@/session/SessionProvider'
+import { MyTimetable } from '@/staff/MyTimetable'
 import { MobileScreen, NavBar, StatusView, Surface, Text, Timeline, WeekStrip, type TimelineItem } from '@/ui'
 
 const DAY_NAMES = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY']
@@ -16,8 +18,14 @@ const sentenceCase = (value: string) => (value === value.toUpperCase() ? value.c
 /** "HH:MM" now, in the school's time zone. */
 const schoolClock = () => new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date())
 
-/** The class's published timetable, one day at a time; today's periods show which one is on now. */
 export default function TimetableScreen() {
+  const session = useSession()
+  if (session.status !== 'signedIn') return null
+  return session.user.kind === 'staff' ? <MyTimetable /> : <FamilyTimetable />
+}
+
+/** The class's published timetable, one day at a time; today's periods show which one is on now. */
+function FamilyTimetable() {
   const router = useRouter()
   const { child } = usePortal()
   const timetable = usePortalTimetable(child?.studentId)

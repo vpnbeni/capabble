@@ -7,6 +7,8 @@ const { SUCCESS_MESSAGES, HTTP_STATUS, ERROR_MESSAGES } = require('../utils/cons
 const { generate: runGenerator } = require('../services/timetableGeneratorService');
 const exportService = require('../services/timetableExportService');
 const eventBus = require('../events/eventBus');
+const schoolDate = require('../utils/schoolDate');
+const { getTeacherDays } = require('../modules/timetable/teacherSchedule');
 const EVENTS = require('../events/eventNames');
 
 const DEFAULT_BELL_TIMINGS = Object.freeze({
@@ -743,6 +745,22 @@ const toResponseState = (document) => {
   );
 };
 
+const STATE_CHANGED_MESSAGE = 'The timetable was changed somewhere else since you opened it. '
+  + 'The latest is shown; make your change again.';
+
+/** The state as the API returns it, with the version (its last save) a later save can name. */
+const withVersion = (document) => ({
+  ...toResponseState(document),
+  updatedAt: document?.updatedAt ? new Date(document.updatedAt).toISOString() : null
+});
+
+/** Whether the stored state is still the version a client last read (null: there was none). */
+const sameVersion = (document, expected) => {
+  const stored = document?.updatedAt ? new Date(document.updatedAt).toISOString() : null;
+  const wanted = expected ? new Date(expected).toISOString() : null;
+  return stored === wanted;
+};
+
 const getSessionScopedFilter = (req) => {
   if (req.academicSession) {
     return { academicSession: req.academicSession };
@@ -756,7 +774,7 @@ const getTimetableState = asyncHandler(async (req, res) => {
   const state = await TimetableState.findOne(filter).lean();
 
   res.status(HTTP_STATUS.OK).json(
-    generateResponse(true, SUCCESS_MESSAGES.FETCHED, toResponseState(state))
+    generateResponse(true, SUCCESS_MESSAGES.FETCHED, withVersion(state))
   );
 });
 
@@ -781,19 +799,43 @@ const upsertTimetableState = asyncHandler(async (req, res) => {
     nextState.academicSession = req.academicSession;
   }
 
+  // A save that says which version it started from is refused when the state changed since
+  // (another tab, or the app), instead of quietly replacing that change.
+  const hasExpected = isPlainObject(req.body) && Object.prototype.hasOwnProperty.call(req.body, 'expectedUpdatedAt');
+  if (hasExpected) {
+    const current = await TimetableState.findOne(filter).select('updatedAt').lean();
+    if (!sameVersion(current, req.body.expectedUpdatedAt)) {
+      return res.status(HTTP_STATUS.CONFLICT).json({
+        success: false,
+        errorCode: 'timetable_state_changed',
+        message: STATE_CHANGED_MESSAGE,
+        data: withVersion(await TimetableState.findOne(filter).lean())
+      });
+    }
+  }
+
   const updatedState = await TimetableState.findOneAndUpdate(
-    filter,
+    hasExpected && req.body.expectedUpdatedAt ? { ...filter, updatedAt: new Date(req.body.expectedUpdatedAt) } : filter,
     persistableState,
     {
       new: true,
-      upsert: true,
+      upsert: !(hasExpected && req.body.expectedUpdatedAt),
       runValidators: true,
       setDefaultsOnInsert: true,
     }
   ).lean();
 
+  if (!updatedState) {
+    return res.status(409).json({
+      success: false,
+      errorCode: 'timetable_state_changed',
+      message: STATE_CHANGED_MESSAGE,
+      data: withVersion(await TimetableState.findOne(filter).lean())
+    });
+  }
+
   res.status(HTTP_STATUS.OK).json(
-    generateResponse(true, SUCCESS_MESSAGES.UPDATED, toResponseState(updatedState))
+    generateResponse(true, SUCCESS_MESSAGES.UPDATED, withVersion(updatedState))
   );
 });
 
@@ -1170,7 +1212,333 @@ const exportVersionTeacherPDF = asyncHandler(async (req, res) => {
   res.send(buffer);
 });
 
+/**
+ * GET /api/timetable/me?from=&to= — the signed-in teacher's own periods, day by
+ * day (the phone's "Your periods" and "My timetable"). Any staff login may ask;
+ * it only ever returns the timetable of the staff record linked to that login.
+ * Defaults to today; at most 14 days.
+ */
+const getMyTimetable = asyncHandler(async (req, res) => {
+  const from = String(req.query.from || schoolDate.today());
+  const to = String(req.query.to || from);
+  if (!schoolDate.isDateKey(from) || !schoolDate.isDateKey(to)) {
+    return res.status(HTTP_STATUS.BAD_REQUEST).json(generateResponse(false, 'Dates must be YYYY-MM-DD'));
+  }
+  if (to < from) {
+    return res.status(HTTP_STATUS.BAD_REQUEST).json(generateResponse(false, 'The end date must be on or after the start date'));
+  }
+  if (schoolDate.daysBetween(from, to) > 13) {
+    return res.status(HTTP_STATUS.BAD_REQUEST).json(generateResponse(false, 'Ask for at most 14 days at a time'));
+  }
+  const data = await getTeacherDays(req.models || { TimetableState, TimetableVersion }, req.user?.teacher, {
+    from, to, filter: getSessionScopedFilter(req)
+  });
+  return res.status(HTTP_STATUS.OK).json(generateResponse(true, SUCCESS_MESSAGES.FETCHED, data));
+});
+
+/* ── One change at a time (the app) ──────────────────────────────────────────
+ * Each reads the state, changes one thing with the same rules the website's
+ * pages follow, and saves only if nobody saved in between (else it tries once
+ * more on the fresh state). The website's whole-state saves name the version
+ * they started from, so they can't quietly undo these.
+ */
+const httpError = (status, message) => Object.assign(new Error(message), { statusCode: status });
+const newId = (prefix) => `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+const sameName = (a, b) => toTrimmedString(a).toLowerCase() === toTrimmedString(b).toLowerCase();
+
+const mutateState = async (req, change) => {
+  const filter = getSessionScopedFilter(req);
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    // Tries again only when someone saved in between, so the reads must happen one after the other.
+    // eslint-disable-next-line no-await-in-loop
+    const document = await TimetableState.findOne(filter).lean();
+    const state = toResponseState(document);
+    const result = change(state) || {};
+    const next = normalizeStatePayload(state, { academicSession: req.academicSession });
+    const persistable = { ...next, periodAllocation: encodePeriodAllocationForMongo(next.periodAllocation) };
+    delete persistable.bellTimings;
+    if (req.academicSession) persistable.academicSession = req.academicSession;
+    // eslint-disable-next-line no-await-in-loop
+    const saved = await TimetableState.findOneAndUpdate(
+      document ? { ...filter, updatedAt: document.updatedAt } : filter,
+      persistable,
+      { new: true, upsert: !document, runValidators: true, setDefaultsOnInsert: true }
+    ).lean();
+    if (saved) return { state: withVersion(saved), ...result };
+  }
+  throw httpError(409, STATE_CHANGED_MESSAGE);
+};
+
+const sendMutation = (handler) => asyncHandler(async (req, res) => {
+  try {
+    const result = await mutateState(req, (state) => handler(state, req));
+    res.status(HTTP_STATUS.OK).json(generateResponse(true, SUCCESS_MESSAGES.UPDATED, result.state));
+  } catch (error) {
+    if (!error.statusCode) throw error;
+    res.status(error.statusCode).json({ success: false, message: error.message });
+  }
+});
+
+/** Ticks a class and section in the classes grid, adding either name when it is new. */
+const tickInMatrix = (state, className, section) => {
+  let matrixClass = state.matrixClasses.find((row) => sameName(row.name, className));
+  if (!matrixClass) {
+    matrixClass = { id: newId('mc'), name: className };
+    state.matrixClasses.push(matrixClass);
+  }
+  let matrixSection = state.matrixSections.find((row) => sameName(row.name, section));
+  if (!matrixSection) {
+    matrixSection = { id: newId('ms'), name: section };
+    state.matrixSections.push(matrixSection);
+  }
+  const ticked = state.matrixSelection[matrixClass.id] || {};
+  state.matrixSelection[matrixClass.id] = { ...ticked, [matrixSection.id]: true };
+};
+
+const untickInMatrix = (state, className, section) => {
+  const matrixClass = state.matrixClasses.find((row) => sameName(row.name, className));
+  const matrixSection = state.matrixSections.find((row) => sameName(row.name, section));
+  if (matrixClass && matrixSection && state.matrixSelection[matrixClass.id]) {
+    state.matrixSelection[matrixClass.id][matrixSection.id] = false;
+  }
+};
+
+/** POST /timetable/state/class-sections { className, section, floor? }: a class-section with its class's subjects. */
+const addClassSection = sendMutation((state, req) => {
+  const className = toTrimmedString(req.body?.className);
+  const section = toTrimmedString(req.body?.section).toUpperCase();
+  if (!className || !section) throw httpError(400, 'Enter the class and the section.');
+  if (state.classes.some((row) => sameName(row.className, className) && sameName(row.section, section))) {
+    throw httpError(409, `${className}-${section} is already there.`);
+  }
+  const sibling = state.classes.find((row) => sameName(row.className, className));
+  state.classes.push({
+    id: newId('tc'),
+    className: sibling?.className || className,
+    section,
+    floor: toTrimmedString(req.body?.floor) || sibling?.floor || 'Ground Floor',
+    subjects: sibling ? [...sibling.subjects] : [],
+    incharge: '',
+    classGroup: sibling?.classGroup || '',
+    displayOrder: sibling?.displayOrder || 0
+  });
+  tickInMatrix(state, sibling?.className || className, section);
+});
+
+/** PATCH /timetable/state/class-sections/:id { floor?, incharge?, subjects? }: subjects change for the whole class. */
+const updateClassSection = sendMutation((state, req) => {
+  const row = state.classes.find((entry) => entry.id === req.params.id);
+  if (!row) throw httpError(404, 'That class-section is no longer in the timetable.');
+  if (req.body?.floor !== undefined) row.floor = toTrimmedString(req.body.floor) || row.floor;
+  if (req.body?.incharge !== undefined) row.incharge = toTrimmedString(req.body.incharge);
+  if (Array.isArray(req.body?.subjects)) {
+    const known = new Map(state.subjects.map((subject) => [subject.name.toLowerCase(), subject.name]));
+    const picked = req.body.subjects.map((name) => known.get(toTrimmedString(name).toLowerCase())).filter(Boolean);
+    const subjects = [...new Set(picked)];
+    state.classes.forEach((entry) => {
+      if (sameName(entry.className, row.className)) entry.subjects = [...subjects];
+    });
+  }
+});
+
+/** DELETE /timetable/state/class-sections/:id: only while no teacher, period or timetable cell uses it. */
+const removeClassSection = sendMutation((state, req) => {
+  const row = state.classes.find((entry) => entry.id === req.params.id);
+  if (!row) throw httpError(404, 'That class-section is no longer in the timetable.');
+  const allocated = state.teacherSubjectAllocations.some((entry) => JSON.stringify(entry).includes(`"${row.id}"`));
+  const periods = Object.values(state.periodAllocation[row.id] || {}).some((count) => Number(count) > 0);
+  const grid = Object.keys(state.timetableGrid[row.id] || {}).length > 0;
+  if (allocated || periods || grid) {
+    const label = `${row.className}-${row.section}`;
+    throw httpError(409, `${label} has teachers or periods set. Remove those on the website first.`);
+  }
+  state.classes = state.classes.filter((entry) => entry.id !== row.id);
+  delete state.periodAllocation[row.id];
+  untickInMatrix(state, row.className, row.section);
+});
+
+/** POST /timetable/state/subjects { name }: a subject the classes can take. */
+const addTimetableSubject = sendMutation((state, req) => {
+  const name = toTrimmedString(req.body?.name);
+  if (!name) throw httpError(400, 'Enter the subject’s name.');
+  if (state.subjects.some((row) => sameName(row.name, name))) throw httpError(409, `${name} is already a subject.`);
+  state.subjects.push({
+    id: newId('ts'), name, type: '', requiresConsecutivePeriods: false, consecutivePeriodCount: 2, color: ''
+  });
+});
+
+/** PUT /timetable/state/period-allocation/:classId { subjects: { [name]: periodsPerWeek } }: one class's periods. */
+const setClassPeriods = sendMutation((state, req) => {
+  const row = state.classes.find((entry) => entry.id === req.params.classId);
+  if (!row) throw httpError(404, 'That class-section is no longer in the timetable.');
+  const input = isPlainObject(req.body?.subjects) ? req.body.subjects : null;
+  if (!input) throw httpError(400, 'Send the periods for each subject.');
+  const next = {};
+  Object.entries(input).forEach(([name, count]) => {
+    if (!row.subjects.some((subject) => sameName(subject, name))) return;
+    const periods = Number.parseInt(String(count), 10);
+    next[toTrimmedString(name)] = Number.isFinite(periods) && periods > 0 ? Math.min(periods, 20) : 0;
+  });
+  state.periodAllocation[row.id] = next;
+});
+
+/** Leaves only a teacher's class entries that still have subjects, and teachers that still have entries. */
+const pruneAllocations = (state) => {
+  state.teacherSubjectAllocations = state.teacherSubjectAllocations
+    .map((entry) => ({ ...entry, assignments: entry.assignments.filter((row) => row.subjects.length > 0) }))
+    .filter((entry) => entry.assignments.length > 0);
+};
+
+/**
+ * PUT /timetable/state/teacher-allocation/:classId { subjects: { [name]: teacherId[] } }: who teaches each
+ * named subject in one class-section (other subjects and classes stay). A teacher given a subject they
+ * don't list yet gets it added, as the website's Departments page shows teachers by the subjects they teach.
+ */
+const setClassTeachers = sendMutation((state, req) => {
+  const row = state.classes.find((entry) => entry.id === req.params.classId);
+  if (!row) throw httpError(404, 'That class-section is no longer in the timetable.');
+  const input = isPlainObject(req.body?.subjects) ? req.body.subjects : null;
+  if (!input) throw httpError(400, 'Send the teachers for each subject.');
+  Object.entries(input).forEach(([rawName, rawIds]) => {
+    const subject = row.subjects.find((name) => sameName(name, rawName));
+    if (!subject) {
+      throw httpError(400, `${toTrimmedString(rawName)} isn’t one of ${row.className}-${row.section}’s subjects.`);
+    }
+    const ids = [...new Set((Array.isArray(rawIds) ? rawIds : []).map(toTrimmedString).filter(Boolean))];
+    ids.forEach((id) => {
+      if (!state.teachers.some((teacher) => teacher.id === id)) {
+        throw httpError(400, 'One of those teachers is no longer in the timetable.');
+      }
+    });
+    // Off for everyone first, then on for the ones named.
+    state.teacherSubjectAllocations.forEach((entry) => {
+      entry.assignments.forEach((assignment) => {
+        if (assignment.classId !== row.id) return;
+        assignment.subjects = assignment.subjects.filter((name) => !sameName(name, subject));
+      });
+    });
+    ids.forEach((id) => {
+      const teacher = state.teachers.find((entry) => entry.id === id);
+      if (!teacher.subjects.some((name) => sameName(name, subject))) teacher.subjects.push(subject);
+      let entry = state.teacherSubjectAllocations.find((item) => item.teacherId === id);
+      if (!entry) {
+        entry = { teacherId: id, teacherName: teacher.name, assignments: [] };
+        state.teacherSubjectAllocations.push(entry);
+      }
+      entry.teacherName = teacher.name;
+      let assignment = entry.assignments.find((item) => item.classId === row.id);
+      if (!assignment) {
+        assignment = { classId: row.id, className: row.className, section: row.section, subjects: [] };
+        entry.assignments.push(assignment);
+      }
+      assignment.subjects.push(subject);
+    });
+  });
+  pruneAllocations(state);
+});
+
+/**
+ * PUT /timetable/state/teachers/:id/subjects { subjects: string[] }: the subjects a teacher can teach.
+ * A subject taken away also leaves the classes they taught it in, as on the website.
+ */
+const setTeacherSubjects = sendMutation((state, req) => {
+  const teacher = state.teachers.find((entry) => entry.id === req.params.id);
+  if (!teacher) throw httpError(404, 'That teacher is no longer in the timetable.');
+  if (!Array.isArray(req.body?.subjects)) throw httpError(400, 'Send the subjects.');
+  const known = new Map(state.subjects.map((subject) => [subject.name.toLowerCase(), subject.name]));
+  const picked = req.body.subjects.map((name) => known.get(toTrimmedString(name).toLowerCase())).filter(Boolean);
+  const subjects = [...new Set(picked)];
+  teacher.subjects = subjects;
+  const entry = state.teacherSubjectAllocations.find((item) => item.teacherId === teacher.id);
+  if (entry) {
+    entry.assignments.forEach((assignment) => {
+      assignment.subjects = assignment.subjects.filter((name) => subjects.some((kept) => sameName(kept, name)));
+    });
+  }
+  pruneAllocations(state);
+});
+
+/* The hand-made timetable (the website's Class wise page): class → weekday → period index → cell.
+ * Generated versions are separate and never change here. */
+const GRID_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+/** The class-section, the weekday as stored and the period index, or a 400/404 saying what is wrong. */
+const gridPlace = (state, classId, day, slot) => {
+  const row = state.classes.find((entry) => entry.id === classId);
+  if (!row) throw httpError(404, 'That class-section is no longer in the timetable.');
+  const weekday = GRID_DAYS.find((name) => sameName(name, day));
+  if (!weekday) throw httpError(400, 'Choose a day from Monday to Saturday.');
+  const periodsPerDay = Math.floor((Number(state.periodsPerWeek) || 0) / GRID_DAYS.length);
+  const index = Number.parseInt(String(slot), 10);
+  if (!Number.isInteger(index) || index < 0 || index >= periodsPerDay) {
+    throw httpError(400, `Choose a period from 1 to ${periodsPerDay}.`);
+  }
+  return { row, weekday, index: String(index) };
+};
+
+/** Refuses a teacher who has another class at that day and period (names compared as the website does). */
+const refuseClash = (state, classId, weekday, index, teacher) => {
+  if (!teacher) return;
+  const busy = state.classes.find((entry) => entry.id !== classId
+    && sameName(state.timetableGrid[entry.id]?.[weekday]?.[index]?.teacher || '', teacher));
+  if (busy) {
+    const when = `${weekday}, period ${Number(index) + 1}`;
+    throw httpError(409, `${teacher} teaches ${busy.className}-${busy.section} then (${when}).`);
+  }
+};
+
+const gridCell = (state, classId, weekday) => {
+  state.timetableGrid[classId] = state.timetableGrid[classId] || {};
+  state.timetableGrid[classId][weekday] = state.timetableGrid[classId][weekday] || {};
+  return state.timetableGrid[classId][weekday];
+};
+
+/** PUT /timetable/state/grid/:classId/:day/:slot { subject, teacher? }: one period of a class's week. */
+const setGridCell = sendMutation((state, req) => {
+  const { row, weekday, index } = gridPlace(state, req.params.classId, req.params.day, req.params.slot);
+  const subject = row.subjects.find((name) => sameName(name, req.body?.subject || ''));
+  if (!subject) throw httpError(400, `Choose one of ${row.className}-${row.section}’s subjects.`);
+  const teacherName = toTrimmedString(req.body?.teacher);
+  const teacher = teacherName ? state.teachers.find((entry) => sameName(entry.name, teacherName)) : null;
+  if (teacherName && !teacher) throw httpError(400, 'That teacher is no longer in the timetable.');
+  refuseClash(state, row.id, weekday, index, teacher?.name);
+  gridCell(state, row.id, weekday)[index] = { subject, teacher: teacher?.name || '' };
+});
+
+/** DELETE /timetable/state/grid/:classId/:day/:slot: empties one period. */
+const clearGridCell = sendMutation((state, req) => {
+  const { row, weekday, index } = gridPlace(state, req.params.classId, req.params.day, req.params.slot);
+  if (state.timetableGrid[row.id]?.[weekday]) delete state.timetableGrid[row.id][weekday][index];
+});
+
+/** POST /timetable/state/grid/:classId/swap { a: { day, slot }, b: { day, slot } }: two periods of a class swap. */
+const swapGridCells = sendMutation((state, req) => {
+  const a = gridPlace(state, req.params.classId, req.body?.a?.day, req.body?.a?.slot);
+  const b = gridPlace(state, req.params.classId, req.body?.b?.day, req.body?.b?.slot);
+  const cellA = state.timetableGrid[a.row.id]?.[a.weekday]?.[a.index] || null;
+  const cellB = state.timetableGrid[b.row.id]?.[b.weekday]?.[b.index] || null;
+  refuseClash(state, a.row.id, b.weekday, b.index, cellA?.teacher);
+  refuseClash(state, a.row.id, a.weekday, a.index, cellB?.teacher);
+  const dayA = gridCell(state, a.row.id, a.weekday);
+  const dayB = gridCell(state, a.row.id, b.weekday);
+  if (cellB) dayA[a.index] = cellB;
+  else delete dayA[a.index];
+  if (cellA) dayB[b.index] = cellA;
+  else delete dayB[b.index];
+});
+
 module.exports = {
+  addClassSection,
+  setGridCell,
+  clearGridCell,
+  swapGridCells,
+  setClassTeachers,
+  setTeacherSubjects,
+  updateClassSection,
+  removeClassSection,
+  addTimetableSubject,
+  setClassPeriods,
+  getMyTimetable,
   getTimetableState,
   upsertTimetableState,
   getBellTimings,

@@ -1,6 +1,10 @@
+import { roadLineFromPolyline, runsForward, tripProgress } from '@capabble/shared/roadPath'
 import { useRouter } from 'expo-router'
 import { Bus, Phone } from 'lucide-react-native'
+import { useMemo } from 'react'
 import { Linking } from 'react-native'
+
+import { BusMap } from '@/components/BusMap'
 
 import { formatTime } from '@/lib/format'
 import { ChildSwitcher } from '@/portal/ChildSwitcher'
@@ -22,6 +26,10 @@ const busTitle = (busNo?: string) => {
   if (!value) return 'School bus'
   return /^bus\b/i.test(value) ? value : `Bus ${value}`
 }
+
+/** "350 m", "2.4 km". */
+const distanceText = (metres: number) =>
+  metres < 1000 ? `${Math.max(10, Math.round(metres / 10) * 10)} m` : `${(metres / 1000).toFixed(metres < 10_000 ? 1 : 0)} km`
 
 /** Where the bus is, in words: a trip with a fresh location is "Live". */
 function liveState(live?: PortalBusLive): { label: string; live: boolean } {
@@ -46,6 +54,23 @@ export default function TransportScreen() {
   const myStop = stops.find((stop) => (stop.id && stop.id === myStopId) || stop.name === data?.myStop?.name)
   const goingHome = live.data?.trip?.direction === 'drop'
   const stopTime = myStop ? (goingHome ? myStop.dropTime : myStop.pickupTime) || myStop.pickupTime || myStop.dropTime : undefined
+
+  // The bus on the map, and how far it still has to drive to the child's stop along the road.
+  const liveStops = useMemo(() => live.data?.stops ?? [], [live.data?.stops])
+  const road = useMemo(() => roadLineFromPolyline(live.data?.roadPath?.polyline), [live.data?.roadPath?.polyline])
+  const forward = runsForward(liveStops, live.data?.trip?.direction ?? 'pickup')
+  const bus = live.data?.active ? live.data.trip?.bus ?? null : null
+  const liveStop = liveStops.find((stop) => stop.id === live.data?.myStopId)
+  const stopPoint = typeof liveStop?.lat === 'number' && typeof liveStop?.lng === 'number' ? { lat: liveStop.lat, lng: liveStop.lng } : null
+  const progress = road && bus && state.live
+    ? tripProgress(road, bus, { forward, stop: stopPoint, distanceM: live.data?.roadPath?.distanceM, durationS: live.data?.roadPath?.durationS })
+    : null
+  const howFar = progress?.passedStop
+    ? 'Has passed the stop'
+    : progress?.toStopM !== null && progress?.toStopM !== undefined
+      ? `About ${distanceText(progress.toStopM)} away${progress.toStopMin ? `, ${progress.toStopMin} min` : ''}`
+      : null
+  const hasMap = Boolean(bus) || liveStops.some((stop) => typeof stop.lat === 'number')
 
   const crew = (person?: string, role?: string, phone?: string): ListGroupItem[] =>
     person
@@ -93,10 +118,26 @@ export default function TransportScreen() {
             icon={Bus}
             label={data.myStop ? `${name}'s stop` : busTitle(data.busNo)}
             value={stopTime ? formatTime(stopTime) : data.myStop?.name ?? busTitle(data.busNo)}
-            detail={[data.myStop?.name && stopTime ? data.myStop.name : null, live.data?.route?.name].filter(Boolean).join(' · ') || undefined}
+            detail={(howFar ? [data.myStop?.name, howFar] : [data.myStop?.name && stopTime ? data.myStop.name : null, live.data?.route?.name]).filter(Boolean).join(' · ') || undefined}
             meta={state.live ? 'Live' : state.label}
-            ariaLabel={`${busTitle(data.busNo)}, ${state.label}${data.myStop ? `. ${name}'s stop is ${data.myStop.name}` : ''}${stopTime ? ` at ${formatTime(stopTime)}` : ''}`}
+            ariaLabel={`${busTitle(data.busNo)}, ${state.label}${data.myStop ? `. ${name}'s stop is ${data.myStop.name}` : ''}${stopTime ? ` at ${formatTime(stopTime)}` : ''}${howFar ? `. ${howFar}` : ''}`}
           />
+
+          {hasMap ? (
+            <Surface padded={false}>
+              <BusMap
+                accessibilityLabel={bus ? `Map showing ${busTitle(data.busNo)} on its route` : `Map of ${busTitle(data.busNo)}'s route`}
+                stops={liveStops}
+                myStopId={live.data?.myStopId}
+                roadPath={live.data?.roadPath?.polyline}
+                forward={forward}
+                bus={bus}
+                vehicleType={live.data?.vehicleType}
+                label={data.busNo || 'Bus'}
+                stale={!state.live}
+              />
+            </Surface>
+          ) : null}
 
           {live.data?.today?.length ? (
             <ListGroup

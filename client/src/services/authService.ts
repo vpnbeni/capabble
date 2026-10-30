@@ -60,6 +60,11 @@ class AuthService {
     return response.data
   }
 
+  /** Stop viewing as someone and go back to your own login. */
+  async stopViewAs(): Promise<void> {
+    await api.delete('/auth/view-as', { _silent: true } as any)
+  }
+
   async getCurrentUser(): Promise<ApiResponse<User>> {
     const response = await api.get('/auth/me')
     return response.data

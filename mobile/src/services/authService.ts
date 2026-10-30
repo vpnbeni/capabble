@@ -23,11 +23,20 @@ export interface User {
   kind: UserKind
   roles: { key: string; name: string }[]
   isAdmin: boolean
+  /** The school owner, where the platform turned on switching users for testing. */
+  canSwitchUsers?: boolean
   permissions: { key: string; scope: 'all' | 'assigned' }[]
   linkedStudents: LinkedStudent[]
+  /** Staff: the staff record linked to this login (their timetable and classes come from it). */
+  teacher?: string | null
+  /** The modules the school has on; a missing key means on (see lib/permissions.ts). */
+  featureToggles?: Record<string, boolean> | null
   mustChangePassword: boolean
   /** brandColor: the school's colour (#rrggbb), empty for Capabble blue. */
   tenant?: { slug: string; name: string; brandColor?: string } | null
+  /** Set while an administrator is viewing as this person (read-only, see server rbac/viewAs). */
+  /** mode view: read-only; switch: the school owner acts as this person (testing). */
+  viewAs?: { by: { _id: string; name: string; email: string | null }; mode: 'view' | 'switch'; expiresAt: string } | null
 }
 
 export interface School {
@@ -59,6 +68,9 @@ export const authService = {
   me: () => api.get<User>('/auth/me'),
 
   logout: () => api.post<unknown>('/auth/logout', {}, { skipRefresh: true }),
+
+  /** Stop viewing as someone; the session is the administrator's own again. */
+  stopViewAs: () => api.delete<unknown>('/auth/view-as'),
 
   /** Other devices are signed out; this one gets fresh session cookies. */
   changePassword: (currentPassword: string, newPassword: string) =>

@@ -28,6 +28,11 @@ const REMINDER_PRESETS = Object.freeze({
 const RESPONSE_TYPES = Object.freeze(['none', 'acknowledge', 'rsvp', 'consent']);
 // What each response type accepts.
 const RESPONSE_VALUES = Object.freeze(['acknowledged', 'yes', 'no', 'maybe', 'given', 'declined']);
+// Replies a family gives once for all its children in an audience (one RSVP headcount, one
+// "I have read this"). Consent is about one child, so it stays per child.
+const FAMILY_REPLIES = Object.freeze(['acknowledge', 'rsvp']);
+const familyReply = (type) => FAMILY_REPLIES.includes(type);
+
 const VALUES_FOR = Object.freeze({
   acknowledge: ['acknowledged'],
   rsvp: ['yes', 'no', 'maybe'],
@@ -61,6 +66,8 @@ module.exports = {
   RESPONSE_TYPES,
   RESPONSE_VALUES,
   VALUES_FOR,
+  FAMILY_REPLIES,
+  familyReply,
   RECURRENCE_FREQS,
   LAYERS
 };

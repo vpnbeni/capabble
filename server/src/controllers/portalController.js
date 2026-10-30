@@ -14,12 +14,14 @@ const { buildClassPDFContext } = require('../services/timetableExportService');
 const { buildCardData } = require('./reportCardController');
 const { receiptPdf } = require('./cpitl/collectionController');
 const { onlinePaymentStatus } = require('./portalPaymentController');
-const { sectionKey } = require('../rbac/scope');
+const { sectionKey, classNameRegex, normalizeClassName } = require('../rbac/scope');
 const schoolDays = require('../modules/clndr/schoolDays');
+const schoolDate = require('../utils/schoolDate');
 const { withEffectiveDueDates, dueDateOf } = require('../modules/cpitl/dueDates');
 const {
   closeStaleTrips, serviceDate, sortedStops, publicStop, staleSeconds
 } = require('../modules/trnst/trips');
+const { roadPathFor } = require('../modules/trnst/roadPath');
 
 const STUDENT_FIELDS = 'name rollNumber class section classRollNo gender dateOfBirth fatherName motherName '
   + 'guardianName guardianPhone guardianEmail email phone house busNo profileImage address admissionDate isActive';
@@ -246,6 +248,54 @@ const getTimetable = asyncHandler(async (req, res) => {
   });
 });
 
+const escapeRegex = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+// GET /api/portal/students/:studentId/homework — the class's published homework, due in the last
+// two weeks or later, with this student's own submission mark when the teacher has recorded one.
+const HOMEWORK_FIELDS = 'title subjectName subject teacherName assignedDate date dueDate '
+  + 'instructions description status submissions';
+
+const getHomework = asyncHandler(async (req, res) => {
+  const Homework = req.models?.AcademicHomework;
+  if (!canOpen(req, 'homework') || !featureOn(req, 'acdmc_academics') || !Homework) {
+    return unavailable(res, 'Homework is not available.');
+  }
+  const student = req.portalStudent;
+  if (!student.class || !student.section) return res.json({ success: true, data: [] });
+  const from = schoolDate.addDays(schoolDate.today(), -14);
+  const rows = await Homework.find({
+    $and: [
+      { isActive: { $ne: false } },
+      { status: { $in: ['published', 'closed'] } },
+      { className: classNameRegex(normalizeClassName(student.class)) },
+      { section: new RegExp(`^\\s*${escapeRegex(String(student.section).trim())}\\s*$`, 'i') },
+      { $or: [{ dueDate: { $gte: from } }, { date: { $gte: from } }] }
+    ]
+  })
+    .select(HOMEWORK_FIELDS)
+    .sort({ dueDate: 1 })
+    .limit(100)
+    .lean();
+  const own = String(student._id);
+  res.json({
+    success: true,
+    data: rows.map((row) => {
+      const mine = (row.submissions || []).find((entry) => String(entry.studentId) === own);
+      return {
+        id: String(row._id),
+        title: row.title,
+        subjectName: row.subjectName || row.subject || '',
+        teacherName: row.teacherName || '',
+        assignedDate: row.assignedDate || row.date || '',
+        dueDate: row.dueDate || row.date || '',
+        instructions: row.instructions || row.description || '',
+        status: row.status,
+        submission: mine && mine.status !== 'pending' ? { status: mine.status, remark: mine.remark || '' } : null
+      };
+    })
+  });
+});
+
 // GET /api/portal/students/:studentId/results
 const getResults = asyncHandler(async (req, res) => {
   if (!canOpen(req, 'results') || !featureOn(req, 'exmcl_exams', 'exmcl_result')) {
@@ -398,20 +448,20 @@ const resolveStudentTransport = async (models, student) => {
     : null;
   if (assignment && TransportRoute) {
     const route = await TransportRoute.findOne({ _id: assignment.routeId, isActive: { $ne: false } })
-      .select('name code vehicleId stops').lean();
+      .select('name code vehicleId stops roadPath').lean();
     if (route) {
       const vehicle = route.vehicleId && TransportVehicle
         ? await TransportVehicle.findById(route.vehicleId)
-          .select('busNo registrationNumber driverName driverPhone conductorName conductorPhone status').lean()
+          .select('busNo registrationNumber vehicleType driverName driverPhone conductorName conductorPhone status').lean()
         : null;
       return { assignment, vehicle, routes: [route] };
     }
   }
   if (!student.busNo || !TransportVehicle) return { assignment: null, vehicle: null, routes: [] };
   const vehicle = await TransportVehicle.findOne({ busNo: student.busNo })
-    .select('busNo registrationNumber driverName driverPhone conductorName conductorPhone status').lean();
+    .select('busNo registrationNumber vehicleType driverName driverPhone conductorName conductorPhone status').lean();
   const routes = vehicle && TransportRoute
-    ? await TransportRoute.find({ vehicleId: vehicle._id, isActive: true }).select('name code vehicleId stops').lean()
+    ? await TransportRoute.find({ vehicleId: vehicle._id, isActive: true }).select('name code vehicleId stops roadPath').lean()
     : [];
   return { assignment: null, vehicle, routes };
 };
@@ -465,7 +515,7 @@ const directionFor = (shift) => (shift === 'both' ? {} : { direction: shift });
 // The location is shared only while the bus is on a trip on the child's route.
 const getTransportLive = asyncHandler(async (req, res) => {
   if (!transportOpen(req)) return unavailable(res, 'Transport is not available.');
-  const { TransportTrip, TransportBoarding } = req.models || {};
+  const { TransportTrip, TransportBoarding, TransportRoute } = req.models || {};
   const student = req.portalStudent;
   const { assignment, vehicle, routes } = await resolveStudentTransport(req.models || {}, student);
   const route = assignment ? routes[0] : null;
@@ -486,6 +536,7 @@ const getTransportLive = asyncHandler(async (req, res) => {
       .select('event at tripId').sort({ at: 1 }).lean()
     : [];
   const now = new Date();
+  const roadPath = await roadPathFor(TransportRoute, route);
 
   return res.json({
     success: true,
@@ -493,7 +544,9 @@ const getTransportLive = asyncHandler(async (req, res) => {
       active: Boolean(trip),
       assigned: true,
       busNo: vehicle?.busNo || '',
+      vehicleType: vehicle?.vehicleType || 'Bus',
       route: { name: route.name, code: route.code },
+      roadPath,
       stops: sortedStops(route).map(publicStop),
       myStopId: assignment.stopId ? String(assignment.stopId) : '',
       trip: trip ? {
@@ -520,6 +573,7 @@ module.exports = {
   getProfile,
   getAttendance,
   getTimetable,
+  getHomework,
   getResults,
   getFees,
   getReceiptPdf,

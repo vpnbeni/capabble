@@ -4,8 +4,9 @@ const createContextModelProxy = require('../tenancy/createContextModelProxy');
 /**
  * One person's reply to a calendar event audience that asked for one:
  * acknowledge ("seen it"), RSVP (yes / no / maybe, with how many coming) or
- * consent per child (given / declined). Parents answer per child; everyone
- * else answers for themselves. The latest answer wins (one row per person,
+ * consent per child (given / declined). A family answers an RSVP or
+ * acknowledgement once for all its children in an audience (studentId empty)
+ * and consent per child; everyone else answers for themselves. The latest answer wins (one row per person,
  * audience and child), and every change is kept in `history` for the record.
  */
 const { RESPONSE_VALUES } = require('../modules/clndr/constants');

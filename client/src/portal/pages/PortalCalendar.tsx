@@ -8,7 +8,7 @@ import CalendarItemSheet from '@/components/calendar/CalendarItemSheet'
 import CalendarAgendaCard from '@/components/calendar/CalendarAgendaCard'
 import CalendarFeedDialog from '@/components/calendar/CalendarFeedDialog'
 import { Smartphone } from 'lucide-react'
-import { dayInfoFrom, groupByDay, toEntry } from '@/components/calendar/calendarUi'
+import { dayInfoFrom, groupByDay, partIsFor, toEntry } from '@/components/calendar/calendarUi'
 import '@/components/calendar/calendar.css'
 import { usePortalCalendar } from '../usePortal'
 import { LoadFailed } from './shared'
@@ -49,7 +49,7 @@ export const PortalCalendar: React.FC = () => {
   const items = useMemo(() => (data?.items || []).filter((item) => {
     if (child === 'all') return true
     if (item.child) return item.child.studentId === child
-    if (item.parts?.length) return item.parts.some((part) => !part.child || part.child.studentId === child)
+    if (item.parts?.length) return item.parts.some((part) => partIsFor(part, child))
     return true
   }), [data, child])
   const entries = useMemo(() => items.map(toEntry), [items])

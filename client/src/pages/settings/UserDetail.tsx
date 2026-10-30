@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { classLabel } from '@/utils/classLabel'
 import { useNavigate, useParams } from 'react-router-dom'
 import toast from 'react-hot-toast'
-import { KeyRound, LogOut, Pencil, Plus, Power, UserX, X } from 'lucide-react'
+import { Eye, KeyRound, LogOut, Pencil, Plus, Power, UserX, X } from 'lucide-react'
 import {
   Button,
   Card,
@@ -28,6 +28,7 @@ import {
   useRoles,
   useSectionOptions,
   useSignOutEverywhere,
+  useStartViewAs,
   useStudentCandidates,
   useUpdateUser,
 } from '@/hooks/useUserAdmin'
@@ -38,6 +39,7 @@ import { selectUser } from '@/redux/slices/authSlice'
 import type { AuditEvent, ClassSection, CredentialDelivery, CredentialMethod } from '@/services/userAdminService'
 import { CredentialDialog, errorMessage, KIND_LABEL, lastSignIn, LoginStatusBadge } from '@/components/access/AccessUi'
 import { CredentialFields } from '@/components/access/CreateLoginSheet'
+import { reloadAsCurrentLogin } from '@/components/access/ViewAsBanner'
 
 const EVENT_LABEL: Record<string, string> = {
   login_success: 'Signed in',
@@ -56,6 +58,11 @@ const EVENT_LABEL: Record<string, string> = {
   user_reactivated: 'Reactivated',
   roles_changed: 'Roles changed',
   sessions_revoked: 'Signed out everywhere',
+  view_as_started: 'An administrator started viewing as them',
+  view_as_ended: 'An administrator stopped viewing as them',
+  switch_started: 'The school owner switched to them',
+  switch_ended: 'The school owner switched back',
+  switched_user_action: 'Change made by the school owner while switched',
 }
 
 const ALL_SECTIONS = '*'
@@ -80,6 +87,7 @@ const UserDetail: React.FC = () => {
   const updateUser = useUpdateUser()
   const resetPassword = useResetPassword()
   const signOut = useSignOutEverywhere()
+  const startViewAs = useStartViewAs()
 
   const isSelf = me?._id === id
   const [roleKeys, setRoleKeys] = useState<string[]>([])
@@ -95,6 +103,7 @@ const UserDetail: React.FC = () => {
   const [resetPasswordValue, setResetPasswordValue] = useState('')
   const [delivery, setDelivery] = useState<CredentialDelivery | null>(null)
   const [deactivateOpen, setDeactivateOpen] = useState(false)
+  const [viewAsOpen, setViewAsOpen] = useState(false)
   const [studentPick, setStudentPick] = useState('')
   const { data: studentOptions = [] } = useStudentCandidates({}, Boolean(user && user.kind === 'parent'))
   const sectionOptions = useSectionOptions(Boolean(canManage && user && user.kind === 'staff'))
@@ -157,8 +166,24 @@ const UserDetail: React.FC = () => {
     }
   }
 
+  // Administrators only, never as another administrator or a turned-off login (the server checks the same).
+  const canViewAs = Boolean(me?.isAdmin) && !isSelf && user.isActive && !user.roles.some((role) => role.key === 'administrator')
+  const displayName = user.name || user.loginId
+  const viewAsItems: MenuItem[] = canViewAs
+    ? [{ label: `View as ${displayName}`, icon: Eye, hint: 'See what they see, read-only', onSelect: () => setViewAsOpen(true) }]
+    : []
+  const beginViewAs = async () => {
+    try {
+      await startViewAs.mutateAsync(id)
+      await reloadAsCurrentLogin(user.kind === 'staff' ? '/' : '/portal')
+    } catch (error) {
+      toast.error(errorMessage(error))
+    }
+  }
+
   const menuItems: MenuItem[] = canManage ? [
     { label: 'Edit details', icon: Pencil, onSelect: openEdit },
+    ...viewAsItems,
     ...(!isSelf ? [{
       label: 'Sign out everywhere',
       icon: LogOut,
@@ -455,6 +480,21 @@ const UserDetail: React.FC = () => {
               }}
             >
               Deactivate login
+            </Button>
+          </>
+        }
+      />
+
+      <Dialog
+        open={viewAsOpen}
+        onClose={() => setViewAsOpen(false)}
+        title={`View as ${displayName}?`}
+        description={`You'll see Capabble exactly as ${displayName} does: their menus, ${user.kind === 'staff' ? 'classes and permissions' : 'children and family portal'}. You can't change anything while viewing. It ends after 30 minutes or when you stop, and it's recorded in their activity.`}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setViewAsOpen(false)}>Cancel</Button>
+            <Button variant="primary" icon={Eye} loading={startViewAs.isPending} onClick={beginViewAs}>
+              {`View as ${displayName}`}
             </Button>
           </>
         }

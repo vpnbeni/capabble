@@ -6,7 +6,7 @@ import './trnst.css'
 export const errorMessage = (error: any, fallback: string) =>
   String(error?.response?.data?.message || error?.message || fallback)
 
-export const VEHICLE_TYPES = ['Bus', 'Mini Bus', 'Van', 'Winger', 'Other'] as const
+export const VEHICLE_TYPES = ['Bus', 'Mini Bus', 'Van', 'Winger', 'Car', 'Auto', 'Other'] as const
 
 export const VEHICLE_STATUS: Record<VehicleStatus, { label: string; tone: Tone }> = {
   active: { label: 'Active', tone: 'success' },

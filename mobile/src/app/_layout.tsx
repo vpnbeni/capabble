@@ -7,6 +7,8 @@ import { useEffect, useState } from 'react'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 
 import { ApiError } from '@/lib/api'
+// Registers the bus location task at start-up: Android may start the app in the background to deliver locations.
+import '@/lib/busLocation'
 import { usePushNotifications } from '@/lib/usePushNotifications'
 import { SessionProvider, useSession } from '@/session/SessionProvider'
 import { ThemeProvider, useTheme } from '@/theme/ThemeProvider'
@@ -47,7 +49,7 @@ function RootStack() {
   const { scheme, colors, setSchoolColor } = useTheme()
   const schoolColor = session.status === 'signedIn' ? session.user.tenant?.brandColor || null : null
 
-  usePushNotifications(status === 'signedIn' && !mustSetPassword ? session.user : null, session.school?.slug ?? null)
+  usePushNotifications(session.status === 'signedIn' && !mustSetPassword && !session.user.viewAs ? session.user : null, session.school?.slug ?? null)
 
   useEffect(() => {
     if (status !== 'loading') SplashScreen.hideAsync()

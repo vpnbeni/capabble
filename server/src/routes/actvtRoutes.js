@@ -44,6 +44,7 @@ mountCrud(router, '/events', events);
 mountCrud(router, '/criteria', criteria);
 mountCrud(router, '/points', points);
 router.get('/ranking', ranking.summary);
+router.post('/certificates/pdf', certificates.pdf);
 mountCrud(router, '/certificates', certificates);
 
 router.get('/councils', councils.list);

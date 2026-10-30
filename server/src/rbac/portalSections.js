@@ -18,6 +18,7 @@ const portalSections = (kind) => catalog.portal[kind] || [];
 const openSections = (req, kind) => portalSections(kind).filter((section) => ({
   attendance: featureOn(req, 'attnd_student_attendance'),
   timetable: featureOn(req, 'timetable_classes', 'timetable_class_wise'),
+  homework: featureOn(req, 'acdmc_academics') && Boolean(req.models?.AcademicHomework),
   results: featureOn(req, 'exmcl_exams', 'exmcl_result'),
   fees: featureOn(req, 'cpitl_fees'),
   notices: featureOn(req, 'exmcl_centre_guidelines'),

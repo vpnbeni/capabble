@@ -26,6 +26,14 @@ const {
 } = require('../rbac/permissions');
 const { revokeAllSessions } = require('../rbac/session');
 const { recordAuthEvent } = require('../rbac/audit');
+const {
+  viewAsRefusal,
+  switchRefusal,
+  canSwitchUsers,
+  startViewAs,
+  VIEW_AS_MINUTES,
+  MODES: VIEW_AS_MODES
+} = require('../rbac/viewAs');
 const { ensureUserIndexes } = require('../rbac/userIndexes');
 const { isPlaceholderEmail, realEmailOrEmpty } = require('../utils/placeholderEmail');
 const { sortClassNames, sortSectionNames } = require('../utils/sortSections');
@@ -355,7 +363,14 @@ const listUsers = handle(async (req, res) => {
   const search = String(req.query.search || '').trim().slice(0, 80);
   if (search) {
     const pattern = new RegExp(escapeRegex(search), 'i');
-    and.push({ $or: [{ name: pattern }, { email: pattern }, { username: pattern }, { 'linkedStudents.rollNumber': pattern }] });
+    const or = [{ name: pattern }, { email: pattern }, { username: pattern }, { 'linkedStudents.rollNumber': pattern }];
+    // Family logins are found by their child's name too ("Pranav" finds Pranav's father).
+    const { Student } = getModels(req);
+    if (Student && kind !== USER_KINDS.STAFF) {
+      const children = await Student.find({ name: pattern }).select('_id').limit(500).lean();
+      if (children.length) or.push({ 'linkedStudents.student': { $in: children.map((child) => child._id) } });
+    }
+    and.push({ $or: or });
   }
 
   const filter = and.length ? { $and: and } : {};
@@ -562,6 +577,42 @@ const signOutEverywhere = handle(async (req, res) => {
   await recordAuthEvent(req, { event: 'sessions_revoked', target: user });
   announce(req, user, 'signed_out_everywhere');
   res.json({ success: true, message: 'Signed out on every device.' });
+});
+
+// POST /api/users/:id/view-as
+// Administrators only: see the panel or portal as this person, read-only (rbac/viewAs).
+const startViewingAs = handle(async (req, res) => {
+  if (!req.rbac?.isAdmin) throw httpError(403, 'Only an administrator can view as someone else.', 'permission_denied');
+  const { User } = getModels(req);
+  const target = await User.findById(req.params.id);
+  const refusal = viewAsRefusal(req.user, target);
+  if (refusal) throw httpError(refusal.status, refusal.message, refusal.code);
+  const expiresAt = startViewAs(res, { admin: req.user, target, tenantSlug: req.tenant?.slug });
+  await recordAuthEvent(req, { event: 'view_as_started', target, details: { minutes: VIEW_AS_MINUTES } });
+  res.json({
+    success: true,
+    message: `Viewing as ${target.name || target.email || target.username}.`,
+    data: { kind: target.kind || USER_KINDS.STAFF, expiresAt }
+  });
+});
+
+// POST /api/users/:id/switch
+// Testing only: the school owner, in a school where the platform turned it on, acts as this person (rbac/viewAs).
+const switchToUser = handle(async (req, res) => {
+  if (!canSwitchUsers(req.tenant, req.user)) {
+    throw httpError(403, 'Switching users isn’t turned on for this school.', 'switch_not_allowed');
+  }
+  const { User } = getModels(req);
+  const target = await User.findById(req.params.id);
+  const refusal = switchRefusal(req.user, target);
+  if (refusal) throw httpError(refusal.status, refusal.message, refusal.code);
+  const expiresAt = startViewAs(res, { admin: req.user, target, tenantSlug: req.tenant?.slug, mode: VIEW_AS_MODES.SWITCH });
+  await recordAuthEvent(req, { event: 'switch_started', target, details: { minutes: VIEW_AS_MINUTES } });
+  res.json({
+    success: true,
+    message: `Switched to ${target.name || target.email || target.username}.`,
+    data: { kind: target.kind || USER_KINDS.STAFF, expiresAt }
+  });
 });
 
 // POST /api/users/bulk-portal
@@ -898,6 +949,8 @@ module.exports = {
   updateUser,
   resetUserPassword,
   signOutEverywhere,
+  startViewingAs,
+  switchToUser,
   bulkCreatePortalLogins,
   listStaffCandidates,
   listStudentCandidates,

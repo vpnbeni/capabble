@@ -8,6 +8,7 @@ import React, {
   useRef,
   type ReactNode,
 } from 'react'
+import toast from 'react-hot-toast'
 import timetableService, { type TimetableStatePayload } from '@/services/timetableService'
 
 export interface TimetableClass {
@@ -291,6 +292,8 @@ export const TimetableProvider: React.FC<{ children: ReactNode }> = ({ children 
   const latestSnapshotRef = useRef<TimetableStatePayload>(DEFAULT_STATE)
   const hasLocalEditsBeforeHydrationRef = useRef(false)
   const lastSyncedStateRef = useRef<string>(JSON.stringify(DEFAULT_STATE))
+  // The version of the state this tab last read or saved; a save names it so it can't undo a newer change.
+  const stateVersionRef = useRef<string | null>(null)
 
   const periodsPerDay = useMemo(() => Math.floor(periodsPerWeek / WEEKDAYS.length), [periodsPerWeek])
 
@@ -299,8 +302,10 @@ export const TimetableProvider: React.FC<{ children: ReactNode }> = ({ children 
 
     const hydrate = async () => {
       try {
-        const remoteState = normalizeState(await timetableService.getState())
+        const remote = await timetableService.getStateVersioned()
+        const remoteState = normalizeState(remote.state)
         if (!isMounted) return
+        stateVersionRef.current = remote.updatedAt
 
         if (hasLocalEditsBeforeHydrationRef.current) {
           return
@@ -339,7 +344,9 @@ export const TimetableProvider: React.FC<{ children: ReactNode }> = ({ children 
 
   const rehydrate = useCallback(async () => {
     try {
-      const remoteState = normalizeState(await timetableService.getState())
+      const remote = await timetableService.getStateVersioned()
+      const remoteState = normalizeState(remote.state)
+      stateVersionRef.current = remote.updatedAt
       setClasses(remoteState.classes)
       setSubjects(remoteState.subjects)
       setTeachersState(remoteState.teachers)
@@ -357,6 +364,11 @@ export const TimetableProvider: React.FC<{ children: ReactNode }> = ({ children 
       // silently keep current state if fetch fails
     }
   }, [])
+
+  const rehydrateRef = useRef(rehydrate)
+  useEffect(() => {
+    rehydrateRef.current = rehydrate
+  }, [rehydrate])
 
   const stateSnapshot = useMemo<TimetableStatePayload>(
     () => ({
@@ -401,10 +413,16 @@ export const TimetableProvider: React.FC<{ children: ReactNode }> = ({ children 
     if (serialized === lastSyncedStateRef.current) return
 
     try {
-      await timetableService.saveState(snapshot, { silent: true })
+      const saved = await timetableService.saveStateVersioned(snapshot, stateVersionRef.current)
+      stateVersionRef.current = saved.updatedAt
       lastSyncedStateRef.current = serialized
-    } catch {
-      // API interceptor already surfaces user-visible errors.
+    } catch (error: any) {
+      // Someone saved since this tab read it (another tab, the app): show theirs instead of overwriting.
+      if (error?.conflict) {
+        toast.error(error.message, { id: 'timetable-state-changed' })
+        await rehydrateRef.current()
+      }
+      // Other errors: the API interceptor already shows them.
     }
   }, [])
 

@@ -9,6 +9,7 @@ const {
   getStudentAttendance,
   saveStudentAttendance,
   getDashboard,
+  getStudentRegisters,
 } = require('../controllers/attndController');
 const { requireTenantFeature, requireAnyTenantFeature } = require('../middleware/tenantFeatureAccess');
 const { requireSectionInScope } = require('../rbac/scope');
@@ -39,6 +40,8 @@ router.get('/staff', requireTenantFeature('attnd_staff_attendance'), getStaffAtt
 router.put('/staff', requireTenantFeature('attnd_staff_attendance'), saveStaffAttendance);
 
 router.get('/students', requireTenantFeature('attnd_student_attendance'), scopedRead, getStudentAttendance);
+// Filters to the login's own sections itself, so it needs no class in the query.
+router.get('/student-registers', requireTenantFeature('attnd_student_attendance'), getStudentRegisters);
 router.put('/students', requireTenantFeature('attnd_student_attendance'), scopedWrite, saveStudentAttendance);
 
 module.exports = router;

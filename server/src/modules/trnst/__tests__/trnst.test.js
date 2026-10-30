@@ -9,6 +9,7 @@ const crew = require('../../../controllers/trnst/crewController');
 const portal = require('../../../controllers/portalController');
 const idCards = require('../../../controllers/idCardController');
 const places = require('../../../controllers/trnst/placesController');
+const roadPath = require('../roadPath');
 
 const MY_BUS = 'aaaaaaaaaaaaaaaaaaaaaaaa';
 const OTHER_BUS = 'bbbbbbbbbbbbbbbbbbbbbbbb';
@@ -307,5 +308,133 @@ describe('TRNST place search', () => {
     jest.spyOn(global, 'fetch').mockResolvedValue({ ok: false, status: 503, json: async () => [] });
     const result = await run(places.searchPlaces, { query: { q: 'Sector 14 Gurgaon' } });
     expect(result.status).toBe(502);
+  });
+});
+
+describe('TRNST road path', () => {
+  const stops = [
+    { _id: 's1', name: 'Gate', sequence: 1, lat: 26.9001, lng: 75.8001 },
+    { _id: 's2', name: 'Circle', sequence: 2, lat: 26.9101, lng: 75.8101 },
+    { _id: 's3', name: 'Market', sequence: 3, lat: 26.9201, lng: 75.8051 }
+  ];
+  const road = [
+    [26.9001, 75.8001], [26.9001, 75.8051], [26.9101, 75.8051], [26.9101, 75.8101], [26.9201, 75.8051]
+  ];
+  const osrm = () => ({
+    ok: true,
+    json: async () => ({
+      code: 'Ok',
+      routes: [{ geometry: roadPath.encodePolyline(road), distance: 4321.4, duration: 610.2 }]
+    })
+  });
+
+  beforeEach(() => roadPath.resetForTests());
+  afterEach(() => jest.restoreAllMocks());
+
+  it('encodes and decodes the polyline format', () => {
+    // Google's documented example.
+    const points = [[38.5, -120.2], [40.7, -120.95], [43.252, -126.453]];
+    expect(roadPath.encodePolyline(points)).toBe('_p~iF~ps|U_ulLnnqC_mqNvxq`@');
+    expect(roadPath.decodePolyline('_p~iF~ps|U_ulLnnqC_mqNvxq`@')).toEqual(points);
+  });
+
+  it('drops points that sit on a straight stretch', () => {
+    const straight = [[26.9, 75.8], [26.9, 75.801], [26.9, 75.802], [26.9, 75.803]];
+    expect(roadPath.simplify(straight)).toEqual([[26.9, 75.8], [26.9, 75.803]]);
+    expect(roadPath.simplify(road)).toHaveLength(road.length);
+  });
+
+  it('asks the routing server once and keeps the road on the route', async () => {
+    const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue(osrm());
+    const Route = { updateOne: jest.fn(async () => ({})) };
+    const route = { _id: ROUTE, stops: [stops[2], stops[0], stops[1]] };
+
+    const [first, second] = await Promise.all([
+      roadPath.roadPathFor(Route, route),
+      roadPath.roadPathFor(Route, route)
+    ]);
+    expect(first).toEqual({ polyline: roadPath.encodePolyline(road), distanceM: 4321, durationS: 610 });
+    expect(second).toEqual(first);
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    // Stops in driving order, as lng,lat.
+    expect(fetchSpy.mock.calls[0][0])
+      .toContain('/route/v1/driving/75.800100,26.900100;75.810100,26.910100;75.805100,26.920100?');
+    expect(Route.updateOne).toHaveBeenCalledWith(
+      { _id: ROUTE },
+      { $set: { roadPath: expect.objectContaining({ key: expect.any(String), distanceM: 4321 }) } }
+    );
+
+    // A saved path with the same stops is used as is.
+    const saved = Route.updateOne.mock.calls[0][1].$set.roadPath;
+    expect(await roadPath.roadPathFor(Route, { ...route, roadPath: saved })).toEqual(first);
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+
+    // Moving a stop asks again.
+    const moved = { ...route, roadPath: saved, stops: [stops[0], stops[1], { ...stops[2], lat: 26.93 }] };
+    await roadPath.roadPathFor(Route, moved);
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it('gives no road for fewer than two placed stops, and none (without retrying) when routing fails', async () => {
+    const fetchSpy = jest.spyOn(global, 'fetch').mockRejectedValue(new Error('offline'));
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(await roadPath.roadPathFor(null, { stops: [stops[0], { name: 'No pin', sequence: 2 }] })).toBeNull();
+    expect(fetchSpy).not.toHaveBeenCalled();
+
+    const route = { _id: ROUTE, stops };
+    expect(await roadPath.roadPathFor(null, route)).toBeNull();
+    expect(await roadPath.roadPathFor(null, route)).toBeNull();
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('sends the road and the vehicle type to families', async () => {
+    jest.spyOn(global, 'fetch').mockResolvedValue(osrm());
+    const req = {
+      user: { kind: 'parent' },
+      tenant: { featureToggles: {} },
+      portalStudent: { _id: STUDENT, busNo: '4' },
+      models: {
+        TransportAssignment: {
+          findOne: jest.fn(() => query({ studentId: STUDENT, routeId: ROUTE, stopId: 's2', shift: 'both' }))
+        },
+        TransportRoute: {
+          findOne: jest.fn(() => query({ _id: ROUTE, name: 'Malviya Nagar', code: 'R4', vehicleId: MY_BUS, stops })),
+          updateOne: jest.fn(async () => ({}))
+        },
+        TransportVehicle: { findById: jest.fn(() => query({ busNo: '4', vehicleType: 'Auto' })) },
+        TransportTrip: {
+          updateMany: jest.fn(async () => ({})),
+          findOne: jest.fn(() => query(null)),
+          find: jest.fn(() => query([]))
+        },
+        TransportBoarding: { find: jest.fn(() => query([])) }
+      }
+    };
+    const result = await run(portal.getTransportLive, req);
+    expect(result.body.data).toMatchObject({ vehicleType: 'Auto', roadPath: { distanceM: 4321, durationS: 610 } });
+  });
+});
+
+describe('crew student card contacts', () => {
+  const { familyContacts } = require('../../../controllers/trnst/crewController');
+
+  it('puts the school phone on the father when he is the guardian', () => {
+    expect(familyContacts({
+      fatherName: 'Vinod Dalal', motherName: 'Suman Dalal', guardianName: 'Vinod Dalal', guardianPhone: '9812000001'
+    })).toEqual([
+      { relation: 'Father', name: 'Vinod Dalal', phone: '9812000001' },
+      { relation: 'Mother', name: 'Suman Dalal', phone: '' }
+    ]);
+  });
+
+  it('puts it on the mother, or on a separate guardian', () => {
+    expect(familyContacts({ fatherName: 'A', motherName: 'B', guardianName: 'b', guardianPhone: '9' })[1])
+      .toEqual({ relation: 'Mother', name: 'B', phone: '9' });
+    expect(familyContacts({ fatherName: 'A', guardianName: 'Uncle C', guardianPhone: '9' }))
+      .toEqual([{ relation: 'Father', name: 'A', phone: '' }, { relation: 'Guardian', name: 'Uncle C', phone: '9' }]);
+  });
+
+  it('still gives a number when no names are on the record', () => {
+    expect(familyContacts({ guardianPhone: '9' })).toEqual([{ relation: 'Parent', name: '', phone: '9' }]);
   });
 });

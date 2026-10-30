@@ -104,7 +104,7 @@ exports.createCopy = async (req, res) => {
 };
 
 exports.bulkCreateCopies = async (req, res) => {
-  const session = model(req, 'LibraryCopy').db.startSession();
+  const session = await model(req, 'LibraryCopy').db.startSession();
   try {
     const Copy = model(req, 'LibraryCopy'); const Title = model(req, 'LibraryTitle'); const body = req.body || {}; const copies = Array.isArray(body.copies) ? body.copies : [];
     if (!mongoose.Types.ObjectId.isValid(body.titleId) || !await Title.exists({ _id: body.titleId, isActive: true }).session(session)) throw Object.assign(new Error('Choose an active catalogue title.'), { statusCode: 400 });
@@ -176,7 +176,7 @@ exports.listLoans = async (req, res) => {
 };
 
 exports.issueLoan = async (req, res) => {
-  const session = model(req, 'LibraryCopy').db.startSession();
+  const session = await model(req, 'LibraryCopy').db.startSession();
   try {
     const Copy = model(req, 'LibraryCopy'); const Member = model(req, 'LibraryMember'); const Policy = model(req, 'LibraryPolicy'); const Loan = model(req, 'LibraryLoan'); const body = req.body || {}; let loan;
     await session.withTransaction(async () => {
@@ -195,7 +195,7 @@ exports.issueLoan = async (req, res) => {
 };
 
 exports.returnLoan = async (req, res) => {
-  const session = model(req, 'LibraryCopy').db.startSession();
+  const session = await model(req, 'LibraryCopy').db.startSession();
   try {
     const Loan = model(req, 'LibraryLoan'); const Copy = model(req, 'LibraryCopy'); let loan;
     await session.withTransaction(async () => {
@@ -208,7 +208,7 @@ exports.returnLoan = async (req, res) => {
 };
 
 exports.returnByBarcode = async (req, res) => {
-  const session = model(req, 'LibraryCopy').db.startSession();
+  const session = await model(req, 'LibraryCopy').db.startSession();
   try {
     const Copy = model(req, 'LibraryCopy'); const Loan = model(req, 'LibraryLoan'); const code = String(req.body?.code || '').trim(); const condition = String(req.body?.condition || 'good'); if (!code) throw Object.assign(new Error('Enter or scan a copy barcode.'), { statusCode: 400 }); let loan;
     await session.withTransaction(async () => {
@@ -309,7 +309,7 @@ exports.createPurchaseOrder = async (req, res) => {
 };
 
 exports.receivePurchaseOrder = async (req, res) => {
-  const session = model(req, 'LibraryCopy').db.startSession();
+  const session = await model(req, 'LibraryCopy').db.startSession();
   try {
     const PurchaseOrder = model(req, 'LibraryPurchaseOrder'); const Receipt = model(req, 'LibraryGoodsReceipt'); const Copy = model(req, 'LibraryCopy'); const Title = model(req, 'LibraryTitle'); const body = req.body || {}; let receipt;
     await session.withTransaction(async () => {
@@ -324,8 +324,18 @@ exports.receivePurchaseOrder = async (req, res) => {
       }
       const remaining = order.lines.reduce((total, line) => total + Math.max(0, line.quantity - line.receivedQuantity), 0);
       if (created.length > remaining) throw Object.assign(new Error('Received copy count exceeds the outstanding purchase-order quantity.'), { statusCode: 400 });
-      let toAllocate = created.length;
-      for (const line of order.lines) { if (!toAllocate) break; const available = line.quantity - line.receivedQuantity; const add = Math.min(available, toAllocate); line.receivedQuantity += add; toAllocate -= add; }
+      // Copies that name their order line count against it; otherwise they fill the lines in order.
+      if (copies.every((entry) => entry.lineId)) {
+        for (const entry of copies) {
+          const line = order.lines.find((row) => String(row._id) === String(entry.lineId));
+          if (!line) throw Object.assign(new Error('A received copy names a line that is not on this order.'), { statusCode: 400 });
+          if (line.receivedQuantity >= line.quantity) throw Object.assign(new Error(`More copies of ${line.title} than were ordered.`), { statusCode: 400 });
+          line.receivedQuantity += 1;
+        }
+      } else {
+        let toAllocate = created.length;
+        for (const line of order.lines) { if (!toAllocate) break; const available = line.quantity - line.receivedQuantity; const add = Math.min(available, toAllocate); line.receivedQuantity += add; toAllocate -= add; }
+      }
       order.status = order.lines.every((line) => line.receivedQuantity >= line.quantity) ? 'received' : 'partially_received'; await order.save({ session });
       [receipt] = await Receipt.create([{ purchaseOrderId: order._id, receivedBy: actor(req), copies: created }], { session });
     });

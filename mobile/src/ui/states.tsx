@@ -1,6 +1,7 @@
 import { Bell, Check, CircleAlert, CircleCheck, Info, Inbox, TriangleAlert, WifiOff, type LucideIcon } from 'lucide-react-native'
-import { useEffect, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, type ReactNode } from 'react'
 import { Image, Pressable, StyleSheet, View } from 'react-native'
+import { SafeAreaInsetsContext, useSafeAreaInsets, type EdgeInsets } from 'react-native-safe-area-context'
 
 import { useTheme } from '@/theme/ThemeProvider'
 import { fontFamily, radius, space, type Tone } from '@/theme/tokens'
@@ -45,6 +46,64 @@ export function Callout({ tone = 'info', title, icon, action, children }: Callou
         </Pressable>
       ) : null}
     </View>
+  )
+}
+
+type PinnedBarProps = {
+  /** null: no bar, the screens keep the whole window. */
+  bar: { tone?: Tone; title: string; action?: { label: string; onPress: () => void; busy?: boolean } } | null
+  children: ReactNode
+}
+
+const WindowInsets = createContext<EdgeInsets | null>(null)
+
+/** The window's safe-area insets, for things drawn over the whole window (sheets), even under a PinnedBar. */
+export function useWindowInsets(): EdgeInsets {
+  const local = useSafeAreaInsets()
+  return useContext(WindowInsets) ?? local
+}
+
+/**
+ * A one-line bar pinned above every screen while a state lasts for the whole app (viewing as
+ * someone else). The screens under it start below the bar, so they drop the top inset; sheets
+ * still use the window's (`useWindowInsets`).
+ */
+export function PinnedBar({ bar, children }: PinnedBarProps) {
+  const { colors } = useTheme()
+  const insets = useSafeAreaInsets()
+  if (!bar) return <>{children}</>
+  const ink = colors[`${bar.tone ?? 'warning'}-ink`]
+  return (
+    <WindowInsets.Provider value={insets}>
+      <View style={{ flex: 1 }}>
+        <View
+          accessibilityRole="alert"
+          style={[styles.pinned, { paddingTop: insets.top + space['space-2'], backgroundColor: colors[`${bar.tone ?? 'warning'}-soft`] }]}
+        >
+          <Icon icon={TONE_ICON[bar.tone ?? 'warning']} size={16} color={ink} />
+          <Text variant="body" numberOfLines={2} style={{ flex: 1, minWidth: 0, color: ink, fontFamily: fontFamily[600], fontSize: 14, lineHeight: 19 }}>
+            {bar.title}
+          </Text>
+          {bar.action ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ busy: bar.action.busy }}
+              disabled={bar.action.busy}
+              onPress={bar.action.onPress}
+              hitSlop={10}
+              style={{ minHeight: 32, justifyContent: 'center' }}
+            >
+              <Text variant="body" numberOfLines={1} style={{ color: ink, fontFamily: fontFamily[600], fontSize: 14, textDecorationLine: 'underline' }}>
+                {bar.action.label}
+              </Text>
+            </Pressable>
+          ) : null}
+        </View>
+        <SafeAreaInsetsContext.Provider value={{ ...insets, top: 0 }}>
+          <View style={{ flex: 1 }}>{children}</View>
+        </SafeAreaInsetsContext.Provider>
+      </View>
+    </WindowInsets.Provider>
   )
 }
 
@@ -159,6 +218,7 @@ export function NotificationBanner({ title, body, time, appIcon, onPress }: Noti
 }
 
 const styles = StyleSheet.create({
+  pinned: { flexDirection: 'row', alignItems: 'center', gap: space['space-2'], paddingBottom: space['space-2'], paddingHorizontal: space['space-4'] },
   callout: { flexDirection: 'row', alignItems: 'flex-start', gap: space['space-3'], paddingVertical: 14, paddingHorizontal: space['space-4'], borderRadius: radius['radius-xl'] },
   status: { alignItems: 'center', paddingVertical: space['space-8'], paddingHorizontal: space['space-6'] },
   statusCompact: { paddingVertical: space['space-6'], paddingHorizontal: space['space-4'] },

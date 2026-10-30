@@ -26,7 +26,10 @@ export type CalendarPart = {
   attachments: { name: string; url: string }[]
   response: ResponseType | string
   responseDeadline?: string | null
+  /** Set only when the part is about one child (always for consent). */
   child?: { studentId: string; name: string } | null
+  /** Every child of this family the part covers: a family answers an RSVP or acknowledgement once for all of them. */
+  children?: { studentId: string; name: string }[]
   myResponse?: { value: ResponseValue; count?: number; note?: string; respondedAt: string } | null
 }
 

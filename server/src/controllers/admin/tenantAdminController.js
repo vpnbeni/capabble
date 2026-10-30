@@ -778,7 +778,8 @@ const updateTenant = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const {
     name,
-    adminEmail
+    adminEmail,
+    allowUserSwitching
   } = req.body;
 
   const tenant = await Tenant.findById(id);
@@ -796,6 +797,10 @@ const updateTenant = asyncHandler(async (req, res) => {
 
   if (adminEmail !== undefined) {
     tenant.adminEmail = adminEmail.toLowerCase();
+  }
+
+  if (allowUserSwitching !== undefined) {
+    tenant.allowUserSwitching = Boolean(allowUserSwitching);
   }
 
   await tenant.save();

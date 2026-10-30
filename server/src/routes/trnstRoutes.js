@@ -44,6 +44,7 @@ router.post('/crew/trips', crew.startTrip);
 router.post('/crew/trips/:id/locations', locationLimiter, crew.postLocations);
 router.post('/crew/trips/:id/end', crew.endTrip);
 router.get('/crew/trips/:id/roster', crew.getRoster);
+router.get('/crew/trips/:id/students/:studentId', crew.getStudentCard);
 router.post('/crew/trips/:id/boarding', crew.markBoarding);
 router.delete('/crew/trips/:id/boarding/:studentId/:event', crew.unmarkBoarding);
 

@@ -1,7 +1,7 @@
 import { CalendarDays, ClipboardList, GraduationCap, Trophy, Users, Wallet, type LucideIcon } from 'lucide-react-native'
 
 import { dayKeyAdd, formatDayKey, formatTime } from '@/lib/format'
-import type { CalendarData, CalendarItem, CalendarLayerKey, EventCategory, EventRole, EventStatus, ResponseValue } from '@/services/calendarTypes'
+import type { CalendarData, CalendarItem, CalendarLayerKey, CalendarPart, EventCategory, EventRole, EventStatus, ResponseValue } from '@/services/calendarTypes'
 import type { Palette, TileIndex } from '@/theme/tokens'
 import type { AgendaDay } from '@/ui'
 
@@ -151,9 +151,23 @@ export const agendaDays = (
     }
   })
 
+/** "For Aarav", "For Aarav and Diya" (first names when there are several), else the audience's name. */
+export const partFor = (part: CalendarPart) => {
+  const kids = part.children?.length ? part.children : part.child ? [part.child] : []
+  if (!kids.length) return part.label || 'For you'
+  if (kids.length === 1) return `For ${kids[0].name}`
+  const names = kids.map((kid) => kid.name.split(' ')[0])
+  return `For ${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`
+}
+
 /** Whether an item concerns one child (or everyone, when it isn't tied to a child). */
 export const isForChild = (item: CalendarItem, studentId: string) => {
   if (item.child) return item.child.studentId === studentId
-  if (item.parts?.length) return item.parts.some((part) => !part.child || part.child.studentId === studentId)
+  if (item.parts?.length) {
+    return item.parts.some((part) => {
+      const kids = part.children?.length ? part.children : part.child ? [part.child] : []
+      return !kids.length || kids.some((kid) => kid.studentId === studentId)
+    })
+  }
   return true
 }

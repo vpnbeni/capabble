@@ -66,6 +66,12 @@ const tenantSchema = new mongoose.Schema({
     trim: true,
     lowercase: true,
   },
+  // Testing only, set from the admin portal: the school owner may switch to any
+  // login and act as them (see rbac/viewAs). Off for every real school.
+  allowUserSwitching: {
+    type: Boolean,
+    default: false,
+  },
   featureToggles: {
     type: mongoose.Schema.Types.Mixed,
     default: () => createAllEnabledFeatureToggles(),

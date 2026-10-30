@@ -56,6 +56,8 @@ const ReplyControls: React.FC<{ eventId: string; part: CalendarPart }> = ({ even
   }
 
   if (!part.response || part.response === 'none') return null
+  // One answer covers all the family's children in this audience, so ask about the family.
+  const family = (part.children?.length ?? 0) > 1
   const deadline = part.responseDeadline ? ` by ${formatDayKey(part.responseDeadline, { weekday: 'short' })}` : ''
 
   if (current && !editing) {
@@ -91,13 +93,13 @@ const ReplyControls: React.FC<{ eventId: string; part: CalendarPart }> = ({ even
   return (
     <div className="cl-reply">
       <SegmentedControl
-        label="Will you come?"
+        label={family ? 'Will your family come?' : 'Will you come?'}
         value={rsvp}
         onChange={(value) => setRsvp(value as ResponseValue)}
         options={[{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }, { value: 'maybe', label: 'Maybe' }]}
       />
       {rsvp === 'yes' ? (
-        <TextField label="How many people" type="number" min={1} max={20} size="sm" value={count} onChange={(e) => setCount(e.target.value)} />
+        <TextField label={family ? 'How many from your family' : 'How many people'} type="number" min={1} max={20} size="sm" value={count} onChange={(e) => setCount(e.target.value)} />
       ) : null}
       <Button size="sm" variant="primary" loading={send.isPending} onClick={() => reply(rsvp)}>Send answer</Button>
       {deadline ? <span className="cb-muted">Reply{deadline}.</span> : null}

@@ -78,6 +78,7 @@ router.use('/students/:studentId', ctrl.loadLinkedStudent);
 router.get('/students/:studentId/profile', ctrl.getProfile);
 router.get('/students/:studentId/attendance', ctrl.getAttendance);
 router.get('/students/:studentId/timetable', ctrl.getTimetable);
+router.get('/students/:studentId/homework', ctrl.getHomework);
 router.get('/students/:studentId/results', ctrl.getResults);
 router.get('/students/:studentId/fees', ctrl.getFees);
 router.get('/students/:studentId/fees/receipts/:paymentId', ctrl.getReceiptPdf);

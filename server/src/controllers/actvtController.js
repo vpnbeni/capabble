@@ -1,4 +1,5 @@
 const { makeRecordCrud } = require('../utils/recordCrud');
+const pdfGenerator = require('../utils/pdfGenerator');
 const { uploadToCloudinary, deleteFromCloudinary, extractPublicId } = require('../config/cloudinary');
 const {
   DEFAULT_HOUSE_COUNCIL_POSTS,
@@ -27,6 +28,56 @@ const certificates = makeRecordCrud('ActivityCertificate', [
   'title', 'eventId', 'eventTitle', 'eventDate', 'houseId', 'houseName', 'studentId',
   'participantName', 'className', 'section', 'role', 'issuedOn', 'status',
 ]);
+
+const MAX_CERTIFICATES_PER_PDF = 200;
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const certificateDay = (value) => {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(value || ''));
+  return match ? `${Number(match[3])} ${MONTHS[Number(match[2]) - 1]} ${match[1]}` : String(value || '');
+};
+
+/** Certificates as a PDF, one landscape A4 page each, in the order asked (the phone app prints these). */
+certificates.pdf = async (req, res) => {
+  try {
+    const CertificateModel = req.models?.ActivityCertificate;
+    if (!CertificateModel) {
+      return res.status(500).json({ success: false, message: 'ActivityCertificate is not available.' });
+    }
+    const ids = Array.isArray(req.body?.ids) ? [...new Set(req.body.ids.map(String))] : [];
+    if (!ids.length) return res.status(400).json({ success: false, message: 'Choose at least one certificate.' });
+    if (ids.length > MAX_CERTIFICATES_PER_PDF) {
+      const message = `Print at most ${MAX_CERTIFICATES_PER_PDF} certificates at a time.`;
+      return res.status(400).json({ success: false, message });
+    }
+    if (ids.some((id) => !/^[a-f0-9]{24}$/i.test(id))) {
+      return res.status(400).json({ success: false, message: 'A certificate id is not valid.' });
+    }
+
+    const rows = await CertificateModel.find({ _id: { $in: ids }, isActive: { $ne: false } }).lean();
+    const byId = new Map(rows.map((row) => [String(row._id), row]));
+    const found = ids.map((id) => byId.get(id)).filter(Boolean);
+    if (!found.length) return res.status(404).json({ success: false, message: 'Those certificates were not found.' });
+
+    const profile = req.models.SchoolProfile ? await req.models.SchoolProfile.findOne({}).lean() : null;
+    const pdf = await pdfGenerator.generatePDF('actvt-certificate', {
+      school: { name: profile?.schoolName || 'School', logoUrl: profile?.logoUrl || '' },
+      certificates: found.map((row) => ({
+        title: row.title || 'Certificate',
+        participantName: row.participantName || '',
+        classLabel: [row.className, row.section].filter(Boolean).join('-'),
+        role: row.role || 'Participant',
+        eventTitle: row.eventTitle || '',
+        houseName: row.houseName || '',
+        issuedOn: certificateDay(row.issuedOn)
+      }))
+    });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'inline; filename="certificates.pdf"');
+    return res.status(200).send(pdf);
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message || 'The certificates could not be made.' });
+  }
+};
 
 const ranking = {
   summary: async (req, res) => {

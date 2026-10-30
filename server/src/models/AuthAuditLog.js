@@ -20,7 +20,12 @@ const AUTH_AUDIT_EVENTS = Object.freeze([
   'sessions_revoked',
   'role_created',
   'role_updated',
-  'role_deleted'
+  'role_deleted',
+  'view_as_started',
+  'view_as_ended',
+  'switch_started',
+  'switch_ended',
+  'switched_user_action'
 ]);
 
 const actorSchema = new mongoose.Schema({

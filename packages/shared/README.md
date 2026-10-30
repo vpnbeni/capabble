@@ -7,6 +7,8 @@ Single source of truth for data and code used by more than one app.
 | `@capabble/shared/tenantFeatureCatalog.json` | `client` (import), `server` (synced copy) |
 | `@capabble/shared/permissionCatalog.json` | `client` (import), `server` (synced copy) |
 | `@capabble/shared/designTokens.json` | `mobile` (import through Metro) |
+| `@capabble/shared/roadPath` | `client`, `mobile`: live transport maps (vehicle on the road, distance to a stop) |
+| `@capabble/shared/vehicleArt` | `client`, `mobile`: top-down vehicle pictures for the live maps |
 
 `designTokens.json` is a copy of `project/tokens.json` from the Capabble design system
 artifact (claude.ai/artifact/LyYegFLHJxi1rNpnkaqHjH). Update it whenever the design

@@ -1,7 +1,7 @@
 import api from './api'
 
 export type VehicleStatus = 'active' | 'maintenance' | 'inactive'
-export type VehicleType = 'Bus' | 'Mini Bus' | 'Van' | 'Winger' | 'Other'
+export type VehicleType = 'Bus' | 'Mini Bus' | 'Van' | 'Winger' | 'Car' | 'Auto' | 'Other'
 export type RouteShift = 'morning' | 'afternoon' | 'both'
 
 export type TransportVehicle = {
@@ -158,6 +158,9 @@ export type PublicStop = {
   lng: number | null
 }
 
+/** The road through a route's stops, from the routing server (null when it couldn't be worked out). */
+export type RoadPath = { polyline: string; distanceM: number; durationS: number }
+
 export type TripCounts = { assigned: number; boarded: number; dropped: number; absent: number }
 
 export type TripSummary = {
@@ -172,8 +175,8 @@ export type TripSummary = {
   lastLocation?: GeoPoint | null
   staleSeconds: number | null
   pingCount?: number
-  vehicle: { _id: string; busNo: string; registrationNumber: string; driverName?: string; driverPhone?: string; conductorName?: string } | null
-  route: { _id: string; name: string; code: string; stops: PublicStop[] } | null
+  vehicle: { _id: string; busNo: string; vehicleType?: VehicleType; registrationNumber: string; driverName?: string; driverPhone?: string; conductorName?: string } | null
+  route: { _id: string; name: string; code: string; stops: PublicStop[]; roadPath?: RoadPath | null } | null
   counts: TripCounts
 }
 
@@ -225,6 +228,14 @@ export type RosterStudent = {
   profileImage: string | null
   guardianPhone: string
   marks: Partial<Record<BoardingEvent, { at: string; method: 'scan' | 'manual' }>>
+}
+
+/** One student on the crew's route: class, stop, class teacher and family to call. */
+export type CrewStudentCard = {
+  student: { studentId: string; name: string; rollNumber: string; className: string; section: string; profileImage: string | null }
+  stop: { name: string; pickupTime?: string; dropTime?: string } | null
+  classTeacher: { name: string; phone: string } | null
+  family: Array<{ relation: 'Father' | 'Mother' | 'Guardian' | 'Parent'; name: string; phone: string }>
 }
 
 export type Roster = {
@@ -322,6 +333,11 @@ const markBoarding = async (
   return response.data.data as BoardingResult
 }
 
+const getCrewStudent = async (tripId: string, studentId: string) => {
+  const response = await api.get(`/trnst/crew/trips/${tripId}/students/${studentId}`, silent)
+  return response.data.data as CrewStudentCard
+}
+
 const unmarkBoarding = async (tripId: string, studentId: string, event: BoardingEvent) =>
   api.delete(`/trnst/crew/trips/${tripId}/boarding/${studentId}/${event}`, silent)
 
@@ -350,6 +366,7 @@ const trnstService = {
   getRoster,
   markBoarding,
   unmarkBoarding,
+  getCrewStudent,
 }
 
 export default trnstService

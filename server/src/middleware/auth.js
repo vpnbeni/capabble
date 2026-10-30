@@ -9,6 +9,17 @@ const { audienceFor, AUDIENCE } = require('../rbac/session');
 const { resolvePermissionSet, PermissionSet } = require('../rbac/permissions');
 const { ensureUserIndexes } = require('../rbac/userIndexes');
 const { getPlatformModels } = require('../tenancy/platformModels');
+const {
+  MODES: VIEW_AS_MODES,
+  readViewAs,
+  viewAsRefusal,
+  switchRefusal,
+  canSwitchUsers,
+  isBlockedWrite,
+  isWrite,
+  requestPath
+} = require('../rbac/viewAs');
+const { recordAuthEvent } = require('../rbac/audit');
 
 const unauthorized = (res, message = 'Not authorized to access this route') => {
   return res.status(401).json({
@@ -88,6 +99,55 @@ const authenticateTenant = async (req) => {
   return { user, audience, source };
 };
 
+/**
+ * If an administrator is viewing as someone, or the school owner switched to
+ * someone (see rbac/viewAs), run the request as that person. Viewing refuses
+ * writes; a switch lets them through and records each one. An expired or
+ * invalid claim, or one its starter may no longer use, is ignored and the
+ * request runs as the starter.
+ */
+const resolveViewAs = async (req) => {
+  const claim = readViewAs(req, req.user);
+  if (!claim) return null;
+  const switching = claim.mode === VIEW_AS_MODES.SWITCH;
+  if (switching ? !canSwitchUsers(req.tenant, req.user) : !req.rbac?.isAdmin) return null;
+
+  const User = getTenantUserModel(req);
+  const target = await User.findById(claim.targetId).select('-password');
+  if ((switching ? switchRefusal : viewAsRefusal)(req.user, target)) return null;
+
+  const admin = req.user;
+  const audience = audienceFor(target);
+  req.user = target;
+  req.auth = {
+    ...req.auth,
+    audience,
+    viewAs: { by: admin, mode: claim.mode, expiresAt: claim.expiresAt }
+  };
+  req.rbac = audience === AUDIENCE.STAFF
+    ? await resolvePermissionSet(target, req.models?.Role)
+    : new PermissionSet();
+
+  const name = target.name || target.email || 'this person';
+  if (isBlockedWrite(req, claim.mode)) {
+    return {
+      blocked: switching
+        ? `You can't do this while switched to ${name}. Switch back first.`
+        : `You're viewing as ${name}. Stop viewing to make changes.`
+    };
+  }
+  if (switching && isWrite(req) && requestPath(req) !== '/auth/view-as') {
+    // Saved as the person; the activity log says the owner did it.
+    recordAuthEvent(req, {
+      event: 'switched_user_action',
+      actor: admin,
+      target,
+      details: { method: req.method, path: requestPath(req) }
+    });
+  }
+  return { target };
+};
+
 const protectTenant = asyncHandler(async (req, res, next) => {
   // Already authenticated by the tenant access gate.
   if (req.auth?.authenticated && req.user) return next();
@@ -107,6 +167,17 @@ const protectTenant = asyncHandler(async (req, res, next) => {
   req.rbac = result.audience === AUDIENCE.STAFF
     ? await resolvePermissionSet(result.user, req.models?.Role)
     : new PermissionSet();
+
+  const viewAs = await resolveViewAs(req);
+  if (viewAs?.blocked) {
+    return res.status(403).json({
+      success: false,
+      error: viewAs.blocked,
+      message: viewAs.blocked,
+      errorCode: 'view_as_read_only'
+    });
+  }
+
   setRequestContext({ user: req.user });
   return next();
 });

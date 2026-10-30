@@ -1,25 +1,28 @@
-import { Check } from 'lucide-react-native'
+import { Check, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react-native'
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
-import { Animated, PanResponder, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native'
+import { Animated, PanResponder, Pressable, StyleSheet, View } from 'react-native'
 import Svg, { Circle } from 'react-native-svg'
+import { useFontScale } from './preview'
 
 import { useTheme } from '@/theme/ThemeProvider'
 import { fontFamily, radius, space, type Tone } from '@/theme/tokens'
 
 import { haptic } from './haptics'
 import { useReduceMotion } from './motion'
-import { Badge } from './primitives'
+import { Badge, Icon } from './primitives'
 import { Text } from './Text'
 
 /**
- * Times sit in fixed columns so rows line up. The columns grow with the phone's text size (capped
- * at 1.3×, like the times themselves) so "12:00 pm" never wraps onto two lines.
+ * Fixed columns (times in `Agenda` and `Timeline`, a row's `SegmentedControl`) keep rows lined up.
+ * They grow with the phone's text size, capped at 1.3× like chrome labels, so "12:00 pm" or
+ * "Present" never wraps onto two lines.
  */
 const TIME_SCALE_CAP = 1.3
-const useTimeColumn = (base: number) => {
-  const { fontScale } = useWindowDimensions()
+export const useFixedColumn = (base: number) => {
+  const fontScale = useFontScale()
   return Math.ceil(base * Math.min(Math.max(fontScale, 1), TIME_SCALE_CAP))
 }
+const useTimeColumn = useFixedColumn
 
 export type WeekDay = {
   /** 'YYYY-MM-DD' */
@@ -41,11 +44,13 @@ type WeekStripProps = {
   onChange: (date: string) => void
   /** Swiping the strip asks for the previous (-1) or next (1) week. */
   onWeekChange?: (step: -1 | 1) => void
+  /** A row above the days ("26 Oct – 1 Nov"): tapping it opens a month to jump to; arrows step a week. */
+  heading?: { label: string; onPress?: () => void }
   label?: string
 }
 
 /** Seven days across the top of the calendar or timetable, with dots for what's on. */
-export function WeekStrip({ days, value, onChange, onWeekChange, label = 'Choose a day' }: WeekStripProps) {
+export function WeekStrip({ days, value, onChange, onWeekChange, heading, label = 'Choose a day' }: WeekStripProps) {
   const { colors } = useTheme()
   const swipe = useRef(onWeekChange)
   useLayoutEffect(() => {
@@ -55,7 +60,9 @@ export function WeekStrip({ days, value, onChange, onWeekChange, label = 'Choose
   // eslint-disable-next-line react-hooks/refs
   const [pan] = useState(() =>
     PanResponder.create({
-      onMoveShouldSetPanResponder: (_, gesture) => !!swipe.current && Math.abs(gesture.dx) > 12 && Math.abs(gesture.dx) > Math.abs(gesture.dy) * 2,
+      // Capture phase: a sideways drag that starts on a day wins over the day's press and the page's scroll.
+      onMoveShouldSetPanResponderCapture: (_, gesture) => !!swipe.current && Math.abs(gesture.dx) > 12 && Math.abs(gesture.dx) > Math.abs(gesture.dy) * 2,
+      onPanResponderTerminationRequest: () => false,
       onPanResponderRelease: (_, gesture) => {
         if (Math.abs(gesture.dx) > 50) {
           haptic.selection()
@@ -65,7 +72,12 @@ export function WeekStrip({ days, value, onChange, onWeekChange, label = 'Choose
     }),
   )
 
-  return (
+  const step = (delta: -1 | 1) => {
+    haptic.selection()
+    onWeekChange?.(delta)
+  }
+
+  const strip = (
     <View accessibilityRole="tablist" accessibilityLabel={label} style={styles.week} {...pan.panHandlers}>
       {days.map((day) => {
         const active = day.date === value
@@ -97,6 +109,48 @@ export function WeekStrip({ days, value, onChange, onWeekChange, label = 'Choose
           </Pressable>
         )
       })}
+    </View>
+  )
+  if (!heading) return strip
+
+  return (
+    <View style={{ gap: space['space-2'] }}>
+      <View style={styles.pickerHead}>
+        <Pressable
+          accessibilityRole={heading.onPress ? 'button' : 'header'}
+          accessibilityLabel={heading.onPress ? `${heading.label}, choose a date` : heading.label}
+          disabled={!heading.onPress}
+          onPress={heading.onPress}
+          hitSlop={8}
+          style={({ pressed }) => [styles.weekHeading, pressed && { opacity: 0.6 }]}
+        >
+          <Text variant="m-headline" numeric numberOfLines={1} maxFontSizeMultiplier={1.3} style={{ flexShrink: 1 }}>
+            {heading.label}
+          </Text>
+          {heading.onPress ? <Icon icon={ChevronDown} size={18} color={colors['accent-strong']} /> : null}
+        </Pressable>
+        {onWeekChange ? (
+          <View style={{ flexDirection: 'row', gap: 4 }}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Previous week"
+              onPress={() => step(-1)}
+              style={({ pressed }) => [styles.pickerArrow, pressed && { backgroundColor: colors['fill-pressed'] }]}
+            >
+              <Icon icon={ChevronLeft} size={22} color={colors['accent-strong']} />
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Next week"
+              onPress={() => step(1)}
+              style={({ pressed }) => [styles.pickerArrow, pressed && { backgroundColor: colors['fill-pressed'] }]}
+            >
+              <Icon icon={ChevronRight} size={22} color={colors['accent-strong']} />
+            </Pressable>
+          </View>
+        ) : null}
+      </View>
+      {strip}
     </View>
   )
 }
@@ -160,7 +214,7 @@ export function Agenda({ groups, empty }: { groups: AgendaDay[]; empty?: ReactNo
                   </View>
                   <View style={[styles.agendaBar, { backgroundColor: item.color }]} />
                   <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-                    <Text variant="m-headline" numberOfLines={2}>
+                    <Text variant="m-headline" numberOfLines={3}>
                       {item.title}
                     </Text>
                     {item.meta ? (
@@ -185,7 +239,7 @@ export type TimelineItem = { time: string; title: string; detail?: string; state
 /** Steps down a line (a bus's stops, a day's periods) with the current step ringed. `compact` for a day's periods. */
 export function Timeline({ items, compact }: { items: TimelineItem[]; compact?: boolean }) {
   const { colors } = useTheme()
-  const timeWidth = useTimeColumn(64)
+  const timeWidth = useTimeColumn(70)
   return (
     <View>
       {items.map((item, index) => {
@@ -256,6 +310,121 @@ const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 const pad = (value: number) => String(value).padStart(2, '0')
 
 /** A Monday-first month for attendance: only days that differ from normal get a tone, always with a letter. */
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+
+type MonthPickerProps = {
+  /** 'YYYY-MM-DD' or null. */
+  value: string | null
+  onChange: (date: string) => void
+  /** The school's today ('YYYY-MM-DD'): ringed. */
+  today?: string
+  /** Days before this can't be picked. */
+  min?: string
+  label?: string
+}
+
+/**
+ * A month to pick one day from, with the previous and next month a tap away. Lives in a
+ * `BottomSheet` opened from a date row ("Date · Mon 2 Nov"). The chosen day is `accent-strong`
+ * (as in `WeekStrip`), today is ringed, days before `min` are dimmed and can't be picked.
+ */
+export function MonthPicker({ value, onChange, today, min, label = 'Choose a date' }: MonthPickerProps) {
+  const { colors } = useTheme()
+  const start = value ?? today ?? new Date().toISOString().slice(0, 10)
+  const [shown, setShown] = useState(() => ({ year: Number(start.slice(0, 4)), month: Number(start.slice(5, 7)) }))
+  const { year, month } = shown
+  const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate()
+  const leading = (new Date(Date.UTC(year, month - 1, 1)).getUTCDay() + 6) % 7
+  const cells: (number | null)[] = [...Array.from({ length: leading }, () => null), ...Array.from({ length: daysInMonth }, (_, index) => index + 1)]
+  while (cells.length % 7) cells.push(null)
+  const weeks = Array.from({ length: cells.length / 7 }, (_, index) => cells.slice(index * 7, index * 7 + 7))
+  const step = (delta: number) => {
+    haptic.selection()
+    setShown(({ year: y, month: m }) => {
+      const next = m + delta
+      return next < 1 ? { year: y - 1, month: 12 } : next > 12 ? { year: y + 1, month: 1 } : { year: y, month: next }
+    })
+  }
+  const lastOfPrevious = `${month === 1 ? year - 1 : year}-${pad(month === 1 ? 12 : month - 1)}-31`
+
+  return (
+    <View accessibilityLabel={label} style={{ gap: 10 }}>
+      <View style={styles.pickerHead}>
+        <Text variant="m-headline" accessibilityRole="header" accessibilityLiveRegion="polite" maxFontSizeMultiplier={1.3} numberOfLines={1}>
+          {`${MONTH_NAMES[month - 1]} ${year}`}
+        </Text>
+        <View style={{ flexDirection: 'row', gap: 4 }}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Previous month"
+            disabled={!!min && lastOfPrevious < min}
+            onPress={() => step(-1)}
+            style={({ pressed }) => [styles.pickerArrow, pressed && { backgroundColor: colors['fill-pressed'] }, !!min && lastOfPrevious < min && { opacity: 0.35 }]}
+          >
+            <Icon icon={ChevronLeft} size={22} color={colors['accent-strong']} />
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Next month"
+            onPress={() => step(1)}
+            style={({ pressed }) => [styles.pickerArrow, pressed && { backgroundColor: colors['fill-pressed'] }]}
+          >
+            <Icon icon={ChevronRight} size={22} color={colors['accent-strong']} />
+          </Pressable>
+        </View>
+      </View>
+      <View style={{ gap: 4 }}>
+        <View style={styles.gridRow}>
+          {WEEKDAYS.map((day) => (
+            <Text key={day} variant="caption" tone="subtle" maxFontSizeMultiplier={1.3} style={styles.gridHead}>
+              {day}
+            </Text>
+          ))}
+        </View>
+        {weeks.map((week, weekIndex) => (
+          <View key={weekIndex} style={styles.gridRow}>
+            {week.map((day, dayIndex) => {
+              if (!day) return <View key={`blank-${dayIndex}`} style={styles.gridCell} />
+              const date = `${year}-${pad(month)}-${pad(day)}`
+              const chosen = date === value
+              const blocked = !!min && date < min
+              return (
+                <Pressable
+                  key={date}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${day} ${MONTH_NAMES[month - 1]}${date === today ? ', today' : ''}`}
+                  accessibilityState={{ selected: chosen, disabled: blocked }}
+                  disabled={blocked}
+                  onPress={() => {
+                    haptic.selection()
+                    onChange(date)
+                  }}
+                  style={({ pressed }) => [
+                    styles.gridCell,
+                    styles.gridDay,
+                    pressed && !chosen && { backgroundColor: colors['fill-pressed'] },
+                    chosen && { backgroundColor: colors['accent-strong'] },
+                    !chosen && date === today && { boxShadow: `inset 0 0 0 2px ${colors['accent-strong']}` },
+                  ]}
+                >
+                  <Text
+                    variant="body"
+                    numeric
+                    maxFontSizeMultiplier={1.3}
+                    style={{ fontFamily: fontFamily[chosen ? 600 : 500], lineHeight: 18, color: chosen ? colors['on-accent'] : blocked ? colors['ink-subtle'] : colors.ink }}
+                  >
+                    {day}
+                  </Text>
+                </Pressable>
+              )
+            })}
+          </View>
+        ))}
+      </View>
+    </View>
+  )
+}
+
 export function DayGrid({ year, month, marks, today, title, legend }: DayGridProps) {
   const { colors } = useTheme()
   const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate()
@@ -386,11 +555,12 @@ export function ProgressRing({ value, label, sublabel, size = 112, stroke = 10, 
         />
       </Svg>
       <View style={styles.ringInner}>
-        <Text numeric maxFontSizeMultiplier={1.3} style={{ fontFamily: fontFamily[700], fontSize: Math.round(size * 0.24), lineHeight: Math.round(size * 0.27), letterSpacing: -0.5, color: colors.ink }}>
+        {/* The ring doesn't grow, so the figures inside it stop growing at 1.1× text ("100%" stays inside). */}
+        <Text numeric maxFontSizeMultiplier={1.1} style={{ fontFamily: fontFamily[700], fontSize: Math.round(size * 0.24), lineHeight: Math.round(size * 0.27), letterSpacing: -0.5, color: colors.ink }}>
           {label ?? `${Math.round(value)}%`}
         </Text>
         {sublabel ? (
-          <Text variant="caption" tone="muted" maxFontSizeMultiplier={1.3}>
+          <Text variant="caption" tone="muted" maxFontSizeMultiplier={1.1}>
             {sublabel}
           </Text>
         ) : null}
@@ -417,6 +587,9 @@ const styles = StyleSheet.create({
   tlBody: { flex: 1, minWidth: 0 },
   tlTitle: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: space['space-2'] },
   gridRow: { flexDirection: 'row', gap: 4 },
+  pickerHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space['space-2'] },
+  weekHeading: { flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 1, minHeight: 44 },
+  pickerArrow: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   gridHead: { flex: 1, textAlign: 'center', paddingBottom: 2 },
   gridCell: { flex: 1, aspectRatio: 1 },
   gridDay: { borderRadius: 10, alignItems: 'center', justifyContent: 'center' },

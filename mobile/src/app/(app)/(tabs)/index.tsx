@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router'
-import { Megaphone } from 'lucide-react-native'
+import { HeartPulse, IndianRupee, Megaphone, UserCheck } from 'lucide-react-native'
 import { useMemo } from 'react'
 import { View } from 'react-native'
 
@@ -12,10 +12,19 @@ import { usePortalCalendar, usePortalFees, usePortalNotices } from '@/portal/que
 import { LoadFailed } from '@/portal/states'
 import type { CalendarItem } from '@/services/calendarTypes'
 import { useSession } from '@/session/SessionProvider'
+import { PrincipalToday } from '@/staff/PrincipalToday'
+import { TeacherToday } from '@/staff/TeacherToday'
+import { TodayDuties } from '@/staff/TodayDuties'
+import { TodayMeetings } from '@/staff/TodayMeetings'
+import { DriverToday } from '@/staff/DriverToday'
+import { useBell } from '@/staff/useBell'
+import { useStaff } from '@/staff/useStaff'
 import { radius, size, space } from '@/theme/tokens'
 import { Avatar, Callout, Hero, ListGroup, MobileScreen, NavBar, Rail, RailCard, Section, ShortcutGrid, Skeleton } from '@/ui'
 
-const firstName = (name?: string | null) => (name ?? '').trim().split(/\s+/)[0] || 'there'
+/** "Ms. Kiran Nurse" → "Kiran": titles are skipped. */
+const TITLES = /^(mr|mrs|ms|miss|dr|prof|sir|smt|shri|sh)\.?$/i
+const firstName = (name?: string | null) => (name ?? '').trim().split(/\s+/).find((word) => word && !TITLES.test(word)) || 'there'
 
 export default function HomeScreen() {
   const session = useSession()
@@ -33,6 +42,7 @@ function FamilyHome() {
   const calendar = usePortalCalendar(today, dayKeyAdd(today, 30), has('calendar'))
   const notices = usePortalNotices(has('notices'))
   const user = session.status === 'signedIn' ? session.user : null
+  const bell = useBell()
 
   // The next things on the calendar for this child (or the whole family), soonest first.
   const coming = useMemo(() => {
@@ -49,7 +59,8 @@ function FamilyHome() {
   const openItem = (item: CalendarItem) =>
     router.push(item.eventId ? { pathname: '/calendar', params: { event: item.eventId, date: item.occurrence ?? item.startDate } } : '/calendar')
 
-  const shortcuts = PORTAL_MODULES.filter((module) => has(module.section)).map((module) => ({
+  // The grid holds eight; Profile (last) is also under More.
+  const shortcuts = PORTAL_MODULES.filter((module) => has(module.section)).slice(0, 8).map((module) => ({
     label: module.label,
     icon: module.icon,
     tile: module.tile,
@@ -73,6 +84,7 @@ function FamilyHome() {
           title={`Hi, ${firstName(user?.displayName || user?.name)}`}
           leading={school ? <Avatar name={school.name} src={school.logoUrl} size={24} square /> : undefined}
           accessory={<ChildSwitcher />}
+          actions={[bell]}
         />
       }
     >
@@ -113,6 +125,7 @@ function FamilyHome() {
                   subtitle: formatDate(notice.circularDate),
                   icon: Megaphone,
                   tile: 1,
+                  lines: 2,
                   onPress: () => router.push({ pathname: '/notice/[id]', params: { id: notice._id } }),
                 }))}
               />
@@ -173,16 +186,45 @@ function HomeSkeleton() {
 }
 
 function StaffHome() {
+  const { mode } = useStaff()
+  if (mode === 'teacher') return <TeacherToday />
+  if (mode === 'glance') return <PrincipalToday />
+  if (mode === 'crew') return <DriverToday />
+  return <OtherStaffToday />
+}
+
+/** Office, accounts, library, clinic and other staff: today's meetings, and the way to the rest. */
+function OtherStaffToday() {
+  const router = useRouter()
   const session = useSession()
+  const bell = useBell()
+  const staff = useStaff()
+  const staffAttendance = staff.canUse('attnd_staff_attendance') && staff.can('attnd.staff.write')
+  const clinic = staff.canUse('mdcl_clinic') && staff.can('mdcl.clinic.write')
+  const counter = staff.canUse('cpitl_fees') && staff.can('cpitl.finance.collect')
   if (session.status !== 'signedIn') return null
-  const roles = session.user.roles.map((role) => role.name).join(', ') || 'Staff'
+  const today = formatDayKey(schoolToday(), { weekday: 'short' })
 
   return (
-    <MobileScreen tabs nav={<NavBar large eyebrow={session.school.name} title={`Hi, ${firstName(session.user.displayName || session.user.name)}`} />}>
-      <Callout tone="info" title="The staff app is being built">
-        Attendance, your timetable and the calendar come to the app next. Use the website for everything else until then.
-      </Callout>
-      <ListGroup header="Signed in as" items={[{ title: session.user.displayName || session.user.name || 'Staff', subtitle: roles }]} />
+    <MobileScreen tabs nav={<NavBar large eyebrow={today} title={`Hi, ${firstName(session.user.displayName || session.user.name)}`} actions={[bell]} />}>
+      {staffAttendance || clinic || counter ? (
+        <ListGroup
+          items={[
+            ...(staffAttendance
+              ? [{ title: 'Staff attendance', subtitle: 'Mark who is absent today', icon: UserCheck, tile: 5 as const, onPress: () => router.push('/staff-attendance') }]
+              : []),
+            ...(clinic ? [{ title: 'Clinic', subtitle: 'Log a visit', icon: HeartPulse, tile: 5 as const, onPress: () => router.push('/clinic') }] : []),
+            ...(counter ? [{ title: 'Fee counter', subtitle: 'Take a payment, share a receipt', icon: IndianRupee, tile: 3 as const, onPress: () => router.push('/counter') }] : []),
+          ]}
+        />
+      ) : null}
+      <TodayDuties />
+      <TodayMeetings />
+      <ListGroup
+        header="Signed in to"
+        footer="Your calendar is in the Calendar tab. Everything else is under More."
+        items={[{ title: session.school.name, subtitle: session.user.roles.map((role) => role.name).join(', ') || 'Staff' }]}
+      />
     </MobileScreen>
   )
 }

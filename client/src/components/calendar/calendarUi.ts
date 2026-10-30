@@ -3,6 +3,7 @@ import type {
   CalendarData,
   CalendarItem,
   CalendarLayerKey,
+  CalendarPart,
   EventCategory,
   EventRole,
   EventStatus,
@@ -155,3 +156,20 @@ export const groupByDay = (items: CalendarItem[], from: string, to: string, data
 }
 
 export const findItem = (data: CalendarData | undefined, entryId: string) => data?.items.find((item) => item.id === entryId)
+
+const partKids = (part: CalendarPart) => (part.children?.length ? part.children : part.child ? [part.child] : [])
+
+/** "For Aarav", "For Aarav and Diya" (first names when there are several), else the audience's name. */
+export const partFor = (part: CalendarPart) => {
+  const kids = partKids(part)
+  if (!kids.length) return part.label || 'For you'
+  if (kids.length === 1) return `For ${kids[0].name}`
+  const names = kids.map((kid) => kid.name.split(' ')[0])
+  return `For ${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`
+}
+
+/** Whether a part concerns this child (a part not tied to a child concerns everyone). */
+export const partIsFor = (part: CalendarPart, studentId: string) => {
+  const kids = partKids(part)
+  return !kids.length || kids.some((kid) => kid.studentId === studentId)
+}

@@ -120,6 +120,7 @@ import TrnstLive from './pages/trnst/TrnstLive'
 import TrnstTrips from './pages/trnst/TrnstTrips'
 import TrnstAssignments from './pages/trnst/TrnstAssignments'
 import TrnstCrew from './pages/trnst/TrnstCrew'
+import TrnstCrewStudent from './pages/trnst/TrnstCrewStudent'
 import StdntIdCards from './pages/stdnt/StdntIdCards'
 import AcdmcOverview from './pages/acdmc/AcdmcOverview'
 import AcdmcLessonPlan from './pages/acdmc/AcdmcLessonPlan'
@@ -413,6 +414,7 @@ function App() {
               <Route path="trnst/trips" element={<TrnstTrips />} />
               <Route path="trnst/assignments" element={<TrnstAssignments />} />
               <Route path="trnst/crew" element={<TrnstCrew />} />
+              <Route path="trnst/crew/student/:tripId/:studentId" element={<TrnstCrewStudent />} />
               <Route path="trnst" element={<TrnstOverview />} />
               <Route path="acdmc/overview" element={<AcdmcOverview />} />
               <Route path="acdmc/lesson-plan" element={<AcdmcLessonPlan />} />
