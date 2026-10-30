@@ -7,7 +7,10 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
-      "environment": "development"
+      "environment": "development",
+      "env": {
+        "APP_VARIANT": "stage"
+      }
     },
     "development-simulator": {
       "extends": "development",
@@ -20,7 +23,8 @@
       "environment": "preview",
       "channel": "preview",
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://stageapi.capabble.cloud/api"
+        "EXPO_PUBLIC_API_URL": "https://stageapi.capabble.cloud/api",
+        "APP_VARIANT": "stage"
       },
       "android": {
         "buildType": "apk"
@@ -31,7 +35,15 @@
       "channel": "production",
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://api.capabble.cloud/api"
+        "EXPO_PUBLIC_API_URL": "https://api.capabble.cloud/api",
+        "APP_VARIANT": "production"
+      }
+    },
+    "production-apk": {
+      "extends": "production",
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
       }
     }
   },

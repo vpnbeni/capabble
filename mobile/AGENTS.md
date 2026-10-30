@@ -27,6 +27,7 @@ This is an Expo/React Native mobile application. Prioritize mobile-first pattern
 ## How we ship
 
 - Branch `stage` (never `main`). Commit as `97426806+vpnbeni@users.noreply.github.com` (check `git config user.email` first), no Co-Authored-By lines. Claude never pushes; the user pushes and runs `deploy-stage` on EC2. Before testing server changes on stage, check `git ls-remote origin stage` shows the commit: a deploy only builds what was pushed.
+- Two apps from one codebase (`app.config.ts`): stage is "(S) Capabble" (`cloud.capabble.app.stage`, scheme `capabble-stage`, profile `preview`, channel `preview`, stage API); live is "Capabble" (`cloud.capabble.app`, scheme `capabble`, profiles `production` for Play and `production-apk` for a sideload link, channel `production`, live API). `APP_VARIANT=production` picks live; anything else is stage. They install side by side.
 - After each change: `npx tsc --noEmit` and `npx eslint src` clean, then publish to the phone:
   `EXPO_PUBLIC_API_URL=https://stageapi.capabble.cloud/api npx eas-cli@latest update --channel preview --environment preview --platform android --message "…" --non-interactive`
   and say plainly that it is live (close and reopen the app twice). A new native module needs a new EAS build and a version bump (`appVersion` runtime policy): ask first.

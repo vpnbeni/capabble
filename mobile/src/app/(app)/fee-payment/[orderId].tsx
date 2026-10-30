@@ -1,10 +1,10 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import * as Linking from 'expo-linking'
 import { Clock } from 'lucide-react-native'
 import { useEffect, useState } from 'react'
 
 import { formatDate, formatINR } from '@/lib/format'
+import { openCheckout } from '@/lib/openCheckout'
 import { sharePdf } from '@/lib/sharePdf'
 import { usePortal } from '@/portal/PortalProvider'
 import { portalKeys } from '@/portal/queries'
@@ -15,7 +15,7 @@ import { DetailList, MobileButton, MobileScreen, NavBar, Skeleton, StatusView, u
 const POLL_FOR_MS = 3 * 60 * 1000
 
 /**
- * Where a parent lands after paying in the browser (capabble://fee-payment/<order>):
+ * Shown under the checkout sheet while a parent pays (capabble://fee-payment/<order>):
  * waits for the payment to be recorded, then shows the receipt.
  */
 export default function FeePaymentScreen() {
@@ -140,19 +140,19 @@ export default function FeePaymentScreen() {
       <StatusView
         kind="empty"
         icon={Clock}
-        title={status === 'processing' ? 'Recording your payment' : 'Finish paying in your browser'}
+        title={status === 'processing' ? 'Recording your payment' : 'Finish paying on Razorpay'}
         value={formatINR(data.amount)}
         body={
           status === 'processing'
             ? 'This takes a few seconds.'
             : stillWaiting
-              ? 'Pay on the Razorpay page, then come back here. This updates by itself.'
+              ? 'This updates by itself once you pay.'
               : 'No payment yet. If you paid, it shows under Fees within a few minutes.'
         }
         actions={
           <>
             {url && status === 'created' ? (
-              <MobileButton size="large" fullWidth onPress={() => Linking.openURL(url)}>
+              <MobileButton size="large" fullWidth onPress={() => openCheckout(url)}>
                 Open the payment page
               </MobileButton>
             ) : null}

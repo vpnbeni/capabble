@@ -75,7 +75,9 @@ const useOrderSession = (order) => {
 
 const formatINR = (amount) => `₹${Number(amount || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
 
-const appReturnUrl = (order) => `capabble://fee-payment/${order._id}?student=${order.student}`;
+// The app's link scheme: the stage server runs with APP_SCHEME=capabble-stage so it returns to "(S) Capabble".
+const APP_SCHEME = (process.env.APP_SCHEME || 'capabble').replace(/[^a-z0-9+.-]/gi, '') || 'capabble';
+const appReturnUrl = (order) => `${APP_SCHEME}://fee-payment/${order._id}?student=${order.student}`;
 
 const page = ({ title, body = '', extra = '', nonce = '', script = '' }) => `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
