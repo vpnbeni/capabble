@@ -132,6 +132,17 @@ npm run lint
 npm run clean
 ```
 
+### Mobile app (Expo Go, from the root; `cd mobile && npm install` once, Node 22.13+)
+```bash
+npm run ios-stage        # stage API, opens the iOS Simulator (and a QR code for a phone)
+npm run ios              # live API ("Capabble"); careful: real school data
+npm run android-stage    # stage API on an Android emulator or phone
+npm run android          # live API on Android
+npm run mobile-stage     # stage API, QR code only
+npm run mobile-live      # live API, QR code only
+npm run mobile           # the API in mobile/.env.local, or this Mac's server on port 5000
+```
+
 ### Client-specific (from /client)
 ```bash
 npm run type-check    # TypeScript checking without emit
