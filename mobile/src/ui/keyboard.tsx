@@ -15,10 +15,29 @@ export function useKeyboardCover() {
     // iOS announces the keyboard before it moves; Android only after.
     const show = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow'
     const hide = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide'
-    const onShow = (event: KeyboardEvent) => setCover(Math.max(0, Dimensions.get('screen').height - event.endCoordinates.screenY))
+    // The keyboard never covers more than its own height. iOS also sends frame changes for a
+    // hidden, undocked or hardware-keyboard bar (height 0, or a frame far up the screen), which
+    // once left the cover near the full screen: sheets squeezed to the top, the action bar pushed off.
+    const coverOf = (event: KeyboardEvent) => {
+      const { height, screenY } = event.endCoordinates
+      if (!height || height <= 0) return 0
+      return Math.max(0, Math.min(height, Dimensions.get('screen').height - screenY))
+    }
+    // Frame changes count only between show and hide.
+    let visible = false
+    const onShow = (event: KeyboardEvent) => {
+      visible = true
+      setCover(coverOf(event))
+    }
+    const onChange = (event: KeyboardEvent) => {
+      if (visible) setCover(coverOf(event))
+    }
     const shown = Keyboard.addListener(show, onShow)
-    const changed = Keyboard.addListener('keyboardDidChangeFrame', onShow)
-    const hidden = Keyboard.addListener(hide, () => setCover(0))
+    const changed = Keyboard.addListener('keyboardDidChangeFrame', onChange)
+    const hidden = Keyboard.addListener(hide, () => {
+      visible = false
+      setCover(0)
+    })
     return () => {
       shown.remove()
       changed.remove()
