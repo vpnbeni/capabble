@@ -303,3 +303,34 @@ describe('checkout links', () => {
     expect(publicPayments.readToken(`${payload}.bad`)).toBeNull();
   });
 });
+
+describe('Capabble\'s own Razorpay keys', () => {
+  const PLATFORM_KEY = 'rzp_test_capabble999999';
+  beforeEach(() => { process.env.RAZORPAY_KEY_ID = PLATFORM_KEY; });
+  afterEach(() => { delete process.env.RAZORPAY_KEY_ID; });
+
+  it('refuses to save them as a school account', async () => {
+    const models = makeModels();
+    await expect(payments.saveSettings(models, { enabled: true, keyId: PLATFORM_KEY, keySecret: 'x', webhookSecret: 'y' }))
+      .rejects.toThrow('Capabble\'s Razorpay keys');
+  });
+
+  it('stops taking payments on a school that already saved them, and says why', () => {
+    const settings = { ...settingsDoc(), keyId: PLATFORM_KEY };
+    expect(payments.credentialsOf(settings)).toBeNull();
+    const view = payments.settingsView(settings, 'greenfield');
+    expect(view.connected).toBe(false);
+    expect(view.lastTestOk).toBe(false);
+    expect(view.lastError).toMatch('Capabble\'s Razorpay keys');
+  });
+
+  it('leaves a school\'s own keys alone', () => {
+    expect(payments.credentialsOf(settingsDoc())).not.toBeNull();
+    expect(payments.isPlatformKey('rzp_test_abcdef123456')).toBe(false);
+  });
+
+  it('matches nothing when the server has no keys of its own', () => {
+    delete process.env.RAZORPAY_KEY_ID;
+    expect(payments.isPlatformKey(PLATFORM_KEY)).toBe(false);
+  });
+});
